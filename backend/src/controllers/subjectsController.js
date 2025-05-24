@@ -81,3 +81,28 @@ exports.removeSubjectFromChild = async (req, res) => {
   if (error) return res.status(400).json({ error: error.message });
   res.json({ message: 'Subject removed from child.' });
 };
+exports.getChildSubjectDetails = async (req, res) => {
+  const { child_subject_id } = req.params;
+
+   const parent_id = req.header('x-parent-id');
+   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
+
+  if (!child_subject_id) return res.status(400).json({ error: 'child_subject_id required' });
+
+  const { data, error } = await supabase
+      .from('child_subjects')
+      .select(`
+          subject:subjects (name),
+          child:children (name)
+      `)
+      .eq('id', child_subject_id)
+      .single(); // Expecting one row
+
+  if (error) return res.status(400).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: 'Child subject assignment not found.' });
+
+  res.json({
+      subject_name: data.subject.name,
+      child_name: data.child.name
+  });
+};

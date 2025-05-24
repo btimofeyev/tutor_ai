@@ -14,4 +14,8 @@ router.put('/:id', childrenController.updateChild);
 // Delete a child
 router.delete('/:id', childrenController.deleteChild);
 
+
+router.post('/:child_id/username', childrenController.setChildUsername);
+router.post('/:child_id/pin', childrenController.setChildPin);
+
 module.exports = router;

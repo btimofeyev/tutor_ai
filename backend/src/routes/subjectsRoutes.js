@@ -17,4 +17,6 @@ router.get('/child/:child_id', subjectsController.listSubjectsForChild);
 // Remove subject from a child
 router.delete('/assign', subjectsController.removeSubjectFromChild);
 
+router.get('/child_subject_details/:child_subject_id', subjectsController.getChildSubjectDetails);
+
 module.exports = router;

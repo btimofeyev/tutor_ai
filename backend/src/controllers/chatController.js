@@ -1,6 +1,8 @@
 // backend/src/controllers/chatController.js
 const { OpenAI } = require('openai');
 const supabase = require('../utils/supabaseClient');
+const mcpClient = require('../services/mcpClient');
+const { formatLearningContextForAI, isLessonQuery } = require('../middleware/mcpContext');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -14,12 +16,13 @@ const KLIO_SYSTEM_PROMPT = `You are Klio, a friendly and encouraging AI tutor fo
 - You never make children feel bad about mistakes
 - You turn learning into fun adventures
 
-IMPORTANT: You have access to the child's curriculum and lessons. Use this information to:
+IMPORTANT: You have access to the child's actual curriculum and lessons. Use this information to:
 - Reference specific lessons when relevant
 - Help with actual assignments they're working on
 - Provide examples from their learning materials
 - Track their progress and celebrate achievements
 - Suggest what to study next based on their curriculum
+- Give specific, actionable guidance based on their current work
 
 Child's Information:
 - Name: {childName}
@@ -29,109 +32,32 @@ Child's Information:
 Current Learning Context:
 {learningContext}
 
-When helping with lessons:
-- Be specific about which lesson/assignment you're referencing
-- Break down complex problems into simple steps
-- Use examples from their actual curriculum when possible
-- Encourage them to check their lesson materials
-- If they're struggling, suggest taking a break or trying an easier part first`;
+When the child asks about lessons, assignments, or what they have coming up, ALWAYS reference their actual curriculum data from the context above. Be specific about lesson titles, due dates, and content.
 
-// Helper to get safe child context
-const getChildContext = async (childId) => {
-  try {
-    const { data: child } = await supabase
-      .from('children')
-      .select('name, grade')
-      .eq('id', childId)
-      .single();
+Guidelines for responses:
+- If they ask "what lessons do I have" or similar, list their actual upcoming lessons/assignments
+- If they need help with homework, check if it matches any of their current lessons
+- If they ask what to study next, suggest based on their actual curriculum sequence
+- Always be encouraging and make learning feel achievable
+- Use the child's actual lesson data to provide personalized guidance`;
 
-    // Get current subjects
-    const { data: subjects } = await supabase
-      .from('child_subjects')
-      .select(`
-        subjects:subject_id (name)
-      `)
-      .eq('child_id', childId);
-
-    const subjectNames = subjects?.map(s => s.subjects?.name).filter(Boolean) || [];
-
-    return {
-      childName: child?.name || 'Friend',
-      childGrade: child?.grade || 'Elementary',
-      currentSubject: subjectNames.join(', ') || 'General Learning'
-    };
-  } catch (error) {
-    console.error('Error fetching child context:', error);
-    return {
-      childName: 'Friend',
-      childGrade: 'Elementary',
-      currentSubject: 'General Learning'
-    };
-  }
-};
-const formatLearningContext = (mcpContext) => {
-    if (!mcpContext) {
-      return "No specific curriculum loaded at the moment.";
-    }
-  
-    let context = "";
-  
-    // Current focus
-    if (mcpContext.currentFocus) {
-      const focus = mcpContext.currentFocus;
-      context += `Current Focus: "${focus.title}" (${focus.content_type || 'lesson'})`;
-      if (focus.due_date) {
-        const dueDate = new Date(focus.due_date);
-        const today = new Date();
-        const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-        context += ` - Due in ${daysUntilDue} days`;
-      }
-      context += "\n";
-    }
-  
-    // Active lessons
-    if (mcpContext.currentLessons && mcpContext.currentLessons.length > 0) {
-      context += "\nActive Lessons:\n";
-      mcpContext.currentLessons.slice(0, 3).forEach(lesson => {
-        context += `- ${lesson.title} (${lesson.child_subjects?.subjects?.name || 'General'})\n`;
-      });
-    }
-  
-    // Upcoming assignments
-    if (mcpContext.upcomingAssignments && mcpContext.upcomingAssignments.length > 0) {
-      context += "\nUpcoming Assignments:\n";
-      mcpContext.upcomingAssignments.slice(0, 3).forEach(assignment => {
-        context += `- ${assignment.title} (Due: ${new Date(assignment.due_date).toLocaleDateString()})\n`;
-      });
-    }
-  
-    return context || "No specific curriculum loaded at the moment.";
-  };
-// Format system prompt with child data
-const formatSystemPrompt = (context) => {
-  return KLIO_SYSTEM_PROMPT
-    .replace('{childName}', context.childName)
-    .replace('{childGrade}', context.childGrade)
-    .replace('{currentSubject}', context.currentSubject);
-};
-
-// Main chat handler using v1 API
+// Main chat handler
 exports.chat = async (req, res) => {
     const childId = req.child?.child_id;
     const { message, sessionHistory = [], lessonContext = null } = req.body;
-    const mcpContext = req.mcpContext; // If you have MCP middleware
-  
+    const mcpContext = req.mcpContext; // Enhanced MCP context from middleware
+
     if (!childId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-  
+
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
     }
     if (message.length > 500) {
       return res.status(400).json({ error: 'Message is too long.' });
     }
-  
+
     try {
       // Get child info (name, grade)
       const { data: child } = await supabase
@@ -139,103 +65,113 @@ exports.chat = async (req, res) => {
         .select('name, grade')
         .eq('id', childId)
         .single();
-  
+
       // Format subjects from MCP context
       const subjects = mcpContext?.childSubjects
         ?.map(cs => cs.subjects?.name)
         .filter(Boolean)
         .join(', ') || 'General Learning';
-  
-      // Optionally look up lesson context (for help/homework/lesson)
+
+      // Check if this is a lesson-related query and we should search for specific content
       let specificLessonData = null;
-      if (
-        message.toLowerCase().includes('help') ||
-        message.toLowerCase().includes('lesson') ||
-        message.toLowerCase().includes('homework')
-      ) {
-        // Try to find relevant lesson (assuming mcpClient is available)
-        if (typeof mcpClient !== 'undefined' && mcpClient?.searchLessons) {
+      const isQueryAboutLessons = isLessonQuery(message);
+
+      if (isQueryAboutLessons || message.toLowerCase().includes('help')) {
+        try {
+          // Try to find relevant lesson content
           const searchResults = await mcpClient.searchLessons(message, childId);
           if (searchResults.length > 0) {
             specificLessonData = searchResults[0];
+            
             // Get full lesson details if available
-            const lessonDetails = await mcpClient.getLessonDetails(specificLessonData.lesson_id);
-            if (lessonDetails) {
-              specificLessonData = lessonDetails;
+            if (specificLessonData.id) {
+              const lessonDetails = await mcpClient.getLessonDetails(specificLessonData.id);
+              if (lessonDetails) {
+                specificLessonData = lessonDetails;
+              }
             }
           }
+        } catch (searchError) {
+          console.error('Error searching lessons:', searchError);
         }
       }
-  
-      // Enhanced system prompt (replace with your real one if different)
+
+      // Format the learning context for the AI
+      const formattedLearningContext = formatLearningContextForAI(mcpContext);
+
+      // Create enhanced system prompt
       const systemPrompt = KLIO_SYSTEM_PROMPT
         .replace('{childName}', child?.name || 'Friend')
         .replace('{childGrade}', child?.grade || 'Elementary')
         .replace('{subjects}', subjects)
-        .replace('{learningContext}', formatLearningContext?.(mcpContext) || '');
-  
+        .replace('{learningContext}', formattedLearningContext);
+
       // Add lesson details if found
       let additionalContext = "";
       if (specificLessonData && specificLessonData.lesson_json) {
         additionalContext = `
-  
-  Relevant Lesson Information:
-  Title: ${specificLessonData.title}
-  Type: ${specificLessonData.content_type}
-  ${specificLessonData.lesson_json.learning_objectives ? `Learning Objectives: ${specificLessonData.lesson_json.learning_objectives.join(', ')}` : ''}
-  ${specificLessonData.lesson_json.tasks_or_questions ? `\nTasks/Questions in this lesson:\n${specificLessonData.lesson_json.tasks_or_questions.slice(0, 3).join('\n')}` : ''}`;
+
+📚 **Relevant Lesson Information**:
+- **Title**: ${specificLessonData.title}
+- **Type**: ${specificLessonData.content_type}
+- **Subject**: ${specificLessonData.child_subjects?.subjects?.name || 'General'}`;
+
+        if (specificLessonData.due_date) {
+          const dueDate = new Date(specificLessonData.due_date);
+          const today = new Date();
+          const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+          additionalContext += `\n- **Due**: ${dueDate.toLocaleDateString()}`;
+          
+          if (daysUntil <= 1) {
+            additionalContext += ` (${daysUntil === 0 ? 'TODAY' : 'TOMORROW'}) ⚠️`;
+          }
+        }
+
+        if (specificLessonData.lesson_json.learning_objectives) {
+          additionalContext += `\n- **Learning Goals**: ${specificLessonData.lesson_json.learning_objectives.join(', ')}`;
+        }
+
+        if (specificLessonData.lesson_json.tasks_or_questions) {
+          additionalContext += `\n- **Tasks/Questions** (${specificLessonData.lesson_json.tasks_or_questions.length} total):`;
+          specificLessonData.lesson_json.tasks_or_questions.slice(0, 3).forEach((task, index) => {
+            additionalContext += `\n  ${index + 1}. ${task}`;
+          });
+          if (specificLessonData.lesson_json.tasks_or_questions.length > 3) {
+            additionalContext += `\n  ... and ${specificLessonData.lesson_json.tasks_or_questions.length - 3} more`;
+          }
+        }
+
+        if (specificLessonData.lesson_json.main_content_summary_or_extract) {
+          additionalContext += `\n- **Content Summary**: ${specificLessonData.lesson_json.main_content_summary_or_extract.substring(0, 200)}...`;
+        }
       }
-  
-      // Prepare conversation history and user input
+
+      // Prepare conversation history
       const recentHistory = sessionHistory.slice(-10);
-  
+
       const openaiMessages = [
         {
           role: "system",
-          content: [
-            {
-              type: "input_text",
-              text: systemPrompt
-            }
-          ]
+          content: systemPrompt
         },
         ...recentHistory.map(msg => ({
           role: msg.role === 'klio' ? 'assistant' : 'user',
-          content: [
-            {
-              type: msg.role === 'klio' ? "output_text" : "input_text",
-              text: msg.content
-            }
-          ]
+          content: msg.content
         })),
         {
           role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: message + additionalContext
-            }
-          ]
+          content: message + additionalContext
         }
       ];
-  
-      // Call OpenAI (use "gpt-4o" for latest/best performance)
+
+      // Call OpenAI
       let response;
       try {
-        response = await openai.responses.create({
+        response = await openai.chat.completions.create({
           model: "gpt-4.1-mini",
-          input: openaiMessages,
-          text: {
-            format: {
-              type: "text"
-            }
-          },
-          reasoning: {},
-          tools: [],
-          temperature: 1,
-          max_output_tokens: 1024,
-          top_p: 1,
-          store: true
+          messages: openaiMessages,
+          temperature: 0.7,
+          max_tokens: 1024,
         });
       } catch (openaiError) {
         console.error('OpenAI API error:', openaiError);
@@ -244,36 +180,31 @@ exports.chat = async (req, res) => {
           code: 'AI_UNAVAILABLE'
         });
       }
-  
+
       // Extract OpenAI response
       let aiMessage = "Sorry, I couldn't generate a response right now. Please try again!";
-      if (typeof response?.output_text === 'string') {
-        aiMessage = response.output_text;
-      } else if (
-        Array.isArray(response?.output) &&
-        response.output[0]?.content &&
-        Array.isArray(response.output[0].content) &&
-        response.output[0].content[0]?.text
-      ) {
-        aiMessage = response.output[0].content[0].text;
-      } else if (response?.error) {
-        console.error("OpenAI API error:", response.error);
-        aiMessage = "Sorry, there was an AI error: " + response.error.message;
+      if (response?.choices?.[0]?.message?.content) {
+        aiMessage = response.choices[0].message.content;
       } else {
-        console.error("OpenAI API unknown response shape:", response);
+        console.error("OpenAI API unexpected response shape:", response);
       }
-  
-      // Log interaction
-      await supabase
-        .from('chat_interactions')
-        .insert([{
-          child_id: childId,
-          message_count: 1,
-          ai_provider: 'openai',
-          interaction_at: new Date().toISOString()
-        }]);
-  
-      // Return response (with lessonContext if present)
+
+      // Log interaction for analytics
+      try {
+        await supabase
+          .from('chat_interactions')
+          .insert([{
+            child_id: childId,
+            message_count: 1,
+            ai_provider: 'openai',
+            interaction_at: new Date().toISOString(),
+            has_lesson_context: !!specificLessonData
+          }]);
+      } catch (logError) {
+        console.error('Failed to log interaction:', logError);
+      }
+
+      // Return response with lesson context if relevant
       res.json({
         success: true,
         message: aiMessage,
@@ -282,10 +213,16 @@ exports.chat = async (req, res) => {
         lessonContext: specificLessonData ? {
           lessonId: specificLessonData.id,
           lessonTitle: specificLessonData.title,
-          lessonType: specificLessonData.content_type
-        } : null
+          lessonType: specificLessonData.content_type,
+          subjectName: specificLessonData.child_subjects?.subjects?.name
+        } : null,
+        mcpContextSummary: {
+          hasActiveContent: mcpContext?.currentLessons?.length > 0 || mcpContext?.upcomingAssignments?.length > 0,
+          currentLessonsCount: mcpContext?.currentLessons?.length || 0,
+          upcomingAssignmentsCount: mcpContext?.upcomingAssignments?.length || 0
+        }
       });
-  
+
     } catch (error) {
       console.error('Enhanced chat error:', error);
       res.status(500).json({
@@ -293,102 +230,17 @@ exports.chat = async (req, res) => {
         code: 'CHAT_ERROR'
       });
     }
-  };
-  
-  exports.getLessonHelp = async (req, res) => {
-    const childId = req.child?.child_id;
-    const { lessonId } = req.params;
-  
-    if (!childId || !lessonId) {
-      return res.status(400).json({ error: 'Invalid request' });
-    }
-  
-    try {
-      // Check access
-      const hasAccess = await mcpClient.checkLessonAccess(childId, lessonId);
-      if (!hasAccess) {
-        return res.status(403).json({ error: 'Access denied to this lesson' });
-      }
-  
-      // Get lesson details
-      const lessonDetails = await mcpClient.getLessonDetails(lessonId);
-      if (!lessonDetails) {
-        return res.status(404).json({ error: 'Lesson not found' });
-      }
-  
-      // Generate helpful content based on lesson
-      const lessonJson = lessonDetails.lesson_json || {};
-      
-      const helpContent = {
-        lessonTitle: lessonDetails.title,
-        lessonType: lessonDetails.content_type,
-        tips: [],
-        encouragement: "You're doing great! Let's work through this together! 🌟"
-      };
-  
-      // Add specific tips based on content type
-      switch (lessonDetails.content_type) {
-        case 'worksheet':
-        case 'assignment':
-          helpContent.tips = [
-            "Read each question carefully before answering 📖",
-            "Start with the easier questions first to build confidence 💪",
-            "If you're stuck, try re-reading the lesson materials 🔍",
-            "Take your time - there's no rush! ⏰"
-          ];
-          break;
-        
-        case 'test':
-        case 'quiz':
-          helpContent.tips = [
-            "Take a deep breath and relax 😌",
-            "Read all answer choices before selecting one 📝",
-            "Trust your first instinct 🎯",
-            "You've prepared well - you can do this! 🌟"
-          ];
-          break;
-        
-        default:
-          helpContent.tips = [
-            "Focus on understanding the main ideas first 💡",
-            "Take notes as you go along 📝",
-            "Ask me if anything is confusing 🤔",
-            "Practice makes perfect! 🎯"
-          ];
-      }
-  
-      // Add specific guidance if available
-      if (lessonJson.learning_objectives && lessonJson.learning_objectives.length > 0) {
-        helpContent.learningGoals = lessonJson.learning_objectives.slice(0, 3);
-      }
-  
-      if (lessonJson.tasks_or_questions && lessonJson.tasks_or_questions.length > 0) {
-        helpContent.totalQuestions = lessonJson.tasks_or_questions.length;
-        helpContent.firstQuestion = lessonJson.tasks_or_questions[0];
-      }
-  
-      res.json({
-        success: true,
-        help: helpContent
-      });
-  
-    } catch (error) {
-      console.error('Get lesson help error:', error);
-      res.status(500).json({
-        error: 'Failed to get lesson help',
-        code: 'HELP_ERROR'
-      });
-    }
-  };
+};
+
 // Get chat suggestions based on current context
 exports.getSuggestions = async (req, res) => {
     const childId = req.child?.child_id;
-    const mcpContext = req.mcpContext; // If available from middleware
-  
+    const mcpContext = req.mcpContext;
+
     if (!childId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-  
+
     try {
       // Start with default suggestions
       const suggestions = [
@@ -397,58 +249,195 @@ exports.getSuggestions = async (req, res) => {
         "Let's practice together! ✏️",
         "I need help with my homework 📝"
       ];
-  
+
       // Enhance with context if available
-      if (mcpContext) {
-        // Current lesson suggestion
+      if (mcpContext && !mcpContext.error) {
+        // Current focus suggestion (highest priority)
         if (mcpContext.currentFocus?.title) {
-          suggestions.unshift(`Help me with "${mcpContext.currentFocus.title}" 📖`);
-        }
-  
-        // Subject-specific suggestion
-        if (Array.isArray(mcpContext.childSubjects) && mcpContext.childSubjects.length > 0) {
-          const topSubject = mcpContext.childSubjects[0]?.subjects?.name;
-          if (topSubject && !suggestions.includes(`Let's practice ${topSubject}! 🎯`)) {
-            suggestions.push(`Let's practice ${topSubject}! 🎯`);
-          }
-        }
-  
-        // Urgent assignment
-        if (Array.isArray(mcpContext.upcomingAssignments) && mcpContext.upcomingAssignments.length > 0) {
-          const nextAssignment = mcpContext.upcomingAssignments[0];
-          if (nextAssignment?.due_date && nextAssignment?.title) {
-            const dueDate = new Date(nextAssignment.due_date);
-            const now = new Date();
-            const daysUntil = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
-            if (!isNaN(daysUntil) && daysUntil <= 2) {
-              suggestions.unshift(`Help with "${nextAssignment.title}" (due soon!) ⏰`);
+          const focus = mcpContext.currentFocus;
+          let suggestion = `Help me with "${focus.title}"`;
+          
+          if (focus.due_date) {
+            const dueDate = new Date(focus.due_date);
+            const today = new Date();
+            const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+            
+            if (daysUntil === 0) {
+              suggestion += " (due today!) ⚠️";
+            } else if (daysUntil === 1) {
+              suggestion += " (due tomorrow) ⏰";
             }
           }
+          
+          suggestions.unshift(suggestion + " 📖");
+        }
+
+        // Upcoming assignments suggestion
+        if (mcpContext.upcomingAssignments?.length > 0) {
+          const nextAssignment = mcpContext.upcomingAssignments[0];
+          const dueDate = new Date(nextAssignment.due_date);
+          const today = new Date();
+          const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+          
+          if (daysUntil <= 3) {
+            suggestions.unshift(`What's due soon? 📅`);
+          } else {
+            suggestions.push(`What assignments are coming up? 📋`);
+          }
+        }
+
+        // Subject-specific suggestion
+        if (mcpContext.childSubjects?.length > 0) {
+          const subjects = mcpContext.childSubjects.map(cs => cs.subjects?.name).filter(Boolean);
+          if (subjects.length > 0) {
+            const randomSubject = subjects[Math.floor(Math.random() * subjects.length)];
+            suggestions.push(`Let's practice ${randomSubject}! 🎯`);
+          }
+        }
+
+        // Progress-based suggestions
+        if (mcpContext.progress?.summary) {
+          if (mcpContext.progress.summary.totalCompletedLessons > 0) {
+            suggestions.push("Show me my progress! 📊");
+          }
+        }
+
+        // Active lessons suggestion
+        if (mcpContext.currentLessons?.length > 1) {
+          suggestions.push("What lessons do I have? 📚");
         }
       }
-  
-      // Remove duplicates, return max 6
+
+      // Remove duplicates and limit to 6 suggestions
       const uniqueSuggestions = [...new Set(suggestions)];
-  
+
       res.json({
         success: true,
         suggestions: uniqueSuggestions.slice(0, 6)
       });
-  
+
     } catch (error) {
       console.error('Get suggestions error:', error);
       res.json({
         success: true,
         suggestions: [
-          "Can you help me learn? 📚",
+          "What are we learning today? 📚",
+          "Can you help me learn? 🤔",
           "Let's practice together! ✏️",
-          "Tell me something cool! 🌟",
           "I need help with homework 📝"
         ]
       });
     }
-  };
-  
+};
+
+// Get lesson help (enhanced)
+exports.getLessonHelp = async (req, res) => {
+  const childId = req.child?.child_id;
+  const { lessonId } = req.params;
+
+  if (!childId || !lessonId) {
+    return res.status(400).json({ error: 'Invalid request' });
+  }
+
+  try {
+    // Check access using enhanced MCP client
+    const hasAccess = await mcpClient.checkLessonAccess(childId, lessonId);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Access denied to this lesson' });
+    }
+
+    // Get detailed lesson information
+    const lessonDetails = await mcpClient.getLessonDetails(lessonId);
+    if (!lessonDetails) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    // Generate helpful content based on lesson
+    const lessonJson = lessonDetails.lesson_json || {};
+    
+    const helpContent = {
+      lessonTitle: lessonDetails.title,
+      lessonType: lessonDetails.content_type,
+      subjectName: lessonDetails.child_subjects?.subjects?.name,
+      tips: [],
+      encouragement: "You're doing great! Let's work through this together! 🌟",
+      learningGoals: [],
+      nextSteps: []
+    };
+
+    // Add specific tips based on content type
+    switch (lessonDetails.content_type) {
+      case 'worksheet':
+      case 'assignment':
+        helpContent.tips = [
+          "Read each question carefully before answering 📖",
+          "Start with the easier questions first to build confidence 💪",
+          "If you're stuck, try re-reading the lesson materials 🔍",
+          "Take your time - there's no rush! ⏰"
+        ];
+        break;
+      
+      case 'test':
+      case 'quiz':
+        helpContent.tips = [
+          "Take a deep breath and relax 😌",
+          "Read all answer choices before selecting one 📝",
+          "Trust your first instinct 🎯",
+          "You've prepared well - you can do this! 🌟"
+        ];
+        break;
+      
+      default:
+        helpContent.tips = [
+          "Focus on understanding the main ideas first 💡",
+          "Take notes as you go along 📝",
+          "Ask me if anything is confusing 🤔",
+          "Practice makes perfect! 🎯"
+        ];
+    }
+
+    // Add specific guidance if available
+    if (lessonJson.learning_objectives && lessonJson.learning_objectives.length > 0) {
+      helpContent.learningGoals = lessonJson.learning_objectives.slice(0, 3);
+    }
+
+    if (lessonJson.tasks_or_questions && lessonJson.tasks_or_questions.length > 0) {
+      helpContent.totalQuestions = lessonJson.tasks_or_questions.length;
+      helpContent.firstQuestion = lessonJson.tasks_or_questions[0];
+      helpContent.sampleQuestions = lessonJson.tasks_or_questions.slice(0, 3);
+    }
+
+    // Add estimated time and difficulty info
+    if (lessonJson.estimated_completion_time_minutes) {
+      helpContent.estimatedTime = lessonJson.estimated_completion_time_minutes;
+    }
+
+    if (lessonDetails.difficulty_level) {
+      helpContent.difficultyLevel = lessonDetails.difficulty_level;
+    }
+
+    // Add next steps based on lesson content
+    helpContent.nextSteps = [
+      "Start with the learning goals above 🎯",
+      "Work through the questions step by step 📝",
+      "Ask me for help if you get stuck 🤝",
+      "Celebrate when you're done! 🎉"
+    ];
+
+    res.json({
+      success: true,
+      help: helpContent
+    });
+
+  } catch (error) {
+    console.error('Get lesson help error:', error);
+    res.status(500).json({
+      error: 'Failed to get lesson help',
+      code: 'HELP_ERROR'
+    });
+  }
+};
+
 // Report concerning message (safety feature)
 exports.reportMessage = async (req, res) => {
   const childId = req.child?.child_id;
@@ -459,7 +448,7 @@ exports.reportMessage = async (req, res) => {
   }
 
   try {
-    // Log the report (without storing actual message content)
+    // Log the report (without storing actual message content for privacy)
     await supabase
       .from('safety_reports')
       .insert([{
@@ -477,7 +466,7 @@ exports.reportMessage = async (req, res) => {
       .single();
 
     if (child?.parent_id) {
-      // Create a notification for the parent (implement based on your notification system)
+      // Create a notification for the parent
       await supabase
         .from('parent_notifications')
         .insert([{

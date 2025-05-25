@@ -265,6 +265,202 @@ class MCPClientService {
       return null;
     }
   }
+
+  // ===== MISSING METHODS - ADD THESE =====
+
+  // Get current lessons for a child (enhanced version)
+  async getCurrentLessons(childId, subjectName = null) {
+    try {
+      await this.connect();
+
+      const result = await this.client.callTool({
+        name: 'get_child_lessons',
+        arguments: {
+          child_id: childId,
+          status: 'approved', // Only get approved lessons
+          subject_name: subjectName,
+          due_soon_days: 30 // Get lessons due in next 30 days
+        }
+      });
+
+      if (!result || !result.content) {
+        return [];
+      }
+
+      return JSON.parse(result.content[0].text);
+
+    } catch (error) {
+      console.error('Error getting current lessons:', error);
+      return [];
+    }
+  }
+
+  // Get child's progress summary
+  async getChildProgressSummary(childId, subjectName = null) {
+    try {
+      await this.connect();
+
+      const result = await this.client.callTool({
+        name: 'get_child_progress_summary',
+        arguments: {
+          child_id: childId,
+          subject_name: subjectName
+        }
+      });
+
+      if (!result || !result.content) {
+        return null;
+      }
+
+      return JSON.parse(result.content[0].text);
+
+    } catch (error) {
+      console.error('Error getting child progress:', error);
+      return null;
+    }
+  }
+
+  // Get child subjects using direct database query (fallback if MCP fails)
+  async getChildSubjects(childId) {
+    try {
+      await this.connect();
+
+      // First try MCP resource
+      try {
+        const result = await this.client.readResource({
+          uri: `edunest://child/${childId}/subjects`
+        });
+
+        if (result && result.contents && result.contents[0]) {
+          return JSON.parse(result.contents[0].text);
+        }
+      } catch (resourceError) {
+        console.log('MCP resource not available, using direct query');
+      }
+
+      // Fallback: direct Supabase query
+      const supabase = require('../utils/supabaseClient');
+      const { data, error } = await supabase
+        .from('child_subjects')
+        .select(`
+          id,
+          subjects:subject_id (id, name)
+        `)
+        .eq('child_id', childId);
+      
+      if (error) throw error;
+      return data || [];
+
+    } catch (error) {
+      console.error('Error getting child subjects:', error);
+      return [];
+    }
+  }
+
+  // Enhanced method to get learning context for chat - THIS IS THE KEY METHOD!
+  async getLearningContext(childId) {
+    try {
+      console.log('Getting learning context for child:', childId);
+
+      const [currentLessons, upcomingAssignments, childSubjects, progress] = await Promise.all([
+        this.getCurrentLessons(childId).catch(e => { console.error('getCurrentLessons error:', e); return []; }),
+        this.getUpcomingAssignments(childId, 7).catch(e => { console.error('getUpcomingAssignments error:', e); return []; }),
+        this.getChildSubjects(childId).catch(e => { console.error('getChildSubjects error:', e); return []; }),
+        this.getChildProgress(childId).catch(e => { console.error('getChildProgress error:', e); return null; })
+      ]);
+
+      console.log('Learning context results:', {
+        currentLessons: currentLessons.length,
+        upcomingAssignments: upcomingAssignments.length,
+        childSubjects: childSubjects.length
+      });
+
+      // Find the most immediate lesson/assignment
+      let currentFocus = null;
+      
+      // Prioritize lessons due soon
+      const lessonsDueSoon = currentLessons.filter(lesson => {
+        if (!lesson.due_date) return false;
+        const dueDate = new Date(lesson.due_date);
+        const today = new Date();
+        const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+        return daysUntilDue >= 0 && daysUntilDue <= 3; // Due in next 3 days
+      });
+
+      if (lessonsDueSoon.length > 0) {
+        currentFocus = lessonsDueSoon[0];
+      } else if (currentLessons.length > 0) {
+        currentFocus = currentLessons[0];
+      } else if (upcomingAssignments.length > 0) {
+        currentFocus = {
+          type: 'assignment',
+          ...upcomingAssignments[0]
+        };
+      }
+
+      return {
+        childSubjects: childSubjects || [],
+        currentLessons: currentLessons || [],
+        upcomingAssignments: upcomingAssignments || [],
+        currentFocus,
+        progress: progress || null
+      };
+
+    } catch (error) {
+      console.error('Error getting learning context:', error);
+      
+      // Return fallback context with direct database queries
+      try {
+        const supabase = require('../utils/supabaseClient');
+        
+        // Get child subjects directly
+        const { data: childSubjects } = await supabase
+          .from('child_subjects')
+          .select(`
+            id,
+            subjects:subject_id (id, name)
+          `)
+          .eq('child_id', childId);
+
+        // Get current lessons directly  
+        const childSubjectIds = (childSubjects || []).map(cs => cs.id);
+        const { data: lessons } = await supabase
+          .from('lessons')
+          .select(`
+            id, title, status, due_date, content_type, created_at,
+            child_subjects:child_subject_id (
+              subjects:subject_id (name)
+            )
+          `)
+          .in('child_subject_id', childSubjectIds)
+          .in('status', ['pending', 'approved'])
+          .is('completed_at', null)
+          .order('due_date', { ascending: true, nullsLast: true })
+          .limit(10);
+
+        console.log('Fallback context - found lessons:', lessons?.length || 0);
+
+        return {
+          childSubjects: childSubjects || [],
+          currentLessons: lessons || [],
+          upcomingAssignments: [],
+          currentFocus: lessons?.[0] || null,
+          progress: null,
+          fallback: true
+        };
+      } catch (fallbackError) {
+        console.error('Fallback context failed:', fallbackError);
+        return {
+          childSubjects: [],
+          currentLessons: [],
+          upcomingAssignments: [],
+          currentFocus: null,
+          progress: null,
+          error: error.message
+        };
+      }
+    }
+  }
 }
 
 // Export singleton instance

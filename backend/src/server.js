@@ -7,6 +7,8 @@ const subjectsRoutes = require('./routes/subjectsRoutes');
 const lessonsRoutes = require('./routes/lessonsRoutes');
 const weightsRoutes = require('./routes/weightsRoutes'); 
 const unitsRoutes = require('./routes/unitsRoutes');
+const childAuthRoutes = require('./routes/childAuthRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 const app = express();
 
@@ -20,7 +22,9 @@ app.use('/api/lessons', lessonsRoutes);
 app.use('/api/weights', weightsRoutes);
 
 app.use('/api/units', unitsRoutes); 
+app.use('/api/auth/child', childAuthRoutes);
 
+app.use('/api/chat', chatRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

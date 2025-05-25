@@ -1,0 +1,153 @@
+/* klioai-frontend/src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import Fredoka font */
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --primary-color: #7c3aed; /* purple-600 */
+  --primary-color-hover: #6d28d9; /* purple-700 */
+  --background-page: #f1f5f9; /* slate-100 */
+  --background-card: #ffffff; /* white */
+  --text-default: #334155; /* slate-700 */
+  --text-muted: #64748b; /* slate-500 */
+  --text-accent: var(--primary-color);
+  --border-default: #cbd5e1; /* slate-300 */
+  --border-focus: var(--primary-color);
+  --success-color: #22c55e; /* green-500 */
+  --error-color: #ef4444; /* red-500 */
+  --error-background-soft: #fee2e2; /* red-50 */
+  --error-border-soft: #fecaca; /* red-200 */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--background-page);
+  font-family: 'Fredoka', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  color: var(--text-default);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Animations */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+@keyframes slide-up { /* Can be reused if needed */
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out forwards;
+}
+
+
+@keyframes progress-bar {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+.animate-progress-bar {
+  animation: progress-bar 2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes shake-short { /* Subtle shake for PIN inputs */
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+.animate-shake-short {
+  animation: shake-short 0.3s ease-in-out;
+}
+
+/* General form shake */
+.shake {
+  animation: shake-strong 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+@keyframes shake-strong {
+  10%, 90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+  20%, 80% {
+    transform: translate3d(2px, 0, 0);
+  }
+  30%, 50%, 70% {
+    transform: translate3d(-4px, 0, 0);
+  }
+  40%, 60% {
+    transform: translate3d(4px, 0, 0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.03); }
+}
+.animate-pulse-soft {
+  animation: pulse-soft 1.8s ease-in-out infinite;
+}
+
+/* Custom scrollbar (optional, but adds to sleekness) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background-page);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #94a3b8; /* slate-400 */
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b; /* slate-500 */
+}
+
+/* Tailwind Components Layer (Optional, but good practice for reusable styles) */
+@layer components {
+  .input-base {
+    @apply w-full px-3.5 py-2.5 text-base border border-slate-300 rounded-lg 
+           focus:ring-1 focus:ring-purple-500 focus:border-purple-500 outline-none placeholder:text-slate-400
+           transition-colors duration-150;
+  }
+  
+  .btn-primary {
+    @apply bg-purple-600 hover:bg-purple-700 text-white text-base font-semibold py-2.5 px-4 rounded-lg 
+           transition-all duration-150 ease-in-out flex items-center justify-center
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500
+           disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-purple-400 disabled:hover:bg-purple-400;
+  }
+
+  .btn-pinpad {
+    @apply bg-slate-100 hover:bg-slate-200 text-slate-700 text-xl sm:text-2xl font-medium py-3.5 sm:py-4 rounded-lg 
+           transition-colors duration-100 ease-in-out disabled:opacity-50
+           focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-500;
+  }
+
+  .card-base {
+    @apply bg-white rounded-xl shadow-xl p-6 sm:p-8 md:p-10 w-full animate-fade-in;
+  }
+
+  .label-base {
+    @apply block text-sm font-medium text-slate-600 mb-1.5 flex items-center;
+  }
+  .label-icon {
+    @apply mr-2 text-purple-600;
+  }
+
+  .error-message-box {
+    @apply flex items-center bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200;
+  }
+  .error-message-icon {
+    @apply mr-2 text-red-500 flex-shrink-0 text-base;
+  }
+}

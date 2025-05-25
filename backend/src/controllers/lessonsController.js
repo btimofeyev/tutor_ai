@@ -1,63 +1,35 @@
-// src/controllers/lessonsController.js
 const supabase = require('../utils/supabaseClient');
 const { OpenAI } = require('openai');
 const fs = require('fs');
 const path = require('path');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
+const { GET_UNIVERSAL_SYSTEM_PROMPT } = require('../utils/llmPrompts'); // Import the prompt
+
+const { extractImagesFromPdf } = require('../utils/pdfImageExtract'); // <--- Use your utility
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-const MAX_TEXT_CHARS_FOR_PROMPT = 60000; 
+const MAX_TEXT_CHARS_FOR_PROMPT = 70000; 
 
-// --- PROMPT DEFINITIONS ---
-const UNIVERSAL_BASE_PROMPT = (userHintContentType, inputDescription = "the provided content") => {
-  let taskInstruction = "List ALL individual questions, problems, or specific tasks for the student to complete, verbatim if possible. Maintain their original order. If questions are numbered or lettered, preserve that. For math problems, list each problem. Do not summarize the types of questions; list each one.";
-  let mainContentInstruction = "Provide a brief overview or summary of the instructional content, if any. If the material is primarily a list of tasks/questions (e.g., a worksheet or test), this summary can be very brief or focus on the overall topic of the tasks. Max 300 words.";
-
-  // If the user indicates it's a type of assessment or practice, be even more insistent on listing all questions.
-  if (['worksheet', 'assignment', 'test', 'quiz'].includes(userHintContentType?.toLowerCase())) {
-    taskInstruction = "CRITICAL: Extract and list EVERY SINGLE question, math problem, or task item LITERALLY as it appears. Preserve all numbering and sub-parts (e.g., 1a, 1b). Do NOT summarize or group similar questions. Each distinct problem or question part should be a separate string in the array. This is the most important field for this type of document.";
-    mainContentInstruction = "If there is any introductory text or instructions NOT part of the questions themselves, summarize it briefly here (max 150 words). Otherwise, this can be null or a very short description of the task set (e.g., 'Multiplication practice problems.').";
-  }
-
-  return `
-You are an expert education AI. Your job is to meticulously extract, structure, and categorize content from ${inputDescription}.
-The user might provide a hint for the content type: ${userHintContentType || 'not provided'}. Use this hint if helpful, but prioritize accurate analysis of the content.
-If multiple documents or images were provided, synthesize them into a single, coherent output. The content should be treated as parts of the same overall material (e.g., sequential pages or related documents).
-
-Return a JSON object strictly in the following format. If a field is not applicable or cannot be found, use null or an empty array as appropriate.
-
-{
-  "title": "string (concise, descriptive title for the material, generate if not obvious, max 100 chars)",
-  "content_type_suggestion": "string (must be one of: 'lesson', 'worksheet', 'assignment', 'test', 'quiz', 'notes', 'reading_material', 'other')",
-  "grade_level_suggestion": "string (e.g., 'Grade 3', 'Middle School', or null)",
-  "subject_keywords_or_subtopics": ["string", "array (keywords/concepts from all provided content)"],
-  "learning_objectives": ["string", "array (specific learning goals from all provided content, synthesized, if any)"],
-  "main_content_summary_or_extract": "string (${mainContentInstruction})",
-  "tasks_or_questions": ["string", "array (${taskInstruction})"],
-  "estimated_completion_time_minutes": "integer (or null)",
-  "page_count_or_length_indicator": "string or integer (e.g., total pages if multiple docs/images, or 'short' if unclear, or null)",
-  "lesson_number_if_applicable": "string or number (or null)",
-  "total_possible_points_suggestion": "integer (total points from all content, or null)"
-}
-
-Ensure the output is a single, valid JSON object. Do not include any text before or after.
-For "tasks_or_questions", if the material is primarily a list of problems (like a math worksheet), ensure every single problem is listed.
-`;
-};
 
 // --- HELPER FUNCTION TO PARSE LLM OUTPUT ---
 async function parseLlmOutput(outputContent, userHintContentType, numFilesProcessed = 1, isMultiImage = false) {
   if (!outputContent) throw new Error("OpenAI returned empty content.");
   try {
     const parsedJson = JSON.parse(outputContent);
-    if (numFilesProcessed > 1 && isMultiImage && (!parsedJson.page_count_or_length_indicator || typeof parsedJson.page_count_or_length_indicator !== 'number' || parsedJson.page_count_or_length_indicator === null)) {
+    if (numFilesProcessed > 0 && isMultiImage && 
+        (!parsedJson.page_count_or_length_indicator || 
+         typeof parsedJson.page_count_or_length_indicator !== 'number' || 
+         parsedJson.page_count_or_length_indicator === null ||
+         parsedJson.page_count_or_length_indicator === 0) // Also check for 0 if LLM fails
+       ) {
         parsedJson.page_count_or_length_indicator = numFilesProcessed;
-    } else if (numFilesProcessed === 1 && parsedJson.page_count_or_length_indicator === null) {
-        // parsedJson.page_count_or_length_indicator = "1 document"; // Optional default for single files
+    } else if (numFilesProcessed === 1 && parsedJson.page_count_or_length_indicator === null && !isMultiImage) {
+        // For single non-image files, if LLM can't determine pages, it's okay to be null or set a default
+        // parsedJson.page_count_or_length_indicator = "1 document"; // Optional default
     }
     return parsedJson;
   } catch (err) {
@@ -66,9 +38,14 @@ async function parseLlmOutput(outputContent, userHintContentType, numFilesProces
     if (match && match[1]) {
         try { 
             const parsedJson = JSON.parse(match[1]);
-            if (numFilesProcessed > 1 && isMultiImage && (!parsedJson.page_count_or_length_indicator || typeof parsedJson.page_count_or_length_indicator !== 'number' || parsedJson.page_count_or_length_indicator === null)) {
+             if (numFilesProcessed > 0 && isMultiImage && 
+                (!parsedJson.page_count_or_length_indicator || 
+                 typeof parsedJson.page_count_or_length_indicator !== 'number' || 
+                 parsedJson.page_count_or_length_indicator === null ||
+                 parsedJson.page_count_or_length_indicator === 0)
+               ) {
                  parsedJson.page_count_or_length_indicator = numFilesProcessed;
-            } else if (numFilesProcessed === 1 && parsedJson.page_count_or_length_indicator === null) {
+            } else if (numFilesProcessed === 1 && parsedJson.page_count_or_length_indicator === null && !isMultiImage) {
                 // parsedJson.page_count_or_length_indicator = "1 document";
             }
             return parsedJson;
@@ -81,7 +58,7 @@ async function parseLlmOutput(outputContent, userHintContentType, numFilesProces
         raw_response: outputContent.substring(0, 1000),
         title: "Extraction Error", 
         content_type_suggestion: userHintContentType || "other",
-        page_count_or_length_indicator: numFilesProcessed > 1 && isMultiImage ? numFilesProcessed : (numFilesProcessed === 1 ? "1 document" : null)
+        page_count_or_length_indicator: numFilesProcessed > 0 && isMultiImage ? numFilesProcessed : (numFilesProcessed === 1 ? "1 document" : null)
     };
   }
 }
@@ -95,9 +72,12 @@ async function analyzeUploadedFiles(files, userHintContentType) {
   let messages;
   let llmInputDescription = "";
   let isMultiImageScenario = false;
+  let extractedImagePathsForCleanup = []; // Store paths of images extracted from PDFs
 
   const allFilesAreImages = files.every(file => file.mimetype.startsWith('image/'));
-  const allFilesAreTextBased = files.every(file => 
+  
+  // Check if all files are of types we can convert to text
+  const allFilesAreTextConvertible = files.every(file => 
     file.mimetype === 'application/pdf' ||
     file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     file.mimetype === 'text/plain' ||
@@ -108,51 +88,94 @@ async function analyzeUploadedFiles(files, userHintContentType) {
   if (allFilesAreImages) {
     isMultiImageScenario = true;
     llmInputDescription = `a series of ${files.length} images`;
-    const userMessageContent = [{ type: "text", text: `Please analyze these ${files.length} images as a single educational material. User hint for content type: ${userHintContentType || 'N/A'}. Synthesize the information into one JSON object, treating them as sequential pages.` }];
+    const userMessageContent = [{ type: "text", text: `Please analyze these ${files.length} images as a single educational material. User hint for content type: '${userHintContentType || 'N/A'}'. Synthesize the information into one JSON object, treating them as sequential pages.` }];
     for (const file of files) {
       const fileData = fs.readFileSync(file.path);
       const base64Image = fileData.toString('base64');
       userMessageContent.push({ type: "image_url", image_url: { url: `data:${file.mimetype};base64,${base64Image}`, detail: "high" } });
     }
-    messages = [{ role: "system", content: UNIVERSAL_BASE_PROMPT(userHintContentType, llmInputDescription) }, { role: "user", content: userMessageContent }];
-  } else if (allFilesAreTextBased) {
+    messages = [{ role: "system", content: GET_UNIVERSAL_SYSTEM_PROMPT(userHintContentType, llmInputDescription) }, { role: "user", content: userMessageContent }];
+  
+  } else if (allFilesAreTextConvertible) {
     llmInputDescription = files.length > 1 ? `a collection of ${files.length} text-based documents` : `a text-based document`;
     let combinedText = "";
+    let imagesFromPdfs = []; // Store images extracted from any PDF
+
     for (const file of files) {
-      const fileData = fs.readFileSync(file.path);
       let currentFileText = "";
       if (file.mimetype === 'application/pdf') {
-        try { const data = await pdf(fileData); currentFileText = data.text; } 
-        catch (e) { throw new Error(`PDF parsing failed for ${file.originalname}: ${e.message}`); }
+        try {
+          const data = await pdf(file.path); // Pass file path to pdf-parse
+          currentFileText = data.text;
+          // If PDF text is empty/minimal (image-based PDF), try extracting images
+          if (!currentFileText || currentFileText.trim().length < 100) { // Heuristic for image-based PDF
+            console.log(`PDF ${file.originalname} seems image-based or has minimal text. Attempting image extraction.`);
+            const extractedPdfImages = await extractImagesFromPdf(file.path); // This is your util
+            if (extractedPdfImages && extractedPdfImages.length > 0) {
+              console.log(`Extracted ${extractedPdfImages.length} images from ${file.originalname}`);
+              imagesFromPdfs.push(...extractedPdfImages.map(imgPath => ({
+                  path: imgPath, // Path to the temporary extracted image
+                  mimetype: `image/${path.extname(imgPath).slice(1) || 'png'}` // Assuming png or get from util
+              })));
+              continue; // Skip adding text for this PDF, will process its images later
+            } else {
+                console.log(`No images extracted from ${file.originalname}, proceeding with minimal text (if any).`);
+            }
+          }
+        } catch (e) { throw new Error(`PDF processing failed for ${file.originalname}: ${e.message}`); }
       } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        try { const { value } = await mammoth.extractRawText({ buffer: fileData }); currentFileText = value; } 
+        try { const { value } = await mammoth.extractRawText({ path: file.path }); currentFileText = value; } 
         catch (e) { throw new Error(`DOCX parsing failed for ${file.originalname}: ${e.message}`); }
       } else { 
-        currentFileText = fileData.toString('utf-8');
+        currentFileText = fs.readFileSync(file.path, 'utf-8');
       }
-      combinedText += `\n\n--- START OF DOCUMENT: ${file.originalname} ---\n${currentFileText}\n--- END OF DOCUMENT: ${file.originalname} ---\n\n`;
+      if(currentFileText) { // Only add if text was extracted
+        combinedText += `\n\n--- START OF DOCUMENT: ${file.originalname} ---\n${currentFileText}\n--- END OF DOCUMENT: ${file.originalname} ---\n\n`;
+      }
     }
 
-    if (combinedText.length > MAX_TEXT_CHARS_FOR_PROMPT) {
-      combinedText = combinedText.substring(0, MAX_TEXT_CHARS_FOR_PROMPT) + "\n[...combined text truncated due to length...]";
-    }
-    messages = [
-        { role: "system", content: UNIVERSAL_BASE_PROMPT(userHintContentType, llmInputDescription) },
-        { role: "user", content: `Please extract and structure the data from the following ${llmInputDescription}. User hint for content type: ${userHintContentType || 'N/A'}. Combined Document Text:\n\n${combinedText}` }
-    ];
-  } else {
-    if (files.length === 1) {
-        throw new Error(`Unsupported file type: ${files[0].originalname} (${files[0].mimetype}). Supported: Images, PDF, DOCX, TXT, MD.`);
+    if (imagesFromPdfs.length > 0) {
+      // If any PDF yielded images, treat the whole batch as a multi-image scenario
+      isMultiImageScenario = true;
+      llmInputDescription = `a series of ${imagesFromPdfs.length} images (extracted from PDF(s))`;
+      const userMessageContent = [{ type: "text", text: `Please analyze these ${imagesFromPdfs.length} images (extracted from uploaded PDF(s)) as a single educational material. User hint for content type: '${userHintContentType || 'N/A'}'. Synthesize into one JSON.` }];
+      for (const imgFile of imagesFromPdfs) {
+        const fileData = fs.readFileSync(imgFile.path);
+        const base64Image = fileData.toString('base64');
+        userMessageContent.push({ type: "image_url", image_url: { url: `data:${imgFile.mimetype};base64,${base64Image}`, detail: "high" } });
+        extractedImagePathsForCleanup.push(imgFile.path); // Add to cleanup list
+      }
+      messages = [{ role: "system", content: GET_UNIVERSAL_SYSTEM_PROMPT(userHintContentType, llmInputDescription) }, { role: "user", content: userMessageContent }];
+    } else if (combinedText.trim().length > 0) {
+      // All files were text-based and yielded text
+      if (combinedText.length > MAX_TEXT_CHARS_FOR_PROMPT) {
+        combinedText = combinedText.substring(0, MAX_TEXT_CHARS_FOR_PROMPT) + "\n[...combined text truncated due to length...]";
+      }
+      messages = [
+          { role: "system", content: UNIVERSAL_BASE_PROMPT(userHintContentType, llmInputDescription) },
+          { role: "user", content: `Please extract and structure data from the following ${llmInputDescription}. User hint: '${userHintContentType || 'N/A'}'. Combined Document Text:\n\n${combinedText}` }
+      ];
     } else {
-        throw new Error("Mixed file types (e.g., images and PDFs together) in a single upload are not supported for combined analysis. Please upload images separately from text documents, or upload multiple files of the same type (all images or all text-based).");
+        throw new Error("No processable content found in the uploaded text-based files.");
+    }
+
+  } else { // Mixed types or unsupported single type
+    if (files.length === 1) {
+        throw new Error(`Unsupported file type: ${files[0].originalname} (${files[0].mimetype}).`);
+    } else {
+        throw new Error("Mixed file types (e.g., images and PDFs together) are not currently supported for combined analysis in a single upload. Please upload images separately from text documents, or upload multiple files of the same primary type (all images or all text-based).");
     }
   }
   
   const response = await openai.chat.completions.create({ model: "gpt-4o", messages, max_tokens: 3500, temperature: 0.1, response_format: { type: "json_object" } });
+  
+  // Cleanup extracted PDF images *after* OpenAI call
+  extractedImagePathsForCleanup.forEach(imgPath => {
+      if (fs.existsSync(imgPath)) try { fs.unlinkSync(imgPath); } catch(e){ console.error("Error cleaning up extracted PDF image:", imgPath, e); }
+  });
+
   return parseLlmOutput(response.choices[0].message.content?.trim(), userHintContentType, files.length, isMultiImageScenario);
 }
-
-
 // --- MAIN UPLOAD CONTROLLER ---
 exports.uploadLesson = async (req, res) => {
   const parent_id = req.header('x-parent-id');
@@ -180,7 +203,6 @@ exports.uploadLesson = async (req, res) => {
   }
 };
 
-// Helper to normalize string inputs that can be null
 const normalizeStringOrNull = (val) => {
   if (val === undefined || val === null || String(val).trim() === '' || String(val).toLowerCase() === 'null') {
     return null;

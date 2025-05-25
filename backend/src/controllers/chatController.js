@@ -16,13 +16,18 @@ const KLIO_SYSTEM_PROMPT = `You are Klio, a friendly and encouraging AI tutor fo
 - You never make children feel bad about mistakes
 - You turn learning into fun adventures
 
-IMPORTANT: You have access to the child's actual curriculum and lessons. Use this information to:
+IMPORTANT CONTEXT:
+- TODAY'S DATE: {currentDate}
+- CURRENT TIME: {currentTime}
+
+You have access to the child's actual curriculum and lessons. Use this information to:
 - Reference specific lessons when relevant
 - Help with actual assignments they're working on
 - Provide examples from their learning materials
 - Track their progress and celebrate achievements
 - Suggest what to study next based on their curriculum
 - Give specific, actionable guidance based on their current work
+- **ACCURATELY determine if assignments are due TODAY, TOMORROW, or OVERDUE based on the current date above**
 
 Child's Information:
 - Name: {childName}
@@ -34,6 +39,13 @@ Current Learning Context:
 
 When the child asks about lessons, assignments, or what they have coming up, ALWAYS reference their actual curriculum data from the context above. Be specific about lesson titles, due dates, and content.
 
+**Date Guidelines:**
+- When asked about today's date, always use the date provided above: {currentDate}
+- When calculating due dates, use {currentDate} as your reference point
+- If something is due on {currentDate}, say it's due TODAY
+- If something is due tomorrow, calculate based on {currentDate}
+- Be precise about overdue items by comparing against {currentDate}
+
 Guidelines for responses:
 - If they ask "what lessons do I have" or similar, list their actual upcoming lessons/assignments
 - If they need help with homework, check if it matches any of their current lessons
@@ -41,11 +53,11 @@ Guidelines for responses:
 - Always be encouraging and make learning feel achievable
 - Use the child's actual lesson data to provide personalized guidance`;
 
-// Main chat handler
+// Main chat handler - Updated
 exports.chat = async (req, res) => {
     const childId = req.child?.child_id;
     const { message, sessionHistory = [], lessonContext = null } = req.body;
-    const mcpContext = req.mcpContext; // Enhanced MCP context from middleware
+    const mcpContext = req.mcpContext;
 
     if (!childId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -59,6 +71,20 @@ exports.chat = async (req, res) => {
     }
 
     try {
+      // Get current date and time - THIS IS THE KEY FIX
+      const now = new Date();
+      const currentDate = now.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      const currentTime = now.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+
       // Get child info (name, grade)
       const { data: child } = await supabase
         .from('children')
@@ -97,16 +123,18 @@ exports.chat = async (req, res) => {
       }
 
       // Format the learning context for the AI
-      const formattedLearningContext = formatLearningContextForAI(mcpContext);
+      const formattedLearningContext = formatLearningContextForAI(mcpContext, currentDate);
 
-      // Create enhanced system prompt
+      // Create enhanced system prompt with current date and time
       const systemPrompt = KLIO_SYSTEM_PROMPT
+        .replace(/{currentDate}/g, currentDate)
+        .replace(/{currentTime}/g, currentTime)
         .replace('{childName}', child?.name || 'Friend')
         .replace('{childGrade}', child?.grade || 'Elementary')
         .replace('{subjects}', subjects)
         .replace('{learningContext}', formattedLearningContext);
 
-      // Add lesson details if found
+      // Add lesson details if found with date-aware context
       let additionalContext = "";
       if (specificLessonData && specificLessonData.lesson_json) {
         additionalContext = `
@@ -117,13 +145,23 @@ exports.chat = async (req, res) => {
 - **Subject**: ${specificLessonData.child_subjects?.subjects?.name || 'General'}`;
 
         if (specificLessonData.due_date) {
-          const dueDate = new Date(specificLessonData.due_date);
+          const dueDate = new Date(specificLessonData.due_date + 'T00:00:00');
           const today = new Date();
-          const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-          additionalContext += `\n- **Due**: ${dueDate.toLocaleDateString()}`;
+          today.setHours(0, 0, 0, 0);
+          dueDate.setHours(0, 0, 0, 0);
           
-          if (daysUntil <= 1) {
-            additionalContext += ` (${daysUntil === 0 ? 'TODAY' : 'TOMORROW'}) ⚠️`;
+          const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+          
+          additionalContext += `\n- **Due**: ${dueDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`;
+          
+          if (daysUntil < 0) {
+            additionalContext += ` (OVERDUE by ${Math.abs(daysUntil)} day${Math.abs(daysUntil) !== 1 ? 's' : ''}) 🚨`;
+          } else if (daysUntil === 0) {
+            additionalContext += ` (DUE TODAY!) ⚠️`;
+          } else if (daysUntil === 1) {
+            additionalContext += ` (DUE TOMORROW) ⏰`;
+          } else if (daysUntil <= 7) {
+            additionalContext += ` (Due in ${daysUntil} days)`;
           }
         }
 
@@ -164,11 +202,12 @@ exports.chat = async (req, res) => {
         }
       ];
 
+      // Rest of the function remains the same...
       // Call OpenAI
       let response;
       try {
         response = await openai.chat.completions.create({
-          model: "gpt-4.1-mini",
+          model: "gpt-4.1-mini", // Fixed model name
           messages: openaiMessages,
           temperature: 0.7,
           max_tokens: 1024,
@@ -231,7 +270,6 @@ exports.chat = async (req, res) => {
       });
     }
 };
-
 // Get chat suggestions based on current context
 exports.getSuggestions = async (req, res) => {
     const childId = req.child?.child_id;

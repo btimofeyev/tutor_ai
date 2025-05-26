@@ -236,6 +236,19 @@ export default function SubjectCard({
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
+                        
+                        // Check if this is a gradable item that requires a grade before completion
+                        const GRADABLE_CONTENT_TYPES = ['worksheet', 'assignment', 'test', 'quiz'];
+                        const isGradable = GRADABLE_CONTENT_TYPES.includes(item.content_type);
+                        const hasMaxScore = item.grade_max_value && item.grade_max_value.trim() !== '';
+                        const hasGrade = item.grade_value && item.grade_value.trim() !== '';
+                        
+                        if (!item.completed_at && isGradable && hasMaxScore && !hasGrade) {
+                          alert(`This ${item.content_type} has a max score of ${item.grade_max_value} but no grade has been entered. Please add a grade before marking as complete.`);
+                          onOpenEditModal(item); // Open edit modal to add grade
+                          return;
+                        }
+                        
                         setCompletingItems(prev => new Set([...prev, item.id]));
                         await onToggleComplete(item.id, !item.completed_at);
                         setCompletingItems(prev => {

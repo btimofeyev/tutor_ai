@@ -78,9 +78,9 @@ export default function EditMaterialModal({
             </select>
           </div>
 
-          {/* NEW: Lesson Container Selection */}
+          {/* Lesson/Assignment Group Selection */}
           <div>
-            <label htmlFor="edit-lesson_id" className="block text-sm font-medium text-gray-700 mb-1">Lesson Container</label>
+            <label htmlFor="edit-lesson_id" className="block text-sm font-medium text-gray-700 mb-1">Lesson/Assignment Group</label>
             <select 
               name="lesson_id" 
               id="edit-lesson_id" 
@@ -89,7 +89,7 @@ export default function EditMaterialModal({
               className="w-full border rounded px-3 py-2 text-sm h-[38px]"
               disabled={lessonContainersForSubject.length === 0}
             >
-              <option value="">-- Select a Lesson Container --</option>
+              <option value="">-- Select a lesson group --</option>
               {lessonContainersForSubject.map(lesson => (
                 <option key={lesson.id} value={lesson.id}>
                   {lesson.lesson_number ? `${lesson.lesson_number}: ` : ''}{lesson.title}
@@ -98,7 +98,7 @@ export default function EditMaterialModal({
             </select>
             {lessonContainersForSubject.length === 0 && (
               <p className="text-xs text-gray-400 italic mt-0.5">
-                No lesson containers available for this subject.
+                No lesson groups available for this subject.
               </p>
             )}
           </div>
@@ -160,43 +160,77 @@ export default function EditMaterialModal({
           )}
 
           {/* Completion Status */}
-          <div className="flex items-center justify-between p-3 border rounded-md">
-            <label htmlFor="edit-completed_toggle" className="text-sm font-medium text-gray-700">Mark as Complete</label>
-            <input 
-              type="checkbox" 
-              name="completed_toggle" 
-              id="edit-completed_toggle" 
-              checked={!!editForm.completed_at} 
-              onChange={onFormChange} 
-              className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
+          <div className="p-3 border rounded-md">
+            <div className="flex items-center justify-between">
+              <label htmlFor="edit-completed_toggle" className="text-sm font-medium text-gray-700">
+                {appGradableContentTypes.includes(editForm.content_type) && editForm.grade_max_value && !editForm.grade_value ? 
+                  'Mark as Complete (add grade first)' : 'Mark as Complete'}
+              </label>
+              <input 
+                type="checkbox" 
+                name="completed_toggle" 
+                id="edit-completed_toggle" 
+                checked={!!editForm.completed_at} 
+                onChange={onFormChange} 
+                className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+            </div>
+            {appGradableContentTypes.includes(editForm.content_type) && editForm.grade_max_value && !editForm.grade_value && (
+              <p className="text-xs text-amber-600 mt-2">
+                ⚠️ This {editForm.content_type} has a max score but no grade. Consider adding a grade before marking complete.
+              </p>
+            )}
           </div>
           
-          {/* AI Extracted Details - Read-only preview */}
-          <details className="text-sm">
-            <summary className="cursor-pointer text-gray-600 hover:text-black">View AI Extracted Details (Read-only)</summary>
-            <div className="mt-2 p-3 bg-gray-50 rounded text-xs space-y-1 border">
-              <p><strong>Lesson Number:</strong> {JSON.parse(editForm.lesson_json_string || '{}').lesson_number_if_applicable || 'N/A'}</p>
-              <p><strong>Objectives:</strong> {(JSON.parse(editForm.lesson_json_string || '{}').learning_objectives || []).join(', ') || 'N/A'}</p>
-              <p><strong>Grade Level:</strong> {JSON.parse(editForm.lesson_json_string || '{}').grade_level_suggestion || 'N/A'}</p>
-              <p><strong>Est. Time:</strong> {JSON.parse(editForm.lesson_json_string || '{}').estimated_completion_time_minutes ? `${JSON.parse(editForm.lesson_json_string || '{}').estimated_completion_time_minutes} min` : 'N/A'}</p>
+          {/* Additional Details from AI Analysis */}
+          <details className="text-sm border rounded-md">
+            <summary className="cursor-pointer p-3 bg-gray-50 text-gray-700 hover:bg-gray-100">View Additional Details</summary>
+            <div className="p-3 space-y-2 text-xs">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="font-medium text-gray-600">Lesson Number:</span>
+                  <p className="text-gray-800">{JSON.parse(editForm.lesson_json_string || '{}').lesson_number_if_applicable || 'Not specified'}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Grade Level:</span>
+                  <p className="text-gray-800">{JSON.parse(editForm.lesson_json_string || '{}').grade_level_suggestion || 'Not specified'}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Est. Time:</span>
+                  <p className="text-gray-800">{JSON.parse(editForm.lesson_json_string || '{}').estimated_completion_time_minutes ? `${JSON.parse(editForm.lesson_json_string || '{}').estimated_completion_time_minutes} minutes` : 'Not specified'}</p>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Length:</span>
+                  <p className="text-gray-800">{JSON.parse(editForm.lesson_json_string || '{}').page_count_or_length_indicator || 'Not specified'}</p>
+                </div>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Learning Objectives:</span>
+                <p className="text-gray-800">{(JSON.parse(editForm.lesson_json_string || '{}').learning_objectives || []).join(', ') || 'None specified'}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Description:</span>
+                <p className="text-gray-800">{JSON.parse(editForm.lesson_json_string || '{}').main_content_summary_or_extract || 'No description available'}</p>
+              </div>
             </div>
           </details>
 
-          {/* Advanced JSON Editing */}
-          <div>
-            <label htmlFor="edit-lesson_json_string" className="block text-sm font-medium text-gray-700 mb-1">
-              Advanced: Raw Extracted Data (JSON)
-            </label>
-            <textarea 
-              name="lesson_json_string" 
-              id="edit-lesson_json_string" 
-              value={editForm.lesson_json_string || ''} 
-              onChange={onFormChange} 
-              rows="6" 
-              className="w-full border rounded px-3 py-2 font-mono text-xs"
-            ></textarea>
-          </div>
+          {/* Advanced JSON Editing - Hidden by default */}
+          <details className="text-sm">
+            <summary className="cursor-pointer text-red-600 hover:text-red-800 text-xs">⚠️ Advanced: Edit Raw Data (Developers Only)</summary>
+            <div className="mt-2">
+              <textarea 
+                name="lesson_json_string" 
+                id="edit-lesson_json_string" 
+                value={editForm.lesson_json_string || ''} 
+                onChange={onFormChange} 
+                rows="4" 
+                className="w-full border rounded px-3 py-2 font-mono text-xs bg-gray-50"
+                placeholder="Raw JSON data..."
+              ></textarea>
+              <p className="text-xs text-red-500 mt-1">⚠️ Only edit if you know what you're doing. Invalid JSON will cause errors.</p>
+            </div>
+          </details>
         
           {/* Action Buttons */}
           <div className="flex gap-3 mt-auto pt-4 border-t">

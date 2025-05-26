@@ -146,26 +146,26 @@ export default function AddMaterialForm({
                 {unitsForSelectedSubject.length === 0 && <p className="text-xs text-gray-400 italic mt-0.5">No units for this subject. Add via "Manage Units".</p>}
             </div>
             
-            {/* Lesson Container Selection - Required */}
+            {/* Lesson Grouping Selection - Required */}
             <div className="mt-3">
-                <label htmlFor="lesson-container-approval" className="block text-xs font-medium text-gray-700">Lesson Container *</label>
+                <label htmlFor="lesson-container-approval" className="block text-xs font-medium text-gray-700">Lesson or Assignment Group *</label>
                 <div className="flex gap-2 mt-1">
                     <select id="lesson-container-approval" value={selectedLessonContainer || ''} onChange={onLessonContainerChange}
                         className="flex-1 border rounded px-3 py-1.5 text-sm h-[34px]" required>
-                        <option value="">-- Select Lesson Container --</option>
-                        <option value="__create_new__">+ Create New Lesson Container</option>
+                        <option value="">-- Choose existing lesson or create new group --</option>
+                        <option value="__create_new__">+ Create New Lesson/Assignment Group</option>
                         {lessonContainersForSelectedUnit.map(lesson => ( 
                             <option key={lesson.id} value={lesson.id}>{lesson.title}</option> 
                         ))}
                     </select>
                     {selectedLessonContainer === '__create_new__' && (
                         <button type="button" onClick={onCreateNewLessonContainer} className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
-                            Create
+                            Create Group
                         </button>
                     )}
                 </div>
-                {!json.unit_id && <p className="text-xs text-gray-400 italic mt-0.5">Select a unit first to see lesson containers.</p>}
-                {json.unit_id && lessonContainersForSelectedUnit.length === 0 && <p className="text-xs text-gray-400 italic mt-0.5">No lesson containers for this unit. Create one to proceed.</p>}
+                {!json.unit_id && <p className="text-xs text-gray-400 italic mt-0.5">Select a unit first to see available lesson groups.</p>}
+                {json.unit_id && lessonContainersForSelectedUnit.length === 0 && <p className="text-xs text-gray-400 italic mt-0.5">No lesson groups in this unit yet. Create one to organize your materials.</p>}
             </div>
             <div className="flex items-center pt-2">
                 <input type="checkbox" id="lesson-completed-approval" checked={lessonCompletedForApproval} onChange={onLessonCompletedForApprovalChange} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>
@@ -175,43 +175,50 @@ export default function AddMaterialForm({
           
           {!json.error && (
             <div className="space-y-4 mb-6">
-                <h4 className="text-sm font-semibold text-gray-700 mb-2 border-b pb-1">Edit Extracted Details (from AI Analysis):</h4>
-                <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Lesson Number</label>
-                    <input type="text" value={json.lesson_number_if_applicable || ''} onChange={(e) => handleJsonFieldChange(e, 'lesson_number_if_applicable')} className="mt-0.5 border rounded w-full md:w-1/2 px-3 py-1.5 text-sm" placeholder="e.g., 1.2, Unit 5" />
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Grade Level Suggestion</label>
-                    <input type="text" value={json.grade_level_suggestion || ''} onChange={(e) => handleJsonFieldChange(e, 'grade_level_suggestion')} className="mt-0.5 border rounded w-full md:w-1/2 px-3 py-1.5 text-sm" placeholder="e.g., Grade 3" />
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Learning Objectives (one per line)</label>
-                    <textarea value={(json.learning_objectives || []).join('\n')} onChange={(e) => handleJsonArrayFieldChange(e, 'learning_objectives')} rows="3" className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" />
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Main Content/Summary</label>
-                    <textarea value={json.main_content_summary_or_extract || ''} onChange={(e) => handleJsonFieldChange(e, 'main_content_summary_or_extract')} rows="4" className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" />
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Tasks/Questions (one per line)</label>
-                    <textarea value={(json.tasks_or_questions || []).join('\n')} onChange={(e) => handleJsonArrayFieldChange(e, 'tasks_or_questions')} rows="4" className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2 border-b pb-1">Review & Edit Details:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-0.5">Est. Completion Time (minutes)</label>
-                        <input type="number" value={json.estimated_completion_time_minutes || ''} onChange={(e) => handleJsonFieldChange(e, 'estimated_completion_time_minutes')} className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="e.g., 30" />
+                        <label className="block text-xs font-medium text-gray-600 mb-0.5">Lesson/Assignment Number</label>
+                        <input type="text" value={json.lesson_number_if_applicable || ''} onChange={(e) => handleJsonFieldChange(e, 'lesson_number_if_applicable')} className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="e.g., 1.2, Assignment 3" />
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-0.5">Page Count/Length</label>
-                        <input type="text" value={json.page_count_or_length_indicator || ''} onChange={(e) => handleJsonFieldChange(e, 'page_count_or_length_indicator')} className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="e.g., 3 pages, short" />
+                        <label className="block text-xs font-medium text-gray-600 mb-0.5">Grade Level</label>
+                        <input type="text" value={json.grade_level_suggestion || ''} onChange={(e) => handleJsonFieldChange(e, 'grade_level_suggestion')} className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="e.g., Grade 3" />
                     </div>
                 </div>
-                 <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Subtopics (comma separated)</label>
-                    <input type="text" value={(json.subject_keywords_or_subtopics || []).join(', ')} 
-                           onChange={(e) => onUpdateLessonJsonField('subject_keywords_or_subtopics', e.target.value.split(',').map(s=>s.trim()).filter(s=>s))} 
-                           className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="e.g., algebra, history" />
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Learning Objectives</label>
+                    <textarea value={(json.learning_objectives || []).join('\n')} onChange={(e) => handleJsonArrayFieldChange(e, 'learning_objectives')} rows="2" className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="What will the student learn? (one per line)" />
                 </div>
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Description/Summary</label>
+                    <textarea value={json.main_content_summary_or_extract || ''} onChange={(e) => handleJsonFieldChange(e, 'main_content_summary_or_extract')} rows="3" className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="Brief description of this material..." />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Key Tasks/Questions</label>
+                    <textarea value={(json.tasks_or_questions || []).join('\n')} onChange={(e) => handleJsonArrayFieldChange(e, 'tasks_or_questions')} rows="3" className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="Main tasks or questions (one per line)" />
+                </div>
+                <details className="border rounded-md">
+                    <summary className="cursor-pointer p-3 bg-gray-50 text-sm font-medium text-gray-700 hover:bg-gray-100">Additional Details (Optional)</summary>
+                    <div className="p-3 space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-0.5">Est. Time (minutes)</label>
+                                <input type="number" value={json.estimated_completion_time_minutes || ''} onChange={(e) => handleJsonFieldChange(e, 'estimated_completion_time_minutes')} className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="30" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-0.5">Length</label>
+                                <input type="text" value={json.page_count_or_length_indicator || ''} onChange={(e) => handleJsonFieldChange(e, 'page_count_or_length_indicator')} className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="3 pages" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-0.5">Topics/Keywords</label>
+                            <input type="text" value={(json.subject_keywords_or_subtopics || []).join(', ')} 
+                                   onChange={(e) => onUpdateLessonJsonField('subject_keywords_or_subtopics', e.target.value.split(',').map(s=>s.trim()).filter(s=>s))} 
+                                   className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="algebra, fractions, word problems" />
+                        </div>
+                    </div>
+                </details>
             </div>
           )}
           

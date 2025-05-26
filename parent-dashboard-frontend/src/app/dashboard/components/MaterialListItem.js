@@ -6,13 +6,28 @@ import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'; // Usi
 // Assume these are imported or passed if needed for styling decisions (isOverdue, isDueSoon)
 // import { isDateOverdue, isDateDueSoon } from '../../../utils/dateHelpers'; 
 
-export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComplete }) { // Added onToggleComplete prop
+export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComplete }) {
   const [isToggling, setIsToggling] = useState(false);
 
+  // Define gradable content types
+  const GRADABLE_CONTENT_TYPES = ['worksheet', 'assignment', 'test', 'quiz'];
+  
+  const isGradable = GRADABLE_CONTENT_TYPES.includes(lesson.content_type);
+  const hasMaxScore = lesson.grade_max_value && lesson.grade_max_value.trim() !== '';
+  const hasGrade = lesson.grade_value && lesson.grade_value.trim() !== '';
+  
   const handleToggle = async (e) => {
     e.stopPropagation(); // Prevent opening edit modal when clicking checkbox area
+    
+    // Check if this is a gradable item that requires a grade before completion
+    if (!lesson.completed_at && isGradable && hasMaxScore && !hasGrade) {
+      alert(`This ${lesson.content_type} has a max score of ${lesson.grade_max_value} but no grade has been entered. Please add a grade before marking as complete.`);
+      onOpenEditModal(lesson); // Open edit modal to add grade
+      return;
+    }
+    
     setIsToggling(true);
-    await onToggleComplete(lesson.id, !lesson.completed_at); // Pass desired new state
+    await onToggleComplete(lesson.id, !lesson.completed_at);
     setIsToggling(false);
   };
   

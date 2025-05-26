@@ -109,3 +109,109 @@ Deliverables for Sprint C:
 Parents can fully manage "Lesson Containers" (create, view, edit, delete, reorder) within each Unit.
 Parents can delete individual materials.
 Dashboard displays the full Subject -> Unit -> Lesson -> Material hierarchy clearly.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+The goal here is to get your API endpoints working with the new schema. Test each controller with Postman/Insomnia after refactoring.
+childrenController.js & subjectsController.js (Minor Adjustments):
+Action: Review these controllers. The changes to the children and subjects tables were mostly adding new nullable columns or is_predefined. The core CRUD operations for listing, creating basic children, and creating global subjects might not need extensive changes unless you are now strictly enforcing created_by_user_id for subjects or handling child_username during child creation.
+Your addSubject in subjectsController.js should now also be able to set is_predefined = false (or true if you have an admin interface for predefined ones).
+Ensure listChildren still returns the necessary info.
+The crucial change is how child_subjects are handled, which is next.
+childSubjectsController.js (NEW or Heavily Refactor subjectsController.js parts):
+Action: Create a new controller or refactor parts of subjectsController.js that dealt with assigning subjects to children. This controller will manage the child_subjects junction table.
+Endpoints:
+POST /api/child-subjects/assign: Assign a subject_id to a child_id. Creates a record in child_subjects.
+DELETE /api/child-subjects/unassign: Unassign (body might contain child_id, subject_id, or it could be DELETE /api/child-subjects/:child_subject_id_pk).
+GET /api/child-subjects/child/:child_id: List all assigned subjects (now child_subjects records, joining with subjects to get names) for a child. This replaces your old /api/subjects/child/:child_id.
+PUT /api/child-subjects/:child_subject_id_pk: To update custom_subject_name_override.
+Update childrenRoutes.js and subjectsRoutes.js or create childSubjectsRoutes.js.
+unitsController.js (CRUD for Units):
+Action: Implement full CRUD for the new units table.
+Endpoints:
+POST /api/units (Body: child_subject_id, name, description, sequence_order)
+GET /api/units/subject/:child_subject_id (Lists units for a child_subject_id)
+PUT /api/units/:unit_id
+DELETE /api/units/:unit_id
+Ensure child_subject_id is correctly validated and used.
+lessonsContainerController.js (CRUD for Lesson Containers - the new lessons table):
+Action: Implement full CRUD for the new lessons table.
+Endpoints:
+POST /api/lessons (Body: unit_id, title, lesson_number, description, sequence_order)
+GET /api/lessons/unit/:unit_id (Lists lesson containers for a unit_id)
+PUT /api/lessons/:lesson_id
+DELETE /api/lessons/:lesson_id
+Ensure unit_id is correctly validated.
+materialsController.js (Refactor from old lessonsController.js):
+Action: This is a major refactor.
+Rename the file and all internal references from "lesson" to "material" where appropriate (e.g., saveMaterial, listMaterialsForLesson).
+Key Change: All functions creating or updating materials now need to accept a lesson_id (the ID of the lesson container) instead of the old unit_id. The child_subject_id on the materials table is now mostly for denormalization/easier querying but the primary link is lesson_id.
+uploadLesson (now uploadMaterialFile or similar): The output lesson_json will be associated with a material that belongs to a lesson container.
+saveMaterial: Takes lesson_id, child_subject_id (ensure consistency), title, content_type, lesson_json, etc.
+updateMaterialDetails: Takes lesson_id to potentially re-assign.
+listMaterialsForLesson: GET /api/materials/lesson/:lesson_id
+deleteMaterial: DELETE /api/materials/:material_id (already planned).
+toggleMaterialCompletion: PUT /api/materials/:material_id/toggle-complete (rename from toggleLessonCompletion).
+Update routes in materialsRoutes.js (old lessonsRoutes.js).
+weightsController.js (Minor Adjustment):
+Ensure it still correctly references child_subject_id from the child_subjects table. The core logic should remain the same.
+Phase 2: Frontend - Adapting Core Data Flow & UI (Iterative)
+Start with DashboardPage.js as it's the central hub.
+DashboardPage.js - Data Fetching (refreshChildSpecificData):
+Action: This is the absolute first frontend part to tackle.
+Modify refreshChildSpecificData to:
+Fetch assigned subjects (now child_subjects records which include the child_subject_id PK).
+For each child_subject_id, fetch its units from /api/units/subject/:child_subject_id. Store in unitsBySubject.
+For each unit.id, fetch its lessons (containers) from /api/lessons/unit/:unit_id. Store in a new state, e.g., lessonsByUnit: { [unitId]: [lessonContainerObjects] }.
+For each lessonContainer.id, fetch its materials from /api/materials/lesson/:lesson_id. Store in a new state, e.g., materialsByLesson: { [lessonContainerId]: [materialObjects] }.
+Alternative for fetching materials: Fetch all materials for a child_subject_id once using a modified /api/materials/subject/:child_subject_id endpoint (you'd need to create this) and then group them client-side by lesson_id. This can be more efficient than many small calls if a subject has many lessons.
+Update gradeWeights fetching if its dependency on child_subject_id changes path.
+DashboardPage.js - State Management:
+Introduce unitsBySubject, lessonsByUnit, materialsByLesson states.
+The old lessonsBySubject will effectively be replaced by materialsByLesson (or how you decide to structure the final display data).
+SubjectCard.js:
+Action: This component will now receive units (for the subject) and potentially nested data for lessons and materials, or it will use the new global states like lessonsByUnit and materialsByLesson keyed by appropriate IDs.
+Refactor its rendering logic to display:
+Unit Name (collapsible)
+Lesson Container Name/Number (collapsible)
+List of Materials (MaterialListItem.js)
+The "Manage Units" button (onManageUnits) will still be here.
+The "Quick Complete" for materials will involve updating materialsByLesson.
+AddMaterialForm.js & EditMaterialModal.js:
+Action: These are significant.
+Unit & Lesson Selection: They need dropdowns:
+Select Subject (as before, provides child_subject_id).
+Select Unit (filters based on child_subject_id, provides unit_id).
+Select Lesson Container (filters based on unit_id, provides lesson_id for the material).
+The payload sent to save/update a material now includes lesson_id.
+lessonJsonForApproval and editForm will still handle the material's specific details.
+"Manage Units" Modal (in DashboardPage.js):
+Action: This modal needs to be enhanced.
+When a unit is selected/expanded within this modal:
+List its "Lesson Containers".
+Allow CRUD operations for these Lesson Containers (calling the new /api/lessons/... endpoints).
+The UI for adding/editing/deleting units themselves remains.
+Update filteredAndSortedLessonsBySubject (now filteredAndSortedMaterials):
+Action: This useMemo hook needs to be adapted. It previously worked on a flat list of "lessons" (which were materials) per subject. Now it needs to:
+Either operate on a flattened list of all materials for a subject (if you choose to fetch all materials for a subject and then group client-side for display).
+Or, if filtering/sorting is to be done within each lesson container, the logic moves into how SubjectCard processes the materials for each lesson.
+For MVP, keeping a subject-wide filter/sort on a flattened list of all materials might be easier to adapt first. The lessons prop to SubjectCard would then be this pre-filtered/sorted flat list, and SubjectCard would be responsible for grouping them by unit_id and lesson_id for display.
+Update subjectStats and dashboardStats:
+Action: Ensure these useMemo hooks are now correctly iterating over the materials data (likely from materialsByLesson or a flattened equivalent) to calculate completion and grades.
+Starting Point for Refactoring:
+I recommend starting with the Backend Refactor, in the order listed (1-6). Get your API endpoints working correctly with the new schema and test them thoroughly with Postman/Insomnia. This ensures your data layer is solid before touching the frontend.

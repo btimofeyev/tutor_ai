@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { CogIcon, ChevronDownIcon, ChevronUpIcon, FolderOpenIcon, PlusCircleIcon, ListBulletIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import MaterialListItem from './MaterialListItem';
 import CompletionPieChart from './charts/CompletionPieChart';
 
@@ -20,6 +21,7 @@ export default function SubjectCard({
 }) {
   const [expandedUnits, setExpandedUnits] = useState({});
   const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
+  const [completingItems, setCompletingItems] = useState(new Set());
 
   if (!subject.child_subject_id) { 
     return (
@@ -50,9 +52,9 @@ export default function SubjectCard({
       .slice(0, 3);
   }, [lessons]);
 
-  // Group materials that don't belong to any unit (uncategorized/general materials)
+  // Group materials that don't belong to any lesson container (uncategorized/general materials)
   const generalMaterials = useMemo(() => {
-    return lessons.filter(lesson => !lesson.unit_id);
+    return lessons.filter(lesson => !lesson.lesson_id);
   }, [lessons]);
 
   const toggleUnitExpansion = (unitId) => {
@@ -223,14 +225,42 @@ export default function SubjectCard({
             <ClockIcon className="h-4 w-4 mr-1"/>
             Coming Up Next
           </h4>
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             {upcomingDueItems.map(item => {
               const isOverdue = item.dueDateObj < new Date();
               const isDueSoon = item.dueDateObj <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
               return (
-                <li key={item.id} className="flex justify-between items-center text-xs">
-                  <span className="truncate font-medium text-gray-800">{item.title}</span>
-                  <span className={`whitespace-nowrap ml-2 ${
+                <li key={item.id} className="flex justify-between items-center text-xs bg-white rounded-md p-2 shadow-sm border">
+                  <div className="flex items-center min-w-0 flex-1">
+                    {/* Quick Complete Button */}
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setCompletingItems(prev => new Set([...prev, item.id]));
+                        await onToggleComplete(item.id, !item.completed_at);
+                        setCompletingItems(prev => {
+                          const newSet = new Set(prev);
+                          newSet.delete(item.id);
+                          return newSet;
+                        });
+                      }}
+                      className="mr-2 p-1 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0"
+                      title={item.completed_at ? "Mark as Incomplete" : "Mark as Complete"}
+                      disabled={completingItems.has(item.id)}
+                    >
+                      {completingItems.has(item.id) ? (
+                        <div className="h-4 w-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+                      ) : item.completed_at ? (
+                        <CheckCircleIcon className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <div className="h-4 w-4 border-2 border-gray-300 rounded-full hover:border-green-500 transition-colors"></div>
+                      )}
+                    </button>
+                    <span className="truncate font-medium text-gray-800 cursor-pointer" onClick={() => onOpenEditModal(item)}>
+                      {item.title}
+                    </span>
+                  </div>
+                  <span className={`whitespace-nowrap ml-2 text-xs ${
                     isOverdue ? 'text-red-600 font-semibold' : 
                     isDueSoon ? 'text-yellow-600 font-semibold' : 'text-blue-600'
                   }`}>

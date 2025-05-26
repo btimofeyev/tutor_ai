@@ -2,7 +2,7 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CogIcon, ChevronDownIcon, ChevronUpIcon, FolderOpenIcon, PlusCircleIcon, ListBulletIcon } from '@heroicons/react/24/outline';
+import { CogIcon, ChevronDownIcon, ChevronUpIcon, FolderOpenIcon, PlusCircleIcon, ListBulletIcon, ClockIcon } from '@heroicons/react/24/outline';
 import MaterialListItem from './MaterialListItem';
 import CompletionPieChart from './charts/CompletionPieChart';
 
@@ -12,12 +12,14 @@ export default function SubjectCard({
     subject, 
     lessons = [], 
     units = [], 
+    lessonsByUnit = {}, // New: lesson containers grouped by unit
     subjectStats, 
     onOpenEditModal, 
     onManageUnits,
-    onToggleComplete // Make sure this prop is accepted from DashboardPage
+    onToggleComplete
 }) {
   const [expandedUnits, setExpandedUnits] = useState({});
+  const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
 
   if (!subject.child_subject_id) { 
     return (
@@ -32,75 +34,146 @@ export default function SubjectCard({
   
   const currentSubjectStats = subjectStats;
 
-  const lessonsByUnitId = useMemo(() => {
-    const grouped = { 'uncategorized': [] };
-    (units || []).forEach(unit => {
-        if(unit && unit.id) grouped[unit.id] = [];
-    });
-    (lessons || []).forEach(lesson => {
-      if (lesson.unit_id && grouped[lesson.unit_id]) {
-        grouped[lesson.unit_id].push(lesson);
-      } else {
-        grouped['uncategorized'].push(lesson);
-      }
-    });
-    return grouped;
-  }, [lessons, units]);
+  // Get next 3 upcoming due items for quick overview
+  const upcomingDueItems = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return lessons
+      .filter(lesson => !lesson.completed_at && lesson.due_date)
+      .map(lesson => ({
+        ...lesson,
+        dueDateObj: new Date(lesson.due_date + 'T00:00:00Z')
+      }))
+      .filter(lesson => lesson.dueDateObj >= today)
+      .sort((a, b) => a.dueDateObj - b.dueDateObj)
+      .slice(0, 3);
+  }, [lessons]);
+
+  // Group materials that don't belong to any unit (uncategorized/general materials)
+  const generalMaterials = useMemo(() => {
+    return lessons.filter(lesson => !lesson.unit_id);
+  }, [lessons]);
 
   const toggleUnitExpansion = (unitId) => {
     setExpandedUnits(prev => ({ ...prev, [unitId]: !prev[unitId] }));
   };
 
-  const renderUnitSection = (unitId, unitName, unitLessons) => {
-    if (!unitLessons || unitLessons.length === 0) return null;
+  const toggleLessonContainerExpansion = (lessonContainerId) => {
+    setExpandedLessonContainers(prev => ({ ...prev, [lessonContainerId]: !prev[lessonContainerId] }));
+  };
+
+  // Render materials for a lesson container
+  const renderLessonContainerMaterials = (lessonContainer, materials) => {
+    const isExpanded = !!expandedLessonContainers[lessonContainer.id];
+    const materialCount = materials.length;
     
-    const isExpanded = !!expandedUnits[unitId];
-    const displayedLessons = isExpanded ? unitLessons : unitLessons.slice(0, ITEMS_TO_SHOW_INITIALLY_PER_UNIT);
-    const actualUnitName = unitName || "General Materials";
+    if (materialCount === 0) return null;
 
     return (
-      <div key={unitId} className="mt-3 pt-3 border-t border-gray-200 first:mt-0 first:pt-0 first:border-t-0">
+      <div key={lessonContainer.id} className="ml-4 mt-2 border-l-2 border-gray-200 pl-3">
         <div 
-          className={`flex justify-between items-center py-1.5 ${unitName ? 'cursor-pointer hover:bg-gray-100 rounded-md px-2 group' : 'px-2'}`}
-          onClick={() => unitName && toggleUnitExpansion(unitId)} 
-          role={unitName ? "button" : undefined}
-          tabIndex={unitName ? 0 : undefined}
-          onKeyDown={(e) => unitName && (e.key === 'Enter' || e.key === ' ') && toggleUnitExpansion(unitId)}
-          aria-expanded={unitName ? isExpanded : undefined}
-          aria-controls={unitName ? `unit-content-${unitId}`: undefined}
+          className="flex justify-between items-center py-1.5 cursor-pointer hover:bg-gray-50 rounded-md px-2 group"
+          onClick={() => toggleLessonContainerExpansion(lessonContainer.id)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleLessonContainerExpansion(lessonContainer.id)}
+          aria-expanded={isExpanded}
+          aria-controls={`lesson-content-${lessonContainer.id}`}
         >
-          <h4 className="text-sm font-semibold text-gray-700 flex items-center">
-              <FolderOpenIcon className="h-5 w-5 mr-2 text-gray-400 group-hover:text-blue-600 transition-colors"/>
-              {actualUnitName} 
-              <span className="ml-2 text-xs text-gray-500 font-normal">({unitLessons.length} item{unitLessons.length === 1 ? '' : 's'})</span>
-          </h4>
-          {unitName && unitLessons.length > ITEMS_TO_SHOW_INITIALLY_PER_UNIT && (
-            isExpanded ? <ChevronUpIcon className="h-5 w-5 text-gray-500"/> : <ChevronDownIcon className="h-5 w-5 text-gray-500"/>
-          )}
+          <h5 className="text-sm font-medium text-gray-600 flex items-center">
+            <ListBulletIcon className="h-4 w-4 mr-2 text-gray-400 group-hover:text-blue-500 transition-colors"/>
+            {lessonContainer.title}
+            <span className="ml-2 text-xs text-gray-500 font-normal">({materialCount} material{materialCount === 1 ? '' : 's'})</span>
+          </h5>
+          {isExpanded ? <ChevronUpIcon className="h-4 w-4 text-gray-500"/> : <ChevronDownIcon className="h-4 w-4 text-gray-500"/>}
         </div>
         
-        <div id={unitName ? `unit-content-${unitId}`: undefined} className={`${(isExpanded || !unitName) ? 'block' : 'hidden'}`}>
-            <ul className="text-sm text-gray-700 space-y-1.5 mt-1.5 pl-2">
-            {displayedLessons.length === 0 && unitName && <li className="text-xs italic text-gray-400 pl-3 py-1">No materials here (check filters).</li>}
-            {displayedLessons.map(lesson => (
-                <MaterialListItem 
-                    key={lesson.id} 
-                    lesson={lesson} 
-                    onOpenEditModal={onOpenEditModal}
-                    onToggleComplete={onToggleComplete} // <-- *** THIS LINE WAS MISSING THE PROP ***
-                />
+        <div id={`lesson-content-${lessonContainer.id}`} className={`${isExpanded ? 'block' : 'hidden'} mt-1`}>
+          <ul className="text-sm text-gray-700 space-y-1.5">
+            {materials.map(material => (
+              <MaterialListItem 
+                key={material.id} 
+                lesson={material} 
+                onOpenEditModal={onOpenEditModal}
+                onToggleComplete={onToggleComplete}
+              />
             ))}
-            </ul>
-            {unitName && unitLessons.length > ITEMS_TO_SHOW_INITIALLY_PER_UNIT && !isExpanded && (
-                 <button
-                  onClick={() => toggleUnitExpansion(unitId)}
-                  className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center w-full justify-center py-1.5 px-2 rounded-md bg-blue-50 hover:bg-blue-100 transition-colors"
-                  aria-label={`Show more materials for ${actualUnitName}`}
-                >
-                    Show All ({unitLessons.length}) <ChevronDownIcon className="ml-1 h-4 w-4" />
-                </button>
-            )}
+          </ul>
         </div>
+      </div>
+    );
+  };
+
+  // Render a unit with its lesson containers
+  const renderUnitSection = (unit) => {
+    const lessonContainers = lessonsByUnit[unit.id] || [];
+    const isExpanded = !!expandedUnits[unit.id];
+    
+    // Get all materials for this unit to count them
+    const allUnitMaterials = lessonContainers.reduce((acc, container) => {
+      const containerMaterials = lessons.filter(lesson => lesson.lesson_id === container.id);
+      return acc + containerMaterials.length;
+    }, 0);
+    
+    if (lessonContainers.length === 0 && allUnitMaterials === 0) return null;
+
+    return (
+      <div key={unit.id} className="mt-4 pt-4 border-t border-gray-200 first:mt-0 first:pt-0 first:border-t-0">
+        <div 
+          className="flex justify-between items-center py-2 cursor-pointer hover:bg-gray-100 rounded-md px-3 group"
+          onClick={() => toggleUnitExpansion(unit.id)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleUnitExpansion(unit.id)}
+          aria-expanded={isExpanded}
+          aria-controls={`unit-content-${unit.id}`}
+        >
+          <h4 className="text-base font-semibold text-gray-800 flex items-center">
+            <FolderOpenIcon className="h-5 w-5 mr-2 text-gray-500 group-hover:text-blue-600 transition-colors"/>
+            {unit.name}
+            <span className="ml-2 text-sm text-gray-500 font-normal">({lessonContainers.length} lesson{lessonContainers.length === 1 ? '' : 's'}, {allUnitMaterials} material{allUnitMaterials === 1 ? '' : 's'})</span>
+          </h4>
+          {isExpanded ? <ChevronUpIcon className="h-5 w-5 text-gray-600"/> : <ChevronDownIcon className="h-5 w-5 text-gray-600"/>}
+        </div>
+        
+        <div id={`unit-content-${unit.id}`} className={`${isExpanded ? 'block' : 'hidden'} mt-2`}>
+          {lessonContainers.length === 0 ? (
+            <div className="text-xs italic text-gray-400 ml-6 py-2">No lesson containers in this unit yet.</div>
+          ) : (
+            lessonContainers
+              .sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.title.localeCompare(b.title))
+              .map(container => {
+                const containerMaterials = lessons.filter(lesson => lesson.lesson_id === container.id);
+                return renderLessonContainerMaterials(container, containerMaterials);
+              })
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render general materials (not assigned to any unit)
+  const renderGeneralMaterials = () => {
+    if (generalMaterials.length === 0) return null;
+
+    return (
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <h4 className="text-base font-semibold text-gray-800 flex items-center px-3 py-2">
+          <ListBulletIcon className="h-5 w-5 mr-2 text-gray-500"/>
+          General Materials
+          <span className="ml-2 text-sm text-gray-500 font-normal">({generalMaterials.length} item{generalMaterials.length === 1 ? '' : 's'})</span>
+        </h4>
+        <ul className="text-sm text-gray-700 space-y-1.5 mt-2 px-3">
+          {generalMaterials.map(material => (
+            <MaterialListItem 
+              key={material.id} 
+              lesson={material} 
+              onOpenEditModal={onOpenEditModal}
+              onToggleComplete={onToggleComplete}
+            />
+          ))}
+        </ul>
       </div>
     );
   };
@@ -143,14 +216,44 @@ export default function SubjectCard({
         </div>
       </div>
       
+      {/* Quick Overview: Next 3 Due Items */}
+      {upcomingDueItems.length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 className="text-sm font-semibold text-blue-800 mb-2 flex items-center">
+            <ClockIcon className="h-4 w-4 mr-1"/>
+            Coming Up Next
+          </h4>
+          <ul className="space-y-1">
+            {upcomingDueItems.map(item => {
+              const isOverdue = item.dueDateObj < new Date();
+              const isDueSoon = item.dueDateObj <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+              return (
+                <li key={item.id} className="flex justify-between items-center text-xs">
+                  <span className="truncate font-medium text-gray-800">{item.title}</span>
+                  <span className={`whitespace-nowrap ml-2 ${
+                    isOverdue ? 'text-red-600 font-semibold' : 
+                    isDueSoon ? 'text-yellow-600 font-semibold' : 'text-blue-600'
+                  }`}>
+                    {item.dueDateObj.toLocaleDateString()}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      
+      {/* Hierarchical Content */}
       {lessons.length > 0 || (units || []).length > 0 ? (
         <div className="mt-1">
-          {(units || []).sort((a,b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.name.localeCompare(b.name)).map(unit => 
-            renderUnitSection(unit.id, unit.name, lessonsByUnitId[unit.id] || [])
-          )}
-          {lessonsByUnitId['uncategorized'] && lessonsByUnitId['uncategorized'].length > 0 && (
-            renderUnitSection('uncategorized', null, lessonsByUnitId['uncategorized'])
-          )}
+          {/* Render Units with Lesson Containers */}
+          {(units || [])
+            .sort((a,b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.name.localeCompare(b.name))
+            .map(unit => renderUnitSection(unit))
+          }
+          
+          {/* Render General Materials */}
+          {renderGeneralMaterials()}
         </div>
       ) : (
         <div className="italic text-gray-400 text-sm p-3 text-center bg-gray-50 rounded-md">

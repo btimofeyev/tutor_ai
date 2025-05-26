@@ -1238,6 +1238,7 @@ export default function DashboardPage() {
                           ] || []
                         }
                         units={unitsBySubject[subject.child_subject_id] || []}
+                        lessonsByUnit={lessonsByUnit}
                         subjectStats={
                           subject.child_subject_id &&
                           subjectStats[subject.child_subject_id]

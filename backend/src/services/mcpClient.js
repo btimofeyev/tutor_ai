@@ -37,14 +37,14 @@ class MCPClientService {
         throw new Error(`MCP server script not found at: ${mcpServerPath}`);
       }
 
-      // Let MCP SDK spawn the process
+      // FIXED: Pass service role key instead of anon key
       this.transport = new StdioClientTransport({
         command: 'node',
         args: [mcpServerPath],
         env: {
           ...process.env,
           SUPABASE_URL: process.env.SUPABASE_URL,
-          SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY
+          SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY // CHANGED: Use service role key
         }
       });
 
@@ -302,7 +302,7 @@ class MCPClientService {
         console.log('MCP resource not available, using direct query');
       }
 
-      // Fallback: direct Supabase query
+      // Fallback: direct Supabase query - Use service role key
       const supabase = require('../utils/supabaseClient');
       const { data, error } = await supabase
         .from('child_subjects')
@@ -423,6 +423,7 @@ class MCPClientService {
       
       // Return fallback context with direct database queries
       try {
+        // Use service role key client for fallback
         const supabase = require('../utils/supabaseClient');
         
         // Get child subjects directly

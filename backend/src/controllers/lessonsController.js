@@ -277,10 +277,71 @@ exports.listLessons = async (req, res) => {
   if (!child_subject_id || child_subject_id === 'undefined') {
     return res.status(400).json({ error: 'Missing or invalid child_subject_id' });
   }
-  const { data, error } = await supabase
-    .from('lessons').select('*').eq('child_subject_id', child_subject_id).order('created_at', { ascending: false });
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data || []);
+
+  try {
+    console.log('📋 Listing lessons for child_subject_id:', child_subject_id);
+    
+    // TEMPORARY: Query lessons table with the current schema
+    // The lessons table currently doesn't have child_subject_id column
+    // So we need to check what columns it actually has
+    
+    // Let's first check if this is the old schema where lessons directly reference child_subject_id
+    // or if we need to go through units
+    
+    const { data, error } = await supabase
+      .from('lessons')
+      .select('*')
+      .eq('child_subject_id', child_subject_id) // This is what's failing
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      // If child_subject_id doesn't exist, the lessons might be linked through units
+      console.log('❌ Direct child_subject_id query failed, trying through units...');
+      console.error('Error details:', error);
+      
+      // Alternative: Get lessons through units
+      // First get units for this child_subject_id
+      const { data: units, error: unitsError } = await supabase
+        .from('units')
+        .select('id')
+        .eq('child_subject_id', child_subject_id);
+      
+      if (unitsError) {
+        console.error('Units query also failed:', unitsError);
+        return res.status(400).json({ error: 'Could not fetch lessons: ' + unitsError.message });
+      }
+      
+      if (!units || units.length === 0) {
+        console.log('No units found for child_subject_id:', child_subject_id);
+        return res.json([]); // No units = no lessons
+      }
+      
+      const unitIds = units.map(u => u.id);
+      console.log('Found unit IDs:', unitIds);
+      
+      // Now get lessons for these units
+      const { data: lessonsData, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('*')
+        .in('unit_id', unitIds)
+        .order('created_at', { ascending: false });
+      
+      if (lessonsError) {
+        console.error('Lessons through units query failed:', lessonsError);
+        return res.status(400).json({ error: 'Could not fetch lessons through units: ' + lessonsError.message });
+      }
+      
+      console.log('✅ Found lessons through units:', lessonsData?.length || 0);
+      return res.json(lessonsData || []);
+    }
+
+    console.log('✅ Direct query succeeded, found lessons:', data?.length || 0);
+    res.json(data || []);
+    
+  } catch (error) {
+    console.error('❌ Error in listLessons:', error);
+    res.status(500).json({ error: 'Internal server error: ' + error.message });
+  }
 };
 
 exports.updateLessonDetails = async (req, res) => {

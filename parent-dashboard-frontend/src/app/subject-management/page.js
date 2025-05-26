@@ -1,4 +1,4 @@
-// app/subjects/page.js
+// app/subject-management/page.js
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -14,7 +14,7 @@ export default function SubjectsPage() {
   const [assignedChildSubjects, setAssignedChildSubjects] = useState([]);
   
   const [loadingChildren, setLoadingChildren] = useState(true);
-  const [loadingAllSubjects, setLoadingAllSubjects] = useState(true); // Renamed for clarity
+  const [loadingAllSubjects, setLoadingAllSubjects] = useState(true);
   const [loadingAssigned, setLoadingAssigned] = useState(false);
   const [processingAction, setProcessingAction] = useState(false);
 
@@ -46,7 +46,9 @@ export default function SubjectsPage() {
       setLoadingAssigned(true);
       const child = children.find(c => c.id === selectedChild);
       setSelectedChildName(child ? child.name : '');
-      api.get(`/subjects/child/${selectedChild}`)
+      
+      // FIXED: Use new child-subjects endpoint
+      api.get(`/child-subjects/child/${selectedChild}`)
         .then(res => setAssignedChildSubjects(res.data || []))
         .catch(err => {
             console.error("Failed to fetch assigned subjects", err);
@@ -59,12 +61,18 @@ export default function SubjectsPage() {
     }
   }, [selectedChild, children]);
 
-  const handleAssign = async (subjectId) => { /* ... (Unchanged) ... */ 
+  // FIXED: Use new child-subjects assign endpoint
+  const handleAssign = async (subjectId) => {
     if (!selectedChild) return;
     setProcessingAction(true);
     try {
-      await api.post('/subjects/assign', { child_id: selectedChild, subject_id: subjectId });
-      const res = await api.get(`/subjects/child/${selectedChild}`);
+      await api.post('/child-subjects/assign', { 
+        child_id: selectedChild, 
+        subject_id: subjectId 
+      });
+      
+      // Refresh assigned subjects list
+      const res = await api.get(`/child-subjects/child/${selectedChild}`);
       setAssignedChildSubjects(res.data || []);
     } catch (error) {
       console.error("Failed to assign subject:", error);
@@ -74,14 +82,22 @@ export default function SubjectsPage() {
     }
   };
 
-  const handleUnassign = async (subjectId) => { /* ... (Unchanged, ensure API endpoint is correct) ... */ 
+  // FIXED: Use new child-subjects unassign endpoint
+  const handleUnassign = async (subjectId) => {
     if (!selectedChild) return;
     if (!confirm("Are you sure you want to unassign this subject?")) return;
     setProcessingAction(true);
     try {
-      // IMPORTANT: Ensure this matches your backend route for unassigning
-      await api.delete('/subjects/unassign', { data: { child_id: selectedChild, subject_id: subjectId } }); 
-      const res = await api.get(`/subjects/child/${selectedChild}`);
+      // FIXED: Use new child-subjects unassign endpoint
+      await api.delete('/child-subjects/unassign', { 
+        data: { 
+          child_id: selectedChild, 
+          subject_id: subjectId 
+        } 
+      });
+      
+      // Refresh assigned subjects list
+      const res = await api.get(`/child-subjects/child/${selectedChild}`);
       setAssignedChildSubjects(res.data || []);
     } catch (error) {
       console.error("Failed to unassign subject:", error);
@@ -119,12 +135,12 @@ export default function SubjectsPage() {
     }
   };
   
+  // FIXED: Compare using the original subject id, not the child_subject assignment id
   const availableSubjects = allSubjects.filter(
     subject => !assignedChildSubjects.some(assigned => assigned.id === subject.id)
   ).sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
 
   const sortedAssignedSubjects = [...assignedChildSubjects].sort((a,b) => a.name.localeCompare(b.name));
-
 
   if (loadingChildren) { // Only initial full page load for children
     return <div className="flex items-center justify-center min-h-screen bg-gray-100"><p className="text-lg text-gray-500">Loading page data...</p></div>;
@@ -160,10 +176,15 @@ export default function SubjectsPage() {
               </h2>
               {loadingAssigned ? ( <p className="text-gray-500">Loading...</p> ) : 
                sortedAssignedSubjects.length > 0 ? (
-                <ul className="space-y-3 max-h-[60vh] overflow-y-auto pr-2"> {/* Added max-h and overflow */}
+                <ul className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
                   {sortedAssignedSubjects.map(subject => (
-                    <li key={subject.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors">
-                      <span className="text-sm font-medium text-blue-800">{subject.name}</span>
+                    <li key={subject.child_subject_id} className="flex items-center justify-between p-3 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-blue-800">{subject.name}</span>
+                        {subject.custom_name && subject.custom_name !== subject.original_name && (
+                          <span className="text-xs text-blue-600 italic">Custom name for: {subject.original_name}</span>
+                        )}
+                      </div>
                       <button onClick={() => handleUnassign(subject.id)} disabled={processingAction}
                         className="flex items-center text-xs text-red-600 hover:text-red-800 font-medium p-1.5 rounded-md hover:bg-red-100 disabled:opacity-50 transition-colors" title="Unassign subject">
                         <MinusCircleIcon className="h-4 w-4 mr-1 sm:mr-1.5" /> <span className="hidden sm:inline">Unassign</span>
@@ -210,10 +231,15 @@ export default function SubjectsPage() {
 
               {loadingAllSubjects ? ( <p className="text-gray-500">Loading...</p> ) : 
                availableSubjects.length > 0 ? (
-                <ul className="space-y-3 max-h-[60vh] overflow-y-auto pr-2"> {/* Added max-h and overflow */}
+                <ul className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
                   {availableSubjects.map(subject => (
                     <li key={subject.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors">
-                      <span className="text-sm font-medium text-gray-800">{subject.name}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-800">{subject.name}</span>
+                        {subject.is_predefined && (
+                          <span className="text-xs text-gray-500">Pre-defined subject</span>
+                        )}
+                      </div>
                       <button onClick={() => handleAssign(subject.id)} disabled={processingAction}
                         className="flex items-center text-xs text-green-600 hover:text-green-800 font-medium p-1.5 rounded-md hover:bg-green-100 disabled:opacity-50 transition-colors" title="Assign subject">
                         <PlusIcon className="h-4 w-4 mr-1 sm:mr-1.5" /> <span className="hidden sm:inline">Assign</span>

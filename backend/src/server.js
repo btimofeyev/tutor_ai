@@ -4,6 +4,7 @@ const cors = require('cors');
 
 const childrenRoutes = require('./routes/childrenRoutes');
 const subjectsRoutes = require('./routes/subjectsRoutes');
+const childSubjectsRoutes = require('./routes/childSubjectsRoutes');
 const lessonsRoutes = require('./routes/lessonsRoutes');
 const weightsRoutes = require('./routes/weightsRoutes'); 
 const unitsRoutes = require('./routes/unitsRoutes');
@@ -18,6 +19,7 @@ app.use(express.json());
 // Mount the children routes
 app.use('/api/children', childrenRoutes);
 app.use('/api/subjects', subjectsRoutes);
+app.use('/api/child-subjects', childSubjectsRoutes);
 app.use('/api/lessons', lessonsRoutes);
 app.use('/api/weights', weightsRoutes);
 

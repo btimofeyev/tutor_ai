@@ -533,9 +533,8 @@ export default function DashboardPage() {
       });
     }
     try {
-      const updatedLessonFromServer = await api.put(
-        `/lessons/${lessonId}/toggle-complete`
-      );
+      const updatedLessonFromServer = await api.put(`/materials/${lessonId}/toggle-complete`);
+
       setLessonsBySubject((prevLBS) => {
         const newLBS = { ...prevLBS };
         if (subjectIdToUpdate && newLBS[subjectIdToUpdate]) {
@@ -617,7 +616,7 @@ export default function DashboardPage() {
     }
   
     try {
-      const res = await api.post("/lessons/upload", formData);
+      const res = await api.post("/materials/upload", formData);
       const receivedLessonJson = res.data.lesson_json || {};
       setLessonJsonForApproval(receivedLessonJson);
       const firstFileName = addLessonFile[0]?.name?.split(".")[0];
@@ -712,7 +711,7 @@ export default function DashboardPage() {
     };
   
     try {
-      await api.post("/lessons/save", payload);
+      await api.post("/materials/save", payload);
       await refreshChildSpecificData();
       setLessonJsonForApproval(null);
       setLessonTitleForApproval("");
@@ -789,7 +788,7 @@ export default function DashboardPage() {
     if (payload.lesson_json && "unit_id" in payload.lesson_json)
       delete payload.lesson_json.unit_id;
     try {
-      await api.put(`/lessons/${editingLesson.id}`, payload);
+      await api.put(`/materials/${editingLesson.id}`, payload);
       await refreshChildSpecificData();
       setEditingLesson(null);
     } catch (error) {

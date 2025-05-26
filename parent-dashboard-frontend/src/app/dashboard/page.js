@@ -136,6 +136,10 @@ export default function DashboardPage() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingChildData, setLoadingChildData] = useState(false);
 
+  // Lesson Container Selection State
+  const [selectedLessonContainer, setSelectedLessonContainer] = useState("");
+  const [newLessonContainerTitle, setNewLessonContainerTitle] = useState("");
+
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterContentType, setFilterContentType] = useState("all");
   const [sortBy, setSortBy] = useState("createdAtDesc");
@@ -466,6 +470,11 @@ export default function DashboardPage() {
     refreshChildSpecificData();
   }, [selectedChild, session, refreshChildSpecificData]);
 
+  // Reset lesson container selection when unit changes
+  useEffect(() => {
+    setSelectedLessonContainer("");
+  }, [lessonJsonForApproval?.unit_id]);
+
   const handleAddChildSubmit = async (e) => {
     e.preventDefault();
     setLoadingInitial(true);
@@ -685,12 +694,20 @@ export default function DashboardPage() {
       setSavingLesson(false);
       return;
     }
+
+    // Validate lesson container selection
+    if (!selectedLessonContainer || selectedLessonContainer === '__create_new__') {
+      alert("Please select or create a lesson container.");
+      setSavingLesson(false);
+      return;
+    }
   
     const unitIdForPayload = lessonJsonForApproval.unit_id || null;
     const lessonJsonToSave = { ...lessonJsonForApproval };
     delete lessonJsonToSave.unit_id;
   
     const payload = {
+      lesson_id: selectedLessonContainer, // Required by new schema
       child_subject_id: subjectInfo.child_subject_id,
       title: lessonTitleForApproval,
       content_type: lessonContentTypeForApproval,
@@ -720,6 +737,7 @@ export default function DashboardPage() {
       setLessonDueDateForApproval("");
       setLessonCompletedForApproval(false);
       setAddLessonFile(null);
+      setSelectedLessonContainer(""); // Reset lesson container selection
   
       const fileInput = document.getElementById("lesson-file-input-main");
       if (fileInput) fileInput.value = "";
@@ -729,6 +747,49 @@ export default function DashboardPage() {
       alert(error.response?.data?.error || "Lesson save failed.");
     }
     setSavingLesson(false);
+  };
+
+  // Lesson Container Handlers
+  const handleLessonContainerChange = (e) => {
+    const value = e.target.value;
+    setSelectedLessonContainer(value);
+    
+    if (value === '__create_new__') {
+      setNewLessonContainerTitle('');
+    }
+  };
+
+  const handleCreateNewLessonContainer = async () => {
+    const unitId = lessonJsonForApproval?.unit_id;
+    if (!unitId) {
+      alert('Please select a unit first.');
+      return;
+    }
+
+    const title = prompt('Enter lesson container title:');
+    if (!title || !title.trim()) return;
+
+    try {
+      const response = await api.post('/lesson-containers', {
+        unit_id: unitId,
+        title: title.trim()
+      });
+      
+      // Refresh lesson containers for this unit
+      const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
+      const updatedLessons = lessonsRes.data || [];
+      
+      setLessonsByUnit(prev => ({
+        ...prev,
+        [unitId]: updatedLessons
+      }));
+      
+      // Auto-select the newly created lesson container
+      setSelectedLessonContainer(response.data.id);
+      alert('Lesson container created successfully!');
+    } catch (error) {
+      alert(error.response?.data?.error || 'Failed to create lesson container.');
+    }
   };
 
   const handleOpenEditModal = (lesson) => {
@@ -1028,6 +1089,13 @@ export default function DashboardPage() {
     ? unitsBySubject[addLessonSubject] || [] // FIXED: addLessonSubject now contains child_subject_id directly
     : [];
 
+  // Get lesson containers for selected unit
+  const currentLessonContainersForUnit = useMemo(() => {
+    const selectedUnitId = lessonJsonForApproval?.unit_id;
+    if (!selectedUnitId) return [];
+    return lessonsByUnit[selectedUnitId] || [];
+  }, [lessonJsonForApproval?.unit_id, lessonsByUnit]);
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-[#f8fafc] to-[#e9ecf0] overflow-hidden">
       <div className="w-64 flex-shrink-0 bg-white border-r border-gray-100 shadow-lg">
@@ -1246,6 +1314,10 @@ export default function DashboardPage() {
             appContentTypes={APP_CONTENT_TYPES}
             appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
             unitsForSelectedSubject={currentUnitsForAddFormSubject}
+            lessonContainersForSelectedUnit={currentLessonContainersForUnit}
+            selectedLessonContainer={selectedLessonContainer}
+            onLessonContainerChange={handleLessonContainerChange}
+            onCreateNewLessonContainer={handleCreateNewLessonContainer}
           />
         ) : (
           <p className="text-sm text-gray-400 italic text-center">

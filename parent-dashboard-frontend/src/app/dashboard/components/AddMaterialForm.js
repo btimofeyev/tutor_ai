@@ -34,6 +34,10 @@ export default function AddMaterialForm({
   appContentTypes = [],
   appGradableContentTypes = [],
   unitsForSelectedSubject = [],
+  lessonContainersForSelectedUnit = [],
+  onLessonContainerChange,
+  selectedLessonContainer,
+  onCreateNewLessonContainer,
 }) {
 
   const handleJsonFieldChange = (e, fieldName) => {
@@ -141,6 +145,28 @@ export default function AddMaterialForm({
                 </select>
                 {unitsForSelectedSubject.length === 0 && <p className="text-xs text-gray-400 italic mt-0.5">No units for this subject. Add via "Manage Units".</p>}
             </div>
+            
+            {/* Lesson Container Selection - Required */}
+            <div className="mt-3">
+                <label htmlFor="lesson-container-approval" className="block text-xs font-medium text-gray-700">Lesson Container *</label>
+                <div className="flex gap-2 mt-1">
+                    <select id="lesson-container-approval" value={selectedLessonContainer || ''} onChange={onLessonContainerChange}
+                        className="flex-1 border rounded px-3 py-1.5 text-sm h-[34px]" required>
+                        <option value="">-- Select Lesson Container --</option>
+                        <option value="__create_new__">+ Create New Lesson Container</option>
+                        {lessonContainersForSelectedUnit.map(lesson => ( 
+                            <option key={lesson.id} value={lesson.id}>{lesson.title}</option> 
+                        ))}
+                    </select>
+                    {selectedLessonContainer === '__create_new__' && (
+                        <button type="button" onClick={onCreateNewLessonContainer} className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
+                            Create
+                        </button>
+                    )}
+                </div>
+                {!json.unit_id && <p className="text-xs text-gray-400 italic mt-0.5">Select a unit first to see lesson containers.</p>}
+                {json.unit_id && lessonContainersForSelectedUnit.length === 0 && <p className="text-xs text-gray-400 italic mt-0.5">No lesson containers for this unit. Create one to proceed.</p>}
+            </div>
             <div className="flex items-center pt-2">
                 <input type="checkbox" id="lesson-completed-approval" checked={lessonCompletedForApproval} onChange={onLessonCompletedForApprovalChange} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>
                 <label htmlFor="lesson-completed-approval" className="ml-2 block text-sm font-medium text-gray-700">Mark as Complete</label>
@@ -190,7 +216,7 @@ export default function AddMaterialForm({
           )}
           
           <button onClick={onApprove} className="w-full px-5 py-2.5 rounded-xl bg-black text-white font-medium hover:bg-gray-900 transition"
-            disabled={savingLesson || !lessonTitleForApproval || !lessonContentTypeForApproval || (json && json.error) }>
+            disabled={savingLesson || !lessonTitleForApproval || !lessonContentTypeForApproval || !selectedLessonContainer || selectedLessonContainer === '__create_new__' || (json && json.error) }>
             {savingLesson ? 'Saving...' : 'Approve & Save Material'}
           </button>
         </div>

@@ -1,6 +1,6 @@
 // app/dashboard/components/AddMaterialForm.js
 'use client';
-import React from 'react'; // Removed useMemo as individual fields are now primary
+import React from 'react';
 
 function formatContentTypeName(contentType) {
     if (!contentType) return '';
@@ -13,8 +13,8 @@ export default function AddMaterialForm({
   onApprove,
   uploading,
   savingLesson,
-  lessonJsonForApproval,      // The full JSON object from LLM
-  onUpdateLessonJsonField,    // Handler: (fieldName, value) => void
+  lessonJsonForApproval,
+  onUpdateLessonJsonField,
   lessonTitleForApproval,
   onLessonTitleForApprovalChange,
   lessonContentTypeForApproval,
@@ -29,8 +29,8 @@ export default function AddMaterialForm({
   onAddLessonSubjectChange,
   currentAddLessonUserContentType,
   onAddLessonUserContentTypeChange,
-  onAddLessonFileChange,      // This now receives event from <input type="file" multiple>
-  currentAddLessonFile,       // This will be a FileList object or null
+  onAddLessonFileChange,
+  currentAddLessonFile,
   appContentTypes = [],
   appGradableContentTypes = [],
   unitsForSelectedSubject = [],
@@ -56,8 +56,9 @@ export default function AddMaterialForm({
             <label htmlFor="add-lesson-subject" className="text-sm font-medium mb-1">Subject</label>
             <select id="add-lesson-subject" value={currentAddLessonSubject} onChange={onAddLessonSubjectChange} className="border rounded px-3 py-2 h-10" required>
               <option value="">Pick a subject…</option>
+              {/* FIXED: Use child_subject_id as the value instead of subject.id */}
               {(childSubjectsForSelectedChild || []).filter(s => s.child_subject_id).map(subject => (
-                <option key={subject.id} value={String(subject.id)}>{subject.name}</option>
+                <option key={subject.child_subject_id} value={subject.child_subject_id}>{subject.name}</option>
               ))}
             </select>
           </div>
@@ -75,7 +76,7 @@ export default function AddMaterialForm({
               id="lesson-file-input-main" 
               type="file" 
               accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt,.md"
-              multiple // Allows multiple files
+              multiple
               onChange={onAddLessonFileChange} 
               required 
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
@@ -94,7 +95,7 @@ export default function AddMaterialForm({
             </div>
         )}
 
-        <button type="submit" disabled={uploading || !currentAddLessonSubject || !currentAddLessonFile || currentAddLessonFile?.length === 0 || !currentAddLessonUserContentType || !(childSubjectsForSelectedChild || []).find(s => String(s.id) === currentAddLessonSubject)?.child_subject_id} className="w-full sm:w-auto px-5 py-2 rounded-xl bg-black text-white font-medium hover:bg-gray-900 transition self-end">
+        <button type="submit" disabled={uploading || !currentAddLessonSubject || !currentAddLessonFile || currentAddLessonFile?.length === 0 || !currentAddLessonUserContentType || !(childSubjectsForSelectedChild || []).find(s => s.child_subject_id === currentAddLessonSubject)} className="w-full sm:w-auto px-5 py-2 rounded-xl bg-black text-white font-medium hover:bg-gray-900 transition self-end">
           {uploading ? 'Analyzing...' : 'Upload & Analyze'}
         </button>
       </form>

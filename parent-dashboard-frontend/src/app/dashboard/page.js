@@ -85,6 +85,7 @@ export default function DashboardPage() {
   const [subjectsData, setSubjectsData] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
   const [childSubjects, setChildSubjects] = useState({});
+  const [lessonsByUnit, setLessonsByUnit] = useState({});
   const [lessonsBySubject, setLessonsBySubject] = useState({});
   const [gradeWeights, setGradeWeights] = useState({});
   const [unitsBySubject, setUnitsBySubject] = useState({});
@@ -315,70 +316,81 @@ export default function DashboardPage() {
     setLoadingChildData(true);
     
     try {
-      console.log('🔍 Fetching child subjects for child ID:', selectedChild.id);
+      console.log('🔍 Fetching hierarchical data for child ID:', selectedChild.id);
       
-      // STEP 1: Fetch child subjects
+      // STEP 1: Fetch child subjects (assignments)
       const childSubjectsRes = await api.get(`/child-subjects/child/${selectedChild.id}`);
       const currentChildAssignedSubjects = childSubjectsRes.data || [];
       
       console.log('✅ Child subjects fetched:', currentChildAssignedSubjects.length, 'subjects');
-      console.log('📋 Child subjects data:', currentChildAssignedSubjects);
-      
       setChildSubjects(cs => ({ ...cs, [selectedChild.id]: currentChildAssignedSubjects }));
   
-      let newLessonsBySubject = {}, newGradeWeights = {}, newUnitsBySubject = {};
+      let newMaterialsBySubject = {}, newGradeWeights = {}, newUnitsBySubject = {}, newLessonsByUnit = {};
       
-      // STEP 2: Fetch data for each assigned subject
+      // STEP 2: For each assigned subject, fetch the hierarchy
       for (const subject of currentChildAssignedSubjects) {
         if (subject.child_subject_id) {
-          console.log(`🔍 Fetching data for subject: ${subject.name} (child_subject_id: ${subject.child_subject_id})`);
+          console.log(`🔍 Fetching hierarchy for subject: ${subject.name} (child_subject_id: ${subject.child_subject_id})`);
           
           try {
-            // Try each API call individually with error handling
-            console.log(`📚 Fetching lessons for child_subject_id: ${subject.child_subject_id}`);
-            let lessonsRes;
-            try {
-              lessonsRes = await api.get(`/lessons/${subject.child_subject_id}`);
-              console.log(`✅ Lessons fetched for ${subject.name}:`, lessonsRes.data?.length || 0, 'lessons');
-            } catch (lessonsError) {
-              console.error(`❌ Lessons fetch failed for ${subject.name}:`, lessonsError.response?.status, lessonsError.response?.data);
-              lessonsRes = { data: [] };
-            }
-  
-            console.log(`⚖️ Fetching weights for child_subject_id: ${subject.child_subject_id}`);
-            let weightsRes;
-            try {
-              weightsRes = await api.get(`/weights/${subject.child_subject_id}`);
-              console.log(`✅ Weights fetched for ${subject.name}:`, weightsRes.data?.length || 0, 'weight rules');
-            } catch (weightsError) {
-              console.error(`❌ Weights fetch failed for ${subject.name}:`, weightsError.response?.status, weightsError.response?.data);
-              weightsRes = { data: [] };
-            }
-  
+            // Fetch Units for this subject
             console.log(`📁 Fetching units for child_subject_id: ${subject.child_subject_id}`);
-            let unitsRes;
-            try {
-              unitsRes = await api.get(`/units/subject/${subject.child_subject_id}`);
-              console.log(`✅ Units fetched for ${subject.name}:`, unitsRes.data?.length || 0, 'units');
-            } catch (unitsError) {
-              console.error(`❌ Units fetch failed for ${subject.name}:`, unitsError.response?.status, unitsError.response?.data);
-              unitsRes = { data: [] };
+            const unitsRes = await api.get(`/units/subject/${subject.child_subject_id}`);
+            const subjectUnits = unitsRes.data || [];
+            console.log(`✅ Units fetched for ${subject.name}:`, subjectUnits.length, 'units');
+            newUnitsBySubject[subject.child_subject_id] = subjectUnits;
+            
+            // Fetch Lesson Containers for each unit
+            for (const unit of subjectUnits) {
+              console.log(`📚 Fetching lesson containers for unit: ${unit.name} (unit_id: ${unit.id})`);
+              try {
+                const lessonsRes = await api.get(`/lesson-containers/unit/${unit.id}`);
+                const unitLessons = lessonsRes.data || [];
+                console.log(`✅ Lesson containers fetched for unit ${unit.name}:`, unitLessons.length, 'lessons');
+                newLessonsByUnit[unit.id] = unitLessons;
+                
+                // Fetch Materials for each lesson container
+                for (const lesson of unitLessons) {
+                  console.log(`📄 Fetching materials for lesson: ${lesson.title} (lesson_id: ${lesson.id})`);
+                  try {
+                    const materialsRes = await api.get(`/materials/lesson/${lesson.id}`);
+                    const lessonMaterials = materialsRes.data || [];
+                    console.log(`✅ Materials fetched for lesson ${lesson.title}:`, lessonMaterials.length, 'materials');
+                    
+                    // Add these materials to the subject's material list (flattened for filtering/sorting)
+                    if (!newMaterialsBySubject[subject.child_subject_id]) {
+                      newMaterialsBySubject[subject.child_subject_id] = [];
+                    }
+                    newMaterialsBySubject[subject.child_subject_id].push(...lessonMaterials);
+                  } catch (materialsError) {
+                    console.error(`❌ Materials fetch failed for lesson ${lesson.title}:`, materialsError);
+                  }
+                }
+              } catch (lessonsError) {
+                console.error(`❌ Lesson containers fetch failed for unit ${unit.name}:`, lessonsError);
+                newLessonsByUnit[unit.id] = [];
+              }
             }
             
-            // Store the results
-            newLessonsBySubject[subject.child_subject_id] = lessonsRes.data || [];
-            
-            const fetchedWeightsMap = new Map((weightsRes.data || []).map(w => [w.content_type, parseFloat(w.weight)]));
-            newGradeWeights[subject.child_subject_id] = APP_CONTENT_TYPES.map(ct => ({
-                content_type: ct,
-                weight: fetchedWeightsMap.get(ct) ?? (APP_GRADABLE_CONTENT_TYPES.includes(ct) ? 0.10 : 0.00)
-            }));
-            
-            newUnitsBySubject[subject.child_subject_id] = unitsRes.data || [];
+            // Fetch Grade Weights for this subject
+            console.log(`⚖️ Fetching weights for child_subject_id: ${subject.child_subject_id}`);
+            try {
+              const weightsRes = await api.get(`/weights/${subject.child_subject_id}`);
+              console.log(`✅ Weights fetched for ${subject.name}:`, weightsRes.data?.length || 0, 'weight rules');
+              
+              const fetchedWeightsMap = new Map((weightsRes.data || []).map(w => [w.content_type, parseFloat(w.weight)]));
+              newGradeWeights[subject.child_subject_id] = APP_CONTENT_TYPES.map(ct => ({
+                  content_type: ct,
+                  weight: fetchedWeightsMap.get(ct) ?? (APP_GRADABLE_CONTENT_TYPES.includes(ct) ? 0.10 : 0.00)
+              }));
+            } catch (weightsError) {
+              console.error(`❌ Weights fetch failed for ${subject.name}:`, weightsError);
+              newGradeWeights[subject.child_subject_id] = [...defaultWeightsForNewSubject];
+            }
             
           } catch (err) {
-            console.error(`❌ Error fetching data for subject ${subject.name}:`, err);
-            newLessonsBySubject[subject.child_subject_id] = [];
+            console.error(`❌ Error fetching hierarchy for subject ${subject.name}:`, err);
+            newMaterialsBySubject[subject.child_subject_id] = [];
             newGradeWeights[subject.child_subject_id] = [...defaultWeightsForNewSubject];
             newUnitsBySubject[subject.child_subject_id] = [];
           }
@@ -387,27 +399,20 @@ export default function DashboardPage() {
         }
       }
       
-      console.log('📊 Final data summary:');
-      console.log('- Lessons by subject:', Object.keys(newLessonsBySubject).length, 'subjects');
-      console.log('- Grade weights:', Object.keys(newGradeWeights).length, 'subjects');  
+      console.log('📊 Final hierarchical data summary:');
       console.log('- Units by subject:', Object.keys(newUnitsBySubject).length, 'subjects');
+      console.log('- Lessons by unit:', Object.keys(newLessonsByUnit).length, 'units');
+      console.log('- Materials by subject (flattened):', Object.keys(newMaterialsBySubject).length, 'subjects');
+      console.log('- Grade weights:', Object.keys(newGradeWeights).length, 'subjects');
       
-      setLessonsBySubject(newLessonsBySubject);
-      setGradeWeights(newGradeWeights);
+      // Update state with hierarchical data
       setUnitsBySubject(newUnitsBySubject);
+      setLessonsByUnit(newLessonsByUnit); // NEW STATE
+      setLessonsBySubject(newMaterialsBySubject); // This now contains flattened materials for filtering/sorting
+      setGradeWeights(newGradeWeights);
       
     } catch (error) { 
       console.error("💥 Major error in refreshChildSpecificData:", error);
-      console.error("Error details:", {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        config: {
-          method: error.config?.method,
-          url: error.config?.url,
-          headers: error.config?.headers
-        }
-      });
     } finally { 
       setLoadingChildData(false); 
     }
@@ -583,24 +588,24 @@ export default function DashboardPage() {
     setLessonMaxPointsForApproval("");
     setLessonDueDateForApproval("");
     setLessonCompletedForApproval(false);
-
+  
     const currentAssignedSubjects = childSubjects[selectedChild?.id] || [];
-
-    // FIXED: Find by child_subject_id since that's what we're storing in addLessonSubject now
+  
+    // FIXED: Now addLessonSubject directly contains the child_subject_id
     const subjectInfo = currentAssignedSubjects.find(
       (s) => s.child_subject_id === addLessonSubject
     );
-
+  
     if (!subjectInfo || !subjectInfo.child_subject_id) {
       alert("Selected subject is invalid.");
       setUploading(false);
       return;
     }
-
+  
     const formData = new FormData();
-    formData.append("child_subject_id", subjectInfo.child_subject_id); // This is already the child_subject_id
+    formData.append("child_subject_id", subjectInfo.child_subject_id);
     formData.append("user_content_type", addLessonUserContentType);
-
+  
     if (addLessonFile instanceof FileList && addLessonFile.length > 0) {
       for (let i = 0; i < addLessonFile.length; i++) {
         formData.append("files", addLessonFile[i], addLessonFile[i].name);
@@ -610,7 +615,7 @@ export default function DashboardPage() {
       setUploading(false);
       return;
     }
-
+  
     try {
       const res = await api.post("/lessons/upload", formData);
       const receivedLessonJson = res.data.lesson_json || {};
@@ -628,7 +633,7 @@ export default function DashboardPage() {
           ? addLessonUserContentType
           : APP_CONTENT_TYPES[0];
       setLessonContentTypeForApproval(finalContentType);
-
+  
       if (
         receivedLessonJson?.total_possible_points_suggestion !== null &&
         receivedLessonJson?.total_possible_points_suggestion !== undefined
@@ -639,7 +644,7 @@ export default function DashboardPage() {
       } else {
         setLessonMaxPointsForApproval("");
       }
-
+  
       setLessonDueDateForApproval("");
       setLessonCompletedForApproval(false);
     } catch (error) {
@@ -660,18 +665,18 @@ export default function DashboardPage() {
   const handleApproveNewLesson = async () => {
     setSavingLesson(true);
     const currentAssignedSubjects = childSubjects[selectedChild?.id] || [];
-
-    // FIXED: Find by child_subject_id since that's what we're storing in addLessonSubject now
+  
+    // FIXED: Now addLessonSubject directly contains the child_subject_id
     const subjectInfo = currentAssignedSubjects.find(
       (s) => s.child_subject_id === addLessonSubject
     );
-
+  
     if (!subjectInfo || !subjectInfo.child_subject_id) {
       alert("Selected subject invalid.");
       setSavingLesson(false);
       return;
     }
-
+  
     if (
       !lessonJsonForApproval ||
       !lessonTitleForApproval ||
@@ -681,13 +686,13 @@ export default function DashboardPage() {
       setSavingLesson(false);
       return;
     }
-
+  
     const unitIdForPayload = lessonJsonForApproval.unit_id || null;
     const lessonJsonToSave = { ...lessonJsonForApproval };
     delete lessonJsonToSave.unit_id;
-
+  
     const payload = {
-      child_subject_id: subjectInfo.child_subject_id, // This is already the child_subject_id
+      child_subject_id: subjectInfo.child_subject_id,
       title: lessonTitleForApproval,
       content_type: lessonContentTypeForApproval,
       lesson_json: lessonJsonToSave,
@@ -705,7 +710,7 @@ export default function DashboardPage() {
         : null,
       unit_id: unitIdForPayload,
     };
-
+  
     try {
       await api.post("/lessons/save", payload);
       await refreshChildSpecificData();
@@ -716,7 +721,7 @@ export default function DashboardPage() {
       setLessonDueDateForApproval("");
       setLessonCompletedForApproval(false);
       setAddLessonFile(null);
-
+  
       const fileInput = document.getElementById("lesson-file-input-main");
       if (fileInput) fileInput.value = "";
       setAddLessonSubject("");

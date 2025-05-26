@@ -4,8 +4,10 @@ const cors = require('cors');
 
 const childrenRoutes = require('./routes/childrenRoutes');
 const subjectsRoutes = require('./routes/subjectsRoutes');
+const lessonContainersRoutes = require('./routes/lessonContainersRoutes');
+const materialsRoutes = require('./routes/materialsRoutes');
 const childSubjectsRoutes = require('./routes/childSubjectsRoutes');
-const lessonsRoutes = require('./routes/lessonsRoutes');
+
 const weightsRoutes = require('./routes/weightsRoutes'); 
 const unitsRoutes = require('./routes/unitsRoutes');
 const childAuthRoutes = require('./routes/childAuthRoutes');
@@ -20,10 +22,13 @@ app.use(express.json());
 app.use('/api/children', childrenRoutes);
 app.use('/api/subjects', subjectsRoutes);
 app.use('/api/child-subjects', childSubjectsRoutes);
-app.use('/api/lessons', lessonsRoutes);
+app.use('/api/units', unitsRoutes); 
+app.use('/api/lesson-containers', lessonContainersRoutes);
+app.use('/api/materials', materialsRoutes); 
+
 app.use('/api/weights', weightsRoutes);
 
-app.use('/api/units', unitsRoutes); 
+
 app.use('/api/auth/child', childAuthRoutes);
 
 app.use('/api/chat', chatRoutes);

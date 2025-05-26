@@ -513,7 +513,8 @@ export default function DashboardPage() {
 
   const handleToggleLessonComplete = async (
     lessonId,
-    currentCompletedStatus
+    currentCompletedStatus,
+    grade = null
   ) => {
     let originalLesson = null;
     let subjectIdToUpdate = null;
@@ -542,7 +543,8 @@ export default function DashboardPage() {
       });
     }
     try {
-      const updatedLessonFromServer = await api.put(`/materials/${lessonId}/toggle-complete`);
+      const payload = grade !== null ? { grade } : {};
+      const updatedLessonFromServer = await api.put(`/materials/${lessonId}/toggle-complete`, payload);
 
       setLessonsBySubject((prevLBS) => {
         const newLBS = { ...prevLBS };

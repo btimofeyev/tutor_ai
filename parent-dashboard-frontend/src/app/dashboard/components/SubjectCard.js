@@ -22,6 +22,8 @@ export default function SubjectCard({
   const [expandedUnits, setExpandedUnits] = useState({});
   const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
   const [completingItems, setCompletingItems] = useState(new Set());
+  const [gradeInputs, setGradeInputs] = useState({}); // { itemId: gradeValue }
+  const [showGradeInputs, setShowGradeInputs] = useState(new Set()); // Set of item IDs
 
   if (!subject.child_subject_id) { 
     return (
@@ -232,43 +234,140 @@ export default function SubjectCard({
               return (
                 <li key={item.id} className="flex justify-between items-center text-xs bg-white rounded-md p-2 shadow-sm border">
                   <div className="flex items-center min-w-0 flex-1">
-                    {/* Quick Complete Button */}
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        
-                        // Check if this is a gradable item that requires a grade before completion
-                        const GRADABLE_CONTENT_TYPES = ['worksheet', 'assignment', 'test', 'quiz'];
-                        const isGradable = GRADABLE_CONTENT_TYPES.includes(item.content_type);
-                        const hasMaxScore = item.grade_max_value && item.grade_max_value.trim() !== '';
-                        const hasGrade = item.grade_value && item.grade_value.trim() !== '';
-                        
-                        if (!item.completed_at && isGradable && hasMaxScore && !hasGrade) {
-                          alert(`This ${item.content_type} has a max score of ${item.grade_max_value} but no grade has been entered. Please add a grade before marking as complete.`);
-                          onOpenEditModal(item); // Open edit modal to add grade
-                          return;
-                        }
-                        
-                        setCompletingItems(prev => new Set([...prev, item.id]));
-                        await onToggleComplete(item.id, !item.completed_at);
-                        setCompletingItems(prev => {
-                          const newSet = new Set(prev);
-                          newSet.delete(item.id);
-                          return newSet;
-                        });
-                      }}
-                      className="mr-2 p-1 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0"
-                      title={item.completed_at ? "Mark as Incomplete" : "Mark as Complete"}
-                      disabled={completingItems.has(item.id)}
-                    >
-                      {completingItems.has(item.id) ? (
-                        <div className="h-4 w-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-                      ) : item.completed_at ? (
-                        <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <div className="h-4 w-4 border-2 border-gray-300 rounded-full hover:border-green-500 transition-colors"></div>
-                      )}
-                    </button>
+                    {showGradeInputs.has(item.id) ? (
+                      /* Grade Input Mode */
+                      <div className="flex items-center gap-1 mr-2">
+                        <input
+                          type="text"
+                          value={gradeInputs[item.id] || ''}
+                          onChange={(e) => setGradeInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const grade = gradeInputs[item.id]?.trim();
+                              if (grade) {
+                                setCompletingItems(prev => new Set([...prev, item.id]));
+                                onToggleComplete(item.id, true, grade).then(() => {
+                                  setCompletingItems(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(item.id);
+                                    return newSet;
+                                  });
+                                  setShowGradeInputs(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(item.id);
+                                    return newSet;
+                                  });
+                                  setGradeInputs(prev => {
+                                    const newObj = { ...prev };
+                                    delete newObj[item.id];
+                                    return newObj;
+                                  });
+                                });
+                              }
+                            }
+                            if (e.key === 'Escape') {
+                              setShowGradeInputs(prev => {
+                                const newSet = new Set(prev);
+                                newSet.delete(item.id);
+                                return newSet;
+                              });
+                              setGradeInputs(prev => {
+                                const newObj = { ...prev };
+                                delete newObj[item.id];
+                                return newObj;
+                              });
+                            }
+                          }}
+                          className="w-12 px-1 py-0.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          placeholder={item.grade_max_value}
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => {
+                            const grade = gradeInputs[item.id]?.trim();
+                            if (grade) {
+                              setCompletingItems(prev => new Set([...prev, item.id]));
+                              onToggleComplete(item.id, true, grade).then(() => {
+                                setCompletingItems(prev => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(item.id);
+                                  return newSet;
+                                });
+                                setShowGradeInputs(prev => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(item.id);
+                                  return newSet;
+                                });
+                                setGradeInputs(prev => {
+                                  const newObj = { ...prev };
+                                  delete newObj[item.id];
+                                  return newObj;
+                                });
+                              });
+                            }
+                          }}
+                          disabled={completingItems.has(item.id)}
+                          className="px-1 py-0.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowGradeInputs(prev => {
+                              const newSet = new Set(prev);
+                              newSet.delete(item.id);
+                              return newSet;
+                            });
+                            setGradeInputs(prev => {
+                              const newObj = { ...prev };
+                              delete newObj[item.id];
+                              return newObj;
+                            });
+                          }}
+                          className="px-1 py-0.5 text-xs bg-gray-400 text-white rounded hover:bg-gray-500"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      /* Quick Complete Button */
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          
+                          // Check if this is a gradable item that requires a grade before completion
+                          const GRADABLE_CONTENT_TYPES = ['worksheet', 'assignment', 'test', 'quiz'];
+                          const isGradable = GRADABLE_CONTENT_TYPES.includes(item.content_type);
+                          const hasMaxScore = item.grade_max_value && item.grade_max_value.trim() !== '';
+                          const hasGrade = item.grade_value && item.grade_value.trim() !== '';
+                          
+                          if (!item.completed_at && isGradable && hasMaxScore && !hasGrade) {
+                            setShowGradeInputs(prev => new Set([...prev, item.id]));
+                            setGradeInputs(prev => ({ ...prev, [item.id]: item.grade_value || '' }));
+                            return;
+                          }
+                          
+                          setCompletingItems(prev => new Set([...prev, item.id]));
+                          await onToggleComplete(item.id, !item.completed_at);
+                          setCompletingItems(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(item.id);
+                            return newSet;
+                          });
+                        }}
+                        className="mr-2 p-1 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0"
+                        title={item.completed_at ? "Mark as Incomplete" : "Mark as Complete"}
+                        disabled={completingItems.has(item.id)}
+                      >
+                        {completingItems.has(item.id) ? (
+                          <div className="h-4 w-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+                        ) : item.completed_at ? (
+                          <CheckCircleIcon className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <div className="h-4 w-4 border-2 border-gray-300 rounded-full hover:border-green-500 transition-colors"></div>
+                        )}
+                      </button>
+                    )}
                     <span className="truncate font-medium text-gray-800 cursor-pointer" onClick={() => onOpenEditModal(item)}>
                       {item.title}
                     </span>

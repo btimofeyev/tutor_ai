@@ -493,6 +493,7 @@ exports.updateMaterialDetails = async (req, res) => {
 exports.toggleMaterialCompletion = async (req, res) => {
   const parent_id = getParentId(req);
   const { material_id } = req.params;
+  const { grade } = req.body; // Optional grade parameter
 
   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
   if (!material_id) return res.status(400).json({ error: 'material_id is required' });
@@ -527,9 +528,17 @@ exports.toggleMaterialCompletion = async (req, res) => {
 
     const newCompletedAt = material.completed_at ? null : new Date().toISOString();
     
+    // Prepare update object
+    const updateData = { completed_at: newCompletedAt };
+    
+    // If marking as complete and grade is provided, update the grade
+    if (newCompletedAt && grade !== undefined && grade !== null) {
+      updateData.grade_value = grade.toString().trim();
+    }
+    
     const { data, error } = await supabase
       .from('materials')
-      .update({ completed_at: newCompletedAt })
+      .update(updateData)
       .eq('id', material_id)
       .select()
       .single();

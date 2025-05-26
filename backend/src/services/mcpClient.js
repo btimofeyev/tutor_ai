@@ -30,14 +30,14 @@ class MCPClientService {
       // Path to your MCP server - adjust based on your setup
       const mcpServerPath =
         process.env.MCP_SERVER_PATH ||
-        path.resolve(__dirname, '../../../MCP Server/index.js');
+        path.resolve(__dirname, '../../../mcp-server/dist/server.js');
       console.log('About to spawn MCP server at:', mcpServerPath);
 
       if (!fs.existsSync(mcpServerPath)) {
         throw new Error(`MCP server script not found at: ${mcpServerPath}`);
       }
 
-      // Let MCP SDK spawn the process (no manual spawn here!)
+      // Let MCP SDK spawn the process
       this.transport = new StdioClientTransport({
         command: 'node',
         args: [mcpServerPath],
@@ -51,7 +51,7 @@ class MCPClientService {
       this.client = new Client(
         {
           name: 'klioai-tutor',
-          version: '1.0.0'
+          version: '2.0.0'
         },
         {
           capabilities: {}
@@ -64,7 +64,7 @@ class MCPClientService {
       const toolsResult = await this.client.listTools();
       this.tools = toolsResult.tools || [];
 
-      console.log('Connected to MCP server with tools:', this.tools.map(t => t.name));
+      console.log('Connected to MCP server v2.0 with tools:', this.tools.map(t => t.name));
 
       this.isConnected = true;
       return this.client;
@@ -87,60 +87,46 @@ class MCPClientService {
     this.connectionPromise = null;
   }
 
-  // Get current lesson for a child
-  async getCurrentLesson(childId, subjectId) {
+  // --- UPDATED METHODS FOR NEW SCHEMA ---
+
+  // Get current materials for a child (replaces getCurrentLesson)
+  async getCurrentMaterials(childId, subjectName = null, contentType = null) {
     try {
       await this.connect();
 
       const result = await this.client.callTool({
-        name: 'get_child_lessons',
+        name: 'get_child_materials',
         arguments: {
           child_id: childId,
-          status: 'active'
+          status: 'approved',
+          subject_name: subjectName,
+          content_type: contentType,
+          due_soon_days: 30,
+          include_completed: false // Only get incomplete materials for "current" view
         }
       });
 
       if (!result || !result.content) {
-        return null;
+        return [];
       }
 
-      const lessons = JSON.parse(result.content[0].text);
-
-      // Filter by subject if provided
-      let filteredLessons = lessons;
-      if (subjectId) {
-        filteredLessons = lessons.filter(lesson =>
-          lesson.child_subjects?.subjects?.id === subjectId
-        );
-      }
-
-      // Find the most relevant current lesson (by due date or created date)
-      const currentLesson = filteredLessons
-        .filter(lesson => lesson.status !== 'completed')
-        .sort((a, b) => {
-          if (a.due_date && b.due_date) {
-            return new Date(a.due_date) - new Date(b.due_date);
-          }
-          return new Date(b.created_at) - new Date(a.created_at);
-        })[0];
-
-      return currentLesson || null;
+      return JSON.parse(result.content[0].text);
 
     } catch (error) {
-      console.error('Error getting current lesson:', error);
-      return null;
+      console.error('Error getting current materials:', error);
+      return [];
     }
   }
 
-  // Get lesson details
-  async getLessonDetails(lessonId) {
+  // Get material details (replaces getLessonDetails)
+  async getMaterialDetails(materialId) {
     try {
       await this.connect();
 
       const result = await this.client.callTool({
-        name: 'get_lesson_details',
+        name: 'get_material_details',
         arguments: {
-          lesson_id: lessonId
+          material_id: materialId
         }
       });
 
@@ -151,12 +137,12 @@ class MCPClientService {
       return JSON.parse(result.content[0].text);
 
     } catch (error) {
-      console.error('Error getting lesson details:', error);
+      console.error('Error getting material details:', error);
       return null;
     }
   }
 
-  // Get upcoming assignments
+  // Get upcoming assignments (updated for new schema)
   async getUpcomingAssignments(childId, daysAhead = 7) {
     try {
       await this.connect();
@@ -181,13 +167,13 @@ class MCPClientService {
     }
   }
 
-  // Search lessons by query
-  async searchLessons(query, childId, subjectName) {
+  // Search materials by query (replaces searchLessons)
+  async searchMaterials(query, childId, subjectName) {
     try {
       await this.connect();
 
       const result = await this.client.callTool({
-        name: 'search_lessons',
+        name: 'search_materials',
         arguments: {
           query,
           child_id: childId,
@@ -202,34 +188,41 @@ class MCPClientService {
       return JSON.parse(result.content[0].text);
 
     } catch (error) {
-      console.error('Error searching lessons:', error);
+      console.error('Error searching materials:', error);
       return [];
     }
   }
 
-  // Check if child has access to a specific lesson
-  async checkLessonAccess(childId, lessonId) {
+  // Check if child has access to a specific material
+  async checkMaterialAccess(childId, materialId) {
     try {
-      const lessons = await this.getChildLessons(childId);
-      return lessons.some(lesson => lesson.id === lessonId);
+      const material = await this.getMaterialDetails(materialId);
+      if (!material) return false;
+      
+      // Check if the material belongs to this child through the hierarchy
+      return material.lesson?.unit?.child_subject?.child?.id === childId;
     } catch (error) {
-      console.error('Error checking lesson access:', error);
+      console.error('Error checking material access:', error);
       return false;
     }
   }
 
-  // Get all lessons for a child
-  async getChildLessons(childId, status = null) {
+  // Get all materials for a child (replaces getChildLessons)
+  async getChildMaterials(childId, status = null, subjectName = null, contentType = null) {
     try {
       await this.connect();
 
-      const args = { child_id: childId };
-      if (status) {
-        args.status = status;
-      }
+      const args = { 
+        child_id: childId,
+        include_completed: true
+      };
+      
+      if (status) args.status = status;
+      if (subjectName) args.subject_name = subjectName;
+      if (contentType) args.content_type = contentType;
 
       const result = await this.client.callTool({
-        name: 'get_child_lessons',
+        name: 'get_child_materials',
         arguments: args
       });
 
@@ -240,7 +233,7 @@ class MCPClientService {
       return JSON.parse(result.content[0].text);
 
     } catch (error) {
-      console.error('Error getting child lessons:', error);
+      console.error('Error getting child materials:', error);
       return [];
     }
   }
@@ -251,7 +244,7 @@ class MCPClientService {
       await this.connect();
 
       const result = await this.client.readResource({
-        uri: `tutor://child/${childId}/progress`
+        uri: `edunest://child/${childId}/progress`
       });
 
       if (!result || !result.contents || !result.contents[0]) {
@@ -263,35 +256,6 @@ class MCPClientService {
     } catch (error) {
       console.error('Error getting child progress:', error);
       return null;
-    }
-  }
-
-  // ===== MISSING METHODS - ADD THESE =====
-
-  // Get current lessons for a child (enhanced version)
-  async getCurrentLessons(childId, subjectName = null) {
-    try {
-      await this.connect();
-
-      const result = await this.client.callTool({
-        name: 'get_child_lessons',
-        arguments: {
-          child_id: childId,
-          status: 'approved', // Only get approved lessons
-          subject_name: subjectName,
-          due_soon_days: 30 // Get lessons due in next 30 days
-        }
-      });
-
-      if (!result || !result.content) {
-        return [];
-      }
-
-      return JSON.parse(result.content[0].text);
-
-    } catch (error) {
-      console.error('Error getting current lessons:', error);
-      return [];
     }
   }
 
@@ -315,7 +279,7 @@ class MCPClientService {
       return JSON.parse(result.content[0].text);
 
     } catch (error) {
-      console.error('Error getting child progress:', error);
+      console.error('Error getting child progress summary:', error);
       return null;
     }
   }
@@ -344,7 +308,8 @@ class MCPClientService {
         .from('child_subjects')
         .select(`
           id,
-          subjects:subject_id (id, name)
+          custom_subject_name_override,
+          subject:subject_id (id, name)
         `)
         .eq('child_id', childId);
       
@@ -357,40 +322,86 @@ class MCPClientService {
     }
   }
 
-  // Enhanced method to get learning context for chat - THIS IS THE KEY METHOD!
+  // NEW: Get curriculum structure (subjects -> units -> lessons -> materials)
+  async getCurriculumStructure(childId, subjectName = null) {
+    try {
+      await this.connect();
+
+      const result = await this.client.callTool({
+        name: 'get_curriculum_structure',
+        arguments: {
+          child_id: childId,
+          subject_name: subjectName
+        }
+      });
+
+      if (!result || !result.content) {
+        return [];
+      }
+
+      return JSON.parse(result.content[0].text);
+
+    } catch (error) {
+      console.error('Error getting curriculum structure:', error);
+      return [];
+    }
+  }
+
+  // NEW: Get units overview for a child
+  async getChildUnits(childId) {
+    try {
+      await this.connect();
+
+      const result = await this.client.readResource({
+        uri: `edunest://child/${childId}/units`
+      });
+
+      if (!result || !result.contents || !result.contents[0]) {
+        return [];
+      }
+
+      return JSON.parse(result.contents[0].text);
+
+    } catch (error) {
+      console.error('Error getting child units:', error);
+      return [];
+    }
+  }
+
+  // Enhanced method to get learning context for chat - UPDATED FOR NEW SCHEMA
   async getLearningContext(childId) {
     try {
       console.log('Getting learning context for child:', childId);
 
-      const [currentLessons, upcomingAssignments, childSubjects, progress] = await Promise.all([
-        this.getCurrentLessons(childId).catch(e => { console.error('getCurrentLessons error:', e); return []; }),
+      const [currentMaterials, upcomingAssignments, childSubjects, progress] = await Promise.all([
+        this.getCurrentMaterials(childId).catch(e => { console.error('getCurrentMaterials error:', e); return []; }),
         this.getUpcomingAssignments(childId, 7).catch(e => { console.error('getUpcomingAssignments error:', e); return []; }),
         this.getChildSubjects(childId).catch(e => { console.error('getChildSubjects error:', e); return []; }),
         this.getChildProgress(childId).catch(e => { console.error('getChildProgress error:', e); return null; })
       ]);
 
       console.log('Learning context results:', {
-        currentLessons: currentLessons.length,
+        currentMaterials: currentMaterials.length,
         upcomingAssignments: upcomingAssignments.length,
         childSubjects: childSubjects.length
       });
 
-      // Find the most immediate lesson/assignment
+      // Find the most immediate material/assignment
       let currentFocus = null;
       
-      // Prioritize lessons due soon
-      const lessonsDueSoon = currentLessons.filter(lesson => {
-        if (!lesson.due_date) return false;
-        const dueDate = new Date(lesson.due_date);
+      // Prioritize materials due soon
+      const materialsDueSoon = currentMaterials.filter(material => {
+        if (!material.due_date) return false;
+        const dueDate = new Date(material.due_date);
         const today = new Date();
         const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
         return daysUntilDue >= 0 && daysUntilDue <= 3; // Due in next 3 days
       });
 
-      if (lessonsDueSoon.length > 0) {
-        currentFocus = lessonsDueSoon[0];
-      } else if (currentLessons.length > 0) {
-        currentFocus = currentLessons[0];
+      if (materialsDueSoon.length > 0) {
+        currentFocus = materialsDueSoon[0];
+      } else if (currentMaterials.length > 0) {
+        currentFocus = currentMaterials[0];
       } else if (upcomingAssignments.length > 0) {
         currentFocus = {
           type: 'assignment',
@@ -400,7 +411,8 @@ class MCPClientService {
 
       return {
         childSubjects: childSubjects || [],
-        currentLessons: currentLessons || [],
+        currentLessons: currentMaterials || [], // Keep the old property name for compatibility
+        currentMaterials: currentMaterials || [], // New property name
         upcomingAssignments: upcomingAssignments || [],
         currentFocus,
         progress: progress || null
@@ -418,18 +430,26 @@ class MCPClientService {
           .from('child_subjects')
           .select(`
             id,
-            subjects:subject_id (id, name)
+            custom_subject_name_override,
+            subject:subject_id (id, name)
           `)
           .eq('child_id', childId);
 
-        // Get current lessons directly  
+        // Get current materials directly  
         const childSubjectIds = (childSubjects || []).map(cs => cs.id);
-        const { data: lessons } = await supabase
-          .from('lessons')
+        const { data: materials } = await supabase
+          .from('materials')
           .select(`
             id, title, status, due_date, content_type, created_at,
-            child_subjects:child_subject_id (
-              subjects:subject_id (name)
+            lesson:lesson_id (
+              id, title, lesson_number,
+              unit:unit_id (
+                id, name,
+                child_subject:child_subject_id (
+                  subject:subject_id (name),
+                  custom_subject_name_override
+                )
+              )
             )
           `)
           .in('child_subject_id', childSubjectIds)
@@ -438,13 +458,14 @@ class MCPClientService {
           .order('due_date', { ascending: true, nullsLast: true })
           .limit(10);
 
-        console.log('Fallback context - found lessons:', lessons?.length || 0);
+        console.log('Fallback context - found materials:', materials?.length || 0);
 
         return {
           childSubjects: childSubjects || [],
-          currentLessons: lessons || [],
+          currentLessons: materials || [], // For compatibility
+          currentMaterials: materials || [],
           upcomingAssignments: [],
-          currentFocus: lessons?.[0] || null,
+          currentFocus: materials?.[0] || null,
           progress: null,
           fallback: true
         };
@@ -453,6 +474,7 @@ class MCPClientService {
         return {
           childSubjects: [],
           currentLessons: [],
+          currentMaterials: [],
           upcomingAssignments: [],
           currentFocus: null,
           progress: null,
@@ -460,6 +482,34 @@ class MCPClientService {
         };
       }
     }
+  }
+
+  // BACKWARD COMPATIBILITY METHODS (map old names to new functionality)
+  
+  async getCurrentLesson(childId, subjectId) {
+    console.warn('getCurrentLesson is deprecated, use getCurrentMaterials instead');
+    const materials = await this.getCurrentMaterials(childId);
+    return materials.length > 0 ? materials[0] : null;
+  }
+
+  async getLessonDetails(lessonId) {
+    console.warn('getLessonDetails is deprecated, use getMaterialDetails instead');
+    return await this.getMaterialDetails(lessonId);
+  }
+
+  async searchLessons(query, childId, subjectName) {
+    console.warn('searchLessons is deprecated, use searchMaterials instead');
+    return await this.searchMaterials(query, childId, subjectName);
+  }
+
+  async checkLessonAccess(childId, lessonId) {
+    console.warn('checkLessonAccess is deprecated, use checkMaterialAccess instead');
+    return await this.checkMaterialAccess(childId, lessonId);
+  }
+
+  async getChildLessons(childId, status = null) {
+    console.warn('getChildLessons is deprecated, use getChildMaterials instead');
+    return await this.getChildMaterials(childId, status);
   }
 }
 

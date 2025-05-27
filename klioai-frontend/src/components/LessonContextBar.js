@@ -1,6 +1,7 @@
+// klioai-frontend/src/components/LessonContextBar.js
 import { motion } from 'framer-motion';
 
-export function LessonContextBar({ lessonContext, onClose, onGetHelp }) {
+export default function LessonContextBar({ lessonContext, onClose, onGetHelp }) {
   if (!lessonContext) return null;
 
   const typeEmoji = {

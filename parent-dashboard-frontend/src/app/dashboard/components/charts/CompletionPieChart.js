@@ -6,23 +6,24 @@ import { Pie } from 'react-chartjs-2';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const CompletionPieChart = ({ completed, total }) => {
-  if (total === 0) return <p className="text-xs text-gray-400 italic text-center py-4">No data for chart.</p>;
+  if (total === 0) return <p className="text-xs text-text-tertiary italic text-center py-4">No data.</p>;
 
   const data = {
     labels: ['Completed', 'Incomplete'],
     datasets: [
       {
-        label: '# of Items',
+        label: 'Items',
         data: [completed, total - completed],
         backgroundColor: [
-          'rgba(75, 192, 192, 0.7)', 
-          'rgba(255, 99, 132, 0.7)', 
+          'var(--accent-green)', // Completed
+          '#E5E7EB',          // Incomplete (Tailwind gray-200) or var(--border-subtle)
         ],
         borderColor: [
-          'rgba(75, 192, 192, 1)',
-          'rgba(255, 99, 132, 1)',
+          'var(--accent-green)',
+          '#E5E7EB',
         ],
         borderWidth: 1,
+        hoverOffset: 4,
       },
     ],
   };
@@ -32,20 +33,18 @@ const CompletionPieChart = ({ completed, total }) => {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'bottom',
-        labels: {
-            boxWidth: 12,
-            padding:15,
-            font: { size: 10}
-        }
+        display: false, // Simplified: remove legend for small chart
       },
       tooltip: {
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        titleFont: { size: 10 },
+        bodyFont: { size: 10 },
+        padding: 8,
+        cornerRadius: 4,
         callbacks: {
           label: function(context) {
             let label = context.label || '';
-            if (label) {
-              label += ': ';
-            }
+            if (label) { label += ': '; }
             if (context.parsed !== null) {
               label += context.parsed;
               const percentage = Math.round((context.parsed / total) * 100);
@@ -56,9 +55,25 @@ const CompletionPieChart = ({ completed, total }) => {
         }
       }
     },
+    cutout: '60%', // Makes it a doughnut chart, a bit more modern
   };
 
-  return <div style={{ height: '130px', width: '130px', margin: 'auto' }}><Pie data={data} options={options} /></div>;
+  return <div style={{ height: '100%', width: '100%', position: 'relative' }}>
+            <Pie data={data} options={options} />
+            <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                textAlign: 'center',
+                pointerEvents: 'none'
+            }}>
+                <div className="text-lg font-semibold text-text-primary">
+                    {total > 0 ? `${Math.round((completed / total) * 100)}%` : '0%'}
+                </div>
+                <div className="text-[10px] text-text-tertiary -mt-1">Done</div>
+            </div>
+         </div>;
 };
 
 export default CompletionPieChart;

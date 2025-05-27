@@ -1,6 +1,9 @@
 'use client';
-import Link from 'next/link';
+import React from 'react';
+import Image from 'next/image';
 import { useRef } from 'react';
+import { ArrowDownCircleIcon, SparklesIcon, UserGroupIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import Button from '../components/ui/Button';
 
 export default function LandingPage() {
   const featuresRef = useRef(null);
@@ -9,149 +12,155 @@ export default function LandingPage() {
     featuresRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const features = [
+    {
+      icon: <SparklesIcon className="text-[var(--accent-blue)]" />,
+      title: "Transform Piles into Plans",
+      desc: "Snap a photo or upload any document. Klio AI intelligently analyzes, structures, and categorizes your materials, turning raw content into ready-to-use lessons and assignments in seconds.",
+    },
+    {
+      icon: <UserGroupIcon className="text-[var(--accent-yellow)]" />,
+      title: "Orchestrate Learning, Child by Child",
+      desc: "Design bespoke learning paths with custom subjects and units. Klio AI provides a clear, organized view of each child's progress, upcoming work, and achievements.",
+    },
+    {
+      icon: <ShieldCheckIcon className="text-[var(--accent-blue)]" />,
+      title: "Your Family's Journey, Securely Yours",
+      desc: "Klio AI is built on a foundation of privacy, ensuring your family's learning remains confidential and under your control. No ads, no data selling. Ever.",
+    }
+  ];
+
+  const FeatureCard = ({ icon, title, children }) => (
+    <div className="card p-6 text-center flex flex-col items-center">
+      <div className="mb-4 flex items-center justify-center w-12 h-12 bg-white rounded-full border border-border-subtle">
+        {icon}
+      </div>
+      <h3 className="text-lg font-semibold text-text-primary mb-2">{title}</h3>
+      <p className="text-sm text-text-secondary leading-relaxed">{children}</p>
+    </div>
+  );
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex flex-col items-center" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+    <main className="min-h-screen bg-background-main text-text-primary flex flex-col items-center">
       {/* HERO PANEL */}
-      <section className="flex flex-col justify-center items-center min-h-[75vh] w-full">
-        <div className="max-w-2xl w-full text-center px-6 py-20"
-             style={{
-               background: 'rgba(255,255,255,0.72)',
-               boxShadow: '0 8px 32px rgba(0,0,0,0.09)',
-               borderRadius: '2rem',
-               border: '1px solid #eee',
-               backdropFilter: 'blur(8px)'
-             }}>
-          <h1 className="text-5xl font-bold mb-4 tracking-tight" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-            EduNest
+      <section className="flex flex-col justify-center items-center w-full py-20 md:py-32 px-4 animate-fade-in">
+        {/* LOGO */}
+        <Image
+          src="/klio_logo.png"
+          alt="Klio AI Logo"
+          width={96}
+          height={96}
+          className="mb-6"
+          priority
+        />
+        <div className="max-w-2xl text-center">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 tracking-tight">
+            Craft Your Homeschool Journey with <span className="text-highlight-yellow"><span className="text-accent-primary-text">Klio AI.</span></span>
           </h1>
-          <p className="text-lg mb-2" style={{ color: 'var(--foreground)', fontWeight: 600 }}>
-            Where Family Learning Takes Flight
+          <p className="text-lg sm:text-xl text-text-secondary mb-8 max-w-xl mx-auto">
+            The intelligent platform that <span className="text-highlight-blue">simplifies planning</span>, digitizes materials, and illuminates your child's learning path.
           </p>
-          <p className="text-xl mb-8" style={{ color: 'var(--foreground)', opacity: 0.9 }}>
-            Organize, digitize, and track every lesson—your all-in-one AI-powered homeschool dashboard.<br />
-            <span style={{ fontWeight: 600 }}>Fast. Private. Effortless.</span>
+          <p className="text-md text-text-secondary mb-10 max-w-lg mx-auto">
+            Stop juggling spreadsheets and scattered notes. Klio AI brings calm and clarity to your homeschool. Spend less time managing, <span className="font-medium text-text-primary">more time inspiring.</span>
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-4">
-            <Link href="/signup">
-              <button className="w-full sm:w-auto px-8 py-3 rounded-xl" style={{
-                background: 'var(--foreground)',
-                color: 'var(--background)',
-                fontWeight: 500,
-                fontSize: '1.1rem',
-                transition: 'all 0.18s',
-                border: 'none',
-                boxShadow: '0 1px 5px rgba(0,0,0,0.03)'
-              }}>Get Started Free</button>
-            </Link>
-            <Link href="/login">
-              <button className="w-full sm:w-auto px-8 py-3 rounded-xl" style={{
-                background: 'var(--background)',
-                color: 'var(--foreground)',
-                fontWeight: 500,
-                fontSize: '1.1rem',
-                border: '1.5px solid var(--foreground)',
-                boxShadow: '0 1px 5px rgba(0,0,0,0.02)',
-                transition: 'all 0.18s'
-              }}>Log In</button>
-            </Link>
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 justify-center mb-6">
+            <Button href="/signup" as="link" className="btn-primary text-lg px-7 py-3">
+              Get Started Free
+            </Button>
+            <Button href="/login" as="link" className="btn-secondary text-lg px-7 py-3">
+              Log In
+            </Button>
           </div>
-          <div className="mb-6 text-xs text-gray-500" style={{ opacity: 0.9 }}>
-            No credit card required. Cancel anytime.
-          </div>
+          <p className="text-xs text-text-tertiary">
+            No credit card required.
+          </p>
         </div>
-        {/* Scroll Down Arrow */}
         <button
           onClick={scrollToFeatures}
-          className="mt-10 animate-bounce text-gray-400 hover:text-black"
-          style={{ background: 'none', border: 'none', outline: 'none', cursor: 'pointer' }}
+          className="mt-16 text-text-tertiary hover:text-accent-dark transition-colors"
           aria-label="Scroll down to features"
         >
-          <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
-            <path d="M12 5v14m0 0l-6-6m6 6l6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <ArrowDownCircleIcon className="h-10 w-10 animate-bounce" />
         </button>
       </section>
 
-      {/* HERO IMAGE / ILLUSTRATION */}
-      <section className="w-full flex justify-center mt-[-60px] mb-16">
-        <img
-          src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80"
-          alt="Family learning together"
-          className="rounded-3xl shadow-lg border-2 border-white max-w-xl w-full"
-          style={{
-            objectFit: 'cover',
-            height: '320px'
-          }}
-        />
+      {/* HERO IMAGE SECTION */}
+      <section className="w-full flex justify-center mb-16 md:mb-24 px-4">
+        <div className="max-w-4xl w-full bg-transparent p-0">
+          <img
+            src="/klio-dashboard-mockup-light.png"
+            alt="Klio AI Dashboard Preview"
+            className="rounded-lg object-contain w-full h-auto max-h-[400px] md:max-h-[550px] shadow-xl border border-border-subtle"
+          />
+        </div>
       </section>
 
       {/* FEATURES SECTION */}
-      <section ref={featuresRef} className="w-full max-w-5xl px-6 pb-20">
-        <h2 className="text-3xl font-bold mb-12 text-center">Why EduNest?</h2>
-        <div className="grid md:grid-cols-3 gap-8">
-          {/* Feature 1 */}
-          <div className="bg-white/80 border border-gray-100 rounded-2xl shadow-lg p-8 flex flex-col items-center text-center">
-            <span className="text-4xl mb-3" role="img" aria-label="Rocket">🚀</span>
-            <h3 className="font-semibold text-lg mb-2">Instant AI Organization</h3>
-            <p className="text-gray-600">Upload lessons and worksheets—AI instantly categorizes and structures everything for you.</p>
-          </div>
-          {/* Feature 2 */}
-          <div className="bg-white/80 border border-gray-100 rounded-2xl shadow-lg p-8 flex flex-col items-center text-center">
-            <span className="text-4xl mb-3" role="img" aria-label="Family">👨‍👩‍👧‍👦</span>
-            <h3 className="font-semibold text-lg mb-2">Made for Homeschool</h3>
-            <p className="text-gray-600">Designed specifically for families—keep each child’s subjects, progress, and work beautifully separated.</p>
-          </div>
-          {/* Feature 3 */}
-          <div className="bg-white/80 border border-gray-100 rounded-2xl shadow-lg p-8 flex flex-col items-center text-center">
-            <span className="text-4xl mb-3" role="img" aria-label="Shield">🔒</span>
-            <h3 className="font-semibold text-lg mb-2">Private & Secure</h3>
-            <p className="text-gray-600">No data sold. No ads. You control your family’s learning data, always.</p>
-          </div>
+      <section ref={featuresRef} className="w-full max-w-5xl px-4 pb-20 md:pb-32">
+        <h2 className="text-3xl font-bold mb-12 text-center text-text-primary">
+          Intelligent Homeschooling, <span className="text-highlight-blue">Effortlessly Orchestrated.</span>
+        </h2>
+        <div className="grid md:grid-cols-3 gap-6 md:gap-8">
+          {features.map((f) => (
+            <FeatureCard
+              key={f.title}
+              icon={f.icon}
+              title={f.title}
+            >
+              {f.desc}
+            </FeatureCard>
+          ))}
         </div>
       </section>
 
-      {/* TESTIMONIAL / SOCIAL PROOF */}
-      <section className="w-full bg-white/70 border-t border-b border-gray-200 py-12 mb-16">
-        <div className="max-w-3xl mx-auto flex flex-col items-center">
-          <div className="mb-4 text-lg font-semibold text-gray-700">
-            <span className="text-green-500">★</span> Trusted by families nationwide <span className="text-green-500">★</span>
-          </div>
-          <blockquote className="italic text-center text-gray-700">
-            "EduNest has transformed our homeschooling. Everything is organized, and the AI makes lesson planning a breeze!"
-          </blockquote>
-          <div className="mt-2 text-xs text-gray-500">— Sarah L., Homeschool Parent</div>
+      {/* TESTIMONIAL SECTION */}
+      <section className="w-full py-16 md:py-20">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <p className="text-xl md:text-2xl text-text-primary italic leading-relaxed">
+            "Klio AI has transformed our homeschooling. Everything is organized, and the AI makes lesson planning a breeze! It feels like I have a <span className="text-highlight-blue">super-efficient assistant.</span>"
+          </p>
+          <p className="mt-4 text-sm text-text-tertiary">— Sarah L., Homeschool Parent</p>
         </div>
       </section>
 
-      {/* FAQ / BENEFITS SECTION */}
-      <section className="w-full max-w-5xl px-6 pb-32">
-        <h3 className="text-2xl font-bold mb-8 text-center">Frequently Asked</h3>
-        <div className="grid md:grid-cols-2 gap-8">
+      {/* FAQ SECTION */}
+      <section className="w-full max-w-5xl px-4 py-20 md:py-32">
+        <h3 className="text-3xl font-bold mb-12 text-center text-text-primary">Unlock Effortless Homeschooling</h3>
+        <div className="grid md:grid-cols-2 gap-x-10 gap-y-8">
           <div>
-            <h4 className="font-semibold mb-2">Do I need any technical skills?</h4>
-            <p className="text-gray-600 mb-4">Nope! EduNest is built to be simple and intuitive for busy parents.</p>
-            <h4 className="font-semibold mb-2">Can I add multiple children?</h4>
-            <p className="text-gray-600">Yes! Each child gets their own subjects and lesson tracking.</p>
+            <h4 className="font-medium text-lg text-text-primary mb-1.5">Do I need any technical skills?</h4>
+            <p className="text-sm text-text-secondary leading-relaxed">Not at all. Klio AI is designed for simplicity and intuitive use, even if you're not tech-savvy.</p>
           </div>
           <div>
-            <h4 className="font-semibold mb-2">What happens to my data?</h4>
-            <p className="text-gray-600 mb-4">Your content stays private—never sold, never shared. Delete anytime.</p>
-            <h4 className="font-semibold mb-2">How much does it cost?</h4>
-            <p className="text-gray-600">Start free! Upgrade only if you need extra features or storage.</p>
+            <h4 className="font-medium text-lg text-text-primary mb-1.5">Can I add multiple children?</h4>
+            <p className="text-sm text-text-secondary leading-relaxed">Absolutely. Each child gets their own personalized dashboard, subjects, and progress tracking.</p>
+          </div>
+          <div>
+            <h4 className="font-medium text-lg text-text-primary mb-1.5">What about my existing curriculum?</h4>
+            <p className="text-sm text-text-secondary leading-relaxed">Bring it on! Upload PDFs, images, or even text files. Klio AI helps you digitize and organize it all.</p>
+          </div>
+          <div>
+            <h4 className="font-medium text-lg text-text-primary mb-1.5">Is there a trial period?</h4>
+            <p className="text-sm text-text-secondary leading-relaxed">You can start with our free plan to explore core features. Upgrade when you're ready for more.</p>
           </div>
         </div>
       </section>
 
       {/* CALL TO ACTION FOOTER */}
-      <footer className="w-full py-8 flex flex-col items-center bg-white/60 border-t border-gray-200">
-        <h3 className="text-xl font-semibold mb-2">Ready to take flight?</h3>
-        <Link href="/signup">
-          <button className="px-8 py-3 rounded-xl bg-black text-white font-medium text-lg shadow hover:bg-gray-900 transition">
-            Start Free Now
-          </button>
-        </Link>
-        <div className="mt-4 text-xs text-gray-400">
-          &copy; {new Date().getFullYear()} EduNest. All rights reserved.
+      <footer className="w-full py-12 md:py-16 flex flex-col items-center bg-background-card border-t border-border-subtle">
+        <div className="text-center px-4">
+          <h3 className="text-2xl md:text-3xl font-bold text-text-primary mb-4">
+            Ready to simplify your homeschool?
+          </h3>
+          <p className="text-md text-text-secondary mb-8 max-w-md mx-auto">
+            Join Klio AI today and experience the future of <span className="text-highlight-yellow">personalized family learning.</span>
+          </p>
+          <Button href="/signup" as="link" className="btn-primary font-semibold text-lg px-7 py-3">
+            Sign Up for Free
+          </Button>
+          <div className="mt-8 text-xs text-text-tertiary">
+            © {new Date().getFullYear()} Klio AI. All rights reserved.
+          </div>
         </div>
       </footer>
     </main>

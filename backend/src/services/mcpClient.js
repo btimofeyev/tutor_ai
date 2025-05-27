@@ -368,7 +368,168 @@ class MCPClientService {
     }
   }
 
+  // --- GRADE-RELATED METHODS ---
+
+  // Get completed materials with grades (for review)
+  async getCompletedMaterialsWithGrades(childId, gradeThreshold = null, subjectName = null, contentType = null, limit = 10) {
+    try {
+      await this.connect();
+
+      const args = { 
+        child_id: childId,
+        limit: limit
+      };
+      
+      if (gradeThreshold) args.grade_threshold = gradeThreshold;
+      if (subjectName) args.subject_name = subjectName;
+      if (contentType) args.content_type = contentType;
+
+      const result = await this.client.callTool({
+        name: 'get_completed_materials_with_grades',
+        arguments: args
+      });
+
+      if (!result || !result.content) {
+        return [];
+      }
+
+      return JSON.parse(result.content[0].text);
+
+    } catch (error) {
+      console.error('Error getting completed materials with grades:', error);
+      return [];
+    }
+  }
+
+  // Get detailed grade analysis
+  async getGradeAnalysis(childId, subjectName = null, daysBack = 30) {
+    try {
+      await this.connect();
+
+      const result = await this.client.callTool({
+        name: 'get_grade_analysis',
+        arguments: {
+          child_id: childId,
+          subject_name: subjectName,
+          days_back: daysBack
+        }
+      });
+
+      if (!result || !result.content) {
+        return null;
+      }
+
+      return JSON.parse(result.content[0].text);
+
+    } catch (error) {
+      console.error('Error getting grade analysis:', error);
+      return null;
+    }
+  }
+
+  // Get materials that need review
+  async getMaterialsForReview(childId, reviewCriteria = 'low_grades', subjectName = null) {
+    try {
+      await this.connect();
+
+      const result = await this.client.callTool({
+        name: 'get_materials_for_review',
+        arguments: {
+          child_id: childId,
+          review_criteria: reviewCriteria,
+          subject_name: subjectName
+        }
+      });
+
+      if (!result || !result.content) {
+        return [];
+      }
+
+      return JSON.parse(result.content[0].text);
+
+    } catch (error) {
+      console.error('Error getting materials for review:', error);
+      return [];
+    }
+  }
+
   // Enhanced method to get learning context for chat - UPDATED FOR NEW SCHEMA
+  async getEnhancedLearningContext(childId) {
+    try {
+      console.log('Getting enhanced learning context for child:', childId);
+
+      const [
+        currentMaterials, 
+        upcomingAssignments, 
+        childSubjects, 
+        progress,
+        gradeAnalysis,
+        materialsForReview
+      ] = await Promise.all([
+        this.getCurrentMaterials(childId).catch(e => { console.error('getCurrentMaterials error:', e); return []; }),
+        this.getUpcomingAssignments(childId, 7).catch(e => { console.error('getUpcomingAssignments error:', e); return []; }),
+        this.getChildSubjects(childId).catch(e => { console.error('getChildSubjects error:', e); return []; }),
+        this.getChildProgress(childId).catch(e => { console.error('getChildProgress error:', e); return null; }),
+        this.getGradeAnalysis(childId, null, 30).catch(e => { console.error('getGradeAnalysis error:', e); return null; }),
+        this.getMaterialsForReview(childId, 'low_grades').catch(e => { console.error('getMaterialsForReview error:', e); return []; })
+      ]);
+
+      console.log('Enhanced learning context results:', {
+        currentMaterials: currentMaterials.length,
+        upcomingAssignments: upcomingAssignments.length,
+        childSubjects: childSubjects.length,
+        hasGradeAnalysis: !!gradeAnalysis,
+        materialsNeedingReview: materialsForReview.length
+      });
+
+      // Find the most immediate material/assignment
+      let currentFocus = null;
+      
+      // Prioritize materials due soon
+      const materialsDueSoon = currentMaterials.filter(material => {
+        if (!material.due_date) return false;
+        const dueDate = new Date(material.due_date);
+        const today = new Date();
+        const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+        return daysUntilDue >= 0 && daysUntilDue <= 3; // Due in next 3 days
+      });
+
+      if (materialsDueSoon.length > 0) {
+        currentFocus = materialsDueSoon[0];
+      } else if (currentMaterials.length > 0) {
+        currentFocus = currentMaterials[0];
+      } else if (upcomingAssignments.length > 0) {
+        currentFocus = {
+          type: 'assignment',
+          ...upcomingAssignments[0]
+        };
+      }
+
+      return {
+        childSubjects: childSubjects || [],
+        currentLessons: currentMaterials || [], // Keep for compatibility
+        currentMaterials: currentMaterials || [],
+        upcomingAssignments: upcomingAssignments || [],
+        currentFocus,
+        progress: progress || null,
+        gradeAnalysis: gradeAnalysis || null,
+        materialsForReview: materialsForReview || [],
+        // Add summary flags for quick checks
+        hasLowGrades: materialsForReview.length > 0,
+        averageGrade: gradeAnalysis?.trends?.averageGrade || null,
+        needsReview: materialsForReview.length > 0,
+        recentGradeCount: gradeAnalysis?.totalGradedMaterials || 0
+      };
+
+    } catch (error) {
+      console.error('Error getting enhanced learning context:', error);
+      
+      // Return basic context if enhanced fails
+      return await this.getLearningContext(childId);
+    }
+  }
+
+  // MISSING METHOD: Basic learning context method for compatibility
   async getLearningContext(childId) {
     try {
       console.log('Getting learning context for child:', childId);
@@ -483,6 +644,19 @@ class MCPClientService {
         };
       }
     }
+  }
+
+  // Utility method to check if child has grade-related queries
+  isGradeRelatedQuery(message) {
+    const gradeKeywords = [
+      'grade', 'grades', 'score', 'scores', 'review', 'wrong', 'missed', 'failed',
+      'perfect', 'how did i do', 'check my work', 'mistakes', 'incorrect',
+      'average', 'performance', 'results', 'feedback', 'percent', '%', 'points',
+      'better', 'improve', 'study more', 'practice more', 'not good', 'disappointed'
+    ];
+    
+    const messageLower = message.toLowerCase();
+    return gradeKeywords.some(keyword => messageLower.includes(keyword));
   }
 
   // BACKWARD COMPATIBILITY METHODS (map old names to new functionality)

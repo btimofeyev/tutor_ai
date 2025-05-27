@@ -761,36 +761,45 @@ export default function DashboardPage() {
     }
   };
 
-  const handleCreateNewLessonContainer = async () => {
-    const unitId = lessonJsonForApproval?.unit_id;
+  const handleCreateNewLessonContainer = async (newTitleFromForm) => { // Accepts newTitleFromForm
+    const unitId = lessonJsonForApproval?.unit_id; 
+  
     if (!unitId) {
-      alert('Please select a unit first.');
-      return;
+      console.error('Dashboard Page: Unit ID is missing for new lesson container creation.'); // Log error
+      alert('Error: A unit must be selected before creating a new lesson group.');
+      return; // Exit if no unitId
     }
-
-    const title = prompt('Enter lesson container title:');
-    if (!title || !title.trim()) return;
-
+    if (!newTitleFromForm || !newTitleFromForm.trim()) {
+      // This should ideally be caught in the form, but good to double-check
+      console.error('Dashboard Page: New lesson container title is empty.'); // Log error
+      alert('Error: New lesson group title cannot be empty.');
+      return; // Exit if no title
+    }
+  
+    console.log(`Dashboard Page: Attempting to create lesson container "${newTitleFromForm}" in unit ${unitId}`); // Log action
+  
     try {
       const response = await api.post('/lesson-containers', {
         unit_id: unitId,
-        title: title.trim()
+        title: newTitleFromForm.trim()
       });
       
-      // Refresh lesson containers for this unit
+      console.log('Dashboard Page: Lesson container created:', response.data); // Log success
+  
       const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
-      const updatedLessons = lessonsRes.data || [];
+      const updatedLessonContainersForUnit = lessonsRes.data || [];
       
       setLessonsByUnit(prev => ({
         ...prev,
-        [unitId]: updatedLessons
+        [unitId]: updatedLessonContainersForUnit
       }));
       
-      // Auto-select the newly created lesson container
-      setSelectedLessonContainer(response.data.id);
-      alert('Lesson container created successfully!');
+      setSelectedLessonContainer(response.data.id); 
+
+  
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to create lesson container.');
+      console.error('Dashboard Page: Failed to create lesson container:', error.response?.data || error.message); // Log detailed error
+      alert(error.response?.data?.error || 'Failed to create lesson group. Please try again.');
     }
   };
 

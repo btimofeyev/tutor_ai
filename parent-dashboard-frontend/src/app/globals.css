@@ -1,41 +1,110 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background-main: #FFFFFF;
+  --background-card: #FFFFFF;
+
+  --text-primary: #232323;
+  --text-secondary: #757575;
+  --text-tertiary: #BDBDBD;
+  --text-on-accent: #232323;
+
+  --accent-blue: #B3E0F8;      /* logo blue */
+  --accent-yellow: #FFE6A7;    /* logo yellow */
+  --accent-dark: #606060;      /* logo outlines */
+
+  --border-subtle: #EAEAEA;
+  --border-input: #D1D5DB;
+  --border-input-focus: var(--accent-blue);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Accent highlights for text */
+.text-highlight-yellow {
+  background-image: linear-gradient(180deg, transparent 60%, var(--accent-yellow) 60%);
+  padding: 0 0.1em;
+  margin: 0 -0.1em;
+  display: inline;
+  line-height: 1.3;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.text-highlight-blue {
+  background-image: linear-gradient(180deg, transparent 60%, var(--accent-blue) 60%);
+  padding: 0 0.1em;
+  margin: 0 -0.1em;
+  display: inline;
+  line-height: 1.3;
+}
+
+/* Accent Buttons */
+.btn-primary {
+  background: var(--accent-blue);
+  color: var(--text-primary);
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: background 0.18s;
+}
+.btn-primary:hover {
+  background: #a1d4ee;
+}
+.btn-secondary {
+  background: var(--accent-yellow);
+  color: var(--text-primary);
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: background 0.18s;
+}
+.btn-secondary:hover {
+  background: #ffe3a7;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--background-main);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Card default is white with subtle border */
+.card {
+  background: var(--background-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgba(0,0,0,0.03);
+}
+
+/* Minimal scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  background: #e5e7eb;
-  border-radius: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 8px;
+  background: #CBD5E1;
+  border-radius: 3px;
 }
-input, button, textarea {
+::-webkit-scrollbar-thumb:hover {
+  background: #BDBDBD;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+input, button, textarea, select {
   font-family: inherit;
 }
 
-@keyframes fade-in { from { opacity: 0; transform: scale(0.97);} to { opacity: 1; transform: scale(1);} }
-.animate-fade-in { animation: fade-in 0.2s ease; }
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: inherit;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(5px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0px) scale(1); }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}

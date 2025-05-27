@@ -2,18 +2,18 @@
 'use client';
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CogIcon, ChevronDownIcon, ChevronUpIcon, FolderOpenIcon, PlusCircleIcon, ListBulletIcon, ClockIcon } from '@heroicons/react/24/outline';
-import { CheckCircleIcon } from '@heroicons/react/24/solid';
-import MaterialListItem from './MaterialListItem';
-import CompletionPieChart from './charts/CompletionPieChart';
+import { CogIcon, ChevronDownIcon, ChevronUpIcon, FolderOpenIcon, PlusCircleIcon, ListBulletIcon, ClockIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
+import MaterialListItem from './MaterialListItem'; // Ensure this is styled
+import CompletionPieChart from './charts/CompletionPieChart'; // Ensure this is styled
 
-const ITEMS_TO_SHOW_INITIALLY_PER_UNIT = 3;
+// Constants moved from MaterialListItem to be accessible here if needed
+const GRADABLE_CONTENT_TYPES = ['worksheet', 'assignment', 'test', 'quiz'];
 
 export default function SubjectCard({ 
     subject, 
     lessons = [], 
     units = [], 
-    lessonsByUnit = {}, // New: lesson containers grouped by unit
+    lessonsByUnit = {},
     subjectStats, 
     onOpenEditModal, 
     onManageUnits,
@@ -21,16 +21,13 @@ export default function SubjectCard({
 }) {
   const [expandedUnits, setExpandedUnits] = useState({});
   const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
-  const [completingItems, setCompletingItems] = useState(new Set());
-  const [gradeInputs, setGradeInputs] = useState({}); // { itemId: gradeValue }
-  const [showGradeInputs, setShowGradeInputs] = useState(new Set()); // Set of item IDs
-
+  
   if (!subject.child_subject_id) { 
     return (
-        <div className="bg-yellow-100 rounded-xl p-4 shadow">
-            <div className="font-semibold mb-2">{subject.name}</div>
-            <div className="text-sm text-yellow-800">
-                <b>Warning:</b> This subject is not fully configured for this student.
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 shadow-sm">
+            <div className="font-semibold text-text-primary mb-1">{subject.name}</div>
+            <div className="text-sm text-orange-700">
+                <b>Configuration Incomplete:</b> This subject needs to be fully set up for this student.
             </div>
         </div>
     );
@@ -38,7 +35,6 @@ export default function SubjectCard({
   
   const currentSubjectStats = subjectStats;
 
-  // Get next 3 upcoming due items for quick overview
   const upcomingDueItems = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -47,16 +43,15 @@ export default function SubjectCard({
       .filter(lesson => !lesson.completed_at && lesson.due_date)
       .map(lesson => ({
         ...lesson,
-        dueDateObj: new Date(lesson.due_date + 'T00:00:00Z')
+        dueDateObj: new Date(lesson.due_date + 'T00:00:00Z') // Ensure UTC context for due date
       }))
       .filter(lesson => lesson.dueDateObj >= today)
       .sort((a, b) => a.dueDateObj - b.dueDateObj)
       .slice(0, 3);
   }, [lessons]);
 
-  // Group materials that don't belong to any lesson container (uncategorized/general materials)
   const generalMaterials = useMemo(() => {
-    return lessons.filter(lesson => !lesson.lesson_id);
+    return lessons.filter(lesson => !lesson.lesson_id); // Materials not in any lesson container
   }, [lessons]);
 
   const toggleUnitExpansion = (unitId) => {
@@ -67,7 +62,11 @@ export default function SubjectCard({
     setExpandedLessonContainers(prev => ({ ...prev, [lessonContainerId]: !prev[lessonContainerId] }));
   };
 
-  // Render materials for a lesson container
+  const commonButtonStyles = "flex items-center text-xs px-2.5 py-1.5 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1";
+  const primaryButtonStyles = `${commonButtonStyles} bg-accent-blue text-text-on-accent hover:bg-accent-blue-hover focus:ring-accent-blue`;
+  const secondaryButtonStyles = `${commonButtonStyles} bg-gray-100 text-text-secondary hover:bg-gray-200 focus:ring-accent-blue`;
+
+
   const renderLessonContainerMaterials = (lessonContainer, materials) => {
     const isExpanded = !!expandedLessonContainers[lessonContainer.id];
     const materialCount = materials.length;
@@ -75,100 +74,96 @@ export default function SubjectCard({
     if (materialCount === 0) return null;
 
     return (
-      <div key={lessonContainer.id} className="ml-4 mt-2 border-l-2 border-gray-200 pl-3">
+      <div key={lessonContainer.id} className="ml-4 mt-1.5 pl-3"> {/* Removed border for cleaner look, rely on indentation */}
         <div 
           className="flex justify-between items-center py-1.5 cursor-pointer hover:bg-gray-50 rounded-md px-2 group"
           onClick={() => toggleLessonContainerExpansion(lessonContainer.id)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleLessonContainerExpansion(lessonContainer.id)}
-          aria-expanded={isExpanded}
-          aria-controls={`lesson-content-${lessonContainer.id}`}
+          role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleLessonContainerExpansion(lessonContainer.id)}
+          aria-expanded={isExpanded} aria-controls={`lesson-content-${lessonContainer.id}`}
         >
-          <h5 className="text-sm font-medium text-gray-600 flex items-center">
-            <ListBulletIcon className="h-4 w-4 mr-2 text-gray-400 group-hover:text-blue-500 transition-colors"/>
+          <h5 className="text-sm font-medium text-text-secondary flex items-center">
+            <ListBulletIcon className="h-4 w-4 mr-1.5 text-text-tertiary group-hover:text-accent-blue transition-colors"/>
             {lessonContainer.title}
-            <span className="ml-2 text-xs text-gray-500 font-normal">({materialCount} material{materialCount === 1 ? '' : 's'})</span>
+            <span className="ml-1.5 text-xs text-text-tertiary font-normal">({materialCount})</span>
           </h5>
-          {isExpanded ? <ChevronUpIcon className="h-4 w-4 text-gray-500"/> : <ChevronDownIcon className="h-4 w-4 text-gray-500"/>}
+          {isExpanded ? <ChevronUpIcon className="h-4 w-4 text-text-tertiary"/> : <ChevronDownIcon className="h-4 w-4 text-text-tertiary"/>}
         </div>
         
-        <div id={`lesson-content-${lessonContainer.id}`} className={`${isExpanded ? 'block' : 'hidden'} mt-1`}>
-          <ul className="text-sm text-gray-700 space-y-1.5">
-            {materials.map(material => (
-              <MaterialListItem 
-                key={material.id} 
-                lesson={material} 
-                onOpenEditModal={onOpenEditModal}
-                onToggleComplete={onToggleComplete}
-              />
-            ))}
-          </ul>
-        </div>
+        {isExpanded && (
+            <div id={`lesson-content-${lessonContainer.id}`} className="mt-1.5 pl-1 space-y-1.5">
+                {materials.map(material => (
+                <MaterialListItem 
+                    key={material.id} 
+                    lesson={material} 
+                    onOpenEditModal={onOpenEditModal}
+                    onToggleComplete={onToggleComplete}
+                />
+                ))}
+            </div>
+        )}
       </div>
     );
   };
 
-  // Render a unit with its lesson containers
   const renderUnitSection = (unit) => {
-    const lessonContainers = lessonsByUnit[unit.id] || [];
+    const lessonContainersInUnit = (lessonsByUnit[unit.id] || [])
+      .sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.title.localeCompare(b.title));
+      
     const isExpanded = !!expandedUnits[unit.id];
     
-    // Get all materials for this unit to count them
-    const allUnitMaterials = lessonContainers.reduce((acc, container) => {
+    const allUnitMaterialsCount = lessonContainersInUnit.reduce((acc, container) => {
       const containerMaterials = lessons.filter(lesson => lesson.lesson_id === container.id);
       return acc + containerMaterials.length;
     }, 0);
     
-    if (lessonContainers.length === 0 && allUnitMaterials === 0) return null;
+    // Don't render unit if it has no lesson containers AND no materials within those containers
+    if (lessonContainersInUnit.length === 0 && allUnitMaterialsCount === 0) return null;
 
     return (
-      <div key={unit.id} className="mt-4 pt-4 border-t border-gray-200 first:mt-0 first:pt-0 first:border-t-0">
+      <div key={unit.id} className="mt-3 pt-3 border-t border-border-subtle first:mt-0 first:pt-0 first:border-t-0">
         <div 
-          className="flex justify-between items-center py-2 cursor-pointer hover:bg-gray-100 rounded-md px-3 group"
+          className="flex justify-between items-center py-2 cursor-pointer hover:bg-gray-100 rounded-md px-2.5 group"
           onClick={() => toggleUnitExpansion(unit.id)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleUnitExpansion(unit.id)}
-          aria-expanded={isExpanded}
-          aria-controls={`unit-content-${unit.id}`}
+          role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleUnitExpansion(unit.id)}
+          aria-expanded={isExpanded} aria-controls={`unit-content-${unit.id}`}
         >
-          <h4 className="text-base font-semibold text-gray-800 flex items-center">
-            <FolderOpenIcon className="h-5 w-5 mr-2 text-gray-500 group-hover:text-blue-600 transition-colors"/>
+          <h4 className="text-base font-semibold text-text-primary flex items-center">
+            <FolderOpenIcon className="h-5 w-5 mr-2 text-text-secondary group-hover:text-accent-blue transition-colors"/>
             {unit.name}
-            <span className="ml-2 text-sm text-gray-500 font-normal">({lessonContainers.length} lesson{lessonContainers.length === 1 ? '' : 's'}, {allUnitMaterials} material{allUnitMaterials === 1 ? '' : 's'})</span>
+            <span className="ml-2 text-xs text-text-tertiary font-normal">
+              ({lessonContainersInUnit.length} lesson groups, {allUnitMaterialsCount} materials)
+            </span>
           </h4>
-          {isExpanded ? <ChevronUpIcon className="h-5 w-5 text-gray-600"/> : <ChevronDownIcon className="h-5 w-5 text-gray-600"/>}
+          {isExpanded ? <ChevronUpIcon className="h-5 w-5 text-text-secondary"/> : <ChevronDownIcon className="h-5 w-5 text-text-secondary"/>}
         </div>
         
-        <div id={`unit-content-${unit.id}`} className={`${isExpanded ? 'block' : 'hidden'} mt-2`}>
-          {lessonContainers.length === 0 ? (
-            <div className="text-xs italic text-gray-400 ml-6 py-2">No lesson containers in this unit yet.</div>
-          ) : (
-            lessonContainers
-              .sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.title.localeCompare(b.title))
-              .map(container => {
+        {isExpanded && (
+            <div id={`unit-content-${unit.id}`} className="mt-1.5 pl-2">
+            {lessonContainersInUnit.length === 0 ? (
+                <div className="text-xs italic text-text-tertiary ml-6 py-2">No lesson groups in this unit yet.</div>
+            ) : (
+                lessonContainersInUnit.map(container => {
                 const containerMaterials = lessons.filter(lesson => lesson.lesson_id === container.id);
                 return renderLessonContainerMaterials(container, containerMaterials);
-              })
-          )}
-        </div>
+                })
+            )}
+            </div>
+        )}
       </div>
     );
   };
 
-  // Render general materials (not assigned to any unit)
-  const renderGeneralMaterials = () => {
+  const renderGeneralMaterialsSection = () => {
     if (generalMaterials.length === 0) return null;
 
     return (
-      <div className="mt-4 pt-4 border-t border-gray-200">
-        <h4 className="text-base font-semibold text-gray-800 flex items-center px-3 py-2">
-          <ListBulletIcon className="h-5 w-5 mr-2 text-gray-500"/>
+      <div className="mt-3 pt-3 border-t border-border-subtle">
+        <h4 className="text-base font-semibold text-text-primary flex items-center px-2.5 py-2">
+          <ListBulletIcon className="h-5 w-5 mr-2 text-text-secondary"/>
           General Materials
-          <span className="ml-2 text-sm text-gray-500 font-normal">({generalMaterials.length} item{generalMaterials.length === 1 ? '' : 's'})</span>
+          <span className="ml-2 text-xs text-text-tertiary font-normal">({generalMaterials.length})</span>
         </h4>
-        <ul className="text-sm text-gray-700 space-y-1.5 mt-2 px-3">
+        <ul className="space-y-1.5 mt-1.5 px-2.5">
           {generalMaterials.map(material => (
             <MaterialListItem 
               key={material.id} 
@@ -183,222 +178,73 @@ export default function SubjectCard({
   };
 
   return (
-    <div className="bg-white rounded-xl p-4 sm:p-5 shadow-lg border border-gray-100">
-      <div className="flex flex-col sm:flex-row justify-between items-start mb-3 pb-3 border-b border-gray-200">
-        <div className="mb-2 sm:mb-0">
-          <h3 className="text-xl font-bold text-gray-800">{subject.name}</h3>
+    <div className="bg-background-card rounded-lg p-4 sm:p-5 shadow-sm border border-border-subtle">
+      <div className="flex flex-col sm:flex-row justify-between items-start mb-3 pb-3 border-b border-border-subtle">
+        <div className="mb-2 sm:mb-0 flex-grow">
+          <h3 className="text-xl font-semibold text-text-primary">{subject.name}</h3>
           {currentSubjectStats && (
-            <div className="text-xs text-gray-500 mt-1 space-x-3">
-              <span><ListBulletIcon className="h-3 w-3 inline-block mr-1 text-gray-400"/>{currentSubjectStats.total} items</span>
-              <span><span className="text-green-500 font-semibold">{currentSubjectStats.completed}</span> done</span>
+            <div className="text-xs text-text-secondary mt-1 space-x-3">
+              <span><ListBulletIcon className="h-3.5 w-3.5 inline-block mr-1 text-text-tertiary align-text-bottom"/>{currentSubjectStats.total} items</span>
+              <span><span className="text-accent-green font-medium">{currentSubjectStats.completed}</span> done</span>
               {currentSubjectStats.avgGradePercent !== null && (
-                <span>Avg Grade: <span className="font-semibold">{currentSubjectStats.avgGradePercent}%</span> <span className="text-gray-400">(W)</span></span>
+                <span>Avg Grade: <span className="font-medium">{currentSubjectStats.avgGradePercent}%</span></span>
               )}
             </div>
           )}
         </div>
-        <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto mt-2 sm:mt-0">
             {currentSubjectStats && currentSubjectStats.total > 0 && (
-              <div className="flex-shrink-0 w-[80px] h-[80px] sm:w-[90px] sm:h-[90px]">
+              <div className="flex-shrink-0 w-[70px] h-[70px] sm:w-[80px] sm:h-[80px] mr-2">
                 <CompletionPieChart completed={currentSubjectStats.completed} total={currentSubjectStats.total} />
               </div>
             )}
             <div className="flex sm:flex-col space-x-2 sm:space-x-0 sm:space-y-1.5 w-full sm:w-auto justify-around sm:justify-start">
                 <button 
                     onClick={onManageUnits} 
-                    title="Manage Units" 
-                    className="flex items-center text-xs px-2.5 py-1.5 bg-green-50 text-green-700 hover:bg-green-100 rounded-md font-medium transition-colors w-full sm:w-auto justify-center"
+                    title="Manage Units & Lesson Groups" 
+                    className={`${secondaryButtonStyles} w-full sm:w-auto justify-center`}
                 >
-                    <PlusCircleIcon className="h-4 w-4 mr-1.5"/> Manage Units
+                    <PlusCircleIcon className="h-4 w-4 mr-1.5"/> Units & Groups
                 </button>
                 <Link href={`/subject-settings/${subject.child_subject_id}`} legacyBehavior>
-                    <a title="Subject Settings & Weights" className="flex items-center text-xs px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md font-medium transition-colors w-full sm:w-auto justify-center">
-                        <CogIcon className="h-4 w-4 mr-1.5" /> Settings
+                    <a title="Subject Settings & Weights" className={`${secondaryButtonStyles} w-full sm:w-auto justify-center`}>
+                        <AdjustmentsHorizontalIcon className="h-4 w-4 mr-1.5" /> Weights
                     </a>
                 </Link>
             </div>
         </div>
       </div>
       
-      {/* Quick Overview: Next 3 Due Items */}
       {upcomingDueItems.length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <h4 className="text-sm font-semibold text-blue-800 mb-2 flex items-center">
-            <ClockIcon className="h-4 w-4 mr-1"/>
-            Coming Up Next
+        <div className="mb-4 p-3 bg-blue-50/50 rounded-md border border-blue-100"> {/* Lighter blue */}
+          <h4 className="text-sm font-medium text-accent-blue mb-1.5 flex items-center">
+            <ClockIcon className="h-4 w-4 mr-1.5"/>
+            Upcoming
           </h4>
-          <ul className="space-y-2">
-            {upcomingDueItems.map(item => {
-              const isOverdue = item.dueDateObj < new Date();
-              const isDueSoon = item.dueDateObj <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-              return (
-                <li key={item.id} className="flex justify-between items-center text-xs bg-white rounded-md p-2 shadow-sm border">
-                  <div className="flex items-center min-w-0 flex-1">
-                    {showGradeInputs.has(item.id) ? (
-                      /* Grade Input Mode */
-                      <div className="flex items-center gap-1 mr-2">
-                        <input
-                          type="text"
-                          value={gradeInputs[item.id] || ''}
-                          onChange={(e) => setGradeInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const grade = gradeInputs[item.id]?.trim();
-                              if (grade) {
-                                setCompletingItems(prev => new Set([...prev, item.id]));
-                                onToggleComplete(item.id, true, grade).then(() => {
-                                  setCompletingItems(prev => {
-                                    const newSet = new Set(prev);
-                                    newSet.delete(item.id);
-                                    return newSet;
-                                  });
-                                  setShowGradeInputs(prev => {
-                                    const newSet = new Set(prev);
-                                    newSet.delete(item.id);
-                                    return newSet;
-                                  });
-                                  setGradeInputs(prev => {
-                                    const newObj = { ...prev };
-                                    delete newObj[item.id];
-                                    return newObj;
-                                  });
-                                });
-                              }
-                            }
-                            if (e.key === 'Escape') {
-                              setShowGradeInputs(prev => {
-                                const newSet = new Set(prev);
-                                newSet.delete(item.id);
-                                return newSet;
-                              });
-                              setGradeInputs(prev => {
-                                const newObj = { ...prev };
-                                delete newObj[item.id];
-                                return newObj;
-                              });
-                            }
-                          }}
-                          className="w-12 px-1 py-0.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          placeholder={item.grade_max_value}
-                          autoFocus
-                        />
-                        <button
-                          onClick={() => {
-                            const grade = gradeInputs[item.id]?.trim();
-                            if (grade) {
-                              setCompletingItems(prev => new Set([...prev, item.id]));
-                              onToggleComplete(item.id, true, grade).then(() => {
-                                setCompletingItems(prev => {
-                                  const newSet = new Set(prev);
-                                  newSet.delete(item.id);
-                                  return newSet;
-                                });
-                                setShowGradeInputs(prev => {
-                                  const newSet = new Set(prev);
-                                  newSet.delete(item.id);
-                                  return newSet;
-                                });
-                                setGradeInputs(prev => {
-                                  const newObj = { ...prev };
-                                  delete newObj[item.id];
-                                  return newObj;
-                                });
-                              });
-                            }
-                          }}
-                          disabled={completingItems.has(item.id)}
-                          className="px-1 py-0.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                        >
-                          ✓
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowGradeInputs(prev => {
-                              const newSet = new Set(prev);
-                              newSet.delete(item.id);
-                              return newSet;
-                            });
-                            setGradeInputs(prev => {
-                              const newObj = { ...prev };
-                              delete newObj[item.id];
-                              return newObj;
-                            });
-                          }}
-                          className="px-1 py-0.5 text-xs bg-gray-400 text-white rounded hover:bg-gray-500"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      /* Quick Complete Button */
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          
-                          // Check if this is a gradable item that requires a grade before completion
-                          const GRADABLE_CONTENT_TYPES = ['worksheet', 'assignment', 'test', 'quiz'];
-                          const isGradable = GRADABLE_CONTENT_TYPES.includes(item.content_type);
-                          const hasMaxScore = item.grade_max_value && item.grade_max_value.trim() !== '';
-                          const hasGrade = item.grade_value && item.grade_value.trim() !== '';
-                          
-                          if (!item.completed_at && isGradable && hasMaxScore && !hasGrade) {
-                            setShowGradeInputs(prev => new Set([...prev, item.id]));
-                            setGradeInputs(prev => ({ ...prev, [item.id]: item.grade_value || '' }));
-                            return;
-                          }
-                          
-                          setCompletingItems(prev => new Set([...prev, item.id]));
-                          await onToggleComplete(item.id, !item.completed_at);
-                          setCompletingItems(prev => {
-                            const newSet = new Set(prev);
-                            newSet.delete(item.id);
-                            return newSet;
-                          });
-                        }}
-                        className="mr-2 p-1 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0"
-                        title={item.completed_at ? "Mark as Incomplete" : "Mark as Complete"}
-                        disabled={completingItems.has(item.id)}
-                      >
-                        {completingItems.has(item.id) ? (
-                          <div className="h-4 w-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-                        ) : item.completed_at ? (
-                          <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <div className="h-4 w-4 border-2 border-gray-300 rounded-full hover:border-green-500 transition-colors"></div>
-                        )}
-                      </button>
-                    )}
-                    <span className="truncate font-medium text-gray-800 cursor-pointer" onClick={() => onOpenEditModal(item)}>
-                      {item.title}
-                    </span>
-                  </div>
-                  <span className={`whitespace-nowrap ml-2 text-xs ${
-                    isOverdue ? 'text-red-600 font-semibold' : 
-                    isDueSoon ? 'text-yellow-600 font-semibold' : 'text-blue-600'
-                  }`}>
-                    {item.dueDateObj.toLocaleDateString()}
-                  </span>
-                </li>
-              );
-            })}
+          <ul className="space-y-1.5">
+            {upcomingDueItems.map(item => (
+              <MaterialListItem 
+                key={item.id} 
+                lesson={item} 
+                onOpenEditModal={onOpenEditModal}
+                onToggleComplete={onToggleComplete}
+                isCompact={true} // You might add a prop for a more compact version if needed
+              />
+            ))}
           </ul>
         </div>
       )}
       
-      {/* Hierarchical Content */}
       {lessons.length > 0 || (units || []).length > 0 ? (
         <div className="mt-1">
-          {/* Render Units with Lesson Containers */}
           {(units || [])
             .sort((a,b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.name.localeCompare(b.name))
             .map(unit => renderUnitSection(unit))
           }
-          
-          {/* Render General Materials */}
-          {renderGeneralMaterials()}
+          {renderGeneralMaterialsSection()}
         </div>
       ) : (
-        <div className="italic text-gray-400 text-sm p-3 text-center bg-gray-50 rounded-md">
+        <div className="italic text-text-tertiary text-sm p-3 text-center bg-gray-50 rounded-md">
             No materials or units added for this subject yet.
         </div>
       )}

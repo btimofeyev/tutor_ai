@@ -1,4 +1,4 @@
-// backend/src/controllers/chatController.js
+// backend/src/controllers/chatController.js - Complete Enhanced Version
 const { OpenAI } = require('openai');
 const supabase = require('../utils/supabaseClient');
 const mcpClient = require('../services/mcpClient');
@@ -37,7 +37,13 @@ Child's Information:
 Current Learning Context:
 {learningContext}
 
-When the child asks about lessons, assignments, or what they have coming up, ALWAYS reference their actual curriculum data from the context above. Be specific about lesson titles, due dates, and content.
+**SPECIFIC ASSIGNMENT HELP GUIDELINES:**
+When a child asks about a specific question number (like "help me with number 7" or "question 15"), you MUST:
+1. Look through the lesson_json data for the exact question they're asking about
+2. Find the specific question text and provide targeted help
+3. Reference the actual content from their assignment
+4. Give step-by-step guidance for that specific problem
+5. Use examples that match the format and style of their assignment
 
 **Date Guidelines:**
 - When asked about today's date, always use the date provided above: {currentDate}
@@ -51,9 +57,115 @@ Guidelines for responses:
 - If they need help with homework, check if it matches any of their current lessons
 - If they ask what to study next, suggest based on their actual curriculum sequence
 - Always be encouraging and make learning feel achievable
-- Use the child's actual lesson data to provide personalized guidance`;
+- Use the child's actual lesson data to provide personalized guidance
+- **When they ask about specific question numbers, find and help with that exact question**`;
 
-// Main chat handler - Updated
+// Helper function to extract specific question from lesson data
+function findSpecificQuestion(lessonData, questionNumber) {
+  if (!lessonData || !lessonData.lesson_json || !lessonData.lesson_json.tasks_or_questions) {
+    return null;
+  }
+  
+  const questions = lessonData.lesson_json.tasks_or_questions;
+  
+  // Try to find question by number pattern - be more specific
+  const questionPattern = new RegExp(`^${questionNumber}\\.\\s`);
+  
+  const matchedQuestionIndex = questions.findIndex(q => 
+    questionPattern.test(q.toString().trim())
+  );
+  
+  if (matchedQuestionIndex === -1) {
+    console.log(`Question ${questionNumber} not found in questions:`, questions.slice(0, 10));
+    return null;
+  }
+  
+  const matchedQuestion = questions[matchedQuestionIndex];
+  console.log(`Found question ${questionNumber}:`, matchedQuestion);
+  
+  // Find the relevant instruction by looking backwards for instruction-like text
+  let relevantInstruction = null;
+  for (let i = matchedQuestionIndex - 1; i >= 0; i--) {
+    const prevItem = questions[i];
+    // Look for instruction patterns (sentences that don't start with numbers)
+    if (!/^\d+\./.test(prevItem) && 
+        (prevItem.toLowerCase().includes('write') || 
+         prevItem.toLowerCase().includes('find') || 
+         prevItem.toLowerCase().includes('complete') || 
+         prevItem.toLowerCase().includes('round') || 
+         prevItem.toLowerCase().includes('convert') || 
+         prevItem.toLowerCase().includes('compare') ||
+         prevItem.toLowerCase().includes('match') ||
+         prevItem.toLowerCase().includes('rewrite') ||
+         prevItem.toLowerCase().includes('value'))) {
+      relevantInstruction = prevItem;
+      console.log(`Found instruction for question ${questionNumber}:`, relevantInstruction);
+      break;
+    }
+  }
+  
+  // Also look for section headers or categories - be more flexible
+  let sectionContext = null;
+  for (let i = matchedQuestionIndex - 1; i >= 0; i--) {
+    const prevItem = questions[i];
+    if (prevItem.length < 80 && !prevItem.match(/^\d+\./)) {
+      // More flexible section detection
+      if (prevItem.toLowerCase().includes('form') || 
+          prevItem.toLowerCase().includes('round') ||
+          prevItem.toLowerCase().includes('compare') ||
+          prevItem.toLowerCase().includes('value') ||
+          prevItem.toLowerCase().includes('match') ||
+          prevItem.toLowerCase().includes('table') ||
+          prevItem.toLowerCase().includes('rewrite')) {
+        sectionContext = prevItem;
+        break;
+      }
+    }
+  }
+  
+  return {
+    questionText: matchedQuestion,
+    questionIndex: matchedQuestionIndex,
+    totalQuestions: questions.length,
+    lessonTitle: lessonData.title,
+    lessonType: lessonData.content_type,
+    learningObjectives: lessonData.lesson_json.learning_objectives || [],
+    relevantInstruction: relevantInstruction,
+    sectionContext: sectionContext,
+    // Extract just the number/content without the question number
+    questionContent: matchedQuestion.replace(/^\d+\.\s*/, ''),
+    // Add the raw question for debugging
+    rawQuestionArray: questions.slice(Math.max(0, matchedQuestionIndex - 3), matchedQuestionIndex + 2)
+  };
+}
+
+// Helper function to find lesson by number/title
+function findLessonByReference(mcpContext, lessonRef) {
+  if (!mcpContext || !mcpContext.currentMaterials) return null;
+  
+  // Try to find by lesson number
+  const lessonNumberMatch = lessonRef.match(/lesson\s*(\d+)/i);
+  if (lessonNumberMatch) {
+    const lessonNum = lessonNumberMatch[1];
+    
+    const matchedMaterial = mcpContext.currentMaterials.find(material => {
+      if (material.lesson_json && material.lesson_json.lesson_number_if_applicable) {
+        const materialLessonNum = material.lesson_json.lesson_number_if_applicable.toString();
+        return materialLessonNum.includes(lessonNum);
+      }
+      return false;
+    });
+    
+    if (matchedMaterial) return matchedMaterial;
+  }
+  
+  // Try to find by title containing the reference
+  return mcpContext.currentMaterials.find(material => 
+    material.title && material.title.toLowerCase().includes(lessonRef.toLowerCase())
+  );
+}
+
+// Main chat handler - Enhanced
 exports.chat = async (req, res) => {
     const childId = req.child?.child_id;
     const { message, sessionHistory = [], lessonContext = null } = req.body;
@@ -98,22 +210,67 @@ exports.chat = async (req, res) => {
         .filter(Boolean)
         .join(', ') || 'General Learning';
 
+      // ENHANCED: Look for specific question references
+      let specificQuestionData = null;
+      let targetLessonData = null;
+      
+      // Check for patterns like "number 7", "question 15", "problem 3", etc.
+      const questionNumberMatch = message.match(/(?:number|question|problem|item)\s*(\d+)/i);
+      const lessonReferenceMatch = message.match(/lesson\s*(\d+|[a-z]+)/i);
+      
+      if (questionNumberMatch || lessonReferenceMatch) {
+        console.log('Detected specific question/lesson reference:', {
+          questionNumber: questionNumberMatch?.[1],
+          lessonReference: lessonReferenceMatch?.[0]
+        });
+        
+        // First, try to find the specific lesson being referenced
+        if (lessonReferenceMatch) {
+          targetLessonData = findLessonByReference(mcpContext, lessonReferenceMatch[0]);
+          console.log('Found target lesson:', targetLessonData?.title);
+        }
+        
+        // If we have a question number, look for it in the target lesson or current focus
+        if (questionNumberMatch) {
+          const questionNumber = questionNumberMatch[1];
+          
+          // Try target lesson first, then current focus, then all current materials
+          const searchOrder = [
+            targetLessonData,
+            mcpContext?.currentFocus,
+            ...(mcpContext?.currentMaterials || [])
+          ].filter(Boolean);
+          
+          for (const lessonData of searchOrder) {
+            specificQuestionData = findSpecificQuestion(lessonData, questionNumber);
+            if (specificQuestionData) {
+              targetLessonData = lessonData;
+              console.log('Found specific question:', {
+                questionText: specificQuestionData.questionText,
+                lessonTitle: specificQuestionData.lessonTitle
+              });
+              break;
+            }
+          }
+        }
+      }
+
       // Check if this is a lesson-related query and we should search for specific content
-      let specificLessonData = null;
+      let additionalLessonData = null;
       const isQueryAboutLessons = isLessonQuery(message);
 
       if (isQueryAboutLessons || message.toLowerCase().includes('help')) {
         try {
           // Try to find relevant lesson content
-          const searchResults = await mcpClient.searchLessons(message, childId);
+          const searchResults = await mcpClient.searchMaterials(message, childId);
           if (searchResults.length > 0) {
-            specificLessonData = searchResults[0];
+            additionalLessonData = searchResults[0];
             
             // Get full lesson details if available
-            if (specificLessonData.id) {
-              const lessonDetails = await mcpClient.getLessonDetails(specificLessonData.id);
+            if (additionalLessonData.id) {
+              const lessonDetails = await mcpClient.getMaterialDetails(additionalLessonData.id);
               if (lessonDetails) {
-                specificLessonData = lessonDetails;
+                additionalLessonData = lessonDetails;
               }
             }
           }
@@ -134,18 +291,88 @@ exports.chat = async (req, res) => {
         .replace('{subjects}', subjects)
         .replace('{learningContext}', formattedLearningContext);
 
-      // Add lesson details if found with date-aware context
+      // ENHANCED: Build additional context with specific question details
       let additionalContext = "";
-      if (specificLessonData && specificLessonData.lesson_json) {
-        additionalContext = `
+      
+      if (specificQuestionData) {
+        additionalContext += `
 
-📚 **Relevant Lesson Information**:
-- **Title**: ${specificLessonData.title}
-- **Type**: ${specificLessonData.content_type}
-- **Subject**: ${specificLessonData.child_subjects?.subjects?.name || 'General'}`;
+🎯 **SPECIFIC QUESTION HELP REQUEST**:
+The student is asking about question ${questionNumberMatch[1]} from "${specificQuestionData.lessonTitle}"
 
-        if (specificLessonData.due_date) {
-          const dueDate = new Date(specificLessonData.due_date + 'T00:00:00');
+**Question Context**:
+- Question number: ${questionNumberMatch[1]}
+- Content: "${specificQuestionData.questionContent}"
+- Relevant instruction: "${specificQuestionData.relevantInstruction || 'See assignment context'}"
+- Section: "${specificQuestionData.sectionContext || 'General practice'}"
+- Lesson: "${specificQuestionData.lessonTitle}" (${targetLessonData?.content_type})
+- Learning objectives: ${specificQuestionData.learningObjectives.join(', ')}
+
+**CRITICAL TEACHING INSTRUCTIONS**: 
+- DO NOT give the direct answer
+- DO NOT hallucinate or make up question content
+- USE ONLY the exact question content provided: "${specificQuestionData.questionContent}"
+- Guide the student step-by-step through the thinking process for THIS SPECIFIC QUESTION
+- Ask clarifying questions to check their understanding
+- Encourage them to try each step before moving to the next
+- Celebrate their thinking and effort
+- If they're stuck, give hints rather than solutions
+- Reference the specific instruction: "${specificQuestionData.relevantInstruction}"
+- Help them understand the CONCEPT behind this type of problem
+- NEVER invent different numbers or change the question content`;
+
+        if (targetLessonData?.due_date) {
+          const dueDate = new Date(targetLessonData.due_date + 'T00:00:00');
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          dueDate.setHours(0, 0, 0, 0);
+          
+          const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+          
+          additionalContext += `\n- **Due**: ${dueDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`;
+          
+          if (daysUntil < 0) {
+            additionalContext += ` (OVERDUE by ${Math.abs(daysUntil)} day${Math.abs(daysUntil) !== 1 ? 's' : ''}) 🚨`;
+          } else if (daysUntil === 0) {
+            additionalContext += ` (DUE TODAY!) ⚠️`;
+          } else if (daysUntil === 1) {
+            additionalContext += ` (DUE TOMORROW) ⏰`;
+          }
+        }
+      } else if (targetLessonData && targetLessonData.lesson_json) {
+        // Add lesson context even if we didn't find the specific question
+        additionalContext += `
+
+📚 **LESSON CONTEXT**:
+- **Title**: ${targetLessonData.title}
+- **Type**: ${targetLessonData.content_type}`;
+
+        if (targetLessonData.lesson_json.tasks_or_questions) {
+          additionalContext += `\n- **Available Questions/Tasks**: ${targetLessonData.lesson_json.tasks_or_questions.length} total`;
+          
+          // Show first few questions as examples
+          const firstFewQuestions = targetLessonData.lesson_json.tasks_or_questions.slice(0, 5);
+          additionalContext += `\n- **Sample Questions**:`;
+          firstFewQuestions.forEach((q, i) => {
+            additionalContext += `\n  ${i + 1}. ${q}`;
+          });
+          if (targetLessonData.lesson_json.tasks_or_questions.length > 5) {
+            additionalContext += `\n  ... and ${targetLessonData.lesson_json.tasks_or_questions.length - 5} more`;
+          }
+        }
+      }
+
+      // Add lesson details if found with date-aware context
+      if (additionalLessonData && additionalLessonData.lesson_json && !specificQuestionData) {
+        additionalContext += `
+
+📚 **RELEVANT LESSON INFORMATION**:
+- **Title**: ${additionalLessonData.title}
+- **Type**: ${additionalLessonData.content_type}
+- **Subject**: ${additionalLessonData.lesson?.unit?.child_subject?.subject?.name || 'General'}`;
+
+        if (additionalLessonData.due_date) {
+          const dueDate = new Date(additionalLessonData.due_date + 'T00:00:00');
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           dueDate.setHours(0, 0, 0, 0);
@@ -165,22 +392,22 @@ exports.chat = async (req, res) => {
           }
         }
 
-        if (specificLessonData.lesson_json.learning_objectives) {
-          additionalContext += `\n- **Learning Goals**: ${specificLessonData.lesson_json.learning_objectives.join(', ')}`;
+        if (additionalLessonData.lesson_json.learning_objectives) {
+          additionalContext += `\n- **Learning Goals**: ${additionalLessonData.lesson_json.learning_objectives.join(', ')}`;
         }
 
-        if (specificLessonData.lesson_json.tasks_or_questions) {
-          additionalContext += `\n- **Tasks/Questions** (${specificLessonData.lesson_json.tasks_or_questions.length} total):`;
-          specificLessonData.lesson_json.tasks_or_questions.slice(0, 3).forEach((task, index) => {
+        if (additionalLessonData.lesson_json.tasks_or_questions) {
+          additionalContext += `\n- **Tasks/Questions** (${additionalLessonData.lesson_json.tasks_or_questions.length} total):`;
+          additionalLessonData.lesson_json.tasks_or_questions.slice(0, 3).forEach((task, index) => {
             additionalContext += `\n  ${index + 1}. ${task}`;
           });
-          if (specificLessonData.lesson_json.tasks_or_questions.length > 3) {
-            additionalContext += `\n  ... and ${specificLessonData.lesson_json.tasks_or_questions.length - 3} more`;
+          if (additionalLessonData.lesson_json.tasks_or_questions.length > 3) {
+            additionalContext += `\n  ... and ${additionalLessonData.lesson_json.tasks_or_questions.length - 3} more`;
           }
         }
 
-        if (specificLessonData.lesson_json.main_content_summary_or_extract) {
-          additionalContext += `\n- **Content Summary**: ${specificLessonData.lesson_json.main_content_summary_or_extract.substring(0, 200)}...`;
+        if (additionalLessonData.lesson_json.main_content_summary_or_extract) {
+          additionalContext += `\n- **Content Summary**: ${additionalLessonData.lesson_json.main_content_summary_or_extract.substring(0, 200)}...`;
         }
       }
 
@@ -202,12 +429,11 @@ exports.chat = async (req, res) => {
         }
       ];
 
-      // Rest of the function remains the same...
       // Call OpenAI
       let response;
       try {
         response = await openai.chat.completions.create({
-          model: "gpt-4.1-mini", // Fixed model name
+          model: "gpt-4.1-mini",
           messages: openaiMessages,
           temperature: 0.7,
           max_tokens: 1024,
@@ -237,7 +463,8 @@ exports.chat = async (req, res) => {
             message_count: 1,
             ai_provider: 'openai',
             interaction_at: new Date().toISOString(),
-            has_lesson_context: !!specificLessonData
+            has_lesson_context: !!(specificQuestionData || targetLessonData || additionalLessonData),
+            specific_question_asked: !!specificQuestionData
           }]);
       } catch (logError) {
         console.error('Failed to log interaction:', logError);
@@ -249,16 +476,23 @@ exports.chat = async (req, res) => {
         message: aiMessage,
         timestamp: new Date().toISOString(),
         provider: 'openai',
-        lessonContext: specificLessonData ? {
-          lessonId: specificLessonData.id,
-          lessonTitle: specificLessonData.title,
-          lessonType: specificLessonData.content_type,
-          subjectName: specificLessonData.child_subjects?.subjects?.name
+        lessonContext: (targetLessonData || additionalLessonData) ? {
+          lessonId: (targetLessonData || additionalLessonData).id,
+          lessonTitle: (targetLessonData || additionalLessonData).title,
+          lessonType: (targetLessonData || additionalLessonData).content_type,
+          subjectName: (targetLessonData || additionalLessonData).lesson?.unit?.child_subject?.subject?.name,
+          specificQuestion: specificQuestionData ? {
+            questionText: specificQuestionData.questionText,
+            questionNumber: specificQuestionData.questionIndex + 1,
+            totalQuestions: specificQuestionData.totalQuestions,
+            instruction: specificQuestionData.relevantInstruction
+          } : null
         } : null,
         mcpContextSummary: {
-          hasActiveContent: mcpContext?.currentLessons?.length > 0 || mcpContext?.upcomingAssignments?.length > 0,
-          currentLessonsCount: mcpContext?.currentLessons?.length || 0,
-          upcomingAssignmentsCount: mcpContext?.upcomingAssignments?.length || 0
+          hasActiveContent: mcpContext?.currentMaterials?.length > 0 || mcpContext?.upcomingAssignments?.length > 0,
+          currentMaterialsCount: mcpContext?.currentMaterials?.length || 0,
+          upcomingAssignmentsCount: mcpContext?.upcomingAssignments?.length || 0,
+          foundSpecificQuestion: !!specificQuestionData
         }
       });
 
@@ -270,6 +504,7 @@ exports.chat = async (req, res) => {
       });
     }
 };
+
 // Get chat suggestions based on current context
 exports.getSuggestions = async (req, res) => {
     const childId = req.child?.child_id;
@@ -335,13 +570,13 @@ exports.getSuggestions = async (req, res) => {
 
         // Progress-based suggestions
         if (mcpContext.progress?.summary) {
-          if (mcpContext.progress.summary.totalCompletedLessons > 0) {
+          if (mcpContext.progress.summary.totalCompletedMaterials > 0) {
             suggestions.push("Show me my progress! 📊");
           }
         }
 
         // Active lessons suggestion
-        if (mcpContext.currentLessons?.length > 1) {
+        if (mcpContext.currentMaterials?.length > 1) {
           suggestions.push("What lessons do I have? 📚");
         }
       }
@@ -379,13 +614,13 @@ exports.getLessonHelp = async (req, res) => {
 
   try {
     // Check access using enhanced MCP client
-    const hasAccess = await mcpClient.checkLessonAccess(childId, lessonId);
+    const hasAccess = await mcpClient.checkMaterialAccess(childId, lessonId);
     if (!hasAccess) {
       return res.status(403).json({ error: 'Access denied to this lesson' });
     }
 
     // Get detailed lesson information
-    const lessonDetails = await mcpClient.getLessonDetails(lessonId);
+    const lessonDetails = await mcpClient.getMaterialDetails(lessonId);
     if (!lessonDetails) {
       return res.status(404).json({ error: 'Lesson not found' });
     }
@@ -396,7 +631,7 @@ exports.getLessonHelp = async (req, res) => {
     const helpContent = {
       lessonTitle: lessonDetails.title,
       lessonType: lessonDetails.content_type,
-      subjectName: lessonDetails.child_subjects?.subjects?.name,
+      subjectName: lessonDetails.lesson?.unit?.child_subject?.subject?.name,
       tips: [],
       encouragement: "You're doing great! Let's work through this together! 🌟",
       learningGoals: [],

@@ -2,8 +2,8 @@ import './globals.css';
 import SupabaseProvider from '../components/SupabaseProvider';
 
 export const metadata = {
-  title: 'EduNest',
-  description: 'Where Family Learning Takes Flight',
+  title: 'Klio AI', 
+  description: 'Intelligent Homeschooling, Effortlessly Orchestrated.', 
 };
 
 export default function RootLayout({ children }) {

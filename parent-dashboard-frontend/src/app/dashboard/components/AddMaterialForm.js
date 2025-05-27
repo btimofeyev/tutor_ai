@@ -1,6 +1,8 @@
 // app/dashboard/components/AddMaterialForm.js
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { DocumentArrowUpIcon, CheckCircleIcon as CheckSolidIcon, ArrowPathIcon, PlusIcon, BookOpenIcon } from '@heroicons/react/24/outline';
+import Button from '../../../components/ui/Button';
 
 function formatContentTypeName(contentType) {
     if (!contentType) return '';
@@ -37,8 +39,19 @@ export default function AddMaterialForm({
   lessonContainersForSelectedUnit = [],
   onLessonContainerChange,
   selectedLessonContainer,
-  onCreateNewLessonContainer,
+  onCreateNewLessonContainer, // THIS IS THE PROP FROM dashboard/page.js
 }) {
+
+  const [newLessonGroupTitle, setNewLessonGroupTitle] = useState('');
+  const [isCreatingLessonGroup, setIsCreatingLessonGroup] = useState(false);
+
+  useEffect(() => {
+    setIsCreatingLessonGroup(selectedLessonContainer === '__create_new__');
+    if (selectedLessonContainer !== '__create_new__') {
+      setNewLessonGroupTitle('');
+    }
+  }, [selectedLessonContainer]);
+
 
   const handleJsonFieldChange = (e, fieldName) => {
     onUpdateLessonJsonField(fieldName, e.target.value);
@@ -51,31 +64,51 @@ export default function AddMaterialForm({
   
   const json = lessonJsonForApproval || {};
 
+  const commonInputClasses = "w-full border-border-input rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-accent-blue focus:border-accent-blue placeholder-text-tertiary shadow-sm";
+  const commonLabelClasses = "block text-xs font-medium text-text-secondary mb-1";
+  const commonSelectClasses = `${commonInputClasses} h-10`;
+
+  const handleInternalCreateNewLessonGroup = async () => { // Renamed to avoid confusion
+    if (!newLessonGroupTitle.trim()) {
+      alert("Please enter a title for the new lesson group.");
+      return;
+    }
+    // CORRECTLY CALL THE PROP PASSED FROM THE PARENT
+    await onCreateNewLessonContainer(newLessonGroupTitle.trim()); 
+    // setNewLessonGroupTitle(''); // Parent will reset selectedLessonContainer, which hides this input
+  };
+
+  // ... (rest of the component: JSX for form, inputs, etc. remains the same as the previous version)
   return (
-    <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100"> 
-      <h2 className="text-lg font-bold mb-4">Add New Material</h2>
-      <form onSubmit={onFormSubmit} className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-          <div className="flex flex-col">
-            <label htmlFor="add-lesson-subject" className="text-sm font-medium mb-1">Subject</label>
-            <select id="add-lesson-subject" value={currentAddLessonSubject} onChange={onAddLessonSubjectChange} className="border rounded px-3 py-2 h-10" required>
-              <option value="">Pick a subject…</option>
-              {/* FIXED: Use child_subject_id as the value instead of subject.id */}
+    <div className="space-y-6"> 
+      <div>
+        <h3 className="text-lg font-semibold text-text-primary mb-1">Add New Material</h3>
+        <p className="text-sm text-text-secondary mb-4">Upload files and let Klio AI structure them for you.</p>
+      </div>
+      <form onSubmit={onFormSubmit} className="space-y-4">
+        {/* ... (Subject, Content Type Hint, File Input - unchanged) ... */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+          <div>
+            <label htmlFor="add-lesson-subject" className={commonLabelClasses}>Subject *</label>
+            <select id="add-lesson-subject" value={currentAddLessonSubject} onChange={onAddLessonSubjectChange} className={commonSelectClasses} required>
+              <option value="">Select subject…</option>
               {(childSubjectsForSelectedChild || []).filter(s => s.child_subject_id).map(subject => (
                 <option key={subject.child_subject_id} value={subject.child_subject_id}>{subject.name}</option>
               ))}
             </select>
           </div>
-          <div className="flex flex-col">
-            <label htmlFor="add-lesson-content-type" className="text-sm font-medium mb-1">Content Type (Initial)</label>
-            <select id="add-lesson-content-type" value={currentAddLessonUserContentType} onChange={onAddLessonUserContentTypeChange} className="border rounded px-3 py-2 h-10" required>
+          <div>
+            <label htmlFor="add-lesson-content-type" className={commonLabelClasses}>Content Type (Initial Hint) *</label>
+            <select id="add-lesson-content-type" value={currentAddLessonUserContentType} onChange={onAddLessonUserContentTypeChange} className={commonSelectClasses} required>
               {appContentTypes.map(type => (
                 <option key={type} value={type}>{formatContentTypeName(type)}</option>
               ))}
             </select>
           </div>
-          <div className="flex flex-col md:col-span-1">
-            <label htmlFor="lesson-file-input-main" className="text-sm font-medium mb-1">File(s)</label>
+        </div>
+        
+        <div>
+            <label htmlFor="lesson-file-input-main" className={commonLabelClasses}>File(s) *</label>
             <input 
               id="lesson-file-input-main" 
               type="file" 
@@ -83,149 +116,206 @@ export default function AddMaterialForm({
               multiple
               onChange={onAddLessonFileChange} 
               required 
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+              className="block w-full text-sm text-text-secondary file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-text-secondary hover:file:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-accent-blue focus:border-accent-blue"
             />
-          </div>
         </div>
-        {/* Display selected file names */}
+
         {currentAddLessonFile && currentAddLessonFile.length > 0 && (
-            <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded-md border">
-                <p className="font-medium mb-1">Selected files ({currentAddLessonFile.length}):</p>
-                <ul className="list-disc list-inside max-h-24 overflow-y-auto">
+            <div className="mt-2 text-xs text-text-secondary bg-gray-50 p-2.5 rounded-md border border-border-subtle">
+                <p className="font-medium text-text-primary mb-1">Selected files ({currentAddLessonFile.length}):</p>
+                <ul className="list-disc list-inside max-h-24 overflow-y-auto space-y-0.5">
                     {Array.from(currentAddLessonFile).map((file, index) => (
-                        <li key={index} className="truncate text-gray-700" title={file.name}>{file.name} ({Math.round(file.size / 1024)} KB)</li>
+                        <li key={index} className="truncate text-text-secondary" title={file.name}>{file.name} ({Math.round(file.size / 1024)} KB)</li>
                     ))}
                 </ul>
             </div>
         )}
-
-        <button type="submit" disabled={uploading || !currentAddLessonSubject || !currentAddLessonFile || currentAddLessonFile?.length === 0 || !currentAddLessonUserContentType || !(childSubjectsForSelectedChild || []).find(s => s.child_subject_id === currentAddLessonSubject)} className="w-full sm:w-auto px-5 py-2 rounded-xl bg-black text-white font-medium hover:bg-gray-900 transition self-end">
-          {uploading ? 'Analyzing...' : 'Upload & Analyze'}
-        </button>
+        
+        <div className="flex justify-end">
+            <Button 
+            type="submit" 
+            variant="primary"
+            size="md"
+            disabled={uploading || !currentAddLessonSubject || !currentAddLessonFile || currentAddLessonFile?.length === 0 || !currentAddLessonUserContentType || !(childSubjectsForSelectedChild || []).find(s => s.child_subject_id === currentAddLessonSubject)} 
+            className="min-w-[180px]"
+            >
+            {uploading ? (
+                <><ArrowPathIcon className="h-5 w-5 mr-2 animate-spin"/>Analyzing...</>
+            ) : (
+                <><DocumentArrowUpIcon className="h-5 w-5 mr-2"/>Upload & Analyze</>
+            )}
+            </Button>
+        </div>
       </form>
 
       {lessonJsonForApproval && (
-        <div className="mt-6 border-t pt-6">
-          <h3 className="text-md font-semibold mb-3">Review & Approve Extracted Material</h3>
-          {json.error && <p className="text-red-500 bg-red-50 p-3 rounded-md mb-4">Analysis Error: {json.error} <br/>{json.raw_response && <span className="text-xs">Raw: {json.raw_response}</span>}</p>}
+        <div className="mt-6 border-t border-border-subtle pt-6 space-y-4 animate-fade-in">
+          <div>
+            <h3 className="text-md font-semibold text-text-primary mb-1">Review & Approve</h3>
+            <p className="text-sm text-text-secondary mb-3">Confirm or adjust the details extracted by Klio AI.</p>
+          </div>
           
-          <div className="space-y-3 mb-6 p-4 border border-blue-200 rounded-lg bg-blue-50">
-            <h4 className="text-sm font-semibold text-blue-700 mb-2">Confirm or Adjust Primary Details:</h4>
+          {json.error && <div className="text-accent-red bg-red-50 p-3 rounded-md mb-4 border border-red-200 text-sm">Analysis Error: {json.error} <br/>{json.raw_response && <span className="text-xs">Raw: {json.raw_response}</span>}</div>}
+          
+          <div className="space-y-3 p-4 border border-blue-100 rounded-lg bg-blue-50/30">
+            <h4 className="text-sm font-semibold text-accent-blue mb-2 flex items-center">
+                <BookOpenIcon className="h-4 w-4 mr-1.5"/> Material Details
+            </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
               <div>
-                <label htmlFor="lesson-title-approval" className="block text-xs font-medium text-gray-700">Title*</label>
-                <input id="lesson-title-approval" value={lessonTitleForApproval} onChange={onLessonTitleForApprovalChange} className="mt-1 border rounded w-full px-3 py-1.5 text-sm" required/>
+                <label htmlFor="lesson-title-approval" className={commonLabelClasses}>Title *</label>
+                <input id="lesson-title-approval" value={lessonTitleForApproval} onChange={onLessonTitleForApprovalChange} className={commonInputClasses} required/>
               </div>
               <div>
-                <label htmlFor="lesson-content-type-approval" className="block text-xs font-medium text-gray-700">Content Type*</label>
-                <select id="lesson-content-type-approval" value={lessonContentTypeForApproval} onChange={onLessonContentTypeForApprovalChange} className="mt-1 border rounded w-full px-3 py-1.5 text-sm h-[34px]" required>
+                <label htmlFor="lesson-content-type-approval" className={commonLabelClasses}>Content Type *</label>
+                <select id="lesson-content-type-approval" value={lessonContentTypeForApproval} onChange={onLessonContentTypeForApprovalChange} className={commonSelectClasses} required>
                   {appContentTypes.map(type => ( <option key={type} value={type}>{formatContentTypeName(type)}</option> ))}
                 </select>
               </div>
               {appGradableContentTypes.includes(lessonContentTypeForApproval) && (
                 <div>
-                    <label htmlFor="lesson-max-points-approval" className="block text-xs font-medium text-gray-700">Max Score</label>
-                    <input type="number" id="lesson-max-points-approval" value={lessonMaxPointsForApproval} onChange={onLessonMaxPointsForApprovalChange} className="mt-1 border rounded w-full px-3 py-1.5 text-sm" placeholder="e.g., 100"/>
+                    <label htmlFor="lesson-max-points-approval" className={commonLabelClasses}>Max Score</label>
+                    <input type="number" id="lesson-max-points-approval" value={lessonMaxPointsForApproval} onChange={onLessonMaxPointsForApprovalChange} className={commonInputClasses} placeholder="e.g., 100"/>
                     {json.total_possible_points_suggestion !== null && json.total_possible_points_suggestion !== undefined && String(json.total_possible_points_suggestion) !== lessonMaxPointsForApproval && (
-                        <p className="text-xs text-gray-500 mt-0.5">AI Suggestion: {json.total_possible_points_suggestion}</p>
+                        <p className="text-xs text-text-tertiary mt-0.5">AI Suggestion: {json.total_possible_points_suggestion}</p>
                     )}
                 </div>
               )}
                <div>
-                    <label htmlFor="lesson-due-date-approval" className="block text-xs font-medium text-gray-700">Due Date</label>
-                    <input type="date" id="lesson-due-date-approval" value={lessonDueDateForApproval} onChange={onLessonDueDateForApprovalChange} className="mt-1 border rounded w-full px-3 py-1.5 text-sm"/>
+                    <label htmlFor="lesson-due-date-approval" className={commonLabelClasses}>Due Date</label>
+                    <input type="date" id="lesson-due-date-approval" value={lessonDueDateForApproval} onChange={onLessonDueDateForApprovalChange} className={commonInputClasses}/>
                 </div>
             </div>
             <div>
-                <label htmlFor="lesson-unit-approval" className="block text-xs font-medium text-gray-700 mt-2">Assign to Unit (Optional)</label>
+                <label htmlFor="lesson-unit-approval" className={`${commonLabelClasses} mt-2`}>Assign to Unit *</label>
                 <select id="lesson-unit-approval" value={json.unit_id || ''} onChange={(e) => onUpdateLessonJsonField('unit_id', e.target.value || null)}
-                    className="mt-1 border rounded w-full px-3 py-1.5 text-sm h-[34px]" disabled={unitsForSelectedSubject.length === 0}>
+                    className={commonSelectClasses} disabled={unitsForSelectedSubject.length === 0} required> 
                     <option value="">-- Select a Unit --</option>
                     {unitsForSelectedSubject.map(unit => ( <option key={unit.id} value={unit.id}>{unit.name}</option> ))}
                 </select>
-                {unitsForSelectedSubject.length === 0 && <p className="text-xs text-gray-400 italic mt-0.5">No units for this subject. Add via "Manage Units".</p>}
+                {unitsForSelectedSubject.length === 0 && <p className="text-xs text-text-tertiary italic mt-0.5">No units for this subject. Add via "Manage Units".</p>}
             </div>
             
-            {/* Lesson Grouping Selection - Required */}
             <div className="mt-3">
-                <label htmlFor="lesson-container-approval" className="block text-xs font-medium text-gray-700">Lesson or Assignment Group *</label>
-                <div className="flex gap-2 mt-1">
-                    <select id="lesson-container-approval" value={selectedLessonContainer || ''} onChange={onLessonContainerChange}
-                        className="flex-1 border rounded px-3 py-1.5 text-sm h-[34px]" required>
-                        <option value="">-- Choose existing lesson or create new group --</option>
-                        <option value="__create_new__">+ Create New Lesson/Assignment Group</option>
-                        {lessonContainersForSelectedUnit.map(lesson => ( 
-                            <option key={lesson.id} value={lesson.id}>{lesson.title}</option> 
-                        ))}
-                    </select>
-                    {selectedLessonContainer === '__create_new__' && (
-                        <button type="button" onClick={onCreateNewLessonContainer} className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
-                            Create Group
-                        </button>
-                    )}
-                </div>
-                {!json.unit_id && <p className="text-xs text-gray-400 italic mt-0.5">Select a unit first to see available lesson groups.</p>}
-                {json.unit_id && lessonContainersForSelectedUnit.length === 0 && <p className="text-xs text-gray-400 italic mt-0.5">No lesson groups in this unit yet. Create one to organize your materials.</p>}
+                <label htmlFor="lesson-container-approval" className={commonLabelClasses}>
+                    Lesson Group * <span className="text-highlight-yellow">(e.g., "Week 1 Algebra", "Photosynthesis Project")</span>
+                </label>
+                <select 
+                    id="lesson-container-approval" 
+                    value={selectedLessonContainer || ''} 
+                    onChange={onLessonContainerChange}
+                    className={commonSelectClasses} 
+                    required
+                    disabled={!json.unit_id}
+                >
+                    <option value="">-- Choose or Create Lesson Group --</option>
+                    <option value="__create_new__" className="font-medium text-accent-blue">+ Create New Lesson Group</option>
+                    {lessonContainersForSelectedUnit.map(lesson => ( 
+                        <option key={lesson.id} value={lesson.id}>{lesson.title}</option> 
+                    ))}
+                </select>
+                {!json.unit_id && <p className="text-xs text-text-tertiary italic mt-0.5">Select a unit first to manage lesson groups.</p>}
             </div>
+
+            {isCreatingLessonGroup && json.unit_id && (
+              <div className="mt-2 p-3 border border-dashed border-blue-300 rounded-md bg-blue-50/50 animate-fade-in">
+                <label htmlFor="new-lesson-group-title" className={`${commonLabelClasses} text-accent-blue`}>New Lesson Group Title *</label>
+                <div className="flex gap-2 mt-1 items-center">
+                  <input
+                    type="text"
+                    id="new-lesson-group-title"
+                    value={newLessonGroupTitle}
+                    onChange={(e) => setNewLessonGroupTitle(e.target.value)}
+                    className={`${commonInputClasses} flex-1`}
+                    placeholder="e.g., Chapter 1 Activities"
+                    required={isCreatingLessonGroup}
+                  />
+                  <Button
+                    type="button"
+                    variant="primary" // Changed to primary to match other creation buttons
+                    size="md" 
+                    onClick={handleInternalCreateNewLessonGroup} // Make sure this calls the correct function
+                    className="h-10 whitespace-nowrap"
+                    disabled={!newLessonGroupTitle.trim()}
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1.5"/> Create
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center pt-2">
-                <input type="checkbox" id="lesson-completed-approval" checked={lessonCompletedForApproval} onChange={onLessonCompletedForApprovalChange} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>
-                <label htmlFor="lesson-completed-approval" className="ml-2 block text-sm font-medium text-gray-700">Mark as Complete</label>
+                <input type="checkbox" id="lesson-completed-approval" checked={lessonCompletedForApproval} onChange={onLessonCompletedForApprovalChange} className="h-4 w-4 text-accent-blue border-border-input rounded focus:ring-accent-blue"/>
+                <label htmlFor="lesson-completed-approval" className="ml-2 block text-sm font-medium text-text-primary">Mark as Complete</label>
             </div>
           </div>
           
           {!json.error && (
-            <div className="space-y-4 mb-6">
-                <h4 className="text-sm font-semibold text-gray-700 mb-2 border-b pb-1">Review & Edit Details:</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+             <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-text-primary mb-2 border-b border-border-subtle pb-1.5">Additional Extracted Details (Editable)</h4>
+                {/* ... (Additional details inputs - unchanged) ... */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-0.5">Lesson/Assignment Number</label>
-                        <input type="text" value={json.lesson_number_if_applicable || ''} onChange={(e) => handleJsonFieldChange(e, 'lesson_number_if_applicable')} className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="e.g., 1.2, Assignment 3" />
+                        <label className={commonLabelClasses}>Lesson/Assignment Number</label>
+                        <input type="text" value={json.lesson_number_if_applicable || ''} onChange={(e) => handleJsonFieldChange(e, 'lesson_number_if_applicable')} className={commonInputClasses} placeholder="e.g., 1.2, Assignment 3" />
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-0.5">Grade Level</label>
-                        <input type="text" value={json.grade_level_suggestion || ''} onChange={(e) => handleJsonFieldChange(e, 'grade_level_suggestion')} className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="e.g., Grade 3" />
+                        <label className={commonLabelClasses}>Grade Level Suggestion</label>
+                        <input type="text" value={json.grade_level_suggestion || ''} onChange={(e) => handleJsonFieldChange(e, 'grade_level_suggestion')} className={commonInputClasses} placeholder="e.g., Grade 3" />
                     </div>
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Learning Objectives</label>
-                    <textarea value={(json.learning_objectives || []).join('\n')} onChange={(e) => handleJsonArrayFieldChange(e, 'learning_objectives')} rows="2" className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="What will the student learn? (one per line)" />
+                    <label className={commonLabelClasses}>Learning Objectives (one per line)</label>
+                    <textarea value={(json.learning_objectives || []).join('\n')} onChange={(e) => handleJsonArrayFieldChange(e, 'learning_objectives')} rows="2" className={commonInputClasses} placeholder="What will the student learn?" />
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Description/Summary</label>
-                    <textarea value={json.main_content_summary_or_extract || ''} onChange={(e) => handleJsonFieldChange(e, 'main_content_summary_or_extract')} rows="3" className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="Brief description of this material..." />
+                    <label className={commonLabelClasses}>Description/Summary</label>
+                    <textarea value={json.main_content_summary_or_extract || ''} onChange={(e) => handleJsonFieldChange(e, 'main_content_summary_or_extract')} rows="3" className={commonInputClasses} placeholder="Brief description of this material..." />
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-0.5">Key Tasks/Questions</label>
-                    <textarea value={(json.tasks_or_questions || []).join('\n')} onChange={(e) => handleJsonArrayFieldChange(e, 'tasks_or_questions')} rows="3" className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="Main tasks or questions (one per line)" />
+                    <label className={commonLabelClasses}>Key Tasks/Questions (one per line)</label>
+                    <textarea value={(json.tasks_or_questions || []).join('\n')} onChange={(e) => handleJsonArrayFieldChange(e, 'tasks_or_questions')} rows="3" className={commonInputClasses} placeholder="Main tasks or questions" />
                 </div>
-                <details className="border rounded-md">
-                    <summary className="cursor-pointer p-3 bg-gray-50 text-sm font-medium text-gray-700 hover:bg-gray-100">Additional Details (Optional)</summary>
-                    <div className="p-3 space-y-3">
+                
+                <details className="border border-border-subtle rounded-md">
+                    <summary className="cursor-pointer p-3 bg-gray-50 text-sm font-medium text-text-secondary hover:bg-gray-100 rounded-t-md">
+                        Optional Fields
+                    </summary>
+                    <div className="p-3 space-y-3 border-t border-border-subtle">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-0.5">Est. Time (minutes)</label>
-                                <input type="number" value={json.estimated_completion_time_minutes || ''} onChange={(e) => handleJsonFieldChange(e, 'estimated_completion_time_minutes')} className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="30" />
+                                <label className={commonLabelClasses}>Est. Time (minutes)</label>
+                                <input type="number" value={json.estimated_completion_time_minutes || ''} onChange={(e) => handleJsonFieldChange(e, 'estimated_completion_time_minutes')} className={commonInputClasses} placeholder="30" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-0.5">Length</label>
-                                <input type="text" value={json.page_count_or_length_indicator || ''} onChange={(e) => handleJsonFieldChange(e, 'page_count_or_length_indicator')} className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="3 pages" />
+                                <label className={commonLabelClasses}>Length Indicator</label>
+                                <input type="text" value={json.page_count_or_length_indicator || ''} onChange={(e) => handleJsonFieldChange(e, 'page_count_or_length_indicator')} className={commonInputClasses} placeholder="e.g., 3 pages, Short video" />
                             </div>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-0.5">Topics/Keywords</label>
+                            <label className={commonLabelClasses}>Topics/Keywords (comma-separated)</label>
                             <input type="text" value={(json.subject_keywords_or_subtopics || []).join(', ')} 
                                    onChange={(e) => onUpdateLessonJsonField('subject_keywords_or_subtopics', e.target.value.split(',').map(s=>s.trim()).filter(s=>s))} 
-                                   className="mt-0.5 border rounded w-full px-3 py-1.5 text-sm" placeholder="algebra, fractions, word problems" />
+                                   className={commonInputClasses} placeholder="algebra, fractions, word problems" />
                         </div>
                     </div>
                 </details>
             </div>
           )}
           
-          <button onClick={onApprove} className="w-full px-5 py-2.5 rounded-xl bg-black text-white font-medium hover:bg-gray-900 transition"
-            disabled={savingLesson || !lessonTitleForApproval || !lessonContentTypeForApproval || !selectedLessonContainer || selectedLessonContainer === '__create_new__' || (json && json.error) }>
-            {savingLesson ? 'Saving...' : 'Approve & Save Material'}
-          </button>
+          {/* UPDATED APPROVE BUTTON STYLING */}
+          <Button 
+            onClick={onApprove} 
+            variant="primary" 
+            size="md"
+            className="w-full !bg-[#ABEBC6] !text-green-900 !border-b-[#7DCEA0] hover:!bg-[#A2E4B9] hover:!border-b-[#68C38B] active:!bg-[#7DCEA0] focus:!ring-[#7DCEA0]" // Pastel Green
+            disabled={savingLesson || !lessonTitleForApproval || !lessonContentTypeForApproval || !selectedLessonContainer || isCreatingLessonGroup || (json && json.error) || !json.unit_id }>
+            {savingLesson ? (
+                <><ArrowPathIcon className="h-5 w-5 mr-2 animate-spin"/>Saving...</>
+            ) : (
+                <><CheckSolidIcon className="h-5 w-5 mr-2"/>Approve & Save Material</>
+            )}
+          </Button>
         </div>
       )}
     </div>

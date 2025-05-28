@@ -211,27 +211,41 @@ class MCPClientService {
   async getChildMaterials(childId, status = null, subjectName = null, contentType = null) {
     try {
       await this.connect();
-
+  
       const args = { 
         child_id: childId,
-        include_completed: true
+        include_completed: true // Always include completed materials
       };
       
       if (status) args.status = status;
       if (subjectName) args.subject_name = subjectName;
       if (contentType) args.content_type = contentType;
-
+  
+      console.log('Getting child materials with args:', args);
+  
       const result = await this.client.callTool({
         name: 'get_child_materials',
         arguments: args
       });
-
+  
       if (!result || !result.content) {
+        console.log('No materials returned from MCP server');
         return [];
       }
-
-      return JSON.parse(result.content[0].text);
-
+  
+      const materials = JSON.parse(result.content[0].text);
+      console.log(`Retrieved ${materials.length} materials for child ${childId}`);
+      
+      // Log first few materials for debugging
+      if (materials.length > 0) {
+        console.log('Sample materials:');
+        materials.slice(0, 3).forEach((mat, i) => {
+          console.log(`  ${i + 1}. ${mat.title} - ${mat.completed_at ? 'Completed' : 'In Progress'} - Grade: ${mat.grade_value || 'N/A'}/${mat.grade_max_value || 'N/A'}`);
+        });
+      }
+  
+      return materials;
+  
     } catch (error) {
       console.error('Error getting child materials:', error);
       return [];
@@ -457,78 +471,208 @@ class MCPClientService {
   async getEnhancedLearningContext(childId) {
     try {
       console.log('Getting enhanced learning context for child:', childId);
-
+  
       const [
-        currentMaterials, 
+        allMaterials, // Get ALL materials first
         upcomingAssignments, 
         childSubjects, 
-        progress,
-        gradeAnalysis,
-        materialsForReview
+        progress
       ] = await Promise.all([
-        this.getCurrentMaterials(childId).catch(e => { console.error('getCurrentMaterials error:', e); return []; }),
-        this.getUpcomingAssignments(childId, 7).catch(e => { console.error('getUpcomingAssignments error:', e); return []; }),
-        this.getChildSubjects(childId).catch(e => { console.error('getChildSubjects error:', e); return []; }),
-        this.getChildProgress(childId).catch(e => { console.error('getChildProgress error:', e); return null; }),
-        this.getGradeAnalysis(childId, null, 30).catch(e => { console.error('getGradeAnalysis error:', e); return null; }),
-        this.getMaterialsForReview(childId, 'low_grades').catch(e => { console.error('getMaterialsForReview error:', e); return []; })
+        this.getChildMaterials(childId, null, null, null).catch(e => { 
+          console.error('getChildMaterials error:', e); 
+          return []; 
+        }),
+        this.getUpcomingAssignments(childId, 7).catch(e => { 
+          console.error('getUpcomingAssignments error:', e); 
+          return []; 
+        }),
+        this.getChildSubjects(childId).catch(e => { 
+          console.error('getChildSubjects error:', e); 
+          return []; 
+        }),
+        this.getChildProgress(childId).catch(e => { 
+          console.error('getChildProgress error:', e); 
+          return null; 
+        })
       ]);
-
-      console.log('Enhanced learning context results:', {
-        currentMaterials: currentMaterials.length,
-        upcomingAssignments: upcomingAssignments.length,
-        childSubjects: childSubjects.length,
-        hasGradeAnalysis: !!gradeAnalysis,
-        materialsNeedingReview: materialsForReview.length
+  
+      // DEDUPLICATE: Remove materials that appear in both allMaterials and upcomingAssignments
+      const allMaterialIds = new Set(allMaterials.map(m => m.id).filter(Boolean));
+      const uniqueUpcomingAssignments = upcomingAssignments.filter(assignment => 
+        !allMaterialIds.has(assignment.id)
+      );
+  
+      console.log(`Deduplication: ${allMaterials.length} all materials, ${upcomingAssignments.length} upcoming -> ${uniqueUpcomingAssignments.length} unique upcoming`);
+  
+      // Separate current (incomplete) materials from all materials
+      const currentMaterials = allMaterials.filter(material => !material.completed_at);
+      const completedMaterials = allMaterials.filter(material => material.completed_at);
+  
+      console.log('Material breakdown:', {
+        total: allMaterials.length,
+        current: currentMaterials.length,
+        completed: completedMaterials.length,
+        uniqueUpcoming: uniqueUpcomingAssignments.length
       });
-
+  
+      // Calculate ACCURATE grade analysis by subject
+      const gradeAnalysisBySubject = {};
+      
+      for (const material of completedMaterials) {
+        const subjectName = material.lesson?.unit?.child_subject?.custom_subject_name_override || 
+                           material.lesson?.unit?.child_subject?.subject?.name || 'General';
+        
+        if (!gradeAnalysisBySubject[subjectName]) {
+          gradeAnalysisBySubject[subjectName] = {
+            materials: [],
+            totalEarned: 0,
+            totalPossible: 0,
+            count: 0
+          };
+        }
+        
+        gradeAnalysisBySubject[subjectName].materials.push(material);
+        
+        if (material.grade_value && material.grade_max_value) {
+          const earned = parseFloat(material.grade_value);
+          const possible = parseFloat(material.grade_max_value);
+          
+          gradeAnalysisBySubject[subjectName].totalEarned += earned;
+          gradeAnalysisBySubject[subjectName].totalPossible += possible;
+          gradeAnalysisBySubject[subjectName].count++;
+        }
+      }
+  
+      // Calculate accurate averages
+      const subjectGrades = {};
+      let overallEarned = 0;
+      let overallPossible = 0;
+      
+      for (const [subject, data] of Object.entries(gradeAnalysisBySubject)) {
+        if (data.count > 0) {
+          const average = (data.totalEarned / data.totalPossible) * 100;
+          subjectGrades[subject] = {
+            average: Math.round(average * 10) / 10,
+            earned: data.totalEarned,
+            possible: data.totalPossible,
+            count: data.count,
+            materials: data.materials
+          };
+          
+          overallEarned += data.totalEarned;
+          overallPossible += data.totalPossible;
+        } else {
+          subjectGrades[subject] = {
+            average: null,
+            earned: 0,
+            possible: 0,
+            count: 0,
+            materials: data.materials
+          };
+        }
+      }
+  
+      const overallAverage = overallPossible > 0 ? 
+        Math.round((overallEarned / overallPossible) * 100 * 10) / 10 : null;
+  
+      // Find materials needing review (below 70%)
+      const materialsForReview = [];
+      for (const material of completedMaterials) {
+        if (material.grade_value && material.grade_max_value) {
+          const percentage = (parseFloat(material.grade_value) / parseFloat(material.grade_max_value)) * 100;
+          if (percentage < 70) {
+            materialsForReview.push({
+              ...material,
+              percentage: Math.round(percentage * 10) / 10,
+              reason: percentage < 50 ? 'Failed - needs significant review' : 
+                     percentage < 60 ? 'Below average - review recommended' : 
+                     'Room for improvement'
+            });
+          }
+        }
+      }
+  
       // Find the most immediate material/assignment
       let currentFocus = null;
       
-      // Prioritize materials due soon
       const materialsDueSoon = currentMaterials.filter(material => {
         if (!material.due_date) return false;
         const dueDate = new Date(material.due_date);
         const today = new Date();
         const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-        return daysUntilDue >= 0 && daysUntilDue <= 3; // Due in next 3 days
+        return daysUntilDue >= 0 && daysUntilDue <= 3;
       });
-
+  
       if (materialsDueSoon.length > 0) {
         currentFocus = materialsDueSoon[0];
       } else if (currentMaterials.length > 0) {
         currentFocus = currentMaterials[0];
-      } else if (upcomingAssignments.length > 0) {
-        currentFocus = {
-          type: 'assignment',
-          ...upcomingAssignments[0]
-        };
+      } else if (uniqueUpcomingAssignments.length > 0) {
+        currentFocus = { type: 'assignment', ...uniqueUpcomingAssignments[0] };
       }
-
+  
       return {
         childSubjects: childSubjects || [],
-        currentLessons: currentMaterials || [], // Keep for compatibility
+        
+        // For backward compatibility
+        currentLessons: currentMaterials || [],
         currentMaterials: currentMaterials || [],
-        upcomingAssignments: upcomingAssignments || [],
+        
+        // All materials for grade analysis
+        allMaterials: allMaterials || [],
+        completedMaterials: completedMaterials || [],
+        
+        // DEDUPLICATED upcoming assignments
+        upcomingAssignments: uniqueUpcomingAssignments || [],
         currentFocus,
         progress: progress || null,
-        gradeAnalysis: gradeAnalysis || null,
+        
+        // ACCURATE grade analysis
+        gradeAnalysis: {
+          bySubject: subjectGrades,
+          overall: {
+            average: overallAverage,
+            totalEarned: overallEarned,
+            totalPossible: overallPossible,
+            totalGradedMaterials: completedMaterials.filter(m => m.grade_value && m.grade_max_value).length
+          },
+          trends: {
+            averageGrade: overallAverage,
+            totalGradedMaterials: completedMaterials.filter(m => m.grade_value && m.grade_max_value).length
+          }
+        },
+        
         materialsForReview: materialsForReview || [],
+        
         // Add summary flags for quick checks
         hasLowGrades: materialsForReview.length > 0,
-        averageGrade: gradeAnalysis?.trends?.averageGrade || null,
+        averageGrade: overallAverage,
         needsReview: materialsForReview.length > 0,
-        recentGradeCount: gradeAnalysis?.totalGradedMaterials || 0
+        recentGradeCount: completedMaterials.filter(m => m.grade_value && m.grade_max_value).length
       };
-
+  
     } catch (error) {
       console.error('Error getting enhanced learning context:', error);
       
-      // Return basic context if enhanced fails
-      return await this.getLearningContext(childId);
+      return {
+        childSubjects: [],
+        currentLessons: [],
+        currentMaterials: [],
+        allMaterials: [],
+        completedMaterials: [],
+        upcomingAssignments: [],
+        currentFocus: null,
+        progress: null,
+        gradeAnalysis: null,
+        materialsForReview: [],
+        hasLowGrades: false,
+        averageGrade: null,
+        needsReview: false,
+        recentGradeCount: 0,
+        error: error.message
+      };
     }
   }
-
   // MISSING METHOD: Basic learning context method for compatibility
   async getLearningContext(childId) {
     try {

@@ -4,9 +4,23 @@ import { motion } from 'framer-motion';
 export default function SuggestionBubbles({ suggestions, onSuggestionClick }) {
   if (!suggestions || suggestions.length === 0) return null;
 
+  // Themed styles for suggestion bubbles
+  const bubbleBaseStyles = "px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-full transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-offset-1";
+  
+  // Using accent-blue for suggestions
+  const bubbleThemeStyles = `
+    bg-[var(--accent-blue)]/20 
+    text-[var(--accent-blue-darker-for-border)] /* Using a slightly darker blue for text for readability */
+    border border-[var(--accent-blue)]/40 
+    hover:bg-[var(--accent-blue)]/30 
+    hover:border-[var(--accent-blue)]/60
+    focus-visible:ring-[var(--accent-blue)]
+    focus-visible:ring-offset-[var(--background-card)] 
+  `;
+
+
+
   return (
-    // This div will be centered by its parent in ChatPage.js. 
-    // The 'flex justify-center' here makes sure the bubbles themselves are centered if they don't fill the line.
     <motion.div 
       className="flex flex-wrap justify-center gap-2 py-2" 
       initial={{ opacity: 0, y: 10 }}
@@ -17,9 +31,10 @@ export default function SuggestionBubbles({ suggestions, onSuggestionClick }) {
         <motion.button
           key={index}
           onClick={() => onSuggestionClick(suggestion)}
-          className="px-3 py-1.5 text-xs sm:text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-full hover:bg-purple-100 transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-500"
-          whileHover={{ scale: 1.03 }}
+          className={`${bubbleBaseStyles} ${bubbleThemeStyles}`}
+          whileHover={{ scale: 1.03, y: -1 }} // Slight lift on hover
           whileTap={{ scale: 0.97 }}
+
         >
           {suggestion}
         </motion.button>

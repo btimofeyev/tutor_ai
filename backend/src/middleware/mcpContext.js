@@ -1,6 +1,7 @@
 // backend/src/middleware/mcpContext.js - Updated with date awareness
 
 const mcpClient = require('../services/mcpClient');
+const { getCurrentDateInfo, getDueDateStatus } = require('../utils/dateUtils');
 
 // Helper function to determine if a query is asking about lessons/assignments
 exports.isLessonQuery = (message) => {
@@ -30,141 +31,235 @@ exports.formatLearningContextForAI = (mcpContext, currentDate = null) => {
       return "No specific curriculum data available at the moment.";
     }
   
-    // Get current date for calculations
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { today, currentDate: autoCurrentDate } = getCurrentDateInfo();
+    const displayDate = currentDate || autoCurrentDate;
     
-    let context = "";
+    let context = `📅 **Current Date**: ${displayDate}\n\n`;
   
-    // Add current date info at the top
-    if (currentDate) {
-      context += `📅 **Current Date**: ${currentDate}\n\n`;
-    }
+    // DEDUPLICATE MATERIALS: Combine and deduplicate all materials by ID
+    const allMaterialsRaw = [
+      ...(mcpContext.currentMaterials || []),
+      ...(mcpContext.upcomingAssignments || []),
+      ...(mcpContext.allMaterials || [])
+    ];
   
-    // Current focus
-    if (mcpContext.currentFocus) {
-      const focus = mcpContext.currentFocus;
-      context += `🎯 **Current Focus**: "${focus.title}" (${focus.content_type || 'lesson'})`;
-      
-      if (focus.due_date) {
-        const dueDate = new Date(focus.due_date + 'T00:00:00');
-        dueDate.setHours(0, 0, 0, 0);
-        const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+    // Remove duplicates by ID
+    const seenIds = new Set();
+    const allMaterials = allMaterialsRaw.filter(material => {
+      if (!material.id) return true;
+      if (seenIds.has(material.id)) return false;
+      seenIds.add(material.id);
+      return true;
+    });
+  
+    console.log(`📋 Deduplication: ${allMaterialsRaw.length} raw materials -> ${allMaterials.length} unique materials`);
+  
+    // CATEGORIZE ALL MATERIALS BY DUE DATE STATUS (including completed for overdue check)
+    const materialsByStatus = {
+      overdue: [],
+      today: [],
+      tomorrow: [],
+      soon: [],
+      upcoming: [],
+      future: [],
+      noDate: []
+    };
+  
+    // Include both completed AND incomplete materials for overdue detection
+    allMaterials.forEach(material => {
+      if (!material.due_date) {
+        // Only include incomplete materials in noDate
+        if (!material.completed_at) {
+          materialsByStatus.noDate.push(material);
+        }
+      } else {
+        const status = getDueDateStatus(material.due_date, today);
         
-        if (daysUntilDue < 0) {
-          context += ` - **OVERDUE by ${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) !== 1 ? 's' : ''}!** 🚨`;
-        } else if (daysUntilDue === 0) {
-          context += ` - **DUE TODAY!** ⚠️`;
-        } else if (daysUntilDue === 1) {
-          context += ` - **Due tomorrow** ⏰`;
-        } else if (daysUntilDue > 0) {
-          context += ` - Due in ${daysUntilDue} day${daysUntilDue !== 1 ? 's' : ''}`;
+        // For overdue: include both completed and incomplete to catch missed deadlines
+        if (status.status === 'overdue') {
+          materialsByStatus.overdue.push(material);
+        } else if (!material.completed_at) {
+          // For other statuses: only include incomplete materials
+          materialsByStatus[status.status].push(material);
+        }
+      }
+    });
+  
+    // ACCURATE GRADE INFORMATION (show early for context)
+    if (mcpContext.gradeAnalysis && mcpContext.gradeAnalysis.bySubject) {
+      context += "📊 **Current Grades**:\n";
+      
+      for (const [subject, gradeData] of Object.entries(mcpContext.gradeAnalysis.bySubject)) {
+        if (gradeData.average !== null) {
+          context += `- **${subject}**: ${gradeData.average}% (${gradeData.earned}/${gradeData.possible} points from ${gradeData.count} assignments)\n`;
+        } else {
+          context += `- **${subject}**: No grades yet (${gradeData.materials.length} materials assigned)\n`;
         }
       }
       
-      // Add learning objectives if available
-      if (focus.lesson_json?.learning_objectives?.length > 0) {
-        context += `\n   📚 Learning goals: ${focus.lesson_json.learning_objectives.slice(0, 2).join(', ')}`;
+      if (mcpContext.gradeAnalysis.overall.average !== null) {
+        context += `- **Overall Average**: ${mcpContext.gradeAnalysis.overall.average}% across all subjects\n`;
+      }
+      context += "\n";
+    }
+  
+    // ===== PRIORITY ASSIGNMENT SECTIONS =====
+    // These sections are designed to be the PRIMARY response for "What lessons do I have?" type queries
+  
+    // 🚨 OVERDUE ASSIGNMENTS (HIGHEST PRIORITY - always show first)
+    if (materialsByStatus.overdue.length > 0) {
+      context += `🚨 **OVERDUE ASSIGNMENTS** - Need immediate attention!\n`;
+      materialsByStatus.overdue.forEach((material, index) => {
+        const subjectName = material.lesson?.unit?.child_subject?.subject?.name || 
+                           material.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
+        const status = getDueDateStatus(material.due_date, today);
+        const completionStatus = material.completed_at ? ' (Completed late)' : '';
+        context += `${index + 1}. **${material.title}** (${subjectName}) - ${status.text}${completionStatus} 🚨\n`;
+      });
+      context += "\n";
+    }
+  
+    // ⚠️ DUE TODAY ASSIGNMENTS
+    if (materialsByStatus.today.length > 0) {
+      context += `⚠️ **DUE TODAY** - Complete these today!\n`;
+      materialsByStatus.today.forEach((material, index) => {
+        const subjectName = material.lesson?.unit?.child_subject?.subject?.name || 
+                           material.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
+        context += `${index + 1}. **${material.title}** (${subjectName}) - DUE TODAY ⚠️\n`;
+      });
+      context += "\n";
+    }
+  
+    // ⏰ DUE TOMORROW ASSIGNMENTS
+    if (materialsByStatus.tomorrow.length > 0) {
+      context += `⏰ **DUE TOMORROW** - Start working on these!\n`;
+      materialsByStatus.tomorrow.forEach((material, index) => {
+        const subjectName = material.lesson?.unit?.child_subject?.subject?.name || 
+                           material.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
+        context += `${index + 1}. **${material.title}** (${subjectName}) - DUE TOMORROW ⏰\n`;
+      });
+      context += "\n";
+    }
+  
+    // 📅 DUE SOON (within 3 days)
+    if (materialsByStatus.soon.length > 0) {
+      context += `📅 **DUE SOON** (within 3 days):\n`;
+      materialsByStatus.soon.forEach((material, index) => {
+        const subjectName = material.lesson?.unit?.child_subject?.subject?.name || 
+                           material.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
+        const status = getDueDateStatus(material.due_date, today);
+        context += `${index + 1}. **${material.title}** (${subjectName}) - ${status.text} ⚠️\n`;
+      });
+      context += "\n";
+    }
+  
+    // 📋 UPCOMING ASSIGNMENTS (4-7 days)
+    if (materialsByStatus.upcoming.length > 0) {
+      context += `📋 **UPCOMING ASSIGNMENTS** (this week):\n`;
+      materialsByStatus.upcoming.slice(0, 5).forEach((material, index) => {
+        const subjectName = material.lesson?.unit?.child_subject?.subject?.name || 
+                           material.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
+        const status = getDueDateStatus(material.due_date, today);
+        context += `${index + 1}. **${material.title}** (${subjectName}) - ${status.text}\n`;
+      });
+      if (materialsByStatus.upcoming.length > 5) {
+        context += `   ... and ${materialsByStatus.upcoming.length - 5} more upcoming assignments\n`;
+      }
+      context += "\n";
+    }
+  
+    // 📖 IN-PROGRESS MATERIALS (no due date)
+    if (materialsByStatus.noDate.length > 0) {
+      context += `📖 **Other Materials** (no due date):\n`;
+      materialsByStatus.noDate.slice(0, 5).forEach((material, index) => {
+        const subjectName = material.lesson?.unit?.child_subject?.subject?.name || 
+                           material.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
+        context += `${index + 1}. **${material.title}** (${subjectName})\n`;
+      });
+      if (materialsByStatus.noDate.length > 5) {
+        context += `   ... and ${materialsByStatus.noDate.length - 5} more materials\n`;
+      }
+      context += "\n";
+    }
+  
+    // ===== SECONDARY INFORMATION SECTIONS =====
+  
+    // COMPLETED ASSIGNMENTS WITH ACTUAL GRADES (for grade-related queries)
+    if (mcpContext.completedMaterials && mcpContext.completedMaterials.length > 0) {
+      context += "✅ **Recent Completed Assignments**:\n";
+      
+      const gradedMaterials = mcpContext.completedMaterials
+        .filter(m => m.grade_value && m.grade_max_value)
+        .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at))
+        .slice(0, 5); // Show fewer to save space
+      
+      gradedMaterials.forEach((material, index) => {
+        const percentage = Math.round((parseFloat(material.grade_value) / parseFloat(material.grade_max_value)) * 100);
+        const subjectName = material.lesson?.unit?.child_subject?.subject?.name || 
+                           material.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
+        
+        context += `${index + 1}. **${material.title}** (${subjectName}): ${material.grade_value}/${material.grade_max_value} = ${percentage}%\n`;
+      });
+      context += "\n";
+    }
+  
+    // MATERIALS NEEDING REVIEW (for performance improvement)
+    if (mcpContext.materialsForReview && mcpContext.materialsForReview.length > 0) {
+      context += "📝 **Materials Needing Review** (below 70%):\n";
+      mcpContext.materialsForReview.slice(0, 3).forEach((material, index) => {
+        const subjectName = material.lesson?.unit?.child_subject?.subject?.name || 
+                           material.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
+        context += `${index + 1}. **${material.title}** (${subjectName}): ${material.percentage}% - ${material.reason}\n`;
+      });
+      context += "\n";
+    }
+  
+    // CURRENT FOCUS (highest priority item for immediate action)
+    const currentFocus = materialsByStatus.overdue[0] || 
+                        materialsByStatus.today[0] || 
+                        materialsByStatus.tomorrow[0] || 
+                        materialsByStatus.soon[0] || 
+                        mcpContext.currentFocus;
+  
+    if (currentFocus) {
+      context += `🎯 **Immediate Priority**: "${currentFocus.title}" (${currentFocus.content_type || 'lesson'})`;
+      
+      if (currentFocus.due_date) {
+        const status = getDueDateStatus(currentFocus.due_date, today);
+        context += ` - **${status.text}**`;
+        if (status.urgent) context += ` ${status.status === 'overdue' ? '🚨' : '⚠️'}`;
       }
       
-      // Add tasks/questions preview if available
-      if (focus.lesson_json?.tasks_or_questions?.length > 0) {
-        context += `\n   📝 Contains ${focus.lesson_json.tasks_or_questions.length} tasks/questions`;
+      if (currentFocus.lesson_json?.learning_objectives?.length > 0) {
+        context += `\n   📚 Learning goals: ${currentFocus.lesson_json.learning_objectives.slice(0, 2).join(', ')}`;
       }
       
       context += "\n\n";
     }
   
-    // Active lessons with accurate date calculations
-    if (mcpContext.currentLessons && mcpContext.currentLessons.length > 0) {
-      context += "📖 **Active Materials**:\n";
-      mcpContext.currentLessons.slice(0, 4).forEach((lesson, index) => {
-        const subjectName = lesson.lesson?.unit?.child_subject?.subject?.name || 
-                           lesson.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
-        context += `${index + 1}. "${lesson.title}" (${subjectName})`;
-        
-        if (lesson.due_date) {
-          const dueDate = new Date(lesson.due_date + 'T00:00:00');
-          dueDate.setHours(0, 0, 0, 0);
-          const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-          
-          if (daysUntil < 0) {
-            context += ` - OVERDUE by ${Math.abs(daysUntil)} day${Math.abs(daysUntil) !== 1 ? 's' : ''} 🚨`;
-          } else if (daysUntil === 0) {
-            context += ` - Due TODAY ⚠️`;
-          } else if (daysUntil === 1) {
-            context += ` - Due TOMORROW ⏰`;
-          } else if (daysUntil <= 7) {
-            context += ` - Due in ${daysUntil} days`;
-          }
-        }
-        context += "\n";
-      });
-      
-      if (mcpContext.currentLessons.length > 4) {
-        context += `   ... and ${mcpContext.currentLessons.length - 4} more materials\n`;
-      }
-      context += "\n";
-    }
+    // SUMMARY STATUS (for quick overview)
+    const totalOverdue = materialsByStatus.overdue.length;
+    const totalDueToday = materialsByStatus.today.length;
+    const totalDueTomorrow = materialsByStatus.tomorrow.length;
+    const totalDueSoon = materialsByStatus.soon.length;
   
-    // Upcoming assignments with accurate urgency
-    if (mcpContext.upcomingAssignments && mcpContext.upcomingAssignments.length > 0) {
-      context += "📅 **Upcoming Assignments**:\n";
-      mcpContext.upcomingAssignments.slice(0, 3).forEach((assignment, index) => {
-        const subjectName = assignment.lesson?.unit?.child_subject?.subject?.name || 
-                           assignment.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
-        const dueDate = new Date(assignment.due_date + 'T00:00:00');
-        dueDate.setHours(0, 0, 0, 0);
-        const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-        
-        let urgencyIcon = "";
-        let urgencyText = "";
-        
-        if (daysUntil < 0) {
-          urgencyIcon = " 🚨";
-          urgencyText = ` (OVERDUE by ${Math.abs(daysUntil)} day${Math.abs(daysUntil) !== 1 ? 's' : ''})`;
-        } else if (daysUntil === 0) {
-          urgencyIcon = " 🚨";
-          urgencyText = " (DUE TODAY)";
-        } else if (daysUntil === 1) {
-          urgencyIcon = " ⚠️";
-          urgencyText = " (DUE TOMORROW)";
-        } else if (daysUntil <= 3) {
-          urgencyIcon = " ⚠️";
-          urgencyText = ` (Due in ${daysUntil} days)`;
-        } else if (daysUntil <= 7) {
-          urgencyIcon = " ⏰";
-          urgencyText = ` (Due in ${daysUntil} days)`;
-        }
-        
-        context += `${index + 1}. "${assignment.title}" (${subjectName})${urgencyText}${urgencyIcon}\n`;
-      });
-      context += "\n";
+    context += "🔔 **Assignment Status Summary**:\n";
+    if (totalOverdue > 0) context += `- 🚨 ${totalOverdue} OVERDUE assignment${totalOverdue !== 1 ? 's' : ''} (needs immediate attention)\n`;
+    if (totalDueToday > 0) context += `- ⚠️ ${totalDueToday} due TODAY\n`;
+    if (totalDueTomorrow > 0) context += `- ⏰ ${totalDueTomorrow} due TOMORROW\n`;
+    if (totalDueSoon > 0) context += `- 📅 ${totalDueSoon} due within 3 days\n`;
+    
+    if (totalOverdue === 0 && totalDueToday === 0 && totalDueTomorrow === 0 && totalDueSoon === 0) {
+      context += "- ✅ No urgent assignments - you're caught up with immediate deadlines! 🎉\n";
     }
+    context += "\n";
   
-    // Progress summary
-    if (mcpContext.progress) {
-      const progress = mcpContext.progress;
-      context += "📊 **Progress Summary**:\n";
-      context += `- Completed materials: ${progress.summary?.totalCompletedMaterials || 0}\n`;
-      
-      if (progress.summary?.averageGrade !== null) {
-        context += `- Average grade: ${progress.summary.averageGrade}%\n`;
-      }
-      
-      if (progress.summary?.subjectsProgress?.length > 0) {
-        context += "- Subject progress: ";
-        progress.summary.subjectsProgress.forEach((subj, index) => {
-          context += `${subj.subject} (${subj.completionRate}%)`;
-          if (index < progress.summary.subjectsProgress.length - 1) context += ", ";
-        });
-        context += "\n";
-      }
-    }
+    // ADDITIONAL CONTEXT for lesson-specific queries
+    context += `**Total Active Materials**: ${allMaterials.filter(m => !m.completed_at).length}\n`;
+    context += `**Completed Materials**: ${mcpContext.completedMaterials?.length || 0}\n`;
   
-    return context || "No specific curriculum data available at the moment.";
+    return context;
   };
-
 // Middleware to add MCP context to requests
 exports.enrichWithMCPContext = async (req, res, next) => {
     const childId = req.child?.child_id;

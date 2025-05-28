@@ -1,5 +1,5 @@
-// backend/debug-mcp-enhanced.js
-// Run this to debug your MCP connection: node debug-mcp-enhanced.js
+// Enhanced MCP Database Debug Script - Focus on Grade Data
+// Run: node enhanced-mcp-debug.js
 
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
@@ -7,297 +7,314 @@ const { createClient } = require('@supabase/supabase-js');
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-console.log('🔧 Environment Check:');
+console.log('🔧 MCP Grade Debug - Environment Check:');
 console.log('   SUPABASE_URL:', supabaseUrl ? 'SET ✓' : 'MISSING ❌');
-console.log('   SUPABASE_ANON_KEY:', supabaseKey ? 'SET ✓' : 'MISSING ❌');
-console.log('   NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('   SUPABASE_SERVICE_ROLE_KEY:', supabaseKey ? 'SET ✓' : 'MISSING ❌');
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Missing SUPABASE_URL or SUPABASE_ANON_KEY');
+  console.error('❌ Missing environment variables');
   process.exit(1);
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function debugDatabase() {
-  console.log('\n🔍 Starting comprehensive database debug...');
+async function debugGradeData() {
+  console.log('\n📊 === DETAILED GRADE DATA ANALYSIS ===');
   console.log('='.repeat(60));
   
   try {
-    // 1. Test basic connection
-    console.log('1. Testing Supabase connection...');
-    const { data: testData, error: testError } = await supabase
+    // 1. Get all children
+    const { data: allChildren, error: childrenError } = await supabase
       .from('children')
-      .select('count', { count: 'exact', head: true });
-    
-    if (testError) {
-      console.error('❌ Supabase connection failed:', testError.message);
-      console.error('   Code:', testError.code);
-      console.error('   Details:', testError.details);
-      return;
-    }
-    
-    console.log(`✅ Supabase connected. Found ${testData} total children.`);
-    
-    // 2. List ALL children to see what we have
-    console.log('\n2. Listing ALL children in database...');
-    const { data: allChildren, error: allChildrenError } = await supabase
-      .from('children')
-      .select('id, parent_id, name, grade, child_username, created_at')
+      .select('id, name, grade')
       .order('created_at', { ascending: false });
     
-    if (allChildrenError) {
-      console.error('❌ Error fetching all children:', allChildrenError.message);
+    if (childrenError) {
+      console.error('❌ Error fetching children:', childrenError);
       return;
     }
     
-    console.log(`📝 Found ${allChildren?.length || 0} children:`);
-    (allChildren || []).forEach((child, i) => {
-      console.log(`   ${i + 1}. ${child.name} (Grade: ${child.grade || 'N/A'})`);
-      console.log(`      ID: ${child.id}`);
-      console.log(`      Parent ID: ${child.parent_id}`);
-      console.log(`      Username: ${child.child_username || 'Not set'}`);
-      console.log('');
-    });
+    console.log(`👨‍👩‍👧‍👦 Found ${allChildren?.length || 0} children`);
     
     if (!allChildren || allChildren.length === 0) {
-      console.log('❌ No children found in database!');
-      console.log('💡 Create a child first in your frontend dashboard.');
+      console.log('❌ No children found! Create a child first.');
       return;
     }
     
-    // 3. Pick the first child for detailed analysis
-    const targetChild = allChildren[0];
-    console.log(`\n3. Analyzing child: ${targetChild.name} (${targetChild.id})`);
-    console.log('-'.repeat(50));
-    
-    // 4. Check child_subjects
-    console.log('\n4. Checking child_subjects assignments...');
-    const { data: childSubjects, error: childSubjectsError } = await supabase
-      .from('child_subjects')
-      .select(`
-        id,
-        child_id,
-        subject_id,
-        custom_subject_name_override,
-        created_at,
-        subject:subject_id (
+    // 2. For each child, analyze their grade data
+    for (const child of allChildren) {
+      console.log(`\n👤 === ANALYZING CHILD: ${child.name} (${child.id}) ===`);
+      console.log('-'.repeat(50));
+      
+      // Get child subjects
+      const { data: childSubjects, error: csError } = await supabase
+        .from('child_subjects')
+        .select(`
           id,
-          name,
-          description,
-          is_predefined
-        )
-      `)
-      .eq('child_id', targetChild.id);
-    
-    if (childSubjectsError) {
-      console.error('❌ Error fetching child_subjects:', childSubjectsError.message);
-    } else {
-      console.log(`📚 Found ${childSubjects?.length || 0} subject assignments:`);
-      (childSubjects || []).forEach((cs, i) => {
-        const displayName = cs.custom_subject_name_override || cs.subject?.name;
-        console.log(`   ${i + 1}. ${displayName}`);
-        console.log(`      Child-Subject ID: ${cs.id}`);
-        console.log(`      Subject ID: ${cs.subject_id}`);
-        console.log(`      Original Name: ${cs.subject?.name}`);
-        console.log('');
-      });
-    }
-    
-    if (!childSubjects || childSubjects.length === 0) {
-      console.log('⚠️  No subjects assigned to this child.');
-      console.log('💡 This is why MCP returns empty results!');
-      console.log('💡 Go to Subject Management in your frontend to assign subjects.');
+          custom_subject_name_override,
+          subject:subject_id (
+            id,
+            name
+          )
+        `)
+        .eq('child_id', child.id);
       
-      // Check if there are any global subjects available
-      console.log('\n5. Checking available global subjects...');
-      const { data: allSubjects, error: subjectsError } = await supabase
-        .from('subjects')
-        .select('id, name, is_predefined')
-        .order('name');
-      
-      if (!subjectsError && allSubjects && allSubjects.length > 0) {
-        console.log(`📖 Available subjects to assign (${allSubjects.length}):`);
-        allSubjects.forEach((subject, i) => {
-          console.log(`   ${i + 1}. ${subject.name} ${subject.is_predefined ? '(predefined)' : '(custom)'}`);
-        });
-      } else {
-        console.log('❌ No global subjects found! Create subjects first.');
-      }
-      return;
-    }
-    
-    // 5. Check units
-    console.log('\n5. Checking units for each subject...');
-    let totalUnits = 0;
-    for (const cs of childSubjects) {
-      const { data: units, error: unitsError } = await supabase
-        .from('units')
-        .select('id, name, description, sequence_order, created_at')
-        .eq('child_subject_id', cs.id)
-        .order('sequence_order');
-      
-      if (unitsError) {
-        console.error(`❌ Error fetching units for ${cs.subject?.name}:`, unitsError.message);
+      if (csError) {
+        console.error(`❌ Error getting child subjects:`, csError);
         continue;
       }
       
-      totalUnits += units?.length || 0;
-      console.log(`   📁 ${cs.subject?.name}: ${units?.length || 0} units`);
-      (units || []).forEach((unit, i) => {
-        console.log(`      ${i + 1}. "${unit.name}" (seq: ${unit.sequence_order || 0})`);
-      });
-    }
-    
-    // 6. Check lesson containers
-    console.log('\n6. Checking lesson containers...');
-    let totalLessons = 0;
-    for (const cs of childSubjects) {
-      const { data: units } = await supabase
-        .from('units')
-        .select('id, name')
-        .eq('child_subject_id', cs.id);
+      console.log(`📚 Child has ${childSubjects?.length || 0} subjects assigned`);
       
-      for (const unit of units || []) {
-        const { data: lessons, error: lessonsError } = await supabase
-          .from('lessons')
-          .select('id, title, lesson_number, sequence_order, created_at')
-          .eq('unit_id', unit.id)
-          .order('sequence_order');
+      if (!childSubjects || childSubjects.length === 0) {
+        console.log('⚠️  No subjects assigned - no grade data possible');
+        continue;
+      }
+      
+      // 3. For each subject, get detailed material and grade info
+      const childSubjectIds = childSubjects.map(cs => cs.id);
+      
+      // Get ALL materials for this child
+      const { data: allMaterials, error: materialsError } = await supabase
+        .from('materials')
+        .select(`
+          id,
+          title,
+          content_type,
+          status,
+          completed_at,
+          grade_value,
+          grade_max_value,
+          child_subject_id,
+          lesson:lesson_id (
+            id,
+            title,
+            unit:unit_id (
+              id,
+              name,
+              child_subject:child_subject_id (
+                id,
+                subject:subject_id (name),
+                custom_subject_name_override
+              )
+            )
+          ),
+          created_at
+        `)
+        .in('child_subject_id', childSubjectIds)
+        .order('created_at', { ascending: false });
+      
+      if (materialsError) {
+        console.error(`❌ Error getting materials:`, materialsError);
+        continue;
+      }
+      
+      console.log(`📄 Found ${allMaterials?.length || 0} total materials`);
+      
+      if (!allMaterials || allMaterials.length === 0) {
+        console.log('⚠️  No materials found - no grade data possible');
+        continue;
+      }
+      
+      // 4. Analyze materials by subject
+      const subjectAnalysis = {};
+      
+      for (const material of allMaterials) {
+        const subjectName = material.lesson?.unit?.child_subject?.custom_subject_name_override || 
+                           material.lesson?.unit?.child_subject?.subject?.name || 'Unknown';
         
-        if (lessonsError) {
-          console.error(`❌ Error fetching lessons for unit ${unit.name}:`, lessonsError.message);
-          continue;
+        if (!subjectAnalysis[subjectName]) {
+          subjectAnalysis[subjectName] = {
+            totalMaterials: 0,
+            completedMaterials: 0,
+            gradedMaterials: 0,
+            totalPoints: 0,
+            earnedPoints: 0,
+            grades: [],
+            materials: []
+          };
         }
         
-        totalLessons += lessons?.length || 0;
-        if (lessons && lessons.length > 0) {
-          console.log(`   📚 ${cs.subject?.name} > ${unit.name}: ${lessons.length} lesson containers`);
-          lessons.forEach((lesson, i) => {
-            console.log(`      ${i + 1}. "${lesson.title}" (${lesson.lesson_number || 'no #'})`);
+        const subject = subjectAnalysis[subjectName];
+        subject.totalMaterials++;
+        subject.materials.push({
+          title: material.title,
+          type: material.content_type,
+          completed: !!material.completed_at,
+          grade: material.grade_value,
+          maxGrade: material.grade_max_value,
+          status: material.status
+        });
+        
+        if (material.completed_at) {
+          subject.completedMaterials++;
+        }
+        
+        if (material.grade_value && material.grade_max_value) {
+          subject.gradedMaterials++;
+          const points = parseFloat(material.grade_value);
+          const maxPoints = parseFloat(material.grade_max_value);
+          
+          subject.earnedPoints += points;
+          subject.totalPoints += maxPoints;
+          
+          const percentage = (points / maxPoints) * 100;
+          subject.grades.push({
+            material: material.title,
+            points: points,
+            maxPoints: maxPoints,
+            percentage: percentage.toFixed(1)
           });
         }
       }
+      
+      // 5. Display detailed analysis
+      console.log('\n📊 SUBJECT-BY-SUBJECT GRADE ANALYSIS:');
+      for (const [subjectName, analysis] of Object.entries(subjectAnalysis)) {
+        console.log(`\n  📖 ${subjectName.toUpperCase()}:`);
+        console.log(`     Total Materials: ${analysis.totalMaterials}`);
+        console.log(`     Completed: ${analysis.completedMaterials}`);
+        console.log(`     With Grades: ${analysis.gradedMaterials}`);
+        
+        if (analysis.gradedMaterials > 0) {
+          const overallPercentage = (analysis.earnedPoints / analysis.totalPoints) * 100;
+          console.log(`     📈 CALCULATED AVERAGE: ${overallPercentage.toFixed(1)}% (${analysis.earnedPoints}/${analysis.totalPoints} points)`);
+          
+          console.log(`     Individual Grades:`);
+          analysis.grades.forEach((grade, i) => {
+            console.log(`       ${i + 1}. ${grade.material}: ${grade.percentage}% (${grade.points}/${grade.maxPoints})`);
+          });
+        } else {
+          console.log(`     📈 NO GRADES YET: 0% (no graded materials)`);
+        }
+        
+        // Show recent materials
+        console.log(`     Recent Materials:`);
+        analysis.materials.slice(0, 3).forEach((mat, i) => {
+          const gradeInfo = mat.grade && mat.maxGrade ? 
+            `${mat.grade}/${mat.maxGrade} (${((mat.grade/mat.maxGrade)*100).toFixed(1)}%)` : 
+            'Not graded';
+          console.log(`       ${i + 1}. ${mat.title} (${mat.type}) - ${mat.completed ? 'Completed' : 'In Progress'} - ${gradeInfo}`);
+        });
+      }
+      
+      // 6. Test MCP Server calculations
+      console.log('\n🤖 === TESTING MCP SERVER CALCULATIONS ===');
+      
+      try {
+        // Simulate what the MCP server should calculate
+        for (const [subjectName, analysis] of Object.entries(subjectAnalysis)) {
+          if (analysis.gradedMaterials > 0) {
+            const mcpCalculatedAverage = (analysis.earnedPoints / analysis.totalPoints) * 100;
+            console.log(`MCP Should Calculate ${subjectName}: ${mcpCalculatedAverage.toFixed(1)}%`);
+          } else {
+            console.log(`MCP Should Calculate ${subjectName}: 0% (no grades)`);
+          }
+        }
+        
+        // Check if there's a mismatch
+        console.log('\n🔍 POTENTIAL ISSUES TO CHECK:');
+        console.log('1. Are materials properly linked to child_subjects?');
+        console.log('2. Are grade_value and grade_max_value stored as numbers?');
+        console.log('3. Is the MCP server using the right child_subject_ids?');
+        console.log('4. Is there caching in the MCP client causing stale data?');
+        
+      } catch (mcpError) {
+        console.error('❌ MCP test failed:', mcpError.message);
+      }
     }
     
-    // 7. Check materials
-    console.log('\n7. Checking materials...');
-    const childSubjectIds = childSubjects.map(cs => cs.id);
-    const { data: materials, error: materialsError } = await supabase
+    // 7. Raw data verification queries
+    console.log('\n🔍 === RAW DATA VERIFICATION ===');
+    
+    // Check for any materials with grades
+    const { data: gradedMaterials, error: gradedError } = await supabase
       .from('materials')
       .select(`
-        id, title, content_type, status, due_date, completed_at,
-        lesson_id, child_subject_id, created_at
+        id,
+        title,
+        grade_value,
+        grade_max_value,
+        child_subject_id,
+        lesson:lesson_id (
+          unit:unit_id (
+            child_subject:child_subject_id (
+              subject:subject_id (name),
+              custom_subject_name_override
+            )
+          )
+        )
       `)
-      .in('child_subject_id', childSubjectIds)
-      .order('created_at', { ascending: false });
+      .not('grade_value', 'is', null)
+      .not('grade_max_value', 'is', null);
     
-    if (materialsError) {
-      console.error('❌ Error fetching materials:', materialsError.message);
-    } else {
-      console.log(`📄 Found ${materials?.length || 0} total materials:`);
-      (materials || []).forEach((material, i) => {
-        const subject = childSubjects.find(cs => cs.id === material.child_subject_id);
-        const subjectName = subject?.custom_subject_name_override || subject?.subject?.name || 'Unknown';
-        console.log(`   ${i + 1}. "${material.title}" (${material.content_type})`);
-        console.log(`      Subject: ${subjectName}`);
-        console.log(`      Status: ${material.status}`);
-        console.log(`      Due: ${material.due_date || 'No due date'}`);
-        console.log(`      Lesson Container ID: ${material.lesson_id || 'NOT ASSIGNED ⚠️'}`);
-        console.log('');
+    if (!gradedError && gradedMaterials) {
+      console.log(`📊 Found ${gradedMaterials.length} materials with grades:`);
+      gradedMaterials.forEach((mat, i) => {
+        const subjectName = mat.lesson?.unit?.child_subject?.custom_subject_name_override || 
+                           mat.lesson?.unit?.child_subject?.subject?.name || 'Unknown';
+        const percentage = ((parseFloat(mat.grade_value) / parseFloat(mat.grade_max_value)) * 100).toFixed(1);
+        console.log(`  ${i + 1}. ${mat.title} (${subjectName}): ${mat.grade_value}/${mat.grade_max_value} = ${percentage}%`);
       });
     }
     
-    // 8. Test MCP Server directly
-    console.log('\n8. Testing MCP Server directly...');
-    try {
-      const mcpClient = require('./src/services/mcpClient');
-      
-      console.log('   Testing getChildSubjects...');
-      const mcpChildSubjects = await mcpClient.getChildSubjects(targetChild.id);
-      console.log(`   MCP returned ${mcpChildSubjects?.length || 0} child subjects`);
-      
-      console.log('   Testing getCurrentMaterials...');
-      const mcpMaterials = await mcpClient.getCurrentMaterials(targetChild.id);
-      console.log(`   MCP returned ${mcpMaterials?.length || 0} current materials`);
-      
-      console.log('   Testing getUpcomingAssignments...');
-      const mcpAssignments = await mcpClient.getUpcomingAssignments(targetChild.id);
-      console.log(`   MCP returned ${mcpAssignments?.length || 0} upcoming assignments`);
-      
-      console.log('   Testing getLearningContext...');
-      const mcpContext = await mcpClient.getLearningContext(targetChild.id);
-      console.log('   MCP Learning Context:', {
-        childSubjects: mcpContext?.childSubjects?.length || 0,
-        currentMaterials: mcpContext?.currentMaterials?.length || 0,
-        upcomingAssignments: mcpContext?.upcomingAssignments?.length || 0,
-        hasFocus: !!mcpContext?.currentFocus,
-        fallback: mcpContext?.fallback || false,
-        error: mcpContext?.error || null
-      });
-      
-      // Cleanup
-      await mcpClient.disconnect();
-      
-    } catch (mcpError) {
-      console.error('❌ MCP test failed:', mcpError.message);
-      console.error('Stack:', mcpError.stack);
-    }
+    // 8. Check grade calculation logic
+    console.log('\n🧮 === GRADE CALCULATION VERIFICATION ===');
     
-    // 9. Final summary and recommendations
-    console.log('\n' + '='.repeat(60));
-    console.log('📊 FINAL DIAGNOSIS:');
-    console.log(`   Child: ${targetChild.name} (${targetChild.id})`);
-    console.log(`   Subject Assignments: ${childSubjects?.length || 0}`);
-    console.log(`   Units: ${totalUnits}`);
-    console.log(`   Lesson Containers: ${totalLessons}`);
-    console.log(`   Materials: ${materials?.length || 0}`);
+    // Test the exact calculation the MCP server should be doing
+    const testChildId = allChildren[0].id;
     
-    // Identify the root cause
-    if (!childSubjects || childSubjects.length === 0) {
-      console.log('\n❌ ROOT CAUSE: No subjects assigned to child');
-      console.log('🔧 SOLUTION:');
-      console.log('   1. Go to Subject Management in your frontend');
-      console.log('   2. Assign at least one subject to this child');
-      console.log('   3. Then test again');
-    } else if (totalUnits === 0) {
-      console.log('\n❌ ROOT CAUSE: No units created');
-      console.log('🔧 SOLUTION:');
-      console.log('   1. Go to Dashboard in your frontend');
-      console.log('   2. Click "Manage Units" for a subject');
-      console.log('   3. Create at least one unit');
-    } else if (totalLessons === 0) {
-      console.log('\n❌ ROOT CAUSE: No lesson containers created');
-      console.log('🔧 SOLUTION:');
-      console.log('   1. Create units first (if not done)');
-      console.log('   2. When adding materials, select a unit');
-      console.log('   3. Create lesson containers to organize materials');
-    } else if (!materials || materials.length === 0) {
-      console.log('\n❌ ROOT CAUSE: No materials added');
-      console.log('🔧 SOLUTION:');
-      console.log('   1. Go to Dashboard > Add New Material');
-      console.log('   2. Upload some files for the child');
-      console.log('   3. Assign them to units and lesson containers');
-    } else {
-      const orphanedMaterials = materials.filter(m => !m.lesson_id);
-      if (orphanedMaterials.length > 0) {
-        console.log('\n⚠️  PARTIAL ISSUE: Some materials not assigned to lesson containers');
-        console.log(`   ${orphanedMaterials.length} materials need lesson container assignment`);
-      } else {
-        console.log('\n✅ Database structure looks good!');
-        console.log('   MCP should be working. Check MCP server logs for connection issues.');
+    const { data: testSubjects } = await supabase
+      .from('child_subjects')
+      .select('id, subject:subject_id(name), custom_subject_name_override')
+      .eq('child_id', testChildId);
+    
+    if (testSubjects) {
+      for (const testSubject of testSubjects) {
+        const subjectName = testSubject.custom_subject_name_override || testSubject.subject.name;
+        
+        const { data: subjectMaterials } = await supabase
+          .from('materials')
+          .select('grade_value, grade_max_value, title')
+          .eq('child_subject_id', testSubject.id)
+          .not('grade_value', 'is', null)
+          .not('grade_max_value', 'is', null);
+        
+        if (subjectMaterials && subjectMaterials.length > 0) {
+          let totalEarned = 0;
+          let totalPossible = 0;
+          
+          subjectMaterials.forEach(mat => {
+            totalEarned += parseFloat(mat.grade_value);
+            totalPossible += parseFloat(mat.grade_max_value);
+          });
+          
+          const calculatedAverage = (totalEarned / totalPossible) * 100;
+          
+          console.log(`${subjectName}:`);
+          console.log(`  Materials with grades: ${subjectMaterials.length}`);
+          console.log(`  Total earned: ${totalEarned}`);
+          console.log(`  Total possible: ${totalPossible}`);
+          console.log(`  🎯 CORRECT AVERAGE: ${calculatedAverage.toFixed(1)}%`);
+          console.log(`  Individual scores:`);
+          subjectMaterials.forEach(mat => {
+            console.log(`    - ${mat.title}: ${mat.grade_value}/${mat.grade_max_value}`);
+          });
+        } else {
+          console.log(`${subjectName}: No graded materials (should show 0% or N/A)`);
+        }
       }
     }
     
   } catch (error) {
-    console.error('💥 Unexpected error during debug:', error);
-    console.error('Stack trace:', error.stack);
+    console.error('💥 Debug script error:', error);
+    console.error('Stack:', error.stack);
   }
 }
 
 // Run the debug
-debugDatabase().then(() => {
-  console.log('\n🏁 Debug complete. Check the analysis above.');
+debugGradeData().then(() => {
+  console.log('\n🏁 Grade debug complete. Check the analysis above for discrepancies.');
   process.exit(0);
 }).catch(error => {
   console.error('💥 Debug script crashed:', error);

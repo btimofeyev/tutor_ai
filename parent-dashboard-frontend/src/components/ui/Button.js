@@ -1,4 +1,3 @@
-// components/ui/Button.js
 'use client';
 import Link from 'next/link';
 import React from 'react';
@@ -19,65 +18,73 @@ const Button = React.forwardRef(
     },
     ref
   ) => {
+    // Size classes now use var(--radius-md) from globals.css for consistent rounding with AuthUI
     const sizeClasses = {
-      sm: 'px-4 py-2 text-sm rounded-md',
-      md: 'px-6 py-2.5 text-base rounded-lg', // Default size, slightly reduced padding for 3D
-      lg: 'px-8 py-3 text-lg rounded-lg',
+      sm: `px-4 py-2 text-sm rounded-[var(--radius-md)]`,
+      md: `px-6 py-2.5 text-base rounded-[var(--radius-md)]`,
+      lg: `px-8 py-3 text-lg rounded-[var(--radius-md)]`,
     };
 
     const baseStyles =
       'font-medium inline-flex items-center justify-center transition-all duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background-main active:scale-[0.97] active:shadow-inner';
-    
-    // 3D Effect: A slightly darker bottom border for the shadow, and an inset shadow on active
-    // We'll use pseudo-elements for a more robust shadow if needed, but for now, border + box-shadow
 
-    let variantStyles = '';
+    let variantSpecificClasses = ''; // Will hold .btn-primary or .btn-secondary for pastel look
+    let effectClasses = '';      // For 3D border, outline, ghost specifics
+
     switch (variant) {
       case 'primary':
-        variantStyles = `
-          bg-accent-blue text-text-on-accent 
-          border-b-4 border-blue-700 hover:border-blue-800 
-          shadow-sm hover:bg-accent-blue-hover active:bg-blue-700 
-          focus:ring-accent-blue
+        variantSpecificClasses = 'btn-primary'; // Applies pastel blue bg, dark text
+        effectClasses = `
+          border-b-4 border-[var(--accent-blue-darker-for-border)] 
+          hover:border-[var(--accent-blue-darker-for-border)] /* Keep border on hover */
+          active:bg-[var(--accent-blue-hover)] /* Make active state use the hover bg from .btn-primary */
+          shadow-sm 
+          focus:ring-[var(--accent-blue)]
         `;
-        // On active, the border-bottom might become less visible.
-        // The active:scale and active:shadow-inner will give the "pressed" feel.
         break;
       case 'secondary':
-        variantStyles = `
-          bg-gray-200 text-text-primary 
-          border-b-4 border-gray-400 hover:border-gray-500 
-          shadow-sm hover:bg-gray-300 active:bg-gray-400 
-          focus:ring-gray-400
+        variantSpecificClasses = 'btn-secondary'; // Applies pastel yellow bg, dark text
+        effectClasses = `
+          border-b-4 border-[var(--accent-yellow-darker-for-border)] 
+          hover:border-[var(--accent-yellow-darker-for-border)] /* Keep border on hover */
+          active:bg-[var(--accent-yellow-hover)] /* Make active state use the hover bg from .btn-secondary */
+          shadow-sm 
+          focus:ring-[var(--accent-yellow)]
         `;
         break;
-      case 'outline': // Added for variety
-        variantStyles = `
-          bg-transparent text-accent-blue border-2 border-accent-blue 
-          hover:bg-accent-blue hover:text-text-on-accent 
-          focus:ring-accent-blue 
-          active:bg-blue-700 active:border-blue-700
-        `; // Outline doesn't lend itself as well to the "bottom border shadow"
+      case 'outline':
+        // Outline styles are specific and don't use .btn- classes
+        // Text color should be --text-primary for better contrast on --accent-blue outline if background is white
+        variantSpecificClasses = `
+          bg-transparent text-[var(--accent-blue)] border-2 border-[var(--accent-blue)]
+          hover:bg-[var(--accent-blue)] hover:text-[var(--text-on-accent)]
+          focus:ring-[var(--accent-blue)]
+          active:bg-[var(--accent-blue-hover)] active:border-[var(--accent-blue-hover)]
+        `;
+        // Note: Outline doesn't naturally have a "bottom border shadow"
         break;
-      case 'ghost': // Added for variety
-        variantStyles = `
-          bg-transparent text-accent-blue 
-          hover:bg-blue-50 
-          focus:ring-accent-blue
-        `; // Ghost also not for 3D effect
+      case 'ghost':
+        // Ghost styles are specific
+        variantSpecificClasses = `
+          bg-transparent text-[var(--accent-blue)]
+          hover:bg-[var(--accent-blue)]/20  /* Use a light opacity of the accent color */
+          focus:ring-[var(--accent-blue)]
+        `;
         break;
-      default:
-        variantStyles = `
-          bg-accent-blue text-text-on-accent 
-          border-b-4 border-blue-700 
-          shadow-sm hover:bg-accent-blue-hover active:bg-blue-700 
-          focus:ring-accent-blue
+      default: // Fallback to primary
+        variantSpecificClasses = 'btn-primary';
+        effectClasses = `
+          border-b-4 border-[var(--accent-blue-darker-for-border)] 
+          hover:border-[var(--accent-blue-darker-for-border)]
+          active:bg-[var(--accent-blue-hover)]
+          shadow-sm 
+          focus:ring-[var(--accent-blue)]
         `;
     }
     
     const disabledStyles = disabled ? 'opacity-60 cursor-not-allowed !shadow-none !border-b-2' : '';
 
-    const combinedClassName = `${baseStyles} ${sizeClasses[size]} ${variantStyles} ${disabledStyles} ${className}`;
+    const combinedClassName = `${baseStyles} ${sizeClasses[size]} ${variantSpecificClasses} ${effectClasses} ${disabledStyles} ${className}`;
 
     if (as === 'link' && href) {
       return (

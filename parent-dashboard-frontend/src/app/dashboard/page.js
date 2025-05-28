@@ -64,18 +64,26 @@ const isDateOverdue = (dateString) => {
   if (!dateString) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dueDate = new Date(dateString + "T00:00:00Z");
+  const dueDate = new Date(dateString + "T00:00:00Z"); // Assuming UTC date from DB
   return dueDate < today;
 };
 const isDateDueSoon = (dateString, days = 7) => {
   if (!dateString) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dueDate = new Date(dateString + "T00:00:00Z");
+  const dueDate = new Date(dateString + "T00:00:00Z"); // Assuming UTC date from DB
   const soonCutoff = new Date(today);
   soonCutoff.setDate(today.getDate() + days);
   return dueDate >= today && dueDate <= soonCutoff;
 };
+
+// Helper for input styling
+const inputBaseClass = "block w-full border-border-input focus:outline-none focus:ring-1 focus:ring-accent-blue focus:border-accent-blue rounded-lg bg-background-card text-text-primary placeholder-text-tertiary shadow-sm";
+const inputPaddingClass = "py-2 px-3";
+const inputSizeClass = "text-sm";
+const formInputStyles = `${inputBaseClass} ${inputPaddingClass} ${inputSizeClass}`;
+const formLabelStyles = "block text-xs font-medium text-text-secondary mb-1";
+
 
 export default function DashboardPage() {
   const session = useSession();
@@ -320,107 +328,79 @@ export default function DashboardPage() {
     setLoadingChildData(true);
     
     try {
-      console.log('🔍 Fetching hierarchical data for child ID:', selectedChild.id);
-      
-      // STEP 1: Fetch child subjects (assignments)
       const childSubjectsRes = await api.get(`/child-subjects/child/${selectedChild.id}`);
       const currentChildAssignedSubjects = childSubjectsRes.data || [];
-      
-      console.log('✅ Child subjects fetched:', currentChildAssignedSubjects.length, 'subjects');
       setChildSubjects(cs => ({ ...cs, [selectedChild.id]: currentChildAssignedSubjects }));
   
       let newMaterialsBySubject = {}, newGradeWeights = {}, newUnitsBySubject = {}, newLessonsByUnit = {};
       
-      // STEP 2: For each assigned subject, fetch the hierarchy
       for (const subject of currentChildAssignedSubjects) {
         if (subject.child_subject_id) {
-          console.log(`🔍 Fetching hierarchy for subject: ${subject.name} (child_subject_id: ${subject.child_subject_id})`);
-          
           try {
-            // Fetch Units for this subject
-            console.log(`📁 Fetching units for child_subject_id: ${subject.child_subject_id}`);
             const unitsRes = await api.get(`/units/subject/${subject.child_subject_id}`);
             const subjectUnits = unitsRes.data || [];
-            console.log(`✅ Units fetched for ${subject.name}:`, subjectUnits.length, 'units');
             newUnitsBySubject[subject.child_subject_id] = subjectUnits;
             
-            // Fetch Lesson Containers for each unit
             for (const unit of subjectUnits) {
-              console.log(`📚 Fetching lesson containers for unit: ${unit.name} (unit_id: ${unit.id})`);
               try {
                 const lessonsRes = await api.get(`/lesson-containers/unit/${unit.id}`);
                 const unitLessons = lessonsRes.data || [];
-                console.log(`✅ Lesson containers fetched for unit ${unit.name}:`, unitLessons.length, 'lessons');
                 newLessonsByUnit[unit.id] = unitLessons;
                 
-                // Fetch Materials for each lesson container
                 for (const lesson of unitLessons) {
-                  console.log(`📄 Fetching materials for lesson: ${lesson.title} (lesson_id: ${lesson.id})`);
                   try {
                     const materialsRes = await api.get(`/materials/lesson/${lesson.id}`);
                     const lessonMaterials = materialsRes.data || [];
-                    console.log(`✅ Materials fetched for lesson ${lesson.title}:`, lessonMaterials.length, 'materials');
                     
-                    // Add these materials to the subject's material list (flattened for filtering/sorting)
                     if (!newMaterialsBySubject[subject.child_subject_id]) {
                       newMaterialsBySubject[subject.child_subject_id] = [];
                     }
                     newMaterialsBySubject[subject.child_subject_id].push(...lessonMaterials);
                   } catch (materialsError) {
-                    console.error(`❌ Materials fetch failed for lesson ${lesson.title}:`, materialsError);
+                    console.error(`Materials fetch failed for lesson ${lesson.title}:`, materialsError);
                   }
                 }
               } catch (lessonsError) {
-                console.error(`❌ Lesson containers fetch failed for unit ${unit.name}:`, lessonsError);
+                console.error(`Lesson containers fetch failed for unit ${unit.name}:`, lessonsError);
                 newLessonsByUnit[unit.id] = [];
               }
             }
             
-            // Fetch Grade Weights for this subject
-            console.log(`⚖️ Fetching weights for child_subject_id: ${subject.child_subject_id}`);
             try {
               const weightsRes = await api.get(`/weights/${subject.child_subject_id}`);
-              console.log(`✅ Weights fetched for ${subject.name}:`, weightsRes.data?.length || 0, 'weight rules');
-              
               const fetchedWeightsMap = new Map((weightsRes.data || []).map(w => [w.content_type, parseFloat(w.weight)]));
               newGradeWeights[subject.child_subject_id] = APP_CONTENT_TYPES.map(ct => ({
                   content_type: ct,
                   weight: fetchedWeightsMap.get(ct) ?? (APP_GRADABLE_CONTENT_TYPES.includes(ct) ? 0.10 : 0.00)
               }));
             } catch (weightsError) {
-              console.error(`❌ Weights fetch failed for ${subject.name}:`, weightsError);
+              console.error(`Weights fetch failed for ${subject.name}:`, weightsError);
               newGradeWeights[subject.child_subject_id] = [...defaultWeightsForNewSubject];
             }
             
           } catch (err) {
-            console.error(`❌ Error fetching hierarchy for subject ${subject.name}:`, err);
+            console.error(`Error fetching hierarchy for subject ${subject.name}:`, err);
             newMaterialsBySubject[subject.child_subject_id] = [];
             newGradeWeights[subject.child_subject_id] = [...defaultWeightsForNewSubject];
             newUnitsBySubject[subject.child_subject_id] = [];
           }
         } else {
-          console.warn(`⚠️ Subject missing child_subject_id:`, subject);
+          console.warn(`Subject missing child_subject_id:`, subject);
         }
       }
       
-      console.log('📊 Final hierarchical data summary:');
-      console.log('- Units by subject:', Object.keys(newUnitsBySubject).length, 'subjects');
-      console.log('- Lessons by unit:', Object.keys(newLessonsByUnit).length, 'units');
-      console.log('- Materials by subject (flattened):', Object.keys(newMaterialsBySubject).length, 'subjects');
-      console.log('- Grade weights:', Object.keys(newGradeWeights).length, 'subjects');
-      
-      // Update state with hierarchical data
       setUnitsBySubject(newUnitsBySubject);
-      setLessonsByUnit(newLessonsByUnit); // NEW STATE
-      setLessonsBySubject(newMaterialsBySubject); // This now contains flattened materials for filtering/sorting
+      setLessonsByUnit(newLessonsByUnit); 
+      setLessonsBySubject(newMaterialsBySubject); 
       setGradeWeights(newGradeWeights);
       
     } catch (error) { 
-      console.error("💥 Major error in refreshChildSpecificData:", error);
+      console.error("Error in refreshChildSpecificData:", error);
     } finally { 
       setLoadingChildData(false); 
     }
   }, [selectedChild, session]);
+
 
   useEffect(() => {
     if (session === undefined) return;
@@ -470,7 +450,6 @@ export default function DashboardPage() {
     refreshChildSpecificData();
   }, [selectedChild, session, refreshChildSpecificData]);
 
-  // Reset lesson container selection when unit changes
   useEffect(() => {
     setSelectedLessonContainer("");
   }, [lessonJsonForApproval?.unit_id]);
@@ -600,8 +579,6 @@ export default function DashboardPage() {
     setLessonCompletedForApproval(false);
   
     const currentAssignedSubjects = childSubjects[selectedChild?.id] || [];
-  
-    // FIXED: Now addLessonSubject directly contains the child_subject_id
     const subjectInfo = currentAssignedSubjects.find(
       (s) => s.child_subject_id === addLessonSubject
     );
@@ -675,8 +652,6 @@ export default function DashboardPage() {
   const handleApproveNewLesson = async () => {
     setSavingLesson(true);
     const currentAssignedSubjects = childSubjects[selectedChild?.id] || [];
-  
-    // FIXED: Now addLessonSubject directly contains the child_subject_id
     const subjectInfo = currentAssignedSubjects.find(
       (s) => s.child_subject_id === addLessonSubject
     );
@@ -697,7 +672,6 @@ export default function DashboardPage() {
       return;
     }
 
-    // Validate lesson container selection
     if (!selectedLessonContainer || selectedLessonContainer === '__create_new__') {
       alert("Please select or create a lesson container.");
       setSavingLesson(false);
@@ -709,7 +683,7 @@ export default function DashboardPage() {
     delete lessonJsonToSave.unit_id;
   
     const payload = {
-      lesson_id: selectedLessonContainer, // Required by new schema
+      lesson_id: selectedLessonContainer, 
       child_subject_id: subjectInfo.child_subject_id,
       title: lessonTitleForApproval,
       content_type: lessonContentTypeForApproval,
@@ -739,7 +713,7 @@ export default function DashboardPage() {
       setLessonDueDateForApproval("");
       setLessonCompletedForApproval(false);
       setAddLessonFile(null);
-      setSelectedLessonContainer(""); // Reset lesson container selection
+      setSelectedLessonContainer(""); 
   
       const fileInput = document.getElementById("lesson-file-input-main");
       if (fileInput) fileInput.value = "";
@@ -751,7 +725,6 @@ export default function DashboardPage() {
     setSavingLesson(false);
   };
 
-  // Lesson Container Handlers
   const handleLessonContainerChange = (e) => {
     const value = e.target.value;
     setSelectedLessonContainer(value);
@@ -761,31 +734,26 @@ export default function DashboardPage() {
     }
   };
 
-  const handleCreateNewLessonContainer = async (newTitleFromForm) => { // Accepts newTitleFromForm
+  const handleCreateNewLessonContainer = async (newTitleFromForm) => { 
     const unitId = lessonJsonForApproval?.unit_id; 
   
     if (!unitId) {
-      console.error('Dashboard Page: Unit ID is missing for new lesson container creation.'); // Log error
+      console.error('Unit ID is missing for new lesson container creation.'); 
       alert('Error: A unit must be selected before creating a new lesson group.');
-      return; // Exit if no unitId
+      return; 
     }
     if (!newTitleFromForm || !newTitleFromForm.trim()) {
-      // This should ideally be caught in the form, but good to double-check
-      console.error('Dashboard Page: New lesson container title is empty.'); // Log error
+      console.error('New lesson container title is empty.'); 
       alert('Error: New lesson group title cannot be empty.');
-      return; // Exit if no title
+      return; 
     }
-  
-    console.log(`Dashboard Page: Attempting to create lesson container "${newTitleFromForm}" in unit ${unitId}`); // Log action
-  
+    
     try {
       const response = await api.post('/lesson-containers', {
         unit_id: unitId,
         title: newTitleFromForm.trim()
       });
       
-      console.log('Dashboard Page: Lesson container created:', response.data); // Log success
-  
       const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
       const updatedLessonContainersForUnit = lessonsRes.data || [];
       
@@ -795,10 +763,9 @@ export default function DashboardPage() {
       }));
       
       setSelectedLessonContainer(response.data.id); 
-
   
     } catch (error) {
-      console.error('Dashboard Page: Failed to create lesson container:', error.response?.data || error.message); // Log detailed error
+      console.error('Failed to create lesson container:', error.response?.data || error.message); 
       alert(error.response?.data?.error || 'Failed to create lesson group. Please try again.');
     }
   };
@@ -870,7 +837,6 @@ export default function DashboardPage() {
   };
 
   const openManageUnitsModal = (subject) => {
-    // FIXED: Use child_subject_id as the key
     setManagingUnitsForSubject({
       id: subject.child_subject_id,
       name: subject.name,
@@ -1067,7 +1033,7 @@ export default function DashboardPage() {
         c.id === editingChildCredentials.id
           ? { ...c, access_pin_hash: "set" }
           : c
-      ); // Indicate PIN is set
+      ); 
       setChildren(updatedChildren);
       if (selectedChild?.id === editingChildCredentials.id)
         setSelectedChild((prev) => ({ ...prev, access_pin_hash: "set" }));
@@ -1084,11 +1050,11 @@ export default function DashboardPage() {
     }
   };
 
-  // --- RENDER ---
+
   if (loadingInitial && session === undefined) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-100">
-        <div className="text-xl text-gray-500">Initializing Dashboard...</div>
+      <div className="flex items-center justify-center h-screen bg-background-main">
+        <div className="text-xl text-text-secondary">Initializing Dashboard...</div>
       </div>
     );
   }
@@ -1097,10 +1063,9 @@ export default function DashboardPage() {
   const assignedSubjectsForCurrentChild =
     childSubjects[selectedChild?.id] || [];
     const currentUnitsForAddFormSubject = addLessonSubject && selectedChild && childSubjects[selectedChild.id]
-    ? unitsBySubject[addLessonSubject] || [] // FIXED: addLessonSubject now contains child_subject_id directly
+    ? unitsBySubject[addLessonSubject] || [] 
     : [];
 
-  // Get lesson containers for selected unit
   const currentLessonContainersForUnit = useMemo(() => {
     const selectedUnitId = lessonJsonForApproval?.unit_id;
     if (!selectedUnitId) return [];
@@ -1108,8 +1073,8 @@ export default function DashboardPage() {
   }, [lessonJsonForApproval?.unit_id, lessonsByUnit]);
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-[#f8fafc] to-[#e9ecf0] overflow-hidden">
-      <div className="w-64 flex-shrink-0 bg-white border-r border-gray-100 shadow-lg">
+    <div className="flex h-screen bg-background-main overflow-hidden">
+      <div className="w-64 flex-shrink-0 bg-background-card border-r border-border-subtle shadow-lg">
         <StudentSidebar
           childrenList={children}
           selectedChild={selectedChild}
@@ -1128,18 +1093,16 @@ export default function DashboardPage() {
       <div className="flex-1 flex flex-col overflow-y-auto p-6 sm:p-8 lg:p-10">
         {loadingInitial && !selectedChild && children.length > 0 && (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-xl text-gray-500">Loading Student Data...</div>
+            <div className="text-xl text-text-secondary">Loading Student Data...</div>
           </div>
         )}
         {!selectedChild && !loadingInitial && (
           <div className="flex-1 flex items-center justify-center">
-            {" "}
-            <div className="text-gray-500 italic text-xl text-center">
-              {" "}
+            <div className="text-text-secondary italic text-xl text-center">
               {children.length > 0
                 ? "Select a student to get started."
-                : "No students found. Please add a student to begin."}{" "}
-            </div>{" "}
+                : "No students found. Please add a student to begin."}
+            </div>
           </div>
         )}
 
@@ -1149,12 +1112,12 @@ export default function DashboardPage() {
               selectedChild={selectedChild}
               dashboardStats={dashboardStats}
             />
-            <div className="my-6 p-4 bg-white rounded-lg shadow">
+            <div className="my-6 card p-4"> {/* Use card class */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div>
                   <label
                     htmlFor="filterStatus"
-                    className="block text-xs font-medium text-gray-700"
+                    className={formLabelStyles}
                   >
                     Filter by Status
                   </label>
@@ -1162,7 +1125,7 @@ export default function DashboardPage() {
                     id="filterStatus"
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                    className={`${formInputStyles} mt-1`}
                   >
                     <option value="all">All Statuses</option>
                     <option value="complete">Complete</option>
@@ -1174,7 +1137,7 @@ export default function DashboardPage() {
                 <div>
                   <label
                     htmlFor="filterContentType"
-                    className="block text-xs font-medium text-gray-700"
+                    className={formLabelStyles}
                   >
                     Filter by Content Type
                   </label>
@@ -1182,7 +1145,7 @@ export default function DashboardPage() {
                     id="filterContentType"
                     value={filterContentType}
                     onChange={(e) => setFilterContentType(e.target.value)}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                    className={`${formInputStyles} mt-1`}
                   >
                     <option value="all">All Types</option>
                     {APP_CONTENT_TYPES.map((type) => (
@@ -1196,7 +1159,7 @@ export default function DashboardPage() {
                 <div>
                   <label
                     htmlFor="sortBy"
-                    className="block text-xs font-medium text-gray-700"
+                    className={formLabelStyles}
                   >
                     Sort By
                   </label>
@@ -1204,7 +1167,7 @@ export default function DashboardPage() {
                     id="sortBy"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                    className={`${formInputStyles} mt-1`}
                   >
                     <option value="createdAtDesc">Most Recent</option>
                     <option value="createdAtAsc">Oldest</option>
@@ -1217,22 +1180,22 @@ export default function DashboardPage() {
               </div>
             </div>
             {loadingChildData ? (
-              <div className="text-center py-10 text-gray-500">
+              <div className="text-center py-10 text-text-secondary">
                 Loading {selectedChild.name}'s curriculum...
               </div>
             ) : (
               <div className="mt-0">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-gray-800">
+                  <h2 className="text-xl font-semibold text-text-primary">
                     Curriculum Overview
                   </h2>
                 </div>
                 {assignedSubjectsForCurrentChild.length === 0 ? (
-                  <div className="italic text-gray-400 p-4 bg-white rounded-lg shadow">
+                  <div className="italic text-text-secondary p-4 bg-background-card rounded-lg shadow border border-border-subtle"> {/* Matches card but might not need full 'card' class features */}
                     No subjects assigned to {selectedChild.name}.
                     <button
                       onClick={() => router.push("/subject-management")}
-                      className="ml-2 text-blue-600 hover:text-blue-700 underline font-medium"
+                      className="ml-2 text-accent-blue hover:text-[var(--accent-blue-hover)] underline font-medium transition-colors"
                     >
                       Assign Subjects
                     </button>
@@ -1275,14 +1238,14 @@ export default function DashboardPage() {
       </div>
 
       <div
-        className={`w-full md:w-1/3 lg:w-2/5 xl:w-1/3 flex-shrink-0 border-l border-gray-200 bg-white shadow-lg overflow-y-auto p-6 transition-opacity duration-300 ${
+        className={`w-full md:w-1/3 lg:w-2/5 xl:w-1/3 flex-shrink-0 border-l border-border-subtle bg-background-card shadow-lg overflow-y-auto p-6 transition-opacity duration-300 ${
           selectedChild && !loadingChildData
             ? "opacity-100"
             : "opacity-50 pointer-events-none"
         }`}
       >
-        <div className="sticky top-0 bg-white z-10 pt-0 pb-4 -mx-6 px-6 border-b mb-6">
-          <h2 className="text-lg font-semibold text-gray-800">Actions</h2>
+        <div className="sticky top-0 bg-background-card z-10 pt-0 pb-4 -mx-6 px-6 border-b border-border-subtle mb-6">
+          <h2 className="text-lg font-semibold text-text-primary">Actions</h2>
         </div>
         {selectedChild && !loadingChildData ? (
           <AddMaterialForm
@@ -1332,7 +1295,7 @@ export default function DashboardPage() {
             onCreateNewLessonContainer={handleCreateNewLessonContainer}
           />
         ) : (
-          <p className="text-sm text-gray-400 italic text-center">
+          <p className="text-sm text-text-tertiary italic text-center">
             {selectedChild && loadingChildData
               ? "Loading actions..."
               : "Select student to enable actions."}
@@ -1341,35 +1304,35 @@ export default function DashboardPage() {
       </div>
 
       {isManageUnitsModalOpen && managingUnitsForSubject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 animate-fade-in">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col">
-            <div className="flex justify-between items-center mb-4 pb-3 border-b">
-              <h3 className="text-xl font-semibold text-gray-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 animate-fade-in">
+          <div className="bg-background-card rounded-lg shadow-xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col border border-border-subtle">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-border-subtle">
+              <h3 className="text-xl font-semibold text-text-primary">
                 Manage Units for:{" "}
-                <span className="text-blue-600">
+                <span className="text-accent-blue">
                   {managingUnitsForSubject.name}
                 </span>
               </h3>
               <button
                 onClick={() => setIsManageUnitsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl p-1 rounded-full hover:bg-gray-100 transition-colors"
+                className="text-text-secondary hover:text-text-primary text-2xl p-1 rounded-full hover:bg-gray-100 transition-colors" /* Using gray-100 for hover as it's neutral */
               >
                 ×
               </button>
             </div>
             <div className="flex-grow overflow-y-auto mb-4 pr-2 space-y-3">
               {currentSubjectUnitsInModal.length === 0 && (
-                <p className="text-sm text-gray-500 italic py-4 text-center">
+                <p className="text-sm text-text-secondary italic py-4 text-center">
                   No units created yet.
                 </p>
               )}
               {currentSubjectUnitsInModal.map((unit) => (
                 <div
                   key={unit.id}
-                  className={`p-3 border rounded-md transition-all duration-150 ${
+                  className={`p-3 border border-border-subtle rounded-md transition-all duration-150 ${
                     editingUnit?.id === unit.id
-                      ? "bg-blue-50 border-blue-300"
-                      : "hover:bg-gray-50"
+                      ? "bg-accent-blue/10 border-accent-blue" /* Light accent bg for editing */
+                      : "hover:bg-gray-50" /* Subtle hover */
                   }`}
                 >
                   {editingUnit?.id === unit.id ? (
@@ -1377,7 +1340,7 @@ export default function DashboardPage() {
                       <div>
                         <label
                           htmlFor={`editUnitName-${unit.id}`}
-                          className="block text-xs font-medium text-gray-700"
+                          className={formLabelStyles}
                         >
                           Unit Name
                         </label>
@@ -1391,7 +1354,7 @@ export default function DashboardPage() {
                               name: e.target.value,
                             })
                           }
-                          className="mt-0.5 w-full border-gray-300 rounded-md shadow-sm text-sm p-2 focus:ring-blue-500 focus:border-blue-500"
+                          className={`${formInputStyles} mt-0.5`}
                           autoFocus
                           required
                         />
@@ -1399,7 +1362,7 @@ export default function DashboardPage() {
                       <div>
                         <label
                           htmlFor={`editUnitDescription-${unit.id}`}
-                          className="block text-xs font-medium text-gray-700"
+                          className={formLabelStyles}
                         >
                           Description (Optional)
                         </label>
@@ -1413,20 +1376,20 @@ export default function DashboardPage() {
                             })
                           }
                           rows="2"
-                          className="mt-0.5 w-full border-gray-300 rounded-md shadow-sm text-sm p-2 focus:ring-blue-500 focus:border-blue-500"
+                          className={`${formInputStyles} mt-0.5`}
                         />
                       </div>
                       <div className="flex items-center justify-end gap-2 pt-2">
                         <button
                           type="button"
                           onClick={() => setEditingUnit(null)}
-                          className="px-3 py-1.5 text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 border rounded-md font-medium"
+                          className="px-3 py-1.5 text-xs text-text-primary bg-gray-100 hover:bg-gray-200 border border-border-subtle rounded-lg font-medium"
                         >
                           Cancel
                         </button>
                         <button
                           type="submit"
-                          className="px-3 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 border rounded-md font-medium"
+                          className="btn-primary text-xs px-3 py-1.5" /* Using btn-primary */
                         >
                           Save Changes
                         </button>
@@ -1435,12 +1398,12 @@ export default function DashboardPage() {
                   ) : (
                     <div className="flex justify-between items-center">
                       <div>
-                        <p className="text-sm font-medium text-gray-800">
+                        <p className="text-sm font-medium text-text-primary">
                           {unit.name}
                         </p>
                         {unit.description && (
                           <p
-                            className="text-xs text-gray-500 mt-0.5 max-w-xs truncate"
+                            className="text-xs text-text-secondary mt-0.5 max-w-xs truncate"
                             title={unit.description}
                           >
                             {unit.description}
@@ -1455,14 +1418,14 @@ export default function DashboardPage() {
                               description: unit.description || "",
                             })
                           }
-                          className="p-1.5 text-blue-600 hover:text-blue-800 rounded-md hover:bg-blue-50"
+                          className="p-1.5 text-accent-blue hover:text-[var(--accent-blue-hover)] rounded-md hover:bg-accent-blue/10 transition-colors"
                           title="Edit Unit"
                         >
                           <PencilIcon className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteUnit(unit.id)}
-                          className="p-1.5 text-red-500 hover:text-red-700 rounded-md hover:bg-red-50"
+                          className="p-1.5 text-[var(--messageTextDanger)] hover:opacity-75 rounded-md hover:bg-[var(--messageTextDanger)]/10 transition-opacity"
                           title="Delete Unit"
                         >
                           <TrashIcon className="h-4 w-4" />
@@ -1474,28 +1437,28 @@ export default function DashboardPage() {
               ))}
             </div>
             {!editingUnit && (
-              <form onSubmit={handleAddUnit} className="mt-auto pt-4 border-t">
+              <form onSubmit={handleAddUnit} className="mt-auto pt-4 border-t border-border-subtle">
                 <label
                   htmlFor="newUnitNameModalState"
-                  className="block text-sm font-medium text-gray-700"
+                  className={formLabelStyles}
                 >
                   Add New Unit
                 </label>
-                <div className="mt-1 flex rounded-md shadow-sm">
+                <div className="mt-1 flex rounded-lg shadow-sm"> {/* Changed to rounded-lg for consistency */}
                   <input
                     type="text"
                     id="newUnitNameModalState"
                     value={newUnitNameModalState}
                     onChange={(e) => setNewUnitNameModalState(e.target.value)}
-                    className="flex-1 block w-full min-w-0 rounded-none rounded-l-md sm:text-sm border-gray-300 p-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={`${formInputStyles} flex-1 min-w-0 rounded-r-none`}
                     placeholder="E.g., Chapter 1: Introduction"
                     required
                   />
                   <button
                     type="submit"
-                    className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 rounded-r-md bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="btn-primary inline-flex items-center px-4 py-2 rounded-l-none text-sm" /* Using btn-primary, adjusted rounding */
                   >
-                    <PlusCircleIcon className="h-5 w-5 mr-1.5 sm:mr-2" />
+                    <PlusCircleIcon className="h-5 w-5 mr-1.5 sm:mr-2 text-text-primary" /> {/* Icon color from btn-primary */}
                     Add
                   </button>
                 </div>
@@ -1523,7 +1486,6 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Child Login Settings Modal */}
       {isChildLoginSettingsModalOpen && editingChildCredentials && (
         <ChildLoginSettingsModal
           child={editingChildCredentials}

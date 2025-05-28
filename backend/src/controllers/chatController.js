@@ -1,7 +1,8 @@
-// backend/src/controllers/chatController.js - Complete Enhanced Version
+// backend/src/controllers/chatController.js - Enhanced with Comprehensive Memory Logging
 const { OpenAI } = require('openai');
 const supabase = require('../utils/supabaseClient');
 const mcpClient = require('../services/mcpClient');
+const memoryService = require('../services/learningMemoryService');
 const { formatLearningContextForAI, isLessonQuery } = require('../middleware/mcpContext');
 
 // Initialize OpenAI client
@@ -67,8 +68,6 @@ function findSpecificQuestion(lessonData, questionNumber) {
   }
   
   const questions = lessonData.lesson_json.tasks_or_questions;
-  
-  // Try to find question by number pattern - be more specific
   const questionPattern = new RegExp(`^${questionNumber}\\.\\s`);
   
   const matchedQuestionIndex = questions.findIndex(q => 
@@ -87,7 +86,6 @@ function findSpecificQuestion(lessonData, questionNumber) {
   let relevantInstruction = null;
   for (let i = matchedQuestionIndex - 1; i >= 0; i--) {
     const prevItem = questions[i];
-    // Look for instruction patterns (sentences that don't start with numbers)
     if (!/^\d+\./.test(prevItem) && 
         (prevItem.toLowerCase().includes('write') || 
          prevItem.toLowerCase().includes('find') || 
@@ -104,12 +102,11 @@ function findSpecificQuestion(lessonData, questionNumber) {
     }
   }
   
-  // Also look for section headers or categories - be more flexible
+  // Also look for section headers or categories
   let sectionContext = null;
   for (let i = matchedQuestionIndex - 1; i >= 0; i--) {
     const prevItem = questions[i];
     if (prevItem.length < 80 && !prevItem.match(/^\d+\./)) {
-      // More flexible section detection
       if (prevItem.toLowerCase().includes('form') || 
           prevItem.toLowerCase().includes('round') ||
           prevItem.toLowerCase().includes('compare') ||
@@ -132,9 +129,7 @@ function findSpecificQuestion(lessonData, questionNumber) {
     learningObjectives: lessonData.lesson_json.learning_objectives || [],
     relevantInstruction: relevantInstruction,
     sectionContext: sectionContext,
-    // Extract just the number/content without the question number
     questionContent: matchedQuestion.replace(/^\d+\.\s*/, ''),
-    // Add the raw question for debugging
     rawQuestionArray: questions.slice(Math.max(0, matchedQuestionIndex - 3), matchedQuestionIndex + 2)
   };
 }
@@ -143,7 +138,6 @@ function findSpecificQuestion(lessonData, questionNumber) {
 function findLessonByReference(mcpContext, lessonRef) {
   if (!mcpContext || !mcpContext.currentMaterials) return null;
   
-  // Try to find by lesson number
   const lessonNumberMatch = lessonRef.match(/lesson\s*(\d+)/i);
   if (lessonNumberMatch) {
     const lessonNum = lessonNumberMatch[1];
@@ -159,17 +153,255 @@ function findLessonByReference(mcpContext, lessonRef) {
     if (matchedMaterial) return matchedMaterial;
   }
   
-  // Try to find by title containing the reference
   return mcpContext.currentMaterials.find(material => 
     material.title && material.title.toLowerCase().includes(lessonRef.toLowerCase())
   );
 }
 
-// Main chat handler - Enhanced
+// Enhanced helper function to build memory context for AI prompt
+function buildMemoryContext(memories, profile) {
+  if (!memories || memories.length === 0) {
+    return "This is a new learning relationship - getting to know this student's learning style.";
+  }
+
+  let context = "";
+  memories.forEach((memory, index) => {
+    const memoryAge = Math.floor((Date.now() - new Date(memory.last_reinforced)) / (1000 * 60 * 60 * 24));
+    context += `${index + 1}. ${memory.memory_type.toUpperCase()}${memory.subject ? ` (${memory.subject})` : ''}: ${memory.topic}`;
+    
+    if (memory.content.userMessage) {
+      context += ` - Previously said: "${memory.content.userMessage.slice(0, 50)}..."`;
+    }
+    
+    if (memory.content.helpfulApproach) {
+      context += ` - What helped: "${memory.content.helpfulApproach.slice(0, 50)}..."`;
+    }
+    
+    if (memory.session_count > 1) {
+      context += ` (pattern seen ${memory.session_count} times)`;
+    }
+    
+    if (memoryAge === 0) {
+      context += ` (from today)`;
+    } else if (memoryAge === 1) {
+      context += ` (from yesterday)`;
+    } else if (memoryAge < 7) {
+      context += ` (${memoryAge} days ago)`;
+    }
+    
+    context += `\n`;
+  });
+
+  return context;
+}
+
+// Enhanced helper function to extract topic from message
+function extractTopic(message) {
+  // Enhanced topic extraction with more comprehensive list
+  const commonTopics = [
+    'multiplication', 'division', 'addition', 'subtraction', 'fractions', 'decimals',
+    'algebra', 'geometry', 'measurement', 'word problems', 'place value',
+    'reading', 'writing', 'spelling', 'grammar', 'vocabulary', 'comprehension',
+    'science', 'history', 'geography', 'biology', 'chemistry', 'physics',
+    'egypt', 'nile', 'pyramid', 'pharaoh', 'ancient', 'civilization',
+    'river', 'desert', 'africa', 'archaeology'
+  ];
+  const messageLower = message.toLowerCase();
+  
+  for (const topic of commonTopics) {
+    if (messageLower.includes(topic)) return topic;
+  }
+  
+  // Try to extract from specific question patterns
+  const questionMatch = message.match(/(?:help.*with|working on|stuck on|talk.*about|learn.*about)\s+([^?.!]+)/i);
+  if (questionMatch) {
+    return questionMatch[1].trim().slice(0, 50);
+  }
+  
+  return 'general';
+}
+
+// Enhanced function to update learning memories after interaction
+async function updateLearningMemories(childId, userMessage, aiResponse, mcpContext, learningProfile) {
+  console.log(`\n💾 === UPDATING LEARNING MEMORIES ===`);
+  console.log(`🔄 Updating memories for child ${childId}...`);
+  
+  try {
+    // Update interaction count and session date
+    await supabase
+      .from('child_learning_profiles')
+      .update({ 
+        total_interactions: learningProfile.total_interactions + 1,
+        last_session_date: new Date().toISOString().split('T')[0],
+        profile_updated_at: new Date().toISOString()
+      })
+      .eq('child_id', childId);
+
+    console.log(`✅ Updated interaction count: ${learningProfile.total_interactions} → ${learningProfile.total_interactions + 1}`);
+
+    // Detect and store learning moments
+    const messageLower = userMessage.toLowerCase();
+    const subject = mcpContext?.currentFocus?.lesson?.unit?.child_subject?.subject?.name || 
+                   mcpContext?.currentFocus?.lesson?.unit?.child_subject?.custom_subject_name_override ||
+                   'general';
+    const topic = mcpContext?.currentFocus?.title || extractTopic(userMessage);
+
+    console.log(`📝 Analyzing message for patterns...`);
+    console.log(`   Subject: ${subject}`);
+    console.log(`   Topic: ${topic}`);
+    console.log(`   Message keywords: ${messageLower.split(' ').slice(0, 10).join(', ')}`);
+
+    let memoryUpdates = [];
+
+    // Struggle patterns
+    if (messageLower.includes("don't understand") || 
+        messageLower.includes("confused") || 
+        messageLower.includes("hard") ||
+        messageLower.includes("difficult") ||
+        messageLower.includes("stuck") ||
+        messageLower.includes("help me")) {
+      
+      console.log(`🚨 STRUGGLE pattern detected`);
+      const memoryId = await memoryService.addMemory(childId, 'struggle', subject, topic, {
+        userMessage: userMessage.slice(0, 200),
+        context: mcpContext?.currentFocus?.title,
+        materialType: mcpContext?.currentFocus?.content_type,
+        specificQuestion: userMessage.match(/(?:number|question|problem)\s*(\d+)/i)?.[1],
+        timestamp: new Date().toISOString()
+      }, 0.7);
+      
+      if (memoryId) {
+        memoryUpdates.push(`STRUGGLE: ${subject} - ${topic}`);
+        console.log(`   ✅ Stored struggle memory: ${memoryId}`);
+      }
+    }
+
+    // Mastery patterns
+    if (messageLower.includes("got it") || 
+        messageLower.includes("understand now") || 
+        messageLower.includes("thank you") ||
+        messageLower.includes("makes sense") ||
+        messageLower.includes("i see") ||
+        messageLower.includes("oh yeah")) {
+      
+      console.log(`🎉 MASTERY pattern detected`);
+      const memoryId = await memoryService.addMemory(childId, 'mastery', subject, topic, {
+        helpfulApproach: aiResponse.slice(0, 200),
+        context: mcpContext?.currentFocus?.title,
+        whatWorked: "explanation_approach",
+        timestamp: new Date().toISOString()
+      }, 0.8);
+      
+      if (memoryId) {
+        memoryUpdates.push(`MASTERY: ${subject} - ${topic}`);
+        console.log(`   ✅ Stored mastery memory: ${memoryId}`);
+      }
+    }
+
+    // Question patterns
+    const questionMatch = userMessage.match(/(?:number|question|problem)\s*(\d+)/i);
+    if (questionMatch) {
+      console.log(`❓ QUESTION PATTERN detected: ${questionMatch[1]}`);
+      const memoryId = await memoryService.addMemory(childId, 'question_pattern', subject, `question_${questionMatch[1]}`, {
+        questionNumber: questionMatch[1],
+        materialType: mcpContext?.currentFocus?.content_type,
+        lessonTitle: mcpContext?.currentFocus?.title,
+        questionText: userMessage.slice(0, 150),
+        timestamp: new Date().toISOString()
+      }, 0.9);
+      
+      if (memoryId) {
+        memoryUpdates.push(`QUESTION: ${subject} - question ${questionMatch[1]}`);
+        console.log(`   ✅ Stored question pattern: ${memoryId}`);
+      }
+    }
+
+    // Engagement patterns
+    if (messageLower.includes("cool") || 
+        messageLower.includes("awesome") || 
+        messageLower.includes("fun") ||
+        messageLower.includes("love") ||
+        messageLower.includes("like this") ||
+        messageLower.includes("interesting")) {
+      
+      console.log(`😍 ENGAGEMENT pattern detected`);
+      const memoryId = await memoryService.addMemory(childId, 'engagement', subject, topic, {
+        positiveResponse: userMessage.slice(0, 100),
+        triggerContent: mcpContext?.currentFocus?.title,
+        materialType: mcpContext?.currentFocus?.content_type,
+        timestamp: new Date().toISOString()
+      }, 0.6);
+      
+      if (memoryId) {
+        memoryUpdates.push(`ENGAGEMENT: ${subject} - ${topic}`);
+        console.log(`   ✅ Stored engagement memory: ${memoryId}`);
+      }
+    }
+
+    // Enhanced: Topic interest patterns (NEW)
+    if (messageLower.includes("talk about") || 
+        messageLower.includes("learn about") ||
+        messageLower.includes("tell me about") ||
+        messageLower.includes("continue from") ||
+        messageLower.includes("what you told me")) {
+      
+      console.log(`🎯 TOPIC INTEREST pattern detected`);
+      const memoryId = await memoryService.addMemory(childId, 'topic_interest', subject, topic, {
+        interestExpression: userMessage.slice(0, 100),
+        requestType: 'continuation_or_exploration',
+        timestamp: new Date().toISOString()
+      }, 0.8);
+      
+      if (memoryId) {
+        memoryUpdates.push(`TOPIC_INTEREST: ${subject} - ${topic}`);
+        console.log(`   ✅ Stored topic interest memory: ${memoryId}`);
+      }
+    }
+
+    // Learning preference detection (from AI response patterns)
+    if (aiResponse.includes("step by step") && messageLower.includes("got it")) {
+      console.log(`🎨 PREFERENCE pattern detected: step_by_step`);
+      const memoryId = await memoryService.addMemory(childId, 'preference', subject, 'step_by_step_explanations', {
+        preferenceType: 'explanation_style',
+        effectiveApproach: 'step_by_step',
+        context: topic,
+        timestamp: new Date().toISOString()
+      }, 0.7);
+      
+      if (memoryId) {
+        memoryUpdates.push(`PREFERENCE: step_by_step explanations`);
+        console.log(`   ✅ Stored preference memory: ${memoryId}`);
+      }
+    }
+
+    // Summary
+    if (memoryUpdates.length > 0) {
+      console.log(`📊 Memory Update Summary:`);
+      memoryUpdates.forEach((update, i) => {
+        console.log(`   ${i + 1}. ${update}`);
+      });
+    } else {
+      console.log(`📝 No new memory patterns detected in this message`);
+    }
+
+    console.log(`Updated learning memories for child ${childId}: ${subject} - ${topic}`);
+
+  } catch (error) {
+    console.error('❌ Error updating learning memories:', error);
+    console.error('   Stack:', error.stack);
+  }
+}
+
+// Main chat handler - Enhanced with Memory System
 exports.chat = async (req, res) => {
     const childId = req.child?.child_id;
     const { message, sessionHistory = [], lessonContext = null } = req.body;
     const mcpContext = req.mcpContext;
+
+    console.log('\n🤖 === KLIO CHAT SESSION START ===');
+    console.log(`Child ID: ${childId}`);
+    console.log(`Message: "${message}"`);
+    console.log(`Session History Length: ${sessionHistory.length}`);
 
     if (!childId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -183,7 +415,7 @@ exports.chat = async (req, res) => {
     }
 
     try {
-      // Get current date and time - THIS IS THE KEY FIX
+      // Get current date and time
       const now = new Date();
       const currentDate = now.toLocaleDateString('en-US', { 
         weekday: 'long', 
@@ -203,6 +435,57 @@ exports.chat = async (req, res) => {
         .select('name, grade')
         .eq('id', childId)
         .single();
+
+      console.log('\n📚 === MEMORY SYSTEM STATUS ===');
+
+      // Enhanced memory system with detailed logging
+      const [recentMemories, learningProfile] = await Promise.all([
+        memoryService.getRelevantMemories(childId, message, mcpContext, 4).catch(e => {
+          console.error('❌ Error getting memories:', e);
+          return [];
+        }),
+        memoryService.getLearningProfile(childId).catch(e => {
+          console.error('❌ Error getting profile:', e);
+          return {
+            days_together: 0,
+            total_interactions: 0,
+            preferred_explanation_style: 'step_by_step',
+            common_difficulties: [],
+            engagement_triggers: [],
+            learning_pace: 'moderate',
+            confidence_level: 'building'
+          };
+        })
+      ]);
+
+      // DETAILED MEMORY LOGGING
+      console.log(`Memory Service Status:`);
+      console.log(`  - Retrieved Memories: ${recentMemories.length}`);
+      console.log(`  - Learning Profile Found: ${learningProfile.total_interactions > 0 ? 'YES' : 'NO (new user)'}`);
+      
+      if (recentMemories.length > 0) {
+        console.log('\n🧠 Retrieved Memories:');
+        recentMemories.forEach((memory, index) => {
+          console.log(`  ${index + 1}. ${memory.memory_type.toUpperCase()} | ${memory.subject} | ${memory.topic}`);
+          console.log(`     Confidence: ${memory.confidence_score} | Sessions: ${memory.session_count}`);
+          console.log(`     Last Seen: ${new Date(memory.last_reinforced).toLocaleDateString()}`);
+          console.log(`     Relevance Score: ${memory.relevanceScore?.toFixed(3) || 'N/A'}`);
+        });
+      } else {
+        console.log('  📝 No relevant memories found - new learning relationship');
+      }
+
+      // Calculate days together
+      const daysTogether = learningProfile.last_session_date ? 
+        Math.max(1, Math.floor((now - new Date(learningProfile.created_at)) / (1000 * 60 * 60 * 24))) : 
+        1;
+
+      console.log('\n👤 Learning Profile:');
+      console.log(`  - Days Together: ${daysTogether}`);
+      console.log(`  - Total Interactions: ${learningProfile.total_interactions}`);
+      console.log(`  - Preferred Style: ${learningProfile.preferred_explanation_style}`);
+      console.log(`  - Learning Pace: ${learningProfile.learning_pace}`);
+      console.log(`  - Confidence Level: ${learningProfile.confidence_level}`);
 
       // Format subjects from MCP context
       const subjects = mcpContext?.childSubjects
@@ -224,17 +507,13 @@ exports.chat = async (req, res) => {
           lessonReference: lessonReferenceMatch?.[0]
         });
         
-        // First, try to find the specific lesson being referenced
         if (lessonReferenceMatch) {
           targetLessonData = findLessonByReference(mcpContext, lessonReferenceMatch[0]);
           console.log('Found target lesson:', targetLessonData?.title);
         }
         
-        // If we have a question number, look for it in the target lesson or current focus
         if (questionNumberMatch) {
           const questionNumber = questionNumberMatch[1];
-          
-          // Try target lesson first, then current focus, then all current materials
           const searchOrder = [
             targetLessonData,
             mcpContext?.currentFocus,
@@ -261,12 +540,10 @@ exports.chat = async (req, res) => {
 
       if (isQueryAboutLessons || message.toLowerCase().includes('help')) {
         try {
-          // Try to find relevant lesson content
           const searchResults = await mcpClient.searchMaterials(message, childId);
           if (searchResults.length > 0) {
             additionalLessonData = searchResults[0];
             
-            // Get full lesson details if available
             if (additionalLessonData.id) {
               const lessonDetails = await mcpClient.getMaterialDetails(additionalLessonData.id);
               if (lessonDetails) {
@@ -282,16 +559,45 @@ exports.chat = async (req, res) => {
       // Format the learning context for the AI
       const formattedLearningContext = formatLearningContextForAI(mcpContext, currentDate);
 
-      // Create enhanced system prompt with current date and time
+      // Build memory context with logging
+      const memoryContext = buildMemoryContext(recentMemories, learningProfile);
+      
+      console.log('\n🔄 Memory Context Built:');
+      console.log(`  Length: ${memoryContext.length} characters`);
+      console.log(`  Preview: ${memoryContext.slice(0, 150)}${memoryContext.length > 150 ? '...' : ''}`);
+
+      // Create enhanced system prompt with memory and current date/time
       const systemPrompt = KLIO_SYSTEM_PROMPT
         .replace(/{currentDate}/g, currentDate)
         .replace(/{currentTime}/g, currentTime)
         .replace('{childName}', child?.name || 'Friend')
         .replace('{childGrade}', child?.grade || 'Elementary')
         .replace('{subjects}', subjects)
-        .replace('{learningContext}', formattedLearningContext);
+        .replace('{learningContext}', formattedLearningContext) + 
 
-      // ENHANCED: Build additional context with specific question details
+        `
+
+**LEARNING RELATIONSHIP CONTEXT:**
+You have been tutoring ${child?.name} for ${daysTogether} day${daysTogether !== 1 ? 's' : ''} with ${learningProfile.total_interactions} total interactions.
+
+**LEARNING PROFILE:**
+- Explanation style that works best: ${learningProfile.preferred_explanation_style}
+- Learning pace: ${learningProfile.learning_pace}
+- Current confidence level: ${learningProfile.confidence_level}
+${learningProfile.common_difficulties?.length > 0 ? `- Common difficulties: ${learningProfile.common_difficulties.join(', ')}` : ''}
+${learningProfile.engagement_triggers?.length > 0 ? `- Gets excited about: ${learningProfile.engagement_triggers.join(', ')}` : ''}
+
+**RELEVANT LEARNING MEMORIES:**
+${memoryContext}
+
+**MEMORY-INFORMED GUIDANCE:**
+- Reference past struggles and successes when relevant
+- Use approaches that have worked before
+- Be encouraging about topics they've previously mastered
+- Provide extra support for recurring difficulty areas
+- Celebrate growth and progress from previous sessions`;
+
+      // Build additional context with specific question details
       let additionalContext = "";
       
       if (specificQuestionData) {
@@ -340,7 +646,6 @@ The student is asking about question ${questionNumberMatch[1]} from "${specificQ
           }
         }
       } else if (targetLessonData && targetLessonData.lesson_json) {
-        // Add lesson context even if we didn't find the specific question
         additionalContext += `
 
 📚 **LESSON CONTEXT**:
@@ -350,7 +655,6 @@ The student is asking about question ${questionNumberMatch[1]} from "${specificQ
         if (targetLessonData.lesson_json.tasks_or_questions) {
           additionalContext += `\n- **Available Questions/Tasks**: ${targetLessonData.lesson_json.tasks_or_questions.length} total`;
           
-          // Show first few questions as examples
           const firstFewQuestions = targetLessonData.lesson_json.tasks_or_questions.slice(0, 5);
           additionalContext += `\n- **Sample Questions**:`;
           firstFewQuestions.forEach((q, i) => {
@@ -362,7 +666,7 @@ The student is asking about question ${questionNumberMatch[1]} from "${specificQ
         }
       }
 
-      // Add lesson details if found with date-aware context
+      // Add lesson details if found with date-aware context (keeping existing logic)
       if (additionalLessonData && additionalLessonData.lesson_json && !specificQuestionData) {
         additionalContext += `
 
@@ -411,8 +715,16 @@ The student is asking about question ${questionNumberMatch[1]} from "${specificQ
         }
       }
 
+      // Log final context size
+      console.log('\n📊 Context Size Analysis:');
+      console.log(`  - Base System Prompt: ~${KLIO_SYSTEM_PROMPT.length} chars`);
+      console.log(`  - MCP Context: ~${formattedLearningContext.length} chars`);
+      console.log(`  - Memory Context: ~${memoryContext.length} chars`);
+      console.log(`  - Additional Context: ~${additionalContext.length} chars`);
+      console.log(`  - Total Estimated: ~${(systemPrompt + additionalContext).length} chars`);
+
       // Prepare conversation history
-      const recentHistory = sessionHistory.slice(-10);
+      const recentHistory = sessionHistory.slice(-8); // Reduced from 10 to make room for memory context
 
       const openaiMessages = [
         {
@@ -433,7 +745,7 @@ The student is asking about question ${questionNumberMatch[1]} from "${specificQ
       let response;
       try {
         response = await openai.chat.completions.create({
-          model: "gpt-4.1-mini",
+          model: "gpt-4o-mini",
           messages: openaiMessages,
           temperature: 0.7,
           max_tokens: 1024,
@@ -454,6 +766,9 @@ The student is asking about question ${questionNumberMatch[1]} from "${specificQ
         console.error("OpenAI API unexpected response shape:", response);
       }
 
+      // Update learning memories after successful interaction
+      await updateLearningMemories(childId, message, aiMessage, mcpContext, learningProfile);
+
       // Log interaction for analytics
       try {
         await supabase
@@ -464,11 +779,21 @@ The student is asking about question ${questionNumberMatch[1]} from "${specificQ
             ai_provider: 'openai',
             interaction_at: new Date().toISOString(),
             has_lesson_context: !!(specificQuestionData || targetLessonData || additionalLessonData),
-            specific_question_asked: !!specificQuestionData
+            specific_question_asked: !!specificQuestionData,
+            has_memory_context: recentMemories.length > 0
           }]);
       } catch (logError) {
         console.error('Failed to log interaction:', logError);
       }
+
+      // Add final summary
+      console.log('\n✅ === CHAT SESSION COMPLETE ===');
+      console.log(`Response Length: ${aiMessage.length} characters`);
+      console.log(`Memory Updates: Attempted`);
+      console.log(`Memories Retrieved: ${recentMemories.length}`);
+      console.log(`Days Together: ${daysTogether}`);
+      console.log(`Total Interactions: ${learningProfile.total_interactions + 1}`);
+      console.log('=====================================\n');
 
       // Return response with lesson context if relevant
       res.json({
@@ -493,11 +818,25 @@ The student is asking about question ${questionNumberMatch[1]} from "${specificQ
           currentMaterialsCount: mcpContext?.currentMaterials?.length || 0,
           upcomingAssignmentsCount: mcpContext?.upcomingAssignments?.length || 0,
           foundSpecificQuestion: !!specificQuestionData
+        },
+        // Memory context summary for debugging/monitoring
+        memoryContextSummary: {
+          daysTogether: daysTogether,
+          totalInteractions: learningProfile.total_interactions + 1,
+          relevantMemoriesCount: recentMemories.length,
+          learningProfile: {
+            explanationStyle: learningProfile.preferred_explanation_style,
+            pace: learningProfile.learning_pace,
+            confidenceLevel: learningProfile.confidence_level
+          },
+          memoryTypes: recentMemories.map(m => m.memory_type)
         }
       });
 
     } catch (error) {
-      console.error('Enhanced chat error:', error);
+      console.error('💥 === CHAT SESSION ERROR ===');
+      console.error('Error:', error);
+      console.log('=====================================\n');
       res.status(500).json({
         error: "Sorry! Klio got a bit confused. Can you try asking again? 🤔",
         code: 'CHAT_ERROR'
@@ -505,7 +844,7 @@ The student is asking about question ${questionNumberMatch[1]} from "${specificQ
     }
 };
 
-// Get chat suggestions based on current context
+// Get chat suggestions based on current context with memory awareness
 exports.getSuggestions = async (req, res) => {
     const childId = req.child?.child_id;
     const mcpContext = req.mcpContext;
@@ -515,15 +854,42 @@ exports.getSuggestions = async (req, res) => {
     }
 
     try {
-      // Start with default suggestions
-      const suggestions = [
-        "What are we learning today? 📚",
-        "Can you explain this to me? 🤔",
-        "Let's practice together! ✏️",
-        "I need help with my homework 📝"
-      ];
+      // Get memory-informed suggestions
+      const [recentMemories, learningProfile] = await Promise.all([
+        memoryService.getRelevantMemories(childId, '', mcpContext, 3).catch(e => {
+          console.error('Error getting memories for suggestions:', e);
+          return [];
+        }),
+        memoryService.getLearningProfile(childId).catch(e => {
+          console.error('Error getting profile for suggestions:', e);
+          return null;
+        })
+      ]);
 
-      // Enhance with context if available
+      const suggestions = [];
+
+      // Memory-based suggestions
+      if (recentMemories.length > 0) {
+        const struggles = recentMemories.filter(m => m.memory_type === 'struggle');
+        if (struggles.length > 0) {
+          const recentStruggle = struggles[0];
+          suggestions.push(`Let's work on ${recentStruggle.topic} again 💪`);
+        }
+
+        const topicInterests = recentMemories.filter(m => m.memory_type === 'topic_interest');
+        if (topicInterests.length > 0) {
+          const recentInterest = topicInterests[0];
+          suggestions.push(`Tell me more about ${recentInterest.topic} 🎯`);
+        }
+
+        const masteries = recentMemories.filter(m => m.memory_type === 'mastery');
+        if (masteries.length > 0) {
+          const recentMastery = masteries[0];
+          suggestions.push(`More practice with ${recentMastery.topic}? 🎯`);
+        }
+      }
+
+      // Enhanced with context if available
       if (mcpContext && !mcpContext.error) {
         // Current focus suggestion (highest priority)
         if (mcpContext.currentFocus?.title) {
@@ -581,6 +947,25 @@ exports.getSuggestions = async (req, res) => {
         }
       }
 
+      // Default suggestions if no context
+      if (suggestions.length === 0) {
+        suggestions.push(
+          "What are we learning today? 📚",
+          "Can you explain this to me? 🤔",
+          "Let's practice together! ✏️",
+          "I need help with my homework 📝"
+        );
+      }
+
+      // Personalized based on learning profile
+      if (learningProfile) {
+        if (learningProfile.preferred_explanation_style === 'examples') {
+          suggestions.push("Show me an example! 📖");
+        } else if (learningProfile.preferred_explanation_style === 'step_by_step') {
+          suggestions.push("Walk me through step by step 👣");
+        }
+      }
+
       // Remove duplicates and limit to 6 suggestions
       const uniqueSuggestions = [...new Set(suggestions)];
 
@@ -603,7 +988,7 @@ exports.getSuggestions = async (req, res) => {
     }
 };
 
-// Get lesson help (enhanced)
+// Get lesson help (enhanced with memory awareness)
 exports.getLessonHelp = async (req, res) => {
   const childId = req.child?.child_id;
   const { lessonId } = req.params;
@@ -625,6 +1010,14 @@ exports.getLessonHelp = async (req, res) => {
       return res.status(404).json({ error: 'Lesson not found' });
     }
 
+    // Get relevant memories for this lesson/subject
+    const subject = lessonDetails.lesson?.unit?.child_subject?.subject?.name || 'general';
+    const lessonMemories = await memoryService.getRelevantMemories(childId, lessonDetails.title, null, 3)
+      .catch(e => {
+        console.error('Error getting lesson memories:', e);
+        return [];
+      });
+
     // Generate helpful content based on lesson
     const lessonJson = lessonDetails.lesson_json || {};
     
@@ -635,8 +1028,23 @@ exports.getLessonHelp = async (req, res) => {
       tips: [],
       encouragement: "You're doing great! Let's work through this together! 🌟",
       learningGoals: [],
-      nextSteps: []
+      nextSteps: [],
+      // Memory-informed guidance
+      pastExperience: null,
+      personalizedTips: []
     };
+
+    // Add memory-informed encouragement and tips
+    const struggles = lessonMemories.filter(m => m.memory_type === 'struggle');
+    const masteries = lessonMemories.filter(m => m.memory_type === 'mastery');
+    
+    if (masteries.length > 0) {
+      helpContent.encouragement = `Remember how well you did with ${masteries[0].topic}? You've got this! 🌟`;
+      helpContent.pastExperience = `You've successfully worked through similar ${subject} topics before!`;
+    } else if (struggles.length > 0) {
+      helpContent.encouragement = `I know ${struggles[0].topic} was tricky before, but we'll take it step by step this time! 💪`;
+      helpContent.personalizedTips.push(`Take your time with this - I'm here to help when you need it 🤝`);
+    }
 
     // Add specific tips based on content type
     switch (lessonDetails.content_type) {
@@ -648,6 +1056,11 @@ exports.getLessonHelp = async (req, res) => {
           "If you're stuck, try re-reading the lesson materials 🔍",
           "Take your time - there's no rush! ⏰"
         ];
+        
+        // Add memory-informed tips
+        if (struggles.some(s => s.content.specificQuestion)) {
+          helpContent.personalizedTips.push("If you get stuck on a specific question, just ask me about that question number! 🎯");
+        }
         break;
       
       case 'test':
@@ -711,7 +1124,7 @@ exports.getLessonHelp = async (req, res) => {
   }
 };
 
-// Report concerning message (safety feature)
+// Report concerning message (safety feature) - Enhanced with memory context
 exports.reportMessage = async (req, res) => {
   const childId = req.child?.child_id;
   const { messageId, reason, content } = req.body;
@@ -750,6 +1163,13 @@ exports.reportMessage = async (req, res) => {
           created_at: new Date().toISOString()
         }]);
     }
+
+    // Add a memory note about safety concerns (without storing the actual content)
+    await memoryService.addMemory(childId, 'safety_concern', 'general', 'inappropriate_content', {
+      reason: reason,
+      timestamp: new Date().toISOString(),
+      note: 'Safety report filed - content not stored for privacy'
+    }, 1.0).catch(e => console.error('Error storing safety memory:', e));
 
     res.json({
       success: true,

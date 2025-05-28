@@ -7,15 +7,27 @@
   --text-primary: #232323;
   --text-secondary: #757575;
   --text-tertiary: #BDBDBD;
-  --text-on-accent: #232323;
+  --text-on-accent: #232323; /* Text color for solid accent backgrounds like selected items */
 
-  --accent-blue: #B3E0F8;      /* logo blue */
-  --accent-yellow: #FFE6A7;    /* logo yellow */
+  --accent-blue: #B3E0F8;      /* logo blue - pastel */
+  --accent-blue-hover: #a1d4ee; /* Slightly darker pastel blue for hover */
+  --accent-blue-darker-for-border: #87b8d4; /* Darker shade for 3D button border */
+
+  --accent-yellow: #FFE6A7;    /* logo yellow - pastel */
+  --accent-yellow-hover: #fddc8a;  /* Slightly darker pastel yellow for hover */
+  --accent-yellow-darker-for-border: #e6c67f; /* Darker shade for 3D button border */
+  
   --accent-dark: #606060;      /* logo outlines */
 
   --border-subtle: #EAEAEA;
   --border-input: #D1D5DB;
-  --border-input-focus: var(--accent-blue);
+  --border-input-focus: var(--accent-blue); /* Keep this for input focus consistency */
+
+  --messageTextDanger: '#FF3B30'; /* Accent red for errors/logout */
+
+  /* Radii and Fonts (from Auth UI for consistency if desired, or define your own) */
+  --radius-md: 0.375rem; /* 6px */
+  --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 
 /* Accent highlights for text */
@@ -35,32 +47,32 @@
   line-height: 1.3;
 }
 
-/* Accent Buttons */
+/* Accent Buttons - These are the core styles for pastel buttons */
 .btn-primary {
   background: var(--accent-blue);
-  color: var(--text-primary);
-  border-radius: 0.5rem;
+  color: var(--text-primary); /* Dark text on pastel blue */
+  border-radius: var(--radius-md); /* Using defined radius */
   font-weight: 600;
   transition: background 0.18s;
 }
 .btn-primary:hover {
-  background: #a1d4ee;
+  background: var(--accent-blue-hover);
 }
 .btn-secondary {
   background: var(--accent-yellow);
-  color: var(--text-primary);
-  border-radius: 0.5rem;
+  color: var(--text-primary); /* Dark text on pastel yellow */
+  border-radius: var(--radius-md); /* Using defined radius */
   font-weight: 600;
   transition: background 0.18s;
 }
 .btn-secondary:hover {
-  background: #ffe3a7;
+  background: var(--accent-yellow-hover);
 }
 
 body {
   background-color: var(--background-main);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family: var(--font-main);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -69,7 +81,7 @@ body {
 .card {
   background: var(--background-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 0.75rem;
+  border-radius: 0.75rem; /* Example radius for cards */
   box-shadow: 0 1px 2px 0 rgba(0,0,0,0.03);
 }
 
@@ -79,11 +91,11 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
+  background: #CBD5E1; /* Or use a var, e.g., var(--text-tertiary) */
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #BDBDBD;
+  background: #BDBDBD; /* Or use a var */
 }
 ::-webkit-scrollbar-track {
   background: transparent;

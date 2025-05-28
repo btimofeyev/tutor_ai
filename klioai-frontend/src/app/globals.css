@@ -3,67 +3,132 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import Fredoka font - KEEPING THIS for now, as it's a distinct part of the current child-friendly feel.
-   If you want a more "Notion/Apple" font, we'd switch to a system UI stack or Inter.
-   For now, let's see how Fredoka pairs with the new pastels.
-*/
+/* Import Fredoka font */
 @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Base Theme - White & Light Gray */
-  --background-main: #F9FAFB; /* gray-50 */
-  --background-card: #FFFFFF;
-  --text-primary: #1F2937;    /* gray-800 */
-  --text-secondary: #6B7280;  /* gray-500 */
-  --text-tertiary: #9CA3AF;   /* gray-400 */
-  --text-on-accent-dark: #FFFFFF; /* For text on darker pastel accents */
+  /* === Klio AI Pastel Theme Variables === */
+  --background-main: #FFFFFF;
+  --background-card: #FFFFFF; 
+
+  --text-primary: #232323;
+  --text-secondary: #757575;
+  --text-tertiary: #BDBDBD;
+  --text-on-accent: #232323; /* For solid accent backgrounds, ensure contrast */
+
+  /* --- Accent Blue --- */
+  --accent-blue: #B3E0F8;     
+  --accent-blue-hover: #a1d4ee; 
+  --accent-blue-darker-for-border: #87b8d4; /* For 3D button borders or darker solid borders */
+  --accent-blue-text-on: var(--text-primary); /* Text color on solid --accent-blue backgrounds */
+  /* Opacity variants for --accent-blue */
+  --accent-blue-10-opacity: hsl(from var(--accent-blue) h s l / 0.10);
+  --accent-blue-15-opacity: hsl(from var(--accent-blue) h s l / 0.15);
+  --accent-blue-20-opacity: hsl(from var(--accent-blue) h s l / 0.20);
+  --accent-blue-30-opacity: hsl(from var(--accent-blue) h s l / 0.30);
+  --accent-blue-40-opacity-for-border: hsl(from var(--accent-blue) h s l / 0.40); /* For lighter borders */
+
+
+  /* --- Accent Yellow --- */
+  --accent-yellow: #FFE6A7;    
+  --accent-yellow-hover: #fddc8a;  
+  --accent-yellow-darker-for-border: #e6c67f; 
+  --accent-yellow-text-on: var(--text-primary); 
+  /* Opacity variants for --accent-yellow */
+  --accent-yellow-10-opacity: hsl(from var(--accent-yellow) h s l / 0.10);
+  --accent-yellow-15-opacity: hsl(from var(--accent-yellow) h s l / 0.15);
+  --accent-yellow-20-opacity: hsl(from var(--accent-yellow) h s l / 0.20);
+  --accent-yellow-30-opacity: hsl(from var(--accent-yellow) h s l / 0.30);
+  --accent-yellow-50-opacity-for-border: hsl(from var(--accent-yellow-darker-for-border) h s l / 0.50); /* For borders */
+
+
+  /* --- Accent Green (for success, completion) --- */
+  --accent-green: #A7F3D0; 
+  --accent-green-hover: #82E0AA;
+  --accent-green-border: #69D899; /* Solid border color */
+  --accent-green-text-on: var(--text-primary);
+  /* Opacity variants for --accent-green */
+  --accent-green-10-opacity: hsl(from var(--accent-green) h s l / 0.10);
+  --accent-green-15-opacity: hsl(from var(--accent-green) h s l / 0.15);
+  --accent-green-20-opacity: hsl(from var(--accent-green) h s l / 0.20);
+  --accent-green-25-opacity: hsl(from var(--accent-green) h s l / 0.25);
+  --accent-green-50-opacity-for-border: hsl(from var(--accent-green-border) h s l / 0.50); /* For borders */
+
+
+  /* --- Accent Orange (for warnings, due soon - can be same as yellow if preferred) --- */
+  --accent-orange: #FDE68A; /* Using the same as yellow for now, or define a distinct orange */
+  --accent-orange-hover: #FCD34D;
+  --accent-orange-border: #FBC92B; 
+  --accent-orange-text-on: var(--text-primary);
+  /* Opacity variants for --accent-orange */
+  --accent-orange-10-opacity: hsl(from var(--accent-orange) h s l / 0.10);
+  --accent-orange-15-opacity: hsl(from var(--accent-orange) h s l / 0.15);
+  --accent-orange-20-opacity: hsl(from var(--accent-orange) h s l / 0.20);
+  --accent-orange-25-opacity: hsl(from var(--accent-orange) h s l / 0.25);
+  --accent-orange-50-opacity-for-border: hsl(from var(--accent-orange-border) h s l / 0.50); /* For borders */
+
+
+  /* --- Accent Red (for errors, overdue) --- */
+  --accent-red: #FDA4AF; 
+  --accent-red-hover: #FB7185;
+  --accent-red-border: #F85A71; 
+  --accent-red-text-on: var(--text-primary); /* Or #FFFFFF if the red is dark enough */
+  /* Opacity variants for --accent-red */
+  --accent-red-10-opacity: hsl(from var(--accent-red) h s l / 0.10);
+  --accent-red-15-opacity: hsl(from var(--accent-red) h s l / 0.15);
+  --accent-red-20-opacity: hsl(from var(--accent-red) h s l / 0.20);
+  --accent-red-25-opacity: hsl(from var(--accent-red) h s l / 0.25);
+  --accent-red-30-opacity-for-border: hsl(from var(--accent-red-border) h s l / 0.30); /* For borders */
+  --accent-red-50-opacity-for-border: hsl(from var(--accent-red-border) h s l / 0.50); /* For borders */
+
   
-  --border-subtle: #F3F4F6;   /* gray-100 */
-  --border-input: #D1D5DB;    /* gray-300 */
-  --border-focus: var(--accent-primary-darker); /* Use new primary accent for focus */
+  /* --- General UI Elements --- */
+  --accent-dark: #606060; /* For very dark text or outlines if needed */
+  --border-subtle: #EAEAEA;
+  --border-input: #D1D5DB;
+  --border-input-focus: var(--accent-blue); 
 
-  /* New Pastel Accent Palette */
-  --accent-primary: #A7F3D0;         /* green-200 (Minty Green) */
-  --accent-primary-darker: #6EE7B7;  /* green-300 */
-  --accent-primary-hover: #34D399;   /* green-400 (a bit more saturated for hover) */
-  --accent-primary-text: #065F46;    /* green-800 */
-
-  --accent-secondary: #FED7AA;       /* orange-200 (Soft Peach) */
-  --accent-secondary-darker: #FDBA74;/* orange-300 */
-  --accent-secondary-hover: #FB923C; /* orange-400 */
-  --accent-secondary-text: #9A3412;  /* orange-800 */
+  --radius-md: 0.375rem; /* 6px */
+  --radius-lg: 0.5rem; /* 8px */
+  --radius-xl: 0.75rem; /* 12px - for chat bubbles or larger cards */
   
-  --accent-tertiary: #DDD6FE;        /* violet-200 (Soft Lavender) */
-  --accent-tertiary-darker: #C4B5FD; /* violet-300 */
-  --accent-tertiary-hover: #A78BFA;  /* violet-400 */
-  --accent-tertiary-text: #5B21B6;   /* violet-700 (slightly lighter than 800 for better contrast on violet-200) */
-
-  /* Highlight Colors */
-  --highlight-yellow-bg: #FEF9C3; /* yellow-100 */
-  --highlight-blue-bg: #DBEAFE;   /* blue-100 - keeping a soft blue for some highlights */
-
-  /* Functional Colors */
-  --success-color: #10B981; /* green-500 */
-  --error-color: #EF4444;   /* red-500 */
-  --warning-color: #F59E0B; /* amber-500 */ /* For due soon, etc. */
-  
-  --error-background-soft: #FEF2F2; /* red-50 (Tailwind v3 name) */
-  --error-border-soft: #FECACA;     /* red-200 */
+  --font-main: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; 
 }
 
 body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: var(--background-main); /* UPDATED */
-  font-family: 'Fredoka', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  color: var(--text-primary); /* UPDATED */
+  background-color: var(--background-main);
+  font-family: var(--font-main);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom Animations - KEEPING */
-/* ... (fade-in, slide-up, progress-bar, shake-short, shake-strong, pulse-soft - these are fine) ... */
+/* Accent Buttons (from our theme) */
+.btn-primary {
+  background: var(--accent-blue);
+  color: var(--accent-blue-text-on);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  transition: background 0.18s;
+}
+.btn-primary:hover {
+  background: var(--accent-blue-hover);
+}
+.btn-secondary {
+  background: var(--accent-yellow);
+  color: var(--accent-yellow-text-on);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  transition: background 0.18s;
+}
+.btn-secondary:hover {
+  background: var(--accent-yellow-hover);
+}
+
+/* --- Custom Animations (Copied from your previous file) --- */
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -71,16 +136,13 @@ body {
 .animate-fade-in {
   animation: fade-in 0.5s ease-out forwards;
 }
-
-@keyframes slide-up { 
+@keyframes slide-up {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-slide-up {
   animation: slide-up 0.4s ease-out forwards;
 }
-
-
 @keyframes progress-bar {
   0% { width: 0%; }
   100% { width: 100%; }
@@ -88,7 +150,6 @@ body {
 .animate-progress-bar {
   animation: progress-bar 2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
-
 @keyframes shake-short {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-3px); }
@@ -97,7 +158,6 @@ body {
 .animate-shake-short {
   animation: shake-short 0.3s ease-in-out;
 }
-
 .shake {
   animation: shake-strong 0.5s cubic-bezier(.36,.07,.19,.97) both;
 }
@@ -107,7 +167,6 @@ body {
   30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
   40%, 60% { transform: translate3d(4px, 0, 0); }
 }
-
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.85; transform: scale(1.03); }
@@ -116,121 +175,96 @@ body {
   animation: pulse-soft 1.8s ease-in-out infinite;
 }
 
-
-/* Custom scrollbar - Update to use new grays if desired, or keep as is */
+/* Custom scrollbar - themed */
 ::-webkit-scrollbar {
-  width: 8px; /* Keep it slim for Notion feel */
-  height: 8px;
+  width: 6px; /* Made slightly thinner */
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--background-main); /* Match page background */
-  border-radius: 10px;
+  background: transparent; /* Cleaner track */
 }
 ::-webkit-scrollbar-thumb {
-  background: #D1D5DB; /* gray-300, softer */
-  border-radius: 10px;
+  background: var(--text-tertiary); 
+  border-radius: 3px; /* Matches previous style */
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9CA3AF; /* gray-400 */
+  background: var(--text-secondary); 
 }
 
-/* Text Highlighter Effect - UPDATED to use new CSS vars */
-.text-highlight-yellow {
-  background-image: linear-gradient(180deg, transparent 60%, var(--highlight-yellow-bg) 60%);
-  padding: 0 0.1em; 
-  margin: 0 -0.1em; 
-  display: inline; 
-  line-height: 1.3; 
-}
-
-.text-highlight-blue { /* Could be renamed to text-highlight-primary-accent or similar if blue is no longer a main theme color */
-  background-image: linear-gradient(180deg, transparent 60%, var(--highlight-blue-bg) 60%);
-  padding: 0 0.1em;
-  margin: 0 -0.1em;
-  display: inline;
-  line-height: 1.3;
-}
-/* NEW: Primary Accent Highlight */
-.text-highlight-mint {
-  background-image: linear-gradient(180deg, transparent 60%, var(--accent-primary) 60%); /* Using the light mint */
-  padding: 0 0.1em;
-  margin: 0 -0.1em;
-  display: inline;
-  line-height: 1.3;
-}
-
-
-/* Tailwind Components Layer - UPDATED */
+/* Tailwind Components Layer - Updated */
 @layer components {
-  .input-base {
-    @apply w-full px-3.5 py-2.5 text-base border rounded-lg outline-none 
-           border-border-input 
-           focus:ring-1 focus:ring-accent-primary-darker focus:border-accent-primary-darker 
-           placeholder:text-text-tertiary /* Softer placeholder */
-           transition-colors duration-150 bg-background-card; /* Ensure input bg is card bg */
+  .input-base { 
+    @apply w-full px-3.5 py-2.5 text-base border border-[var(--border-input)] rounded-[var(--radius-md)] 
+           focus:ring-1 focus:ring-[var(--border-input-focus)] focus:border-[var(--border-input-focus)] outline-none placeholder:text-[var(--text-tertiary)]
+           transition-colors duration-150 bg-[var(--background-card)] text-[var(--text-primary)];
   }
   
-  .btn-primary { /* This will be our default primary button style - using the new Mint accent */
-    @apply bg-accent-primary hover:bg-accent-primary-hover text-accent-primary-text 
-           text-base font-semibold py-2.5 px-5 rounded-lg /* Slightly more padding for a softer look */
-           transition-all duration-150 ease-in-out flex items-center justify-center
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-primary-darker
-           disabled:opacity-70 disabled:cursor-not-allowed disabled:!bg-gray-300 disabled:text-gray-500; /* Clearer disabled state */
-          /* 3D effect - optional to add here or in a separate .btn-3d class */
-    border-bottom-width: 3px; /* Slightly less than 4px for pastels */
-    border-color: var(--accent-primary-darker); /* Dynamic darker shade */
-    /* @apply active:translate-y-px active:shadow-inner; /* Simpler active state */
-    @apply active:scale-[0.98] active:shadow-inner; /* Keep the scale and inner shadow for tactile feel */
-  }
-  .btn-primary:disabled {
-    border-bottom-width: 2px !important; /* Flatter when disabled */
-    border-color: transparent !important;
-  }
-  .btn-primary:hover:not(:disabled) {
-    border-color: var(--accent-primary-hover); /* Darken "shadow" on hover slightly */
-  }
-
-
-  .btn-secondary { /* A softer secondary button */
-    @apply bg-gray-100 hover:bg-gray-200 text-text-secondary
-           text-base font-medium py-2.5 px-5 rounded-lg
-           transition-all duration-150 ease-in-out flex items-center justify-center
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-400
-           disabled:opacity-70 disabled:cursor-not-allowed disabled:!bg-gray-300 disabled:text-gray-500;
-    border-bottom-width: 3px;
-    border-color: #CBD5E1; /* gray-300 */
-    @apply active:scale-[0.98] active:shadow-inner;
-  }
-   .btn-secondary:disabled {
-    border-bottom-width: 2px !important;
-    border-color: transparent !important;
-  }
-  .btn-secondary:hover:not(:disabled) {
-    border-color: #9CA3AF; /* gray-400 */
-  }
-
-
-  .btn-pinpad { /* Kept purple for now, as it's a specific UI element, can be changed */
-    @apply bg-slate-100 hover:bg-slate-200 text-slate-700 text-xl sm:text-2xl font-medium py-3.5 sm:py-4 rounded-lg 
+  .btn-pinpad { /* For PIN input buttons, if used */
+    @apply text-[var(--text-primary)] text-xl sm:text-2xl font-medium py-3.5 sm:py-4 rounded-[var(--radius-md)] 
            transition-colors duration-100 ease-in-out disabled:opacity-50
-           focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-500; /* Still purple focus */
+           focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-blue)];
+    background-color: var(--accent-blue-20-opacity); 
+  }
+  .btn-pinpad:hover {
+    background-color: var(--accent-blue-30-opacity); 
   }
 
-  .card-base { /* Base card style for dashboard etc. */
-    @apply bg-background-card rounded-xl shadow-lg p-6 sm:p-8 md:p-10 w-full animate-fade-in border border-border-subtle; /* Subtle border */
+  .card-base { /* General card style, can be used by SubjectCard, etc. */
+    @apply bg-[var(--background-card)] rounded-[var(--radius-lg)] shadow-lg p-6 sm:p-8 md:p-10 w-full animate-fade-in border border-[var(--border-subtle)];
+    /* Using radius-lg and shadow-lg for a bit more prominence */
   }
+
+  /* Specific card for dashboard items like SubjectCard if different from card-base */
+  .dashboard-card {
+    @apply bg-[var(--background-card)] rounded-[var(--radius-lg)] shadow-md p-4 sm:p-5 w-full border border-[var(--border-subtle)];
+  }
+
 
   .label-base {
-    @apply block text-sm font-medium text-text-secondary mb-1.5 flex items-center; /* Use secondary text for labels */
+    @apply block text-sm font-medium text-[var(--text-secondary)] mb-1.5 flex items-center;
   }
-  .label-icon { /* Generic icon style within labels */
-    @apply mr-1.5 text-text-tertiary; /* Softer icon color */
+  .label-icon { 
+    @apply mr-2 text-[var(--accent-blue)]; /* Example: icon next to a label uses accent blue */
   }
 
   .error-message-box {
-    @apply flex items-center bg-error-background-soft text-error-color text-sm p-3 rounded-lg border border-error-border-soft;
+    @apply flex items-center text-[var(--accent-red)] text-sm p-3 rounded-[var(--radius-md)] border;
+    background-color: var(--accent-red-10-opacity);
+    border-color: var(--accent-red-30-opacity-for-border); 
   }
   .error-message-icon {
-    @apply mr-2 text-error-color flex-shrink-0 text-base;
+    @apply mr-2 text-[var(--accent-red)] flex-shrink-0 text-base;
   }
+
+  /* Highlight classes from landing page, adapted */
+  .text-highlight-yellow {
+    background-image: linear-gradient(180deg, transparent 60%, var(--accent-yellow) 60%);
+    @apply px-[0.1em] -mx-[0.1em] inline leading-snug; /* Adjusted padding/margin */
+  }
+  .text-highlight-blue {
+    background-image: linear-gradient(180deg, transparent 60%, var(--accent-blue) 60%);
+    @apply px-[0.1em] -mx-[0.1em] inline leading-snug; /* Adjusted padding/margin */
+  }
+
+  /* For Klio's typing indicator dots */
+  .loading-dots span {
+    @apply inline-block w-1.5 h-1.5 rounded-full bg-current opacity-70 mx-0.5 animate-pulse-soft;
+  }
+  .loading-dots span:nth-child(1) { animation-delay: 0s; }
+  .loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+}
+
+/* Ensure global font styles for inputs and buttons if not handled by Tailwind's base */
+input, button, textarea, select {
+  font-family: var(--font-main);
+}
+
+button { /* Minimal reset for buttons if not using a dedicated button component everywhere */
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: inherit;
+  color: inherit; /* Inherit text color by default */
 }

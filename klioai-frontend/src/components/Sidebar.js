@@ -1,30 +1,49 @@
 // klioai-frontend/src/components/Sidebar.js
-import { FiLogOut, FiSettings, FiRefreshCw } from 'react-icons/fi'; // Removed FiMessageSquare if not used for logo
+import Image from 'next/image'; // Import Next.js Image component
+import { FiLogOut, FiSettings, FiRefreshCw } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link'; // For the logo link
+
+// Assuming you might want to use your main Button component for consistency
+// If not, you can style these buttons directly as shown below.
+// import Button from './ui/Button'; // Path to your global Button component
 
 export default function Sidebar({ childName, onLogout, onClearChat }) {
   const router = useRouter();
 
+  // Common styles for sidebar action buttons if not using the global Button component
+  const sidebarButtonBaseStyles = "w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-[var(--radius-md)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-1";
+  const sidebarButtonDefaultStyles = `${sidebarButtonBaseStyles} text-[var(--text-secondary)] hover:bg-[var(--accent-blue)]/20 hover:text-[var(--text-primary)] focus-visible:ring-[var(--accent-blue)]`;
+  const sidebarButtonDestructiveStyles = `${sidebarButtonBaseStyles} text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10 hover:text-[var(--accent-red)] focus-visible:ring-[var(--accent-red)]`;
+
+
   return (
-    <aside className="w-56 md:w-60 bg-slate-50 border-r border-slate-200 flex flex-col p-3 space-y-4"> {/* Reduced padding slightly */}
-      {/* Logo/Brand */}
-      <div 
-        className="flex items-center justify-center pt-3 pb-3 mb-2 cursor-pointer group border-b border-slate-200" // Centered logo
-        onClick={() => router.push('/')}
-        title="Klio Home"
-      >
-        {/* Screenshot shows text logo */}
-        <span className="font-bold text-3xl text-purple-600 group-hover:text-purple-700 transition-colors">Klio</span>
+    <aside className="w-56 md:w-60 bg-[var(--background-card)] border-r border-[var(--border-subtle)] flex flex-col p-3 space-y-4">
+      {/* Logo/Brand - Klio AI Themed */}
+      <div className="pt-3 pb-3 mb-2 border-b border-[var(--border-subtle)]">
+        <Link href="/" className="flex items-center justify-center group transition-opacity hover:opacity-80" title="Klio Home">
+          <Image
+            src="/klio_logo.png" // Assuming your logo is in /public/klio_logo.png
+            alt="Klio AI Logo"
+            width={32} // Consistent with other sidebar logo size
+            height={32}
+            className="mr-2"
+            priority
+          />
+          <span className="font-bold text-2xl text-[var(--accent-blue)] group-hover:text-[var(--accent-blue-hover)] transition-colors">
+            Klio AI
+          </span>
+        </Link>
       </div>
       
       <div className="flex-1">
          {/* Future: Placeholder for Projects/Topics List */}
-         {/* <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 px-1">Topics</h3>
+         {/* <h3 className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5 px-1">Topics</h3>
          <nav className="space-y-0.5">
-           <a href="#" className="block px-2.5 py-1.5 rounded-md text-sm text-slate-700 bg-purple-100 font-medium">
+           <a href="#" className="block px-2.5 py-1.5 rounded-[var(--radius-md)] text-sm text-[var(--text-primary)] bg-[var(--accent-blue)]/30 font-medium">
              General Chat
            </a>
-           <a href="#" className="block px-2.5 py-1.5 rounded-md text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-700">
+           <a href="#" className="block px-2.5 py-1.5 rounded-[var(--radius-md)] text-sm text-[var(--text-secondary)] hover:bg-[var(--accent-blue)]/10 hover:text-[var(--text-primary)]">
              Space Exploration
            </a>
          </nav> */}
@@ -33,31 +52,38 @@ export default function Sidebar({ childName, onLogout, onClearChat }) {
       {/* User Info & Actions */}
       <div>
         {childName && (
-          <div className="mb-3 p-2.5 bg-purple-50 border border-purple-100 rounded-lg text-center"> {/* Light purple bg */}
-            <p className="text-xs text-purple-700 opacity-80">Signed in as</p>
-            <p className="font-semibold text-sm text-purple-800">{childName}</p>
+          <div className="mb-3 p-2.5 bg-[var(--accent-yellow)]/20 border border-[var(--accent-yellow-darker-for-border)]/50 rounded-lg text-center">
+            <p className="text-xs text-[var(--text-secondary)] opacity-80">Signed in as</p>
+            <p className="font-semibold text-sm text-[var(--text-primary)]">{childName}</p>
           </div>
         )}
         <nav className="space-y-1">
           <button
             onClick={onClearChat}
-            className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-800 focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-500"
+            className={sidebarButtonDefaultStyles}
           >
-            <FiRefreshCw size={16} className="text-slate-500" />
+            <FiRefreshCw size={16} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent-blue)]" /> {/* Icon color can also change on hover if desired */}
             <span>New Chat</span>
           </button>
-          <button
-            onClick={() => router.push('/settings')}
-            className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-800 focus:outline-none focus-visible:ring-1 focus-visible:ring-purple-500"
+          {/* <button // Example if using the global Button component:
+            onClick={onClearChat}
+            className="w-full justify-start" // Adjust alignment for sidebar
           >
-            <FiSettings size={16} className="text-slate-500" />
+            <FiRefreshCw size={16} className="mr-2.5 text-[var(--text-tertiary)]" />
+            New Chat
+          </button> */}
+          <button
+            onClick={() => router.push('/settings')} // Assuming /settings is the correct path
+            className={sidebarButtonDefaultStyles}
+          >
+            <FiSettings size={16} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent-blue)]" />
             <span>Settings</span>
           </button>
           <button
             onClick={onLogout}
-            className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-red-100 hover:text-red-600 focus:outline-none focus-visible:ring-1 focus-visible:ring-red-500"
+            className={sidebarButtonDestructiveStyles}
           >
-            <FiLogOut size={16} className="text-slate-500" />
+            <FiLogOut size={16} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent-red)]" />
             <span>Logout</span>
           </button>
         </nav>

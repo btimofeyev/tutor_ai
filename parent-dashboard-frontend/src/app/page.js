@@ -88,7 +88,7 @@ export default function LandingPage() {
       <section className="w-full flex justify-center mb-16 md:mb-24 px-4">
         <div className="max-w-4xl w-full bg-transparent p-0">
           <img
-            src="/klio-dashboard-mockup-light.png"
+            src="/hero_img.png"
             alt="Klio AI Dashboard Preview"
             className="rounded-lg object-contain w-full h-auto max-h-[400px] md:max-h-[550px] shadow-xl border border-border-subtle"
           />

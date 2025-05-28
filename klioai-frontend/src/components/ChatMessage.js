@@ -15,6 +15,61 @@ const KlioAvatar = () => (
   </div>
 );
 
+// Function to automatically style Klio's structured responses
+function formatKlioMessage(content) {
+  if (!content) return content;
+  
+  // Auto-detect and style urgent items (🚨) - more flexible patterns
+  let formattedContent = content.replace(
+    /(🚨[^\n]*(?:overdue|OVERDUE|was due|past due)[^\n]*)/gi, 
+    '<span class="urgent-item">$1</span>'
+  );
+  
+  // Auto-detect and style due today items (⚠️)
+  formattedContent = formattedContent.replace(
+    /(⚠️[^\n]*(?:due today|DUE TODAY|today)[^\n]*)/gi, 
+    '<span class="due-today-item">$1</span>'
+  );
+  
+  // Auto-detect and style upcoming items (📅)
+  formattedContent = formattedContent.replace(
+    /(📅[^\n]*(?:due tomorrow|DUE TOMORROW|tomorrow|coming up)[^\n]*)/gi, 
+    '<span class="upcoming-item">$1</span>'
+  );
+  
+  // Also catch lines that mention overdue without emoji
+  formattedContent = formattedContent.replace(
+    /([^\n]*(?:overdue|was due yesterday)[^\n]*)/gi, 
+    '<span class="urgent-item">$1</span>'
+  );
+  
+  // Catch lines that mention due today without emoji  
+  formattedContent = formattedContent.replace(
+    /([^\n]*(?:due today)[^\n]*)/gi, 
+    '<span class="due-today-item">$1</span>'
+  );
+  
+  // Catch lines that mention due tomorrow without emoji
+  formattedContent = formattedContent.replace(
+    /([^\n]*(?:due tomorrow)[^\n]*)/gi, 
+    '<span class="upcoming-item">$1</span>'
+  );
+  
+  // Auto-detect and style grade information
+  formattedContent = formattedContent.replace(
+    /(Your .+ average is .+|Grade: .+\/.+|scored .+\/.+|\d+\.\d+%|\d+%)/g, 
+    '<span class="grade-info">$1</span>'
+  );
+  
+  // Auto-detect and style section headers (like "URGENT - Overdue!")
+  formattedContent = formattedContent.replace(
+    /^(URGENT[^\n]*|Due Today[^\n]*|Due Tomorrow[^\n]*|Coming up[^\n]*)/gm,
+    '<strong>$1</strong>'
+  );
+  
+  return formattedContent;
+}
+
 export default function ChatMessage({ message }) {
   const isKlio = message.role === 'klio';
 
@@ -57,6 +112,14 @@ export default function ChatMessage({ message }) {
   // Combine all bubble classes
   const finalBubbleClasses = `${baseBubbleClasses} ${borderBubbleClasses} ${roundedClasses}`;
 
+  // Format Klio's messages for better visual hierarchy
+  const displayContent = isKlio && !message.isError 
+    ? formatKlioMessage(message.content) 
+    : message.content;
+
+  // Determine if we should use HTML rendering or plain text
+  const shouldUseHTML = isKlio && !message.isError && displayContent !== message.content;
+
   return (
     <motion.div
       variants={messageVariants}
@@ -73,9 +136,17 @@ export default function ChatMessage({ message }) {
           {message.isError && (
             <FiAlertTriangle className="inline-block mr-1.5 mb-0.5" size={16} />
           )}
-          <div className="text-sm sm:text-base whitespace-pre-wrap font-fredoka break-words">
-            {message.content}
-          </div>
+          
+          {shouldUseHTML ? (
+            <div 
+              className="text-sm sm:text-base whitespace-pre-wrap font-fredoka break-words chat-message-content"
+              dangerouslySetInnerHTML={{ __html: displayContent }}
+            />
+          ) : (
+            <div className="text-sm sm:text-base whitespace-pre-wrap font-fredoka break-words chat-message-content">
+              {displayContent}
+            </div>
+          )}
         </div>
         <time className={timestampClasses}>
           {new Date(message.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}

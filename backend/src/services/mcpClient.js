@@ -87,13 +87,11 @@ class MCPClientService {
     this.connectionPromise = null;
   }
 
-  // --- UPDATED METHODS FOR NEW SCHEMA ---
-
   // Get current materials for a child (replaces getCurrentLesson)
   async getCurrentMaterials(childId, subjectName = null, contentType = null) {
     try {
       await this.connect();
-
+  
       const result = await this.client.callTool({
         name: 'get_child_materials',
         arguments: {
@@ -101,17 +99,41 @@ class MCPClientService {
           status: 'approved',
           subject_name: subjectName,
           content_type: contentType,
-          due_soon_days: 30,
+          due_soon_days: 30, // Look 30 days ahead
           include_completed: false // Only get incomplete materials for "current" view
         }
       });
-
+  
       if (!result || !result.content) {
         return [];
       }
-
-      return JSON.parse(result.content[0].text);
-
+  
+      const materials = JSON.parse(result.content[0].text);
+      
+      // Additional client-side filtering to ensure overdue items are prioritized
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Sort materials: overdue first, then by due date
+      materials.sort((a, b) => {
+        if (!a.due_date && !b.due_date) return 0;
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        
+        const aOverdue = a.due_date < today;
+        const bOverdue = b.due_date < today;
+        
+        // Overdue items come first
+        if (aOverdue && !bOverdue) return -1;
+        if (!aOverdue && bOverdue) return 1;
+        
+        // Within same category, sort by due date
+        return a.due_date.localeCompare(b.due_date);
+      });
+  
+      console.log(`getCurrentMaterials: Found ${materials.length} materials, ${materials.filter(m => m.due_date && m.due_date < today).length} are overdue`);
+      
+      return materials;
+  
     } catch (error) {
       console.error('Error getting current materials:', error);
       return [];

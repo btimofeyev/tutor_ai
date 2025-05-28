@@ -127,7 +127,63 @@ body {
 .btn-secondary:hover {
   background: var(--accent-yellow-hover);
 }
+.chat-message-content {
+  line-height: 1.6;
+}
 
+/* Style emoji indicators in chat messages */
+.chat-message-content .emoji-indicator {
+  font-size: 1.1em;
+  margin-right: 0.5em;
+}
+
+/* Style for assignment/lesson lines in chat */
+.chat-message-content .assignment-line {
+  padding: 0.25em 0;
+  margin: 0.125em 0;
+}
+
+/* Make urgent items stand out slightly */
+.chat-message-content .urgent-item {
+  background: var(--accent-red-10-opacity);
+  padding: 0.25em 0.5em;
+  border-radius: var(--radius-md);
+  margin: 0.25em 0;
+}
+
+/* Style for due today items */
+.chat-message-content .due-today-item {
+  background: var(--accent-yellow-10-opacity);
+  padding: 0.25em 0.5em;
+  border-radius: var(--radius-md);
+  margin: 0.25em 0;
+}
+
+/* Style for upcoming items */
+.chat-message-content .upcoming-item {
+  background: var(--accent-blue-10-opacity);
+  padding: 0.25em 0.5em;
+  border-radius: var(--radius-md);
+  margin: 0.25em 0;
+}
+
+/* Better spacing for structured content */
+.chat-message-content .section-break {
+  margin: 1em 0 0.5em 0;
+}
+
+/* Style for grade information */
+.chat-message-content .grade-info {
+  background: var(--accent-green-10-opacity);
+  padding: 0.5em;
+  border-radius: var(--radius-md);
+  margin: 0.5em 0;
+}
+
+/* Better emoji spacing */
+.chat-message-content .emoji {
+  margin: 0 0.2em;
+}
 /* --- Custom Animations (Copied from your previous file) --- */
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(10px); }

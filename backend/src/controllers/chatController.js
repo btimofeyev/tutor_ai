@@ -111,75 +111,6 @@ function createSystemPrompt(childInfo, mcpContext, memoryContext, resistanceCont
 function findQuestionInLessonData(mcpContext, questionRequest) {
   console.log('🔍 Looking for question in lesson data...');
   
-  const questions = lessonData.lesson_json.tasks_or_questions;
-  const questionPattern = new RegExp(`^${questionNumber}\\.\\s`);
-  
-  const matchedQuestionIndex = questions.findIndex(q => 
-    questionPattern.test(q.toString().trim())
-  );
-  
-  if (matchedQuestionIndex === -1) {
-    console.log(`Question ${questionNumber} not found in questions:`, questions.slice(0, 10));
-    return null;
-  }
-  
-  const matchedQuestion = questions[matchedQuestionIndex];
-  console.log(`Found question ${questionNumber}:`, matchedQuestion);
-  
-  // Find the relevant instruction by looking backwards for instruction-like text
-  let relevantInstruction = null;
-  for (let i = matchedQuestionIndex - 1; i >= 0; i--) {
-    const prevItem = questions[i];
-    if (!/^\d+\./.test(prevItem) && 
-        (prevItem.toLowerCase().includes('write') || 
-         prevItem.toLowerCase().includes('find') || 
-         prevItem.toLowerCase().includes('complete') || 
-         prevItem.toLowerCase().includes('round') || 
-         prevItem.toLowerCase().includes('convert') || 
-         prevItem.toLowerCase().includes('compare') ||
-         prevItem.toLowerCase().includes('match') ||
-         prevItem.toLowerCase().includes('rewrite') ||
-         prevItem.toLowerCase().includes('value'))) {
-      relevantInstruction = prevItem;
-      console.log(`Found instruction for question ${questionNumber}:`, relevantInstruction);
-      break;
-    }
-  }
-  
-  // Also look for section headers or categories
-  let sectionContext = null;
-  for (let i = matchedQuestionIndex - 1; i >= 0; i--) {
-    const prevItem = questions[i];
-    if (prevItem.length < 80 && !prevItem.match(/^\d+\./)) {
-      if (prevItem.toLowerCase().includes('form') || 
-          prevItem.toLowerCase().includes('round') ||
-          prevItem.toLowerCase().includes('compare') ||
-          prevItem.toLowerCase().includes('value') ||
-          prevItem.toLowerCase().includes('match') ||
-          prevItem.toLowerCase().includes('table') ||
-          prevItem.toLowerCase().includes('rewrite')) {
-        sectionContext = prevItem;
-        break;
-      }
-    }
-  }
-  
-  return {
-    questionText: matchedQuestion,
-    questionIndex: matchedQuestionIndex,
-    totalQuestions: questions.length,
-    lessonTitle: lessonData.title,
-    lessonType: lessonData.content_type,
-    learningObjectives: lessonData.lesson_json.learning_objectives || [],
-    relevantInstruction: relevantInstruction,
-    sectionContext: sectionContext,
-    questionContent: matchedQuestion.replace(/^\d+\.\s*/, ''),
-    rawQuestionArray: questions.slice(Math.max(0, matchedQuestionIndex - 3), matchedQuestionIndex + 2)
-  };
-}
-function findQuestionInLessonData(mcpContext, questionRequest) {
-  console.log('🔍 Looking for question in lesson data...');
-  
   // Check if we have current focus with lesson data
   if (!mcpContext?.currentFocus?.lesson_json?.tasks_or_questions) {
     console.log('❌ No lesson_json data available');
@@ -208,35 +139,74 @@ function findQuestionInLessonData(mcpContext, questionRequest) {
   console.log(`🎯 Looking for question number: ${questionNumber}`);
   
   if (questionNumber) {
-    // Look for numbered questions
+    // Look for numbered questions with exact pattern matching
     const questionPattern = new RegExp(`^${questionNumber}\\.\\s`);
-    const matchedQuestion = questions.find(q => questionPattern.test(q.toString().trim()));
     
-    if (matchedQuestion) {
-      console.log(`✅ Found question ${questionNumber}: ${matchedQuestion}`);
-      
-      // Find relevant instruction by looking backwards
-      const questionIndex = questions.indexOf(matchedQuestion);
-      let relevantInstruction = null;
-      
-      for (let i = questionIndex - 1; i >= 0; i--) {
-        const prevItem = questions[i];
-        if (!/^\d+\./.test(prevItem) && prevItem.length < 100) {
-          // This looks like an instruction
-          relevantInstruction = prevItem;
+    // Find the question in the array
+    const matchedQuestionIndex = questions.findIndex(q => 
+      questionPattern.test(q.toString().trim())
+    );
+    
+    if (matchedQuestionIndex === -1) {
+      console.log(`❌ Question ${questionNumber} not found in questions:`, questions.slice(0, 10));
+      return null;
+    }
+    
+    const matchedQuestion = questions[matchedQuestionIndex];
+    console.log(`✅ Found question ${questionNumber}:`, matchedQuestion);
+    
+    // Find the relevant instruction by looking backwards for instruction-like text
+    let relevantInstruction = null;
+    for (let i = matchedQuestionIndex - 1; i >= 0; i--) {
+      const prevItem = questions[i];
+      // Look for instruction text that doesn't start with a number
+      if (!/^\d+\./.test(prevItem) && 
+          (prevItem.toLowerCase().includes('write') || 
+           prevItem.toLowerCase().includes('find') || 
+           prevItem.toLowerCase().includes('complete') || 
+           prevItem.toLowerCase().includes('round') || 
+           prevItem.toLowerCase().includes('convert') || 
+           prevItem.toLowerCase().includes('compare') ||
+           prevItem.toLowerCase().includes('match') ||
+           prevItem.toLowerCase().includes('rewrite') ||
+           prevItem.toLowerCase().includes('value'))) {
+        relevantInstruction = prevItem;
+        console.log(`Found instruction for question ${questionNumber}:`, relevantInstruction);
+        break;
+      }
+    }
+    
+    // Also look for section headers or categories
+    let sectionContext = null;
+    for (let i = matchedQuestionIndex - 1; i >= 0; i--) {
+      const prevItem = questions[i];
+      if (prevItem.length < 80 && !prevItem.match(/^\d+\./)) {
+        if (prevItem.toLowerCase().includes('form') || 
+            prevItem.toLowerCase().includes('round') ||
+            prevItem.toLowerCase().includes('compare') ||
+            prevItem.toLowerCase().includes('value') ||
+            prevItem.toLowerCase().includes('match') ||
+            prevItem.toLowerCase().includes('table') ||
+            prevItem.toLowerCase().includes('rewrite')) {
+          sectionContext = prevItem;
           break;
         }
       }
-      
-      return {
-        questionNumber,
-        questionText: matchedQuestion,
-        instruction: relevantInstruction,
-        lessonTitle: mcpContext.currentFocus.title,
-        questionIndex: questionIndex,
-        totalQuestions: questions.length
-      };
     }
+    
+    return {
+      questionText: matchedQuestion,
+      questionIndex: matchedQuestionIndex,
+      totalQuestions: questions.length,
+      lessonTitle: mcpContext.currentFocus.title,
+      lessonType: mcpContext.currentFocus.content_type,
+      learningObjectives: mcpContext.currentFocus.lesson_json.learning_objectives || [],
+      relevantInstruction: relevantInstruction,
+      sectionContext: sectionContext,
+      questionContent: matchedQuestion.replace(/^\d+\.\s*/, ''),
+      // Include surrounding context for better understanding
+      rawQuestionArray: questions.slice(Math.max(0, matchedQuestionIndex - 3), matchedQuestionIndex + 2)
+    };
   }
   
   // If no specific number, try to find the first numbered question
@@ -258,6 +228,7 @@ function findQuestionInLessonData(mcpContext, questionRequest) {
   console.log('❌ Could not find requested question');
   return null;
 }
+
 // Helper function to find lesson by number/title
 function findLessonByReference(mcpContext, lessonRef) {
   if (!mcpContext || !mcpContext.currentMaterials) return null;

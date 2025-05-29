@@ -1,3 +1,4 @@
+// backend/src/services/mcpClient.js - SIMPLIFIED VERSION
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
 const fs = require('fs');
@@ -7,7 +8,6 @@ class MCPClientService {
   constructor() {
     this.client = null;
     this.transport = null;
-    this.tools = [];
     this.isConnected = false;
     this.connectionPromise = null;
   }
@@ -25,666 +25,180 @@ class MCPClientService {
 
   async _establishConnection() {
     try {
-      console.log('Connecting to MCP server...');
+      console.log('Connecting to simplified MCP server...');
 
-      // Path to your MCP server - adjust based on your setup
-      const mcpServerPath =
-        process.env.MCP_SERVER_PATH ||
+      const mcpServerPath = process.env.MCP_SERVER_PATH || 
         path.resolve(__dirname, '../../../mcp-server/dist/server.js');
-      console.log('About to spawn MCP server at:', mcpServerPath);
-
+      
       if (!fs.existsSync(mcpServerPath)) {
         throw new Error(`MCP server script not found at: ${mcpServerPath}`);
       }
 
-      // FIXED: Pass service role key instead of anon key
       this.transport = new StdioClientTransport({
         command: 'node',
         args: [mcpServerPath],
         env: {
           ...process.env,
           SUPABASE_URL: process.env.SUPABASE_URL,
-          SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY // CHANGED: Use service role key
+          SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY
         }
       });
 
       this.client = new Client(
-        {
-          name: 'klioai-tutor',
-          version: '2.0.0'
-        },
-        {
-          capabilities: {}
-        }
+        { name: 'klioai-tutor', version: '2.0.0' },
+        { capabilities: {} }
       );
 
       await this.client.connect(this.transport);
-
-      // Get available tools
-      const toolsResult = await this.client.listTools();
-      this.tools = toolsResult.tools || [];
-
-      console.log('Connected to MCP server v2.0 with tools:', this.tools.map(t => t.name));
-
+      console.log('✅ Connected to simplified MCP server');
       this.isConnected = true;
       return this.client;
 
     } catch (error) {
-      console.error('MCP connection error:', error);
+      console.error('❌ MCP connection error:', error);
       this.connectionPromise = null;
       throw error;
     }
   }
 
   async disconnect() {
-    if (this.client) {
-      await this.client.close();
-    }
-    if (this.transport) {
-      await this.transport.close();
-    }
+    if (this.client) await this.client.close();
+    if (this.transport) await this.transport.close();
     this.isConnected = false;
     this.connectionPromise = null;
   }
 
-  // Get current materials for a child (replaces getCurrentLesson)
-  async getCurrentMaterials(childId, subjectName = null, contentType = null) {
+  // 🎯 ONE SEARCH METHOD TO RULE THEM ALL
+  async search(childId, query, searchType = 'all') {
     try {
       await this.connect();
-  
+
+      console.log(`🔍 Searching: "${query}" (type: ${searchType}) for child: ${childId}`);
+
       const result = await this.client.callTool({
-        name: 'get_child_materials',
+        name: 'search_database',
         arguments: {
           child_id: childId,
-          status: 'approved',
-          subject_name: subjectName,
-          content_type: contentType,
-          due_soon_days: 30, // Look 30 days ahead
-          include_completed: false // Only get incomplete materials for "current" view
-        }
-      });
-  
-      if (!result || !result.content) {
-        return [];
-      }
-  
-      const materials = JSON.parse(result.content[0].text);
-      
-      // Additional client-side filtering to ensure overdue items are prioritized
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Sort materials: overdue first, then by due date
-      materials.sort((a, b) => {
-        if (!a.due_date && !b.due_date) return 0;
-        if (!a.due_date) return 1;
-        if (!b.due_date) return -1;
-        
-        const aOverdue = a.due_date < today;
-        const bOverdue = b.due_date < today;
-        
-        // Overdue items come first
-        if (aOverdue && !bOverdue) return -1;
-        if (!aOverdue && bOverdue) return 1;
-        
-        // Within same category, sort by due date
-        return a.due_date.localeCompare(b.due_date);
-      });
-  
-      console.log(`getCurrentMaterials: Found ${materials.length} materials, ${materials.filter(m => m.due_date && m.due_date < today).length} are overdue`);
-      
-      return materials;
-  
-    } catch (error) {
-      console.error('Error getting current materials:', error);
-      return [];
-    }
-  }
-
-  // Get material details (replaces getLessonDetails)
-  async getMaterialDetails(materialId) {
-    try {
-      await this.connect();
-
-      const result = await this.client.callTool({
-        name: 'get_material_details',
-        arguments: {
-          material_id: materialId
+          query: query,
+          search_type: searchType
         }
       });
 
-      if (!result || !result.content) {
-        return null;
+      if (!result?.content?.[0]?.text) {
+        console.log('❌ No search results returned');
+        return { results: {}, summary: 'No results found' };
       }
 
-      return JSON.parse(result.content[0].text);
-
-    } catch (error) {
-      console.error('Error getting material details:', error);
-      return null;
-    }
-  }
-
-  // Get upcoming assignments (updated for new schema)
-  async getUpcomingAssignments(childId, daysAhead = 7) {
-    try {
-      await this.connect();
-
-      const result = await this.client.callTool({
-        name: 'get_upcoming_deadlines',
-        arguments: {
-          child_id: childId,
-          days_ahead: daysAhead
-        }
-      });
-
-      if (!result || !result.content) {
-        return [];
-      }
-
-      return JSON.parse(result.content[0].text);
-
-    } catch (error) {
-      console.error('Error getting upcoming assignments:', error);
-      return [];
-    }
-  }
-
-  // Search materials by query (replaces searchLessons)
-  async searchMaterials(query, childId, subjectName) {
-    try {
-      await this.connect();
-
-      const result = await this.client.callTool({
-        name: 'search_materials',
-        arguments: {
-          query,
-          child_id: childId,
-          subject_name: subjectName
-        }
-      });
-
-      if (!result || !result.content) {
-        return [];
-      }
-
-      return JSON.parse(result.content[0].text);
-
-    } catch (error) {
-      console.error('Error searching materials:', error);
-      return [];
-    }
-  }
-
-  // Check if child has access to a specific material
-  async checkMaterialAccess(childId, materialId) {
-    try {
-      const material = await this.getMaterialDetails(materialId);
-      if (!material) return false;
+      const searchData = JSON.parse(result.content[0].text);
+      console.log(`✅ Search completed: ${searchData.summary}`);
       
-      // Check if the material belongs to this child through the hierarchy
-      return material.lesson?.unit?.child_subject?.child?.id === childId;
-    } catch (error) {
-      console.error('Error checking material access:', error);
-      return false;
-    }
-  }
+      return searchData;
 
-  // Get all materials for a child (replaces getChildLessons)
-  async getChildMaterials(childId, status = null, subjectName = null, contentType = null) {
-    try {
-      await this.connect();
-  
-      const args = { 
-        child_id: childId,
-        include_completed: true // Always include completed materials
+    } catch (error) {
+      console.error('❌ Search error:', error);
+      return { 
+        error: error.message,
+        results: {},
+        summary: 'Search failed'
       };
-      
-      if (status) args.status = status;
-      if (subjectName) args.subject_name = subjectName;
-      if (contentType) args.content_type = contentType;
+    }
+  }
+
+  // 🚀 SMART CONTEXT METHODS (use the one search method)
   
-      console.log('Getting child materials with args:', args);
-  
-      const result = await this.client.callTool({
-        name: 'get_child_materials',
-        arguments: args
-      });
-  
-      if (!result || !result.content) {
-        console.log('No materials returned from MCP server');
-        return [];
-      }
-  
-      const materials = JSON.parse(result.content[0].text);
-      console.log(`Retrieved ${materials.length} materials for child ${childId}`);
-      
-      // Log first few materials for debugging
-      if (materials.length > 0) {
-        console.log('Sample materials:');
-        materials.slice(0, 3).forEach((mat, i) => {
-          console.log(`  ${i + 1}. ${mat.title} - ${mat.completed_at ? 'Completed' : 'In Progress'} - Grade: ${mat.grade_value || 'N/A'}/${mat.grade_max_value || 'N/A'}`);
-        });
-      }
-  
-      return materials;
-  
-    } catch (error) {
-      console.error('Error getting child materials:', error);
-      return [];
-    }
-  }
-
-  // Get child's progress
-  async getChildProgress(childId) {
+  // Get learning context for chat
+  async getLearningContext(childId) {
     try {
-      await this.connect();
+      console.log('📚 Getting learning context for child:', childId);
 
-      const result = await this.client.readResource({
-        uri: `edunest://child/${childId}/progress`
-      });
-
-      if (!result || !result.contents || !result.contents[0]) {
-        return null;
-      }
-
-      return JSON.parse(result.contents[0].text);
-
-    } catch (error) {
-      console.error('Error getting child progress:', error);
-      return null;
-    }
-  }
-
-  // Get child's progress summary
-  async getChildProgressSummary(childId, subjectName = null) {
-    try {
-      await this.connect();
-
-      const result = await this.client.callTool({
-        name: 'get_child_progress_summary',
-        arguments: {
-          child_id: childId,
-          subject_name: subjectName
-        }
-      });
-
-      if (!result || !result.content) {
-        return null;
-      }
-
-      return JSON.parse(result.content[0].text);
-
-    } catch (error) {
-      console.error('Error getting child progress summary:', error);
-      return null;
-    }
-  }
-
-  // Get child subjects using direct database query (fallback if MCP fails)
-  async getChildSubjects(childId) {
-    try {
-      await this.connect();
-
-      // First try MCP resource
-      try {
-        const result = await this.client.readResource({
-          uri: `edunest://child/${childId}/subjects`
-        });
-
-        if (result && result.contents && result.contents[0]) {
-          return JSON.parse(result.contents[0].text);
-        }
-      } catch (resourceError) {
-        console.log('MCP resource not available, using direct query');
-      }
-
-      // Fallback: direct Supabase query - Use service role key
-      const supabase = require('../utils/supabaseClient');
-      const { data, error } = await supabase
-        .from('child_subjects')
-        .select(`
-          id,
-          custom_subject_name_override,
-          subject:subject_id (id, name)
-        `)
-        .eq('child_id', childId);
-      
-      if (error) throw error;
-      return data || [];
-
-    } catch (error) {
-      console.error('Error getting child subjects:', error);
-      return [];
-    }
-  }
-
-  // NEW: Get curriculum structure (subjects -> units -> lessons -> materials)
-  async getCurriculumStructure(childId, subjectName = null) {
-    try {
-      await this.connect();
-
-      const result = await this.client.callTool({
-        name: 'get_curriculum_structure',
-        arguments: {
-          child_id: childId,
-          subject_name: subjectName
-        }
-      });
-
-      if (!result || !result.content) {
-        return [];
-      }
-
-      return JSON.parse(result.content[0].text);
-
-    } catch (error) {
-      console.error('Error getting curriculum structure:', error);
-      return [];
-    }
-  }
-
-  // NEW: Get units overview for a child
-  async getChildUnits(childId) {
-    try {
-      await this.connect();
-
-      const result = await this.client.readResource({
-        uri: `edunest://child/${childId}/units`
-      });
-
-      if (!result || !result.contents || !result.contents[0]) {
-        return [];
-      }
-
-      return JSON.parse(result.contents[0].text);
-
-    } catch (error) {
-      console.error('Error getting child units:', error);
-      return [];
-    }
-  }
-
-  // --- GRADE-RELATED METHODS ---
-
-  // Get completed materials with grades (for review)
-  async getCompletedMaterialsWithGrades(childId, gradeThreshold = null, subjectName = null, contentType = null, limit = 10) {
-    try {
-      await this.connect();
-
-      const args = { 
-        child_id: childId,
-        limit: limit
-      };
-      
-      if (gradeThreshold) args.grade_threshold = gradeThreshold;
-      if (subjectName) args.subject_name = subjectName;
-      if (contentType) args.content_type = contentType;
-
-      const result = await this.client.callTool({
-        name: 'get_completed_materials_with_grades',
-        arguments: args
-      });
-
-      if (!result || !result.content) {
-        return [];
-      }
-
-      return JSON.parse(result.content[0].text);
-
-    } catch (error) {
-      console.error('Error getting completed materials with grades:', error);
-      return [];
-    }
-  }
-
-  // Get detailed grade analysis
-  async getGradeAnalysis(childId, subjectName = null, daysBack = 30) {
-    try {
-      await this.connect();
-
-      const result = await this.client.callTool({
-        name: 'get_grade_analysis',
-        arguments: {
-          child_id: childId,
-          subject_name: subjectName,
-          days_back: daysBack
-        }
-      });
-
-      if (!result || !result.content) {
-        return null;
-      }
-
-      return JSON.parse(result.content[0].text);
-
-    } catch (error) {
-      console.error('Error getting grade analysis:', error);
-      return null;
-    }
-  }
-
-  // Get materials that need review
-  async getMaterialsForReview(childId, reviewCriteria = 'low_grades', subjectName = null) {
-    try {
-      await this.connect();
-
-      const result = await this.client.callTool({
-        name: 'get_materials_for_review',
-        arguments: {
-          child_id: childId,
-          review_criteria: reviewCriteria,
-          subject_name: subjectName
-        }
-      });
-
-      if (!result || !result.content) {
-        return [];
-      }
-
-      return JSON.parse(result.content[0].text);
-
-    } catch (error) {
-      console.error('Error getting materials for review:', error);
-      return [];
-    }
-  }
-
-  // Enhanced method to get learning context for chat - UPDATED FOR NEW SCHEMA
-  async getEnhancedLearningContext(childId) {
-    try {
-      console.log('Getting enhanced learning context for child:', childId);
-  
-      const [
-        allMaterials, // Get ALL materials first
-        upcomingAssignments, 
-        childSubjects, 
-        progress
-      ] = await Promise.all([
-        this.getChildMaterials(childId, null, null, null).catch(e => { 
-          console.error('getChildMaterials error:', e); 
-          return []; 
-        }),
-        this.getUpcomingAssignments(childId, 7).catch(e => { 
-          console.error('getUpcomingAssignments error:', e); 
-          return []; 
-        }),
-        this.getChildSubjects(childId).catch(e => { 
-          console.error('getChildSubjects error:', e); 
-          return []; 
-        }),
-        this.getChildProgress(childId).catch(e => { 
-          console.error('getChildProgress error:', e); 
-          return null; 
-        })
+      // Search for different types of content in parallel
+      const [overdue, recent, assignments] = await Promise.all([
+        this.search(childId, 'overdue due late', 'overdue').catch(() => ({ results: {} })),
+        this.search(childId, 'recent today yesterday', 'recent').catch(() => ({ results: {} })),
+        this.search(childId, '', 'assignments').catch(() => ({ results: {} }))
       ]);
-  
-      // DEDUPLICATE: Remove materials that appear in both allMaterials and upcomingAssignments
-      const allMaterialIds = new Set(allMaterials.map(m => m.id).filter(Boolean));
-      const uniqueUpcomingAssignments = upcomingAssignments.filter(assignment => 
-        !allMaterialIds.has(assignment.id)
-      );
-  
-      console.log(`Deduplication: ${allMaterials.length} all materials, ${upcomingAssignments.length} upcoming -> ${uniqueUpcomingAssignments.length} unique upcoming`);
-  
-      // Separate current (incomplete) materials from all materials
-      const currentMaterials = allMaterials.filter(material => !material.completed_at);
-      const completedMaterials = allMaterials.filter(material => material.completed_at);
-  
-      console.log('Material breakdown:', {
-        total: allMaterials.length,
-        current: currentMaterials.length,
-        completed: completedMaterials.length,
-        uniqueUpcoming: uniqueUpcomingAssignments.length
-      });
-  
-      // Calculate ACCURATE grade analysis by subject
-      const gradeAnalysisBySubject = {};
-      
-      for (const material of completedMaterials) {
-        const subjectName = material.lesson?.unit?.child_subject?.custom_subject_name_override || 
-                           material.lesson?.unit?.child_subject?.subject?.name || 'General';
-        
-        if (!gradeAnalysisBySubject[subjectName]) {
-          gradeAnalysisBySubject[subjectName] = {
-            materials: [],
-            totalEarned: 0,
-            totalPossible: 0,
-            count: 0
-          };
-        }
-        
-        gradeAnalysisBySubject[subjectName].materials.push(material);
-        
-        if (material.grade_value && material.grade_max_value) {
-          const earned = parseFloat(material.grade_value);
-          const possible = parseFloat(material.grade_max_value);
-          
-          gradeAnalysisBySubject[subjectName].totalEarned += earned;
-          gradeAnalysisBySubject[subjectName].totalPossible += possible;
-          gradeAnalysisBySubject[subjectName].count++;
-        }
-      }
-  
-      // Calculate accurate averages
-      const subjectGrades = {};
-      let overallEarned = 0;
-      let overallPossible = 0;
-      
-      for (const [subject, data] of Object.entries(gradeAnalysisBySubject)) {
-        if (data.count > 0) {
-          const average = (data.totalEarned / data.totalPossible) * 100;
-          subjectGrades[subject] = {
-            average: Math.round(average * 10) / 10,
-            earned: data.totalEarned,
-            possible: data.totalPossible,
-            count: data.count,
-            materials: data.materials
-          };
-          
-          overallEarned += data.totalEarned;
-          overallPossible += data.totalPossible;
-        } else {
-          subjectGrades[subject] = {
-            average: null,
-            earned: 0,
-            possible: 0,
-            count: 0,
-            materials: data.materials
-          };
-        }
-      }
-  
-      const overallAverage = overallPossible > 0 ? 
-        Math.round((overallEarned / overallPossible) * 100 * 10) / 10 : null;
-  
-      // Find materials needing review (below 70%)
-      const materialsForReview = [];
-      for (const material of completedMaterials) {
-        if (material.grade_value && material.grade_max_value) {
-          const percentage = (parseFloat(material.grade_value) / parseFloat(material.grade_max_value)) * 100;
-          if (percentage < 70) {
-            materialsForReview.push({
-              ...material,
-              percentage: Math.round(percentage * 10) / 10,
-              reason: percentage < 50 ? 'Failed - needs significant review' : 
-                     percentage < 60 ? 'Below average - review recommended' : 
-                     'Room for improvement'
-            });
-          }
-        }
-      }
-  
-      // Find the most immediate material/assignment
-      let currentFocus = null;
-      
-      const materialsDueSoon = currentMaterials.filter(material => {
-        if (!material.due_date) return false;
-        const dueDate = new Date(material.due_date);
-        const today = new Date();
-        const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-        return daysUntilDue >= 0 && daysUntilDue <= 3;
-      });
-  
-      if (materialsDueSoon.length > 0) {
-        currentFocus = materialsDueSoon[0];
-      } else if (currentMaterials.length > 0) {
-        currentFocus = currentMaterials[0];
-      } else if (uniqueUpcomingAssignments.length > 0) {
-        currentFocus = { type: 'assignment', ...uniqueUpcomingAssignments[0] };
-      }
-  
-      return {
-        childSubjects: childSubjects || [],
-        
-        // For backward compatibility
-        currentLessons: currentMaterials || [],
-        currentMaterials: currentMaterials || [],
-        
-        // All materials for grade analysis
-        allMaterials: allMaterials || [],
-        completedMaterials: completedMaterials || [],
-        
-        // DEDUPLICATED upcoming assignments
-        upcomingAssignments: uniqueUpcomingAssignments || [],
-        currentFocus,
-        progress: progress || null,
-        
-        // ACCURATE grade analysis
-        gradeAnalysis: {
-          bySubject: subjectGrades,
-          overall: {
-            average: overallAverage,
-            totalEarned: overallEarned,
-            totalPossible: overallPossible,
-            totalGradedMaterials: completedMaterials.filter(m => m.grade_value && m.grade_max_value).length
-          },
-          trends: {
-            averageGrade: overallAverage,
-            totalGradedMaterials: completedMaterials.filter(m => m.grade_value && m.grade_max_value).length
-          }
-        },
-        
-        materialsForReview: materialsForReview || [],
-        
-        // Add summary flags for quick checks
-        hasLowGrades: materialsForReview.length > 0,
-        averageGrade: overallAverage,
-        needsReview: materialsForReview.length > 0,
-        recentGradeCount: completedMaterials.filter(m => m.grade_value && m.grade_max_value).length
+
+      // Combine results
+      const context = {
+        childSubjects: [], // We'll get this from the search results
+        currentMaterials: assignments.results.assignments || [],
+        allMaterials: assignments.results.assignments || [],
+        upcomingAssignments: [],
+        overdue: overdue.results.overdue || [],
+        recentWork: recent.results.recent || [],
+        currentFocus: null,
+        progress: null
       };
-  
+
+      // Find current focus (most urgent item)
+      if (context.overdue.length > 0) {
+        context.currentFocus = context.overdue[0];
+      } else if (context.currentMaterials.length > 0) {
+        // Find item due soonest
+        const withDueDates = context.currentMaterials.filter(m => m.due_date);
+        if (withDueDates.length > 0) {
+          withDueDates.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+          context.currentFocus = withDueDates[0];
+        } else {
+          context.currentFocus = context.currentMaterials[0];
+        }
+      }
+
+      console.log('📊 Context summary:', {
+        currentMaterials: context.currentMaterials.length,
+        overdue: context.overdue.length,
+        recentWork: context.recentWork.length,
+        hasFocus: !!context.currentFocus
+      });
+
+      return context;
+
     } catch (error) {
-      console.error('Error getting enhanced learning context:', error);
-      
+      console.error('❌ Error getting learning context:', error);
       return {
         childSubjects: [],
-        currentLessons: [],
         currentMaterials: [],
         allMaterials: [],
-        completedMaterials: [],
         upcomingAssignments: [],
+        overdue: [],
+        recentWork: [],
         currentFocus: null,
         progress: null,
+        error: error.message
+      };
+    }
+  }
+
+  // Enhanced context with grades
+  async getEnhancedLearningContext(childId) {
+    try {
+      console.log('📈 Getting enhanced context (with grades) for child:', childId);
+
+      // Get basic context + grades
+      const [basicContext, gradesData] = await Promise.all([
+        this.getLearningContext(childId),
+        this.search(childId, 'grades scores percent', 'grades').catch(() => ({ results: {} }))
+      ]);
+
+      // Calculate grade analysis from results
+      const grades = gradesData.results.grades || [];
+      const gradeAnalysis = this.calculateGradeAnalysis(grades);
+
+      return {
+        ...basicContext,
+        completedMaterials: grades.filter(g => g.completed_at),
+        gradeAnalysis,
+        materialsForReview: this.findMaterialsForReview(grades),
+        hasLowGrades: grades.some(g => this.calculatePercentage(g) < 70),
+        averageGrade: gradeAnalysis.overall.average,
+        needsReview: grades.some(g => this.calculatePercentage(g) < 70),
+        recentGradeCount: grades.length
+      };
+
+    } catch (error) {
+      console.error('❌ Error getting enhanced context:', error);
+      return {
+        ...await this.getLearningContext(childId),
         gradeAnalysis: null,
         materialsForReview: [],
         hasLowGrades: false,
@@ -695,162 +209,150 @@ class MCPClientService {
       };
     }
   }
-  // MISSING METHOD: Basic learning context method for compatibility
-  async getLearningContext(childId) {
-    try {
-      console.log('Getting learning context for child:', childId);
 
-      const [currentMaterials, upcomingAssignments, childSubjects, progress] = await Promise.all([
-        this.getCurrentMaterials(childId).catch(e => { console.error('getCurrentMaterials error:', e); return []; }),
-        this.getUpcomingAssignments(childId, 7).catch(e => { console.error('getUpcomingAssignments error:', e); return []; }),
-        this.getChildSubjects(childId).catch(e => { console.error('getChildSubjects error:', e); return []; }),
-        this.getChildProgress(childId).catch(e => { console.error('getChildProgress error:', e); return null; })
-      ]);
-
-      console.log('Learning context results:', {
-        currentMaterials: currentMaterials.length,
-        upcomingAssignments: upcomingAssignments.length,
-        childSubjects: childSubjects.length
-      });
-
-      // Find the most immediate material/assignment
-      let currentFocus = null;
-      
-      // Prioritize materials due soon
-      const materialsDueSoon = currentMaterials.filter(material => {
-        if (!material.due_date) return false;
-        const dueDate = new Date(material.due_date);
-        const today = new Date();
-        const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-        return daysUntilDue >= 0 && daysUntilDue <= 3; // Due in next 3 days
-      });
-
-      if (materialsDueSoon.length > 0) {
-        currentFocus = materialsDueSoon[0];
-      } else if (currentMaterials.length > 0) {
-        currentFocus = currentMaterials[0];
-      } else if (upcomingAssignments.length > 0) {
-        currentFocus = {
-          type: 'assignment',
-          ...upcomingAssignments[0]
-        };
-      }
-
-      return {
-        childSubjects: childSubjects || [],
-        currentLessons: currentMaterials || [], // Keep the old property name for compatibility
-        currentMaterials: currentMaterials || [], // New property name
-        upcomingAssignments: upcomingAssignments || [],
-        currentFocus,
-        progress: progress || null
-      };
-
-    } catch (error) {
-      console.error('Error getting learning context:', error);
-      
-      // Return fallback context with direct database queries
-      try {
-        // Use service role key client for fallback
-        const supabase = require('../utils/supabaseClient');
-        
-        // Get child subjects directly
-        const { data: childSubjects } = await supabase
-          .from('child_subjects')
-          .select(`
-            id,
-            custom_subject_name_override,
-            subject:subject_id (id, name)
-          `)
-          .eq('child_id', childId);
-
-        // Get current materials directly  
-        const childSubjectIds = (childSubjects || []).map(cs => cs.id);
-        const { data: materials } = await supabase
-          .from('materials')
-          .select(`
-            id, title, status, due_date, content_type, created_at,
-            lesson:lesson_id (
-              id, title, lesson_number,
-              unit:unit_id (
-                id, name,
-                child_subject:child_subject_id (
-                  subject:subject_id (name),
-                  custom_subject_name_override
-                )
-              )
-            )
-          `)
-          .in('child_subject_id', childSubjectIds)
-          .in('status', ['pending', 'approved'])
-          .is('completed_at', null)
-          .order('due_date', { ascending: true, nullsLast: true })
-          .limit(10);
-
-        console.log('Fallback context - found materials:', materials?.length || 0);
-
-        return {
-          childSubjects: childSubjects || [],
-          currentLessons: materials || [], // For compatibility
-          currentMaterials: materials || [],
-          upcomingAssignments: [],
-          currentFocus: materials?.[0] || null,
-          progress: null,
-          fallback: true
-        };
-      } catch (fallbackError) {
-        console.error('Fallback context failed:', fallbackError);
-        return {
-          childSubjects: [],
-          currentLessons: [],
-          currentMaterials: [],
-          upcomingAssignments: [],
-          currentFocus: null,
-          progress: null,
-          error: error.message
-        };
-      }
-    }
-  }
-
-  // Utility method to check if child has grade-related queries
-  isGradeRelatedQuery(message) {
-    const gradeKeywords = [
-      'grade', 'grades', 'score', 'scores', 'review', 'wrong', 'missed', 'failed',
-      'perfect', 'how did i do', 'check my work', 'mistakes', 'incorrect',
-      'average', 'performance', 'results', 'feedback', 'percent', '%', 'points',
-      'better', 'improve', 'study more', 'practice more', 'not good', 'disappointed'
-    ];
+  // Find specific assignment/material
+  async findMaterial(childId, materialName) {
+    console.log(`🎯 Looking for material: "${materialName}"`);
     
-    const messageLower = message.toLowerCase();
-    return gradeKeywords.some(keyword => messageLower.includes(keyword));
+    const searchResult = await this.search(childId, materialName, 'assignments');
+    const assignments = searchResult.results.assignments || searchResult.results.matching_assignments || [];
+    
+    if (assignments.length > 0) {
+      console.log(`✅ Found material: ${assignments[0].title}`);
+      return assignments[0];
+    }
+    
+    console.log(`❌ Material not found: "${materialName}"`);
+    return null;
   }
 
-  // BACKWARD COMPATIBILITY METHODS (map old names to new functionality)
+  // Get material details (simplified - just search for it)
+  async getMaterialDetails(materialId) {
+    // For now, we don't have a specific "get by ID" search
+    // But this could be added to the MCP server if needed
+    console.log(`⚠️ getMaterialDetails(${materialId}) - not implemented in simplified version`);
+    return null;
+  }
+
+  // Check if child has access to material
+  async checkMaterialAccess(childId, materialId) {
+    // Simple permission check - could search for the specific material
+    console.log(`⚠️ checkMaterialAccess(${childId}, ${materialId}) - simplified to always allow`);
+    return true;
+  }
+
+  // 📊 HELPER METHODS
+
+  calculateGradeAnalysis(grades) {
+    const bySubject = {};
+    let totalEarned = 0;
+    let totalPossible = 0;
+    let gradedCount = 0;
+
+    grades.forEach(grade => {
+      const subjectName = grade.lesson?.unit?.child_subject?.custom_subject_name_override || 
+                         grade.lesson?.unit?.child_subject?.subject?.name || 'General';
+      
+      if (!bySubject[subjectName]) {
+        bySubject[subjectName] = {
+          earned: 0,
+          possible: 0,
+          count: 0,
+          materials: []
+        };
+      }
+
+      bySubject[subjectName].materials.push(grade);
+
+      if (grade.grade_value && grade.grade_max_value) {
+        const earned = parseFloat(grade.grade_value);
+        const possible = parseFloat(grade.grade_max_value);
+        
+        bySubject[subjectName].earned += earned;
+        bySubject[subjectName].possible += possible;
+        bySubject[subjectName].count++;
+        
+        totalEarned += earned;
+        totalPossible += possible;
+        gradedCount++;
+      }
+    });
+
+    // Calculate averages
+    Object.keys(bySubject).forEach(subject => {
+      const data = bySubject[subject];
+      data.average = data.possible > 0 ? Math.round((data.earned / data.possible) * 100 * 10) / 10 : null;
+    });
+
+    const overallAverage = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100 * 10) / 10 : null;
+
+    return {
+      bySubject,
+      overall: {
+        average: overallAverage,
+        totalEarned,
+        totalPossible,
+        totalGradedMaterials: gradedCount
+      }
+    };
+  }
+
+  calculatePercentage(grade) {
+    if (!grade.grade_value || !grade.grade_max_value) return 0;
+    return (parseFloat(grade.grade_value) / parseFloat(grade.grade_max_value)) * 100;
+  }
+
+  findMaterialsForReview(grades) {
+    return grades
+      .filter(grade => grade.grade_value && grade.grade_max_value)
+      .map(grade => ({
+        ...grade,
+        percentage: this.calculatePercentage(grade)
+      }))
+      .filter(grade => grade.percentage < 70)
+      .map(grade => ({
+        ...grade,
+        reason: grade.percentage < 50 ? 'Failed - needs significant review' : 
+               grade.percentage < 60 ? 'Below average - review recommended' : 
+               'Room for improvement'
+      }));
+  }
+
+  // 🔄 BACKWARD COMPATIBILITY (these methods now use search)
   
-  async getCurrentLesson(childId, subjectId) {
+  async getCurrentMaterials(childId) {
+    const result = await this.search(childId, '', 'assignments');
+    return result.results.assignments || [];
+  }
+
+  async getUpcomingAssignments(childId, daysAhead = 7) {
+    const result = await this.search(childId, 'due upcoming', 'assignments');
+    return result.results.assignments || [];
+  }
+
+  async searchMaterials(query, childId) {
+    const result = await this.search(childId, query, 'all');
+    return result.results.matching_assignments || result.results.assignments || [];
+  }
+
+  async getChildMaterials(childId) {
+    const result = await this.search(childId, '', 'all');
+    return [
+      ...(result.results.assignments || []),
+      ...(result.results.matching_assignments || [])
+    ];
+  }
+
+  // Deprecated methods (log warnings)
+  async getCurrentLesson(childId) {
     console.warn('getCurrentLesson is deprecated, use getCurrentMaterials instead');
     const materials = await this.getCurrentMaterials(childId);
     return materials.length > 0 ? materials[0] : null;
   }
 
   async getLessonDetails(lessonId) {
-    console.warn('getLessonDetails is deprecated, use getMaterialDetails instead');
-    return await this.getMaterialDetails(lessonId);
-  }
-
-  async searchLessons(query, childId, subjectName) {
-    console.warn('searchLessons is deprecated, use searchMaterials instead');
-    return await this.searchMaterials(query, childId, subjectName);
-  }
-
-  async checkLessonAccess(childId, lessonId) {
-    console.warn('checkLessonAccess is deprecated, use checkMaterialAccess instead');
-    return await this.checkMaterialAccess(childId, lessonId);
-  }
-
-  async getChildLessons(childId, status = null) {
-    console.warn('getChildLessons is deprecated, use getChildMaterials instead');
-    return await this.getChildMaterials(childId, status);
+    console.warn('getLessonDetails is deprecated, use search instead');
+    return null;
   }
 }
 

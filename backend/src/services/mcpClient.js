@@ -1,4 +1,4 @@
-// backend/src/services/mcpClient.js - SIMPLIFIED VERSION
+// backend/src/services/mcpClient.js - ENHANCED VERSION with Material Content Access
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
 const fs = require('fs');
@@ -25,7 +25,7 @@ class MCPClientService {
 
   async _establishConnection() {
     try {
-      console.log('Connecting to simplified MCP server...');
+      console.log('Connecting to enhanced MCP server...');
 
       const mcpServerPath = process.env.MCP_SERVER_PATH || 
         path.resolve(__dirname, '../../../mcp-server/dist/server.js');
@@ -45,12 +45,12 @@ class MCPClientService {
       });
 
       this.client = new Client(
-        { name: 'klioai-tutor', version: '2.0.0' },
+        { name: 'klioai-enhanced-tutor', version: '2.1.0' },
         { capabilities: {} }
       );
 
       await this.client.connect(this.transport);
-      console.log('✅ Connected to simplified MCP server');
+      console.log('✅ Connected to enhanced MCP server');
       this.isConnected = true;
       return this.client;
 
@@ -68,7 +68,110 @@ class MCPClientService {
     this.connectionPromise = null;
   }
 
-  // 🎯 ONE SEARCH METHOD TO RULE THEM ALL
+  // 🎯 ENHANCED: Get complete material content with all questions
+  async getMaterialContent(childId, materialIdentifier) {
+    try {
+      await this.connect();
+
+      console.log(`📖 Getting material content: "${materialIdentifier}" for child: ${childId}`);
+
+      const result = await this.client.callTool({
+        name: 'get_material_content',
+        arguments: {
+          child_id: childId,
+          material_identifier: materialIdentifier
+        }
+      });
+
+      if (!result?.content?.[0]?.text) {
+        console.log('❌ No material content returned');
+        return null;
+      }
+
+      const materialData = JSON.parse(result.content[0].text);
+      
+      if (materialData.error) {
+        console.log(`❌ Material error: ${materialData.error}`);
+        return null;
+      }
+
+      console.log(`✅ Retrieved material: "${materialData.material.title}" with ${materialData.total_questions} questions`);
+      
+      return materialData;
+
+    } catch (error) {
+      console.error('❌ Error getting material content:', error);
+      return null;
+    }
+  }
+
+  // 🎯 ENHANCED: Extract specific question from material
+  async getSpecificQuestion(childId, materialIdentifier, questionNumber) {
+    try {
+      const materialData = await this.getMaterialContent(childId, materialIdentifier);
+      
+      if (!materialData || !materialData.questions) {
+        console.log(`❌ No questions found for material: ${materialIdentifier}`);
+        return null;
+      }
+
+      const questions = materialData.questions;
+      
+      // Find the specific question
+      const questionPattern = new RegExp(`^${questionNumber}\\.\\s*`);
+      const questionIndex = questions.findIndex(q => 
+        questionPattern.test(q.toString().trim())
+      );
+
+      if (questionIndex === -1) {
+        console.log(`❌ Question ${questionNumber} not found in ${materialIdentifier}`);
+        return null;
+      }
+
+      const targetQuestion = questions[questionIndex];
+      
+      // Find the relevant instruction by looking backwards
+      let relevantInstruction = null;
+      for (let i = questionIndex - 1; i >= 0; i--) {
+        const prevItem = questions[i];
+        if (!/^\d+\./.test(prevItem) && 
+            (prevItem.toLowerCase().includes('solve') || 
+             prevItem.toLowerCase().includes('write') || 
+             prevItem.toLowerCase().includes('shade') ||
+             prevItem.toLowerCase().includes('round') ||
+             prevItem.toLowerCase().includes('draw'))) {
+          relevantInstruction = prevItem;
+          break;
+        }
+      }
+
+      const result = {
+        material: materialData.material,
+        question: {
+          number: questionNumber,
+          text: targetQuestion,
+          cleanText: targetQuestion.replace(/^\d+\.\s*/, '').trim(),
+          instruction: relevantInstruction,
+          index: questionIndex,
+          totalQuestions: questions.length
+        },
+        context: {
+          learningObjectives: materialData.learning_objectives,
+          contentType: materialData.material.content_type,
+          subject: materialData.material.subject
+        }
+      };
+
+      console.log(`✅ Found question ${questionNumber}: "${result.question.cleanText}"`);
+      return result;
+
+    } catch (error) {
+      console.error(`❌ Error getting specific question:`, error);
+      return null;
+    }
+  }
+
+  // 🚀 EXISTING SEARCH METHOD (enhanced)
   async search(childId, query, searchType = 'all') {
     try {
       await this.connect();
@@ -104,23 +207,20 @@ class MCPClientService {
     }
   }
 
-  // 🚀 SMART CONTEXT METHODS (use the one search method)
-  
-  // Get learning context for chat
+  // 🚀 ENHANCED CONTEXT METHODS
+
   async getLearningContext(childId) {
     try {
       console.log('📚 Getting learning context for child:', childId);
 
-      // Search for different types of content in parallel
       const [overdue, recent, assignments] = await Promise.all([
         this.search(childId, 'overdue due late', 'overdue').catch(() => ({ results: {} })),
         this.search(childId, 'recent today yesterday', 'recent').catch(() => ({ results: {} })),
         this.search(childId, '', 'assignments').catch(() => ({ results: {} }))
       ]);
 
-      // Combine results
       const context = {
-        childSubjects: [], // We'll get this from the search results
+        childSubjects: [],
         currentMaterials: assignments.results.assignments || [],
         allMaterials: assignments.results.assignments || [],
         upcomingAssignments: [],
@@ -134,7 +234,6 @@ class MCPClientService {
       if (context.overdue.length > 0) {
         context.currentFocus = context.overdue[0];
       } else if (context.currentMaterials.length > 0) {
-        // Find item due soonest
         const withDueDates = context.currentMaterials.filter(m => m.due_date);
         if (withDueDates.length > 0) {
           withDueDates.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
@@ -169,18 +268,15 @@ class MCPClientService {
     }
   }
 
-  // Enhanced context with grades
   async getEnhancedLearningContext(childId) {
     try {
       console.log('📈 Getting enhanced context (with grades) for child:', childId);
 
-      // Get basic context + grades
       const [basicContext, gradesData] = await Promise.all([
         this.getLearningContext(childId),
         this.search(childId, 'grades scores percent', 'grades').catch(() => ({ results: {} }))
       ]);
 
-      // Calculate grade analysis from results
       const grades = gradesData.results.grades || [];
       const gradeAnalysis = this.calculateGradeAnalysis(grades);
 
@@ -210,35 +306,82 @@ class MCPClientService {
     }
   }
 
-  // Find specific assignment/material
+  // 🎯 ENHANCED: Find specific material with content access
   async findMaterial(childId, materialName) {
     console.log(`🎯 Looking for material: "${materialName}"`);
     
+    // First try search
     const searchResult = await this.search(childId, materialName, 'assignments');
     const assignments = searchResult.results.assignments || searchResult.results.matching_assignments || [];
     
     if (assignments.length > 0) {
-      console.log(`✅ Found material: ${assignments[0].title}`);
-      return assignments[0];
+      const material = assignments[0];
+      console.log(`✅ Found material: ${material.title}`);
+      
+      // Try to get full content if it has lesson_json
+      if (material.has_content) {
+        const fullContent = await this.getMaterialContent(childId, material.title);
+        if (fullContent) {
+          return {
+            ...material,
+            full_content: fullContent
+          };
+        }
+      }
+      
+      return material;
     }
     
     console.log(`❌ Material not found: "${materialName}"`);
     return null;
   }
 
-  // Get material details (simplified - just search for it)
+  // 🎯 NEW: Enhanced material details that includes full content
   async getMaterialDetails(materialId) {
-    // For now, we don't have a specific "get by ID" search
-    // But this could be added to the MCP server if needed
-    console.log(`⚠️ getMaterialDetails(${materialId}) - not implemented in simplified version`);
+    // For backward compatibility - this would need the child_id to work properly
+    console.log(`⚠️ getMaterialDetails(${materialId}) - requires child_id for enhanced version`);
     return null;
+  }
+
+  // 🎯 NEW: Get material details with child context
+  async getMaterialDetailsWithChild(childId, materialId) {
+    try {
+      // Try to get by ID first
+      const materialData = await this.getMaterialContent(childId, materialId);
+      if (materialData) {
+        return materialData;
+      }
+
+      // If ID doesn't work, search for it
+      const searchResult = await this.search(childId, materialId, 'all');
+      const allResults = [
+        ...(searchResult.results.assignments || []),
+        ...(searchResult.results.matching_assignments || [])
+      ];
+
+      const material = allResults.find(m => m.id === materialId);
+      if (material) {
+        // Try to get full content
+        const fullContent = await this.getMaterialContent(childId, material.title);
+        return fullContent || material;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('❌ Error getting material details with child:', error);
+      return null;
+    }
   }
 
   // Check if child has access to material
   async checkMaterialAccess(childId, materialId) {
-    // Simple permission check - could search for the specific material
-    console.log(`⚠️ checkMaterialAccess(${childId}, ${materialId}) - simplified to always allow`);
-    return true;
+    try {
+      const material = await this.getMaterialDetailsWithChild(childId, materialId);
+      return !!material;
+    } catch (error) {
+      console.error('❌ Error checking material access:', error);
+      return false;
+    }
   }
 
   // 📊 HELPER METHODS
@@ -351,7 +494,7 @@ class MCPClientService {
   }
 
   async getLessonDetails(lessonId) {
-    console.warn('getLessonDetails is deprecated, use search instead');
+    console.warn('getLessonDetails is deprecated, use getMaterialContent instead');
     return null;
   }
 }

@@ -1,3 +1,4 @@
+// Fixed learningMemoryService.js - Removes supabase.raw error
 const supabase = require('../utils/supabaseClient');
 const { OpenAI } = require('openai');
 
@@ -110,41 +111,47 @@ class LearningMemoryService {
     return score;
   }
 
-  // Reinforce an existing memory
+  // FIXED: Reinforce an existing memory without using supabase.raw
   async reinforceMemory(memoryId, newDetails = null) {
     try {
+      // First get the current memory to calculate new values
+      const { data: currentMemory, error: fetchError } = await supabase
+        .from('child_learning_memories')
+        .select('*')
+        .eq('id', memoryId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Calculate new confidence score (max 1.0)
+      const newConfidenceScore = Math.min(currentMemory.confidence_score + 0.1, 1.0);
+      const newSessionCount = currentMemory.session_count + 1;
+
       const updateData = {
-        confidence_score: supabase.raw('LEAST(confidence_score + 0.1, 1.0)'),
-        session_count: supabase.raw('session_count + 1'),
+        confidence_score: newConfidenceScore,
+        session_count: newSessionCount,
         last_reinforced: new Date().toISOString()
       };
 
       if (newDetails) {
         // Merge new details with existing content
-        const { data: existing } = await supabase
-          .from('child_learning_memories')
-          .select('content')
-          .eq('id', memoryId)
-          .single();
-
-        if (existing) {
-          const mergedContent = {
-            ...existing.content,
-            ...newDetails,
-            reinforcement_history: [
-              ...(existing.content.reinforcement_history || []),
-              { date: new Date().toISOString(), details: newDetails }
-            ]
-          };
-          updateData.content = mergedContent;
-        }
+        const mergedContent = {
+          ...currentMemory.content,
+          ...newDetails,
+          reinforcement_history: [
+            ...(currentMemory.content.reinforcement_history || []),
+            { date: new Date().toISOString(), details: newDetails }
+          ]
+        };
+        updateData.content = mergedContent;
       }
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('child_learning_memories')
         .update(updateData)
         .eq('id', memoryId);
 
+      if (updateError) throw updateError;
       return true;
     } catch (error) {
       console.error('Error reinforcing memory:', error);
@@ -187,6 +194,134 @@ class LearningMemoryService {
         learning_pace: 'moderate',
         confidence_level: 'building'
       };
+    }
+  }
+
+  // NEW: Update learning profile with new insights
+  async updateLearningProfile(childId, updates) {
+    try {
+      const { error } = await supabase
+        .from('child_learning_profiles')
+        .update({
+          ...updates,
+          profile_updated_at: new Date().toISOString()
+        })
+        .eq('child_id', childId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error updating learning profile:', error);
+      return false;
+    }
+  }
+
+  // NEW: Get memory statistics for a child
+  async getMemoryStats(childId) {
+    try {
+      const { data: memories, error } = await supabase
+        .from('child_learning_memories')
+        .select('memory_type, confidence_score, session_count')
+        .eq('child_id', childId);
+
+      if (error) throw error;
+
+      const stats = {
+        totalMemories: memories.length,
+        byType: {},
+        averageConfidence: 0,
+        totalReinforcements: 0
+      };
+
+      memories.forEach(memory => {
+        // Count by type
+        stats.byType[memory.memory_type] = (stats.byType[memory.memory_type] || 0) + 1;
+        
+        // Sum for averages
+        stats.averageConfidence += memory.confidence_score;
+        stats.totalReinforcements += memory.session_count;
+      });
+
+      if (memories.length > 0) {
+        stats.averageConfidence = Math.round((stats.averageConfidence / memories.length) * 100) / 100;
+      }
+
+      return stats;
+    } catch (error) {
+      console.error('Error getting memory stats:', error);
+      return null;
+    }
+  }
+
+  // NEW: Clean up old, low-confidence memories
+  async cleanupMemories(childId, daysOld = 90, minConfidence = 0.2) {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+
+      const { data: deleted, error } = await supabase
+        .from('child_learning_memories')
+        .delete()
+        .eq('child_id', childId)
+        .lt('confidence_score', minConfidence)
+        .lt('last_reinforced', cutoffDate.toISOString())
+        .select('id, memory_type');
+
+      if (error) throw error;
+
+      console.log(`Cleaned up ${deleted?.length || 0} old memories for child ${childId}`);
+      return deleted?.length || 0;
+    } catch (error) {
+      console.error('Error cleaning up memories:', error);
+      return 0;
+    }
+  }
+
+  // NEW: Find patterns in learning memories
+  async findLearningPatterns(childId) {
+    try {
+      const { data: memories, error } = await supabase
+        .from('child_learning_memories')
+        .select('*')
+        .eq('child_id', childId)
+        .gte('confidence_score', 0.5)
+        .order('last_reinforced', { ascending: false });
+
+      if (error) throw error;
+
+      const patterns = {
+        commonStruggles: [],
+        preferredTopics: [],
+        learningStyles: [],
+        timePatterns: []
+      };
+
+      // Analyze struggles
+      const struggles = memories.filter(m => m.memory_type === 'struggle');
+      const struggleTopics = {};
+      struggles.forEach(s => {
+        struggleTopics[s.topic] = (struggleTopics[s.topic] || 0) + s.session_count;
+      });
+      patterns.commonStruggles = Object.entries(struggleTopics)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([topic, count]) => ({ topic, frequency: count }));
+
+      // Analyze engagement
+      const engagements = memories.filter(m => m.memory_type === 'engagement');
+      const engagementTopics = {};
+      engagements.forEach(e => {
+        engagementTopics[e.topic] = (engagementTopics[e.topic] || 0) + e.session_count;
+      });
+      patterns.preferredTopics = Object.entries(engagementTopics)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([topic, count]) => ({ topic, frequency: count }));
+
+      return patterns;
+    } catch (error) {
+      console.error('Error finding learning patterns:', error);
+      return null;
     }
   }
 }

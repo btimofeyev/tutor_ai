@@ -1,3 +1,4 @@
+// Enhanced chatController.js - Fix for accessing specific materials
 const { OpenAI } = require('openai');
 const supabase = require('../utils/supabaseClient');
 const mcpClient = require('../services/mcpClient');
@@ -12,9 +13,132 @@ const openai = new OpenAI({
 
 const MAX_MESSAGE_LENGTH = 500;
 const MAX_HISTORY_LENGTH = 8;
-const OPENAI_MODEL = "gpt-4o-mini";
+const OPENAI_MODEL = "gpt-4.1-mini";
 const OPENAI_TIMEOUT = 1024;
 const OPENAI_TEMPERATURE = 0.7;
+
+// NEW: Enhanced function to find and access specific materials
+async function findAndAccessMaterial(childId, materialReference, mcpContext) {
+  console.log(`🔍 Searching for material: "${materialReference}" for child: ${childId}`);
+  
+  if (!mcpContext?.allMaterials?.length) {
+    console.log("❌ No materials available in MCP context");
+    return null;
+  }
+
+  // Search strategies for finding materials
+  const searchStrategies = [
+    // Exact title match
+    (ref) => mcpContext.allMaterials.find(m => 
+      m.title?.toLowerCase() === ref.toLowerCase()
+    ),
+    // Partial title match
+    (ref) => mcpContext.allMaterials.find(m => 
+      m.title?.toLowerCase().includes(ref.toLowerCase())
+    ),
+    // Chapter/lesson number match
+    (ref) => {
+      const chapterMatch = ref.match(/chapter\s*(\d+)/i);
+      if (chapterMatch) {
+        const chapterNum = chapterMatch[1];
+        return mcpContext.allMaterials.find(m => 
+          m.title?.toLowerCase().includes(`chapter ${chapterNum}`) ||
+          m.title?.toLowerCase().includes(`chapter${chapterNum}`)
+        );
+      }
+      return null;
+    },
+    // Lesson number match
+    (ref) => {
+      const lessonMatch = ref.match(/lesson\s*(\d+)/i);
+      if (lessonMatch) {
+        const lessonNum = lessonMatch[1];
+        return mcpContext.allMaterials.find(m => 
+          m.title?.toLowerCase().includes(`lesson ${lessonNum}`) ||
+          m.lesson_json?.lesson_number_if_applicable?.toString() === lessonNum
+        );
+      }
+      return null;
+    }
+  ];
+
+  // Try each search strategy
+  for (const strategy of searchStrategies) {
+    const found = strategy(materialReference);
+    if (found) {
+      console.log(`✅ Found material: ${found.title} (ID: ${found.id})`);
+      
+      // Get full material details using MCP client
+      try {
+        const fullDetails = await mcpClient.getMaterialDetails(found.id);
+        if (fullDetails) {
+          console.log(`📋 Retrieved full details for: ${fullDetails.title}`);
+          return fullDetails;
+        }
+      } catch (error) {
+        console.error(`❌ Error getting material details:`, error);
+      }
+      
+      // Fallback to basic material info if MCP fails
+      return found;
+    }
+  }
+
+  console.log(`❌ Could not find material: "${materialReference}"`);
+  return null;
+}
+
+// NEW: Function to detect material access requests
+function detectMaterialAccessRequest(message) {
+  const patterns = [
+    /(?:review|look at|show me|work on|help with|let's do)\s+(.+?)(?:\s|$)/i,
+    /(?:chapter|lesson|assignment|test|quiz|worksheet)\s+(\d+)/i,
+    /(?:the\s+)?(.+?)\s+(?:assignment|test|quiz|worksheet)/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match) {
+      return match[1]?.trim();
+    }
+  }
+
+  return null;
+}
+
+// NEW: Function to format material content for AI prompt
+function formatMaterialForAI(material) {
+  if (!material?.lesson_json) {
+    return `Material: ${material.title} (No detailed content available)`;
+  }
+
+  const json = material.lesson_json;
+  let content = `**${material.title}**
+Type: ${material.content_type}
+Status: ${material.status}`;
+
+  if (json.learning_objectives?.length > 0) {
+    content += `\n\n**Learning Objectives:**\n${json.learning_objectives.map(obj => `- ${obj}`).join('\n')}`;
+  }
+
+  if (json.main_content_summary_or_extract) {
+    content += `\n\n**Summary:**\n${json.main_content_summary_or_extract}`;
+  }
+
+  if (json.tasks_or_questions?.length > 0) {
+    content += `\n\n**Questions/Tasks:**\n${json.tasks_or_questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}`;
+  }
+
+  if (json.subject_keywords_or_subtopics?.length > 0) {
+    content += `\n\n**Topics Covered:** ${json.subject_keywords_or_subtopics.join(', ')}`;
+  }
+
+  if (json.estimated_completion_time_minutes) {
+    content += `\n\n**Estimated Time:** ${json.estimated_completion_time_minutes} minutes`;
+  }
+
+  return content;
+}
 
 // Find specific question from lesson data
 function findSpecificQuestion(lessonData, questionNumber) {
@@ -55,26 +179,8 @@ function findSpecificQuestion(lessonData, questionNumber) {
 }
 
 function isInstructionText(text) {
-  const instructionKeywords = ['write', 'find', 'complete', 'round', 'convert', 'compare', 'match', 'rewrite', 'value'];
+  const instructionKeywords = ['write', 'find', 'complete', 'round', 'convert', 'compare', 'match', 'rewrite', 'value', 'solve', 'shade', 'draw'];
   return instructionKeywords.some(keyword => text.toLowerCase().includes(keyword));
-}
-
-// Find lesson by reference
-function findLessonByReference(mcpContext, lessonRef) {
-  if (!mcpContext?.currentMaterials) return null;
-  
-  const lessonNumberMatch = lessonRef.match(/lesson\s*(\d+)/i);
-  if (lessonNumberMatch) {
-    const lessonNum = lessonNumberMatch[1];
-    return mcpContext.currentMaterials.find(material => {
-      const materialLessonNum = material.lesson_json?.lesson_number_if_applicable?.toString();
-      return materialLessonNum?.includes(lessonNum);
-    });
-  }
-  
-  return mcpContext.currentMaterials.find(material => 
-    material.title?.toLowerCase().includes(lessonRef.toLowerCase())
-  );
 }
 
 // Build memory context for AI prompt
@@ -222,7 +328,7 @@ async function updateLearningMemories(childId, userMessage, aiResponse, mcpConte
   }
 }
 
-// Main chat handler
+// ENHANCED: Main chat handler with material access
 exports.chat = async (req, res) => {
   const childId = req.child?.child_id;
   const { message, sessionHistory = [], lessonContext = null } = req.body;
@@ -249,6 +355,21 @@ exports.chat = async (req, res) => {
       .select('name, grade')
       .eq('id', childId)
       .single();
+
+    // NEW: Check if user is requesting access to specific material
+    const materialRequest = detectMaterialAccessRequest(message);
+    let specificMaterial = null;
+    
+    if (materialRequest) {
+      console.log(`🎯 Material access request detected: "${materialRequest}"`);
+      specificMaterial = await findAndAccessMaterial(childId, materialRequest, mcpContext);
+      
+      if (specificMaterial) {
+        console.log(`✅ Successfully accessed material: ${specificMaterial.title}`);
+      } else {
+        console.log(`❌ Could not find requested material: "${materialRequest}"`);
+      }
+    }
 
     // Get memory context
     const [recentMemories, learningProfile] = await Promise.all([
@@ -283,7 +404,13 @@ exports.chat = async (req, res) => {
     const formattedLearningContext = formatLearningContextForAI(mcpContext, currentDate);
     const memoryContext = buildMemoryContext(recentMemories, learningProfile);
 
-    // Create system prompt
+    // NEW: Add specific material content to prompt if found
+    let specificMaterialContext = '';
+    if (specificMaterial) {
+      specificMaterialContext = `\n\n**SPECIFIC MATERIAL ACCESSED:**\n${formatMaterialForAI(specificMaterial)}\n\nThe student is asking about this specific material. You have the EXACT content above - use it directly instead of saying you need to "pull up" or "access" materials.`;
+    }
+
+    // Create enhanced system prompt
     const systemPrompt = KLIO_SYSTEM_PROMPT
       .replace(/{currentDate}/g, currentDate)
       .replace(/{currentTime}/g, currentTime)
@@ -305,11 +432,14 @@ ${learningProfile.engagement_triggers?.length > 0 ? `- Gets excited about: ${lea
 **RELEVANT LEARNING MEMORIES:**
 ${memoryContext}
 
+${specificMaterialContext}
+
 **CRITICAL ACCURACY REMINDERS:**
 - Current date is: ${currentDate}
 - ${hasOverdueAssignments ? '⚠️ STUDENT HAS OVERDUE ASSIGNMENTS - mention them if asked' : 'No overdue assignments currently'}
 - Use EXACT assignment titles and grades from the learning context above
-- Never make up assignment information - only use what's provided in the context`;
+- Never make up assignment information - only use what's provided in the context
+${specificMaterial ? '- You have access to the specific material content above - use it directly!' : ''}`;
 
     // Prepare conversation
     const recentHistory = sessionHistory.slice(-MAX_HISTORY_LENGTH);
@@ -343,11 +473,13 @@ ${memoryContext}
         interaction_at: new Date().toISOString(),
         has_lesson_context: !!(mcpContext?.currentFocus || mcpContext?.allMaterials?.length > 0),
         has_overdue_assignments: hasOverdueAssignments,
-        has_memory_context: recentMemories.length > 0
+        has_memory_context: recentMemories.length > 0,
+        accessed_specific_material: !!specificMaterial
       }]).catch(err => console.error('Failed to log interaction:', err))
     ]);
 
-    res.json({
+    // NEW: Return additional context for workspace if material was accessed
+    const responseData = {
       success: true,
       message: aiMessage,
       timestamp: new Date().toISOString(),
@@ -356,9 +488,34 @@ ${memoryContext}
         currentDate,
         hasOverdueAssignments,
         totalMaterials: mcpContext?.allMaterials?.length || 0,
-        contextLength: formattedLearningContext.length
+        contextLength: formattedLearningContext.length,
+        accessedMaterial: specificMaterial?.title || null
       }
-    });
+    };
+
+    // Add lesson context if specific material was accessed
+    if (specificMaterial) {
+      responseData.lessonContext = {
+        lessonId: specificMaterial.id,
+        lessonTitle: specificMaterial.title,
+        lessonType: specificMaterial.content_type,
+        lesson_json: specificMaterial.lesson_json
+      };
+
+      // Add workspace hint for material content
+      if (specificMaterial.lesson_json?.tasks_or_questions?.length > 0) {
+        responseData.workspaceHint = {
+          type: 'assignment_hint',
+          lessonContext: {
+            title: specificMaterial.title,
+            content_type: specificMaterial.content_type,
+            lesson_json: specificMaterial.lesson_json
+          }
+        };
+      }
+    }
+
+    res.json(responseData);
 
   } catch (error) {
     console.error('Chat session error:', error);
@@ -376,6 +533,9 @@ ${memoryContext}
     });
   }
 };
+
+// ... rest of the existing exports remain the same ...
+// (getSuggestions, getLessonHelp, reportMessage functions)
 
 // Get chat suggestions
 exports.getSuggestions = async (req, res) => {

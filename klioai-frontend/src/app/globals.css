@@ -1,98 +1,61 @@
-/* klioai-frontend/src/app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Import Fredoka font */
 @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* === Klio AI Pastel Theme Variables === */
+  /* Background */
   --background-main: #FFFFFF;
   --background-card: #FFFFFF; 
 
+  /* Text Colors */
   --text-primary: #232323;
   --text-secondary: #757575;
   --text-tertiary: #BDBDBD;
-  --text-on-accent: #232323; /* For solid accent backgrounds, ensure contrast */
 
-  /* --- Accent Blue --- */
+  /* Accent Blue */
   --accent-blue: #B3E0F8;     
   --accent-blue-hover: #a1d4ee; 
-  --accent-blue-darker-for-border: #87b8d4; /* For 3D button borders or darker solid borders */
-  --accent-blue-text-on: var(--text-primary); /* Text color on solid --accent-blue backgrounds */
-  /* Opacity variants for --accent-blue */
-  --accent-blue-10-opacity: hsl(from var(--accent-blue) h s l / 0.10);
-  --accent-blue-15-opacity: hsl(from var(--accent-blue) h s l / 0.15);
-  --accent-blue-20-opacity: hsl(from var(--accent-blue) h s l / 0.20);
-  --accent-blue-30-opacity: hsl(from var(--accent-blue) h s l / 0.30);
-  --accent-blue-40-opacity-for-border: hsl(from var(--accent-blue) h s l / 0.40); /* For lighter borders */
+  --accent-blue-darker-for-border: #87b8d4;
+  --accent-blue-text-on: var(--text-primary);
 
-
-  /* --- Accent Yellow --- */
+  /* Accent Yellow */
   --accent-yellow: #FFE6A7;    
   --accent-yellow-hover: #fddc8a;  
   --accent-yellow-darker-for-border: #e6c67f; 
   --accent-yellow-text-on: var(--text-primary); 
-  /* Opacity variants for --accent-yellow */
-  --accent-yellow-10-opacity: hsl(from var(--accent-yellow) h s l / 0.10);
-  --accent-yellow-15-opacity: hsl(from var(--accent-yellow) h s l / 0.15);
-  --accent-yellow-20-opacity: hsl(from var(--accent-yellow) h s l / 0.20);
-  --accent-yellow-30-opacity: hsl(from var(--accent-yellow) h s l / 0.30);
-  --accent-yellow-50-opacity-for-border: hsl(from var(--accent-yellow-darker-for-border) h s l / 0.50); /* For borders */
 
-
-  /* --- Accent Green (for success, completion) --- */
+  /* Accent Green */
   --accent-green: #A7F3D0; 
   --accent-green-hover: #82E0AA;
-  --accent-green-border: #69D899; /* Solid border color */
+  --accent-green-border: #69D899;
   --accent-green-text-on: var(--text-primary);
-  /* Opacity variants for --accent-green */
-  --accent-green-10-opacity: hsl(from var(--accent-green) h s l / 0.10);
-  --accent-green-15-opacity: hsl(from var(--accent-green) h s l / 0.15);
-  --accent-green-20-opacity: hsl(from var(--accent-green) h s l / 0.20);
-  --accent-green-25-opacity: hsl(from var(--accent-green) h s l / 0.25);
-  --accent-green-50-opacity-for-border: hsl(from var(--accent-green-border) h s l / 0.50); /* For borders */
 
-
-  /* --- Accent Orange (for warnings, due soon - can be same as yellow if preferred) --- */
-  --accent-orange: #FDE68A; /* Using the same as yellow for now, or define a distinct orange */
+  /* Accent Orange */
+  --accent-orange: #FDE68A;
   --accent-orange-hover: #FCD34D;
   --accent-orange-border: #FBC92B; 
   --accent-orange-text-on: var(--text-primary);
-  /* Opacity variants for --accent-orange */
-  --accent-orange-10-opacity: hsl(from var(--accent-orange) h s l / 0.10);
-  --accent-orange-15-opacity: hsl(from var(--accent-orange) h s l / 0.15);
-  --accent-orange-20-opacity: hsl(from var(--accent-orange) h s l / 0.20);
-  --accent-orange-25-opacity: hsl(from var(--accent-orange) h s l / 0.25);
-  --accent-orange-50-opacity-for-border: hsl(from var(--accent-orange-border) h s l / 0.50); /* For borders */
 
-
-  /* --- Accent Red (for errors, overdue) --- */
+  /* Accent Red */
   --accent-red: #FDA4AF; 
   --accent-red-hover: #FB7185;
   --accent-red-border: #F85A71; 
-  --accent-red-text-on: var(--text-primary); /* Or #FFFFFF if the red is dark enough */
-  /* Opacity variants for --accent-red */
-  --accent-red-10-opacity: hsl(from var(--accent-red) h s l / 0.10);
-  --accent-red-15-opacity: hsl(from var(--accent-red) h s l / 0.15);
-  --accent-red-20-opacity: hsl(from var(--accent-red) h s l / 0.20);
-  --accent-red-25-opacity: hsl(from var(--accent-red) h s l / 0.25);
-  --accent-red-30-opacity-for-border: hsl(from var(--accent-red-border) h s l / 0.30); /* For borders */
-  --accent-red-50-opacity-for-border: hsl(from var(--accent-red-border) h s l / 0.50); /* For borders */
-
+  --accent-red-text-on: var(--text-primary);
   
-  /* --- General UI Elements --- */
-  --accent-dark: #606060; /* For very dark text or outlines if needed */
+  /* UI Elements */
   --border-subtle: #EAEAEA;
   --border-input: #D1D5DB;
   --border-input-focus: var(--accent-blue); 
 
-  --radius-md: 0.375rem; /* 6px */
-  --radius-lg: 0.5rem; /* 8px */
-  --radius-xl: 0.75rem; /* 12px - for chat bubbles or larger cards */
+  /* Border Radius */
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
   
-  --font-main: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; 
+  /* Font */
+  --font-main: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
@@ -106,212 +69,170 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Accent Buttons (from our theme) */
-.btn-primary {
-  background: var(--accent-blue);
-  color: var(--accent-blue-text-on);
-  border-radius: var(--radius-md);
-  font-weight: 600;
-  transition: background 0.18s;
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-.btn-primary:hover {
-  background: var(--accent-blue-hover);
+::-webkit-scrollbar-track {
+  background: transparent;
 }
-.btn-secondary {
-  background: var(--accent-yellow);
-  color: var(--accent-yellow-text-on);
-  border-radius: var(--radius-md);
-  font-weight: 600;
-  transition: background 0.18s;
+::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary); 
+  border-radius: 3px;
 }
-.btn-secondary:hover {
-  background: var(--accent-yellow-hover);
-}
-.chat-message-content {
-  line-height: 1.6;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary); 
 }
 
-/* Style emoji indicators in chat messages */
-.chat-message-content .emoji-indicator {
-  font-size: 1.1em;
-  margin-right: 0.5em;
-}
-
-/* Style for assignment/lesson lines in chat */
-.chat-message-content .assignment-line {
-  padding: 0.25em 0;
-  margin: 0.125em 0;
-}
-
-/* Make urgent items stand out slightly */
-.chat-message-content .urgent-item {
-  background: var(--accent-red-10-opacity);
-  padding: 0.25em 0.5em;
-  border-radius: var(--radius-md);
-  margin: 0.25em 0;
-}
-
-/* Style for due today items */
-.chat-message-content .due-today-item {
-  background: var(--accent-yellow-10-opacity);
-  padding: 0.25em 0.5em;
-  border-radius: var(--radius-md);
-  margin: 0.25em 0;
-}
-
-/* Style for upcoming items */
-.chat-message-content .upcoming-item {
-  background: var(--accent-blue-10-opacity);
-  padding: 0.25em 0.5em;
-  border-radius: var(--radius-md);
-  margin: 0.25em 0;
-}
-
-/* Better spacing for structured content */
-.chat-message-content .section-break {
-  margin: 1em 0 0.5em 0;
-}
-
-/* Style for grade information */
-.chat-message-content .grade-info {
-  background: var(--accent-green-10-opacity);
-  padding: 0.5em;
-  border-radius: var(--radius-md);
-  margin: 0.5em 0;
-}
-
-/* Better emoji spacing */
-.chat-message-content .emoji {
-  margin: 0 0.2em;
-}
-.chat-message-content .math-problem-highlight {
-  background: linear-gradient(135deg, var(--accent-blue-15-opacity) 0%, var(--accent-blue-20-opacity) 100%);
-  padding: 0.5em 0.75em;
-  border-radius: var(--radius-md);
-  margin: 0.25em 0;
-  border-left: 3px solid var(--accent-blue);
-  font-weight: 600;
-  display: inline-block;
-}
-/* --- Custom Animations (Copied from your previous file) --- */
+/* Animations */
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-in {
-  animation: fade-in 0.5s ease-out forwards;
-}
+
 @keyframes slide-up {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-slide-up {
-  animation: slide-up 0.4s ease-out forwards;
-}
+
 @keyframes progress-bar {
   0% { width: 0%; }
   100% { width: 100%; }
 }
-.animate-progress-bar {
-  animation: progress-bar 2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-}
+
 @keyframes shake-short {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-3px); }
   75% { transform: translateX(3px); }
 }
-.animate-shake-short {
-  animation: shake-short 0.3s ease-in-out;
-}
-.shake {
-  animation: shake-strong 0.5s cubic-bezier(.36,.07,.19,.97) both;
-}
+
 @keyframes shake-strong {
   10%, 90% { transform: translate3d(-1px, 0, 0); }
   20%, 80% { transform: translate3d(2px, 0, 0); }
   30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
   40%, 60% { transform: translate3d(4px, 0, 0); }
 }
+
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.85; transform: scale(1.03); }
 }
-.animate-pulse-soft {
-  animation: pulse-soft 1.8s ease-in-out infinite;
+
+@keyframes bounce-gentle {
+  0%, 100% { transform: translateY(-5%); }
+  50% { transform: translateY(0); }
 }
 
-/* Custom scrollbar - themed */
-::-webkit-scrollbar {
-  width: 6px; /* Made slightly thinner */
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent; /* Cleaner track */
-}
-::-webkit-scrollbar-thumb {
-  background: var(--text-tertiary); 
-  border-radius: 3px; /* Matches previous style */
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary); 
+@keyframes workspaceSlideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
-/* Tailwind Components Layer - Updated */
+@keyframes workspaceSlideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes loadingPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(1); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Animation Classes */
+.animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+.animate-slide-up { animation: slide-up 0.4s ease-out forwards; }
+.animate-progress-bar { animation: progress-bar 2s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+.animate-shake-short { animation: shake-short 0.3s ease-in-out; }
+.animate-pulse-soft { animation: pulse-soft 1.8s ease-in-out infinite; }
+.animate-bounce-gentle { animation: bounce-gentle 1.5s infinite; }
+.shake { animation: shake-strong 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+.workspace-slide-in { animation: workspaceSlideIn 0.3s ease-out forwards; }
+.workspace-slide-out { animation: workspaceSlideOut 0.3s ease-out forwards; }
+
 @layer components {
+  /* Form Elements */
   .input-base { 
     @apply w-full px-3.5 py-2.5 text-base border border-[var(--border-input)] rounded-[var(--radius-md)] 
-           focus:ring-1 focus:ring-[var(--border-input-focus)] focus:border-[var(--border-input-focus)] outline-none placeholder:text-[var(--text-tertiary)]
-           transition-colors duration-150 bg-[var(--background-card)] text-[var(--text-primary)];
+           focus:ring-1 focus:ring-[var(--border-input-focus)] focus:border-[var(--border-input-focus)] outline-none 
+           placeholder:text-[var(--text-tertiary)] transition-colors duration-150 bg-[var(--background-card)] text-[var(--text-primary)];
   }
   
-  .btn-pinpad { /* For PIN input buttons, if used */
-    @apply text-[var(--text-primary)] text-xl sm:text-2xl font-medium py-3.5 sm:py-4 rounded-[var(--radius-md)] 
-           transition-colors duration-100 ease-in-out disabled:opacity-50
-           focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-blue)];
-    background-color: var(--accent-blue-20-opacity); 
-  }
-  .btn-pinpad:hover {
-    background-color: var(--accent-blue-30-opacity); 
-  }
-
-  .card-base { /* General card style, can be used by SubjectCard, etc. */
-    @apply bg-[var(--background-card)] rounded-[var(--radius-lg)] shadow-lg p-6 sm:p-8 md:p-10 w-full animate-fade-in border border-[var(--border-subtle)];
-    /* Using radius-lg and shadow-lg for a bit more prominence */
-  }
-
-  /* Specific card for dashboard items like SubjectCard if different from card-base */
-  .dashboard-card {
-    @apply bg-[var(--background-card)] rounded-[var(--radius-lg)] shadow-md p-4 sm:p-5 w-full border border-[var(--border-subtle)];
-  }
-
-
   .label-base {
     @apply block text-sm font-medium text-[var(--text-secondary)] mb-1.5 flex items-center;
   }
+  
   .label-icon { 
-    @apply mr-2 text-[var(--accent-blue)]; /* Example: icon next to a label uses accent blue */
+    @apply mr-2 text-[var(--accent-blue)];
   }
 
+  /* Buttons */
+  .btn-primary {
+    background: var(--accent-blue);
+    color: var(--accent-blue-text-on);
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    transition: background 0.18s;
+  }
+  .btn-primary:hover {
+    background: var(--accent-blue-hover);
+  }
+
+  .btn-secondary {
+    background: var(--accent-yellow);
+    color: var(--accent-yellow-text-on);
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    transition: background 0.18s;
+  }
+  .btn-secondary:hover {
+    background: var(--accent-yellow-hover);
+  }
+
+  .btn-pinpad {
+    @apply text-[var(--text-primary)] text-xl sm:text-2xl font-medium py-3.5 sm:py-4 rounded-[var(--radius-md)] 
+           transition-colors duration-100 ease-in-out disabled:opacity-50
+           focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-blue)];
+    background-color: rgba(179, 224, 248, 0.2);
+  }
+  .btn-pinpad:hover {
+    background-color: rgba(179, 224, 248, 0.3);
+  }
+
+  /* Cards */
+  .card-base {
+    @apply bg-[var(--background-card)] rounded-[var(--radius-lg)] shadow-lg p-6 sm:p-8 md:p-10 w-full 
+           animate-fade-in border border-[var(--border-subtle)];
+  }
+
+  .dashboard-card {
+    @apply bg-[var(--background-card)] rounded-[var(--radius-lg)] shadow-md p-4 sm:p-5 w-full 
+           border border-[var(--border-subtle)];
+  }
+
+  /* Error Messages */
   .error-message-box {
     @apply flex items-center text-[var(--accent-red)] text-sm p-3 rounded-[var(--radius-md)] border;
-    background-color: var(--accent-red-10-opacity);
-    border-color: var(--accent-red-30-opacity-for-border); 
+    background-color: rgba(253, 164, 175, 0.1);
+    border-color: rgba(248, 90, 113, 0.3);
   }
+  
   .error-message-icon {
     @apply mr-2 text-[var(--accent-red)] flex-shrink-0 text-base;
   }
 
-  /* Highlight classes from landing page, adapted */
+  /* Text Highlights */
   .text-highlight-yellow {
     background-image: linear-gradient(180deg, transparent 60%, var(--accent-yellow) 60%);
-    @apply px-[0.1em] -mx-[0.1em] inline leading-snug; /* Adjusted padding/margin */
+    @apply px-[0.1em] -mx-[0.1em] inline leading-snug;
   }
+  
   .text-highlight-blue {
     background-image: linear-gradient(180deg, transparent 60%, var(--accent-blue) 60%);
-    @apply px-[0.1em] -mx-[0.1em] inline leading-snug; /* Adjusted padding/margin */
+    @apply px-[0.1em] -mx-[0.1em] inline leading-snug;
   }
 
-  /* For Klio's typing indicator dots */
+  /* Loading Dots */
   .loading-dots span {
     @apply inline-block w-1.5 h-1.5 rounded-full bg-current opacity-70 mx-0.5 animate-pulse-soft;
   }
@@ -320,198 +241,61 @@ body {
   .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
 }
 
-/* Ensure global font styles for inputs and buttons if not handled by Tailwind's base */
-input, button, textarea, select {
-  font-family: var(--font-main);
+/* Chat Message Styling */
+.chat-message-content {
+  line-height: 1.6;
 }
 
-button { /* Minimal reset for buttons if not using a dedicated button component everywhere */
-  border: none;
-  background: none;
-  cursor: pointer;
-  padding: 0;
-  text-align: inherit;
-  color: inherit; /* Inherit text color by default */
+.chat-message-content .urgent-item {
+  background: rgba(253, 164, 175, 0.1);
+  padding: 0.25em 0.5em;
+  border-radius: var(--radius-md);
+  margin: 0.25em 0;
 }
 
-/* Add these styles to your existing globals.css file */
+.chat-message-content .due-today-item {
+  background: rgba(255, 230, 167, 0.1);
+  padding: 0.25em 0.5em;
+  border-radius: var(--radius-md);
+  margin: 0.25em 0;
+}
 
-/* Whiteboard-style background for workspace */
+.chat-message-content .upcoming-item {
+  background: rgba(179, 224, 248, 0.1);
+  padding: 0.25em 0.5em;
+  border-radius: var(--radius-md);
+  margin: 0.25em 0;
+}
+
+.chat-message-content .grade-info {
+  background: rgba(167, 243, 208, 0.1);
+  padding: 0.5em;
+  border-radius: var(--radius-md);
+  margin: 0.5em 0;
+}
+
+.chat-message-content .math-problem-highlight {
+  background: linear-gradient(135deg, rgba(179, 224, 248, 0.15) 0%, rgba(179, 224, 248, 0.20) 100%);
+  padding: 0.5em 0.75em;
+  border-radius: var(--radius-md);
+  margin: 0.25em 0;
+  border-left: 3px solid var(--accent-blue);
+  font-weight: 600;
+  display: inline-block;
+}
+
+/* Workspace Styling */
 .workspace-background {
   background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.05) 1px, transparent 0);
   background-size: 20px 20px;
 }
 
-/* Lined paper effect for work areas */
 .lined-paper {
   background-image: linear-gradient(transparent 31px, #e5e7eb 32px);
   background-size: 100% 32px;
   line-height: 32px;
 }
 
-/* Enhanced fraction display styling */
-.fraction-display {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  vertical-align: middle;
-  margin: 0 4px;
-}
-
-.fraction-numerator {
-  border-bottom: 2px solid currentColor;
-  padding-bottom: 2px;
-  padding-left: 8px;
-  padding-right: 8px;
-  font-weight: bold;
-}
-
-.fraction-denominator {
-  padding-top: 2px;
-  padding-left: 8px;
-  padding-right: 8px;
-  font-weight: bold;
-}
-
-/* Math expression styling */
-.math-expression {
-  font-family: 'Computer Modern', 'Latin Modern Math', 'Times New Roman', serif;
-  font-size: 1.2em;
-  line-height: 1.4;
-}
-.math-operation-addition {
-  color: var(--accent-green);
-  font-weight: bold;
-}
-
-.math-operation-subtraction {
-  color: var(--accent-orange);
-  font-weight: bold;
-}
-
-.math-operation-multiplication {
-  color: var(--accent-blue);
-  font-weight: bold;
-}
-
-.math-operation-division {
-  color: var(--accent-red);
-  font-weight: bold;
-}
-/* Step cards styling */
-.step-card {
-  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.2);
-}
-
-/* Workspace panel animations */
-.workspace-enter {
-  opacity: 0;
-  transform: translateX(100%);
-}
-
-.workspace-enter-active {
-  opacity: 1;
-  transform: translateX(0);
-  transition: opacity 300ms, transform 300ms;
-}
-
-.workspace-exit {
-  opacity: 1;
-}
-
-.workspace-exit-active {
-  opacity: 0;
-  transform: translateX(100%);
-  transition: opacity 300ms, transform 300ms;
-}
-
-/* Enhanced button styling for workspace */
-.workspace-button {
-  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-hover) 100%);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-  transition: all 0.3s ease;
-}
-
-.workspace-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-}
-
-/* Problem card styling */
-.problem-card {
-  background: white;
-  border: 2px solid var(--border-subtle);
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  transition: all 0.3s ease;
-}
-
-.problem-card:hover {
-  box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-  transform: translateY(-2px);
-}
-
-/* Step indicator styling */
-.step-indicator {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: bold;
-  color: white;
-}
-
-/* Work area styling */
-.work-area {
-  background: white;
-  border: 2px solid var(--border-input);
-  border-radius: 8px;
-  padding: 16px;
-  font-family: 'Courier New', monospace;
-  resize: none;
-  transition: border-color 0.3s ease;
-}
-
-.work-area:focus {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px rgba(var(--accent-blue), 0.1);
-  outline: none;
-}
-
-/* Enhance existing chat message content for better workspace detection */
-.chat-message-content {
-  line-height: 1.6;
-}
-
-/* Style the "Send to Workspace" button in chat messages */
-.send-to-workspace-btn {
-  background: linear-gradient(135deg, var(--accent-blue-10-opacity) 0%, var(--accent-blue-15-opacity) 100%);
-  color: var(--accent-blue);
-  border: 1px solid var(--accent-blue-40-opacity-for-border);
-  border-radius: 20px;
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-
-.send-to-workspace-btn:hover {
-  background: linear-gradient(135deg, var(--accent-blue-20-opacity) 0%, var(--accent-blue-30-opacity) 100%);
-  border-color: var(--accent-blue);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
 .workspace-problem-card {
   background: white;
   border: 2px solid var(--border-subtle);
@@ -535,10 +319,22 @@ button { /* Minimal reset for buttons if not using a dedicated button component 
 .workspace-problem-card:hover {
   box-shadow: 0 8px 25px rgba(0,0,0,0.1);
   transform: translateY(-2px);
-  border-color: var(--accent-blue-40-opacity-for-border);
+  border-color: rgba(179, 224, 248, 0.4);
 }
 
-/* Step indicator enhancements */
+.problem-card {
+  background: white;
+  border: 2px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+}
+
+.problem-card:hover {
+  box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
 .step-indicator {
   width: 28px;
   height: 28px;
@@ -553,28 +349,6 @@ button { /* Minimal reset for buttons if not using a dedicated button component 
   border: 2px solid white;
 }
 
-.step-indicator.step-green {
-  background: linear-gradient(135deg, var(--accent-green) 0%, var(--accent-green-hover) 100%);
-}
-
-.step-indicator.step-blue {
-  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-hover) 100%);
-}
-
-.step-indicator.step-yellow {
-  background: linear-gradient(135deg, var(--accent-yellow) 0%, var(--accent-yellow-hover) 100%);
-  color: var(--text-primary);
-}
-
-.step-indicator.step-orange {
-  background: linear-gradient(135deg, var(--accent-orange) 0%, var(--accent-orange-hover) 100%);
-}
-
-.step-indicator.step-red {
-  background: linear-gradient(135deg, var(--accent-red) 0%, var(--accent-red-hover) 100%);
-}
-
-/* Enhanced work area styling */
 .work-area {
   background: white;
   border: 2px solid var(--border-input);
@@ -588,7 +362,7 @@ button { /* Minimal reset for buttons if not using a dedicated button component 
 
 .work-area:focus {
   border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px var(--accent-blue-20-opacity);
+  box-shadow: 0 0 0 3px rgba(179, 224, 248, 0.2);
   outline: none;
 }
 
@@ -597,7 +371,7 @@ button { /* Minimal reset for buttons if not using a dedicated button component 
   font-style: italic;
 }
 
-/* Fraction display enhancements */
+/* Math Elements */
 .fraction-display {
   display: inline-flex;
   flex-direction: column;
@@ -625,7 +399,6 @@ button { /* Minimal reset for buttons if not using a dedicated button component 
   font-size: 1.2em;
 }
 
-/* Math expression styling */
 .math-expression {
   font-family: 'Computer Modern', 'Latin Modern Math', 'Times New Roman', serif;
   font-size: 1.3em;
@@ -640,85 +413,56 @@ button { /* Minimal reset for buttons if not using a dedicated button component 
   border: 2px solid var(--border-subtle);
 }
 
-/* Enhanced type-specific backgrounds */
+/* Math Operation Colors */
+.math-operation-addition { color: var(--accent-green); font-weight: bold; }
+.math-operation-subtraction { color: var(--accent-orange); font-weight: bold; }
+.math-operation-multiplication { color: var(--accent-blue); font-weight: bold; }
+.math-operation-division { color: var(--accent-red); font-weight: bold; }
+
+/* Problem Type Backgrounds */
 .problem-type-addition {
-  background: linear-gradient(135deg, var(--accent-green-10-opacity) 0%, var(--accent-green-15-opacity) 100%);
-  border-color: var(--accent-green-50-opacity-for-border);
+  background: linear-gradient(135deg, rgba(167, 243, 208, 0.1) 0%, rgba(167, 243, 208, 0.15) 100%);
+  border-color: rgba(105, 216, 153, 0.5);
 }
 
 .problem-type-subtraction {
-  background: linear-gradient(135deg, var(--accent-orange-10-opacity) 0%, var(--accent-orange-15-opacity) 100%);
-  border-color: var(--accent-orange-50-opacity-for-border);
+  background: linear-gradient(135deg, rgba(253, 230, 138, 0.1) 0%, rgba(253, 230, 138, 0.15) 100%);
+  border-color: rgba(251, 201, 43, 0.5);
 }
 
-.problem-type-multiplication {
-  background: linear-gradient(135deg, var(--accent-blue-10-opacity) 0%, var(--accent-blue-15-opacity) 100%);
-  border-color: var(--accent-blue-40-opacity-for-border);
+.problem-type-multiplication, .problem-type-fractions {
+  background: linear-gradient(135deg, rgba(179, 224, 248, 0.1) 0%, rgba(179, 224, 248, 0.15) 100%);
+  border-color: rgba(179, 224, 248, 0.4);
 }
 
 .problem-type-division {
-  background: linear-gradient(135deg, var(--accent-red-10-opacity) 0%, var(--accent-red-15-opacity) 100%);
-  border-color: var(--accent-red-30-opacity-for-border);
+  background: linear-gradient(135deg, rgba(253, 164, 175, 0.1) 0%, rgba(253, 164, 175, 0.15) 100%);
+  border-color: rgba(248, 90, 113, 0.3);
 }
 
-.problem-type-fractions {
-  background: linear-gradient(135deg, var(--accent-blue-10-opacity) 0%, var(--accent-blue-15-opacity) 100%);
-  border-color: var(--accent-blue-40-opacity-for-border);
-}
-
-/* Workspace panel animations */
-.workspace-slide-in {
-  animation: workspaceSlideIn 0.3s ease-out forwards;
-}
-
-@keyframes workspaceSlideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.workspace-slide-out {
-  animation: workspaceSlideOut 0.3s ease-out forwards;
-}
-
-@keyframes workspaceSlideOut {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-}
-
-/* Problem card hover effects */
-.workspace-problem-card:hover .math-expression {
-  background: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(248,250,252,0.9) 100%);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-
-/* Enhanced button styling for problem type indicators */
-.problem-type-badge {
+/* Utility Elements */
+.send-to-workspace-btn {
+  background: linear-gradient(135deg, rgba(179, 224, 248, 0.1) 0%, rgba(179, 224, 248, 0.15) 100%);
+  color: var(--accent-blue);
+  border: 1px solid rgba(179, 224, 248, 0.4);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: capitalize;
-  border: 1px solid currentColor;
-  background: rgba(255,255,255,0.9);
-  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-/* Copy button enhancement */
+.send-to-workspace-btn:hover {
+  background: linear-gradient(135deg, rgba(179, 224, 248, 0.2) 0%, rgba(179, 224, 248, 0.3) 100%);
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
 .copy-button {
   background: var(--background-card);
   border: 1px solid var(--border-subtle);
@@ -729,19 +473,54 @@ button { /* Minimal reset for buttons if not using a dedicated button component 
 }
 
 .copy-button:hover {
-  background: var(--accent-blue-10-opacity);
-  border-color: var(--accent-blue-40-opacity-for-border);
+  background: rgba(179, 224, 248, 0.1);
+  border-color: rgba(179, 224, 248, 0.4);
   color: var(--accent-blue);
   transform: scale(1.1);
 }
 
 .copy-button.copied {
-  background: var(--accent-green-10-opacity);
-  border-color: var(--accent-green-50-opacity-for-border);
+  background: rgba(167, 243, 208, 0.1);
+  border-color: rgba(105, 216, 153, 0.5);
   color: var(--accent-green);
 }
 
-/* Responsive adjustments for workspace */
+/* Loading Animation */
+.workspace-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px;
+  color: var(--text-tertiary);
+}
+
+.workspace-loading .loading-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  animation: loadingPulse 1.5s ease-in-out infinite;
+}
+
+.workspace-loading .loading-dot:nth-child(2) { animation-delay: 0.2s; }
+.workspace-loading .loading-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Global Element Resets */
+input, button, textarea, select {
+  font-family: var(--font-main);
+}
+
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: inherit;
+  color: inherit;
+}
+
+/* Responsive Adjustments */
 @media (max-width: 768px) {
   .workspace-panel {
     width: 100% !important;
@@ -762,61 +541,9 @@ button { /* Minimal reset for buttons if not using a dedicated button component 
     padding: 16px;
   }
   
-  .fraction-numerator,
-  .fraction-denominator {
+  .fraction-numerator, .fraction-denominator {
     padding-left: 8px;
     padding-right: 8px;
     font-size: 1em;
-  }
-}
-
-/* Loading animation for workspace content */
-.workspace-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 40px;
-  color: var(--text-tertiary);
-}
-
-.workspace-loading .loading-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent-blue);
-  animation: loadingPulse 1.5s ease-in-out infinite;
-}
-
-.workspace-loading .loading-dot:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.workspace-loading .loading-dot:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes loadingPulse {
-  0%, 80%, 100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-  40% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-}
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .workspace-panel {
-    width: 100% !important;
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 1000;
-  }
-  
-  .chat-with-workspace {
-    width: 100% !important;
   }
 }

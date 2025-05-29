@@ -268,7 +268,7 @@ const WorkspacePanel = ({ workspaceContent, onToggleSize, isExpanded, onClose, o
               className="text-[var(--text-tertiary)] hover:text-[var(--accent-orange)] transition-colors p-1"
               title="Ask Klio for help"
             >
-              <FiHelpCircle size={14} />
+              <FiHelpCircle size={28} />
             </button>
             <button
               onClick={() => copyToClipboard(problem.text)}

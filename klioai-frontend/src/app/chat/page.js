@@ -1,5 +1,3 @@
-// klioai-frontend/src/app/chat/page.js - COMPLETE UPDATED VERSION
-
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,16 +8,24 @@ import ChatMessage from '../../components/ChatMessage';
 import ChatInput from '../../components/ChatInput';
 import SuggestionBubbles from '../../components/SuggestionBubbles'; 
 import LessonContextBar from '../../components/LessonContextBar';
-import WorkspacePanel from '../../components/WorkspacePanel'; // NEW IMPORT
+import WorkspacePanel from '../../components/WorkspacePanel';
 import { useAuth } from '../../contexts/AuthContext'; 
 import { chatService } from '../../utils/chatService';
-import { parseWorkspaceContent, parseFractionMessage, extractQuestionFromLesson } from '../../utils/workspaceParser'; // NEW IMPORT
+import { parseWorkspaceContent, extractQuestionFromLesson } from '../../utils/workspaceParser';
+
+const INITIAL_SUGGESTIONS = [
+  "Can you help me with my homework? 📚", 
+  "Let's practice math problems! 🧮", 
+  "Tell me a fun fact! ☀️", 
+  "Can we play a learning game? 🎮"
+];
 
 export default function ChatPage() {
   const { child, logout } = useAuth();
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
 
+  // Chat state
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
@@ -28,18 +34,22 @@ export default function ChatPage() {
   const [currentTopic, setCurrentTopic] = useState("General Conversation");
   const [currentLessonContext, setCurrentLessonContext] = useState(null);
   
-  // NEW WORKSPACE STATE
+  // Workspace state
   const [workspaceContent, setWorkspaceContent] = useState(null);
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(false);
 
+  // Load initial messages
   useEffect(() => {
     const savedMessages = sessionStorage.getItem('klio_chat_history');
     let initialMessages = [];
+    
     if (savedMessages) {
       try {
         const parsed = JSON.parse(savedMessages);
         if (parsed.length > 0) initialMessages = parsed;
-      } catch (e) { console.error('Failed to load chat history:', e); }
+      } catch (e) {
+        console.error('Failed to load chat history:', e);
+      }
     }
 
     if (initialMessages.length === 0) {
@@ -50,62 +60,55 @@ export default function ChatPage() {
         timestamp: new Date().toISOString()
       }];
     }
+    
     setMessages(initialMessages);
     setShowSuggestions(initialMessages.length <= 1);
-
   }, [child?.name]);
 
+  // Load suggestions
   useEffect(() => {
     const fetchSuggestions = async () => {
-        try {
-            const data = await (chatService.getSuggestions ? chatService.getSuggestions() : Promise.resolve({suggestions: ["Can you help me with my homework? 📚", "Let's practice math problems! 🧮", "Tell me a fun fact! ☀️", "Can we play a learning game? 🎮"]}));
-            setSuggestions(data.suggestions || []);
-        } catch (error) {
-            console.error('Failed to fetch suggestions:', error);
-            setSuggestions(["Explore space", "Learn about animals", "Discover history"]);
-        }
+      try {
+        const data = await chatService.getSuggestions();
+        setSuggestions(data.suggestions || INITIAL_SUGGESTIONS);
+      } catch (error) {
+        console.error('Failed to fetch suggestions:', error);
+        setSuggestions(INITIAL_SUGGESTIONS);
+      }
     };
     fetchSuggestions();
   }, []);
 
+  // Save messages to session storage
   useEffect(() => {
     if (messages.length > 0) {
       sessionStorage.setItem('klio_chat_history', JSON.stringify(messages));
     }
   }, [messages]);
 
+  // Auto-scroll to bottom
   useEffect(() => {
-    if (chatContainerRef.current) {
-        const { scrollHeight, clientHeight, scrollTop } = chatContainerRef.current;
-        const isScrolledToBottom = scrollHeight - clientHeight <= scrollTop + 150;
-        const lastMessage = messages[messages.length - 1];
+    if (!chatContainerRef.current) return;
+    
+    const { scrollHeight, clientHeight, scrollTop } = chatContainerRef.current;
+    const isScrolledToBottom = scrollHeight - clientHeight <= scrollTop + 150;
+    const lastMessage = messages[messages.length - 1];
+    const shouldScroll = isScrolledToBottom || 
+                        (lastMessage && lastMessage.role === 'klio') || 
+                        isKlioTyping;
 
-        if (isScrolledToBottom || (lastMessage && lastMessage.role === 'klio') || isKlioTyping) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }
+    if (shouldScroll) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
   }, [messages, isKlioTyping]);
 
   const handleSendToWorkspace = (message) => {
-    console.log('Sending to workspace:', message);
-    
-    // Try the specific fraction message parser first
-    let parsedContent = parseFractionMessage(message.content);
-    
-    // Fall back to general parser
-    if (!parsedContent) {
-      parsedContent = parseWorkspaceContent(message.content, currentLessonContext);
-    }
-    
+    const parsedContent = parseWorkspaceContent(message.content, currentLessonContext);
     if (parsedContent) {
       setWorkspaceContent(parsedContent);
-      console.log('Workspace content set:', parsedContent);
-    } else {
-      console.log('No structured content found in message');
     }
   };
   
-  // NEW FUNCTION: Handle specific question requests
   const handleQuestionRequest = (questionNumber, lessonContext) => {
     if (lessonContext?.lesson_json) {
       const questionContent = extractQuestionFromLesson(lessonContext.lesson_json, questionNumber);
@@ -115,15 +118,13 @@ export default function ChatPage() {
     }
   };
 
-  // 🆕 NEW FUNCTION: Handle workspace-to-chat communication
   const handleWorkspaceToChat = (message) => {
-    console.log('📤 Workspace sending to chat:', message);
     handleSendMessage(message);
   };
 
-  // UPDATED FUNCTION: Enhanced message sending with workspace integration
   const handleSendMessage = async (messageText) => {
     if (!messageText.trim() || isLoading) return;
+    
     setShowSuggestions(false);
     
     const userMessage = {
@@ -132,12 +133,12 @@ export default function ChatPage() {
       content: messageText,
       timestamp: new Date().toISOString(),
     };
+    
     setMessages(prev => [...prev, userMessage]);
     setIsKlioTyping(true);
     setIsLoading(true);
 
     try {
-      // Enhanced chat service call
       const response = await chatService.sendMessage(messageText, messages.slice(-10), currentLessonContext);
 
       const klioMessage = {
@@ -146,22 +147,20 @@ export default function ChatPage() {
         content: response.message,
         timestamp: response.timestamp || new Date().toISOString(),
         lessonContext: response.lessonContext || null,
-        workspaceHint: response.workspaceHint || null, // NEW: Workspace hint from backend
+        workspaceHint: response.workspaceHint || null,
       };
       
       setMessages(prev => [...prev, klioMessage]);
 
-      // Handle lesson context updates
       if (response.lessonContext) {
         setCurrentLessonContext(response.lessonContext);
       }
 
-      // NEW: Handle workspace content from backend hints
       if (response.workspaceHint) {
         handleWorkspaceHint(response.workspaceHint, klioMessage);
       }
 
-      // NEW: Auto-detect and parse workspace content from message
+      // Auto-detect workspace content
       setTimeout(() => {
         const autoDetectedContent = parseWorkspaceContent(response.message, currentLessonContext);
         if (autoDetectedContent && !response.workspaceHint) {
@@ -184,14 +183,11 @@ export default function ChatPage() {
     }
   };
 
-  // NEW FUNCTION: Handle workspace hints from backend
   const handleWorkspaceHint = (workspaceHint, klioMessage) => {
-    console.log('Processing workspace hint:', workspaceHint);
-    
     switch (workspaceHint.type) {
       case 'assignment_hint':
         if (workspaceHint.lessonContext) {
-          const assignmentContent = {
+          setWorkspaceContent({
             type: 'assignment',
             data: {
               title: workspaceHint.lessonContext.title || 'Current Assignment',
@@ -200,8 +196,7 @@ export default function ChatPage() {
               problems: workspaceHint.lessonContext.lesson_json?.tasks_or_questions?.slice(0, 8) || [],
               estimatedTime: workspaceHint.lessonContext.lesson_json?.estimated_completion_time_minutes
             }
-          };
-          setWorkspaceContent(assignmentContent);
+          });
         }
         break;
         
@@ -219,7 +214,6 @@ export default function ChatPage() {
         break;
         
       default:
-        // Try auto-parsing the message
         const parsedContent = parseWorkspaceContent(klioMessage.content, currentLessonContext);
         if (parsedContent) {
           setWorkspaceContent(parsedContent);
@@ -231,8 +225,6 @@ export default function ChatPage() {
     setIsLoading(true);
     try {
       await handleSendMessage(`Can you help me with "${lessonTitle}"?`);
-    } catch (error) {
-      // error handling as needed
     } finally {
       setIsLoading(false);
     }
@@ -251,7 +243,7 @@ export default function ChatPage() {
       sessionStorage.removeItem('klio_chat_history');
       setShowSuggestions(true);
       setCurrentLessonContext(null);
-      setWorkspaceContent(null); // NEW: Clear workspace on chat clear
+      setWorkspaceContent(null);
     }
   };
 
@@ -261,43 +253,36 @@ export default function ChatPage() {
     }
   };
 
-  // NEW FUNCTION: Toggle workspace size
   const handleToggleWorkspaceSize = () => {
     setIsWorkspaceExpanded(!isWorkspaceExpanded);
   };
 
+  const chatWidth = workspaceContent 
+    ? (isWorkspaceExpanded ? 'w-1/2' : 'w-2/3') 
+    : 'w-full';
+
+  const workspaceWidth = isWorkspaceExpanded ? 'w-1/2' : 'w-1/3';
+
   return (
     <ProtectedRoute>
-      {/* UPDATED: Main container with workspace consideration */}
       <div className="flex h-screen overflow-hidden bg-[var(--background-main)]">
-        {/* Sidebar - unchanged */}
         <Sidebar
           childName={child?.name}
           onLogout={handleLogoutConfirmed}
           onClearChat={handleClearChat}
         />
 
-        {/* UPDATED: Chat area with dynamic width based on workspace */}
-        <main className={`flex-1 flex flex-col bg-[var(--background-card)] overflow-hidden transition-all duration-300 ${
-          workspaceContent 
-            ? (isWorkspaceExpanded ? 'w-1/2' : 'w-2/3') 
-            : 'w-full'
-        }`}>
-          {/* ChatHeader - unchanged */}
+        <main className={`flex-1 flex flex-col bg-[var(--background-card)] overflow-hidden transition-all duration-300 ${chatWidth}`}>
           <ChatHeader currentTopic={currentTopic} />
 
-          {/* LessonContextBar - unchanged */}
           {currentLessonContext && (
             <LessonContextBar
               lessonContext={currentLessonContext}
               onClose={() => setCurrentLessonContext(null)}
-              onGetHelp={() =>
-                handleLessonHelp(currentLessonContext.lessonId, currentLessonContext.lessonTitle)
-              }
+              onGetHelp={() => handleLessonHelp(currentLessonContext.lessonId, currentLessonContext.lessonTitle)}
             />
           )}
 
-          {/* Chat messages area - unchanged except for workspace prop */}
           <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-[var(--background-main)]">
             <AnimatePresence initial={false}>
               {messages.map((message) => (
@@ -311,7 +296,6 @@ export default function ChatPage() {
               ))}
             </AnimatePresence>
 
-            {/* Klio Typing Indicator - unchanged */}
             {isKlioTyping && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -329,7 +313,6 @@ export default function ChatPage() {
             <div ref={messagesEndRef} className="h-1"/>
           </div>
           
-          {/* Suggestion Bubbles - unchanged */}
           {showSuggestions && suggestions.length > 0 && (
              <div className="w-full flex justify-center px-4 sm:px-6 pb-2 pt-1 border-t border-[var(--border-subtle)] bg-[var(--background-card)]">
                 <div className="max-w-3xl w-full">
@@ -341,7 +324,6 @@ export default function ChatPage() {
             </div>
           )}
 
-          {/* Chat Input Area - unchanged */}
           <div className="bg-[var(--background-card)] p-3 sm:p-4 border-t border-[var(--border-subtle)]">
             <div className="max-w-3xl mx-auto">
                 <ChatInput
@@ -352,7 +334,6 @@ export default function ChatPage() {
           </div>
         </main>
 
-        {/* 🆕 UPDATED: Workspace Panel with Chat Integration */}
         <AnimatePresence>
           {workspaceContent && (
             <motion.div 
@@ -360,16 +341,14 @@ export default function ChatPage() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: '100%', opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className={`${
-                isWorkspaceExpanded ? 'w-1/2' : 'w-1/3'
-              } bg-[var(--background-card)] border-l border-[var(--border-subtle)] transition-all duration-300`}
+              className={`${workspaceWidth} bg-[var(--background-card)] border-l border-[var(--border-subtle)] transition-all duration-300`}
             >
               <WorkspacePanel 
                 workspaceContent={workspaceContent}
                 onToggleSize={handleToggleWorkspaceSize}
                 isExpanded={isWorkspaceExpanded}
                 onClose={() => setWorkspaceContent(null)}
-                onSendToChat={handleWorkspaceToChat} // 🆕 NEW: Chat integration prop
+                onSendToChat={handleWorkspaceToChat}
               />
             </motion.div>
           )}

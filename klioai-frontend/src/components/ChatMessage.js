@@ -1,4 +1,4 @@
-// klioai-frontend/src/components/ChatMessage.js
+// klioai-frontend/src/components/ChatMessage.js - ENHANCED VERSION
 import { motion } from 'framer-motion';
 import { FiAlertTriangle } from 'react-icons/fi';
 import Image from 'next/image';
@@ -15,25 +15,69 @@ const KlioAvatar = () => (
   </div>
 );
 
+// ENHANCED: Better detection for ALL types of structured content
 const hasStructuredContent = (content) => {
+  if (!content || typeof content !== 'string') return false;
+  
   const indicators = [
-    /(?:problem|question)\s*\d+/i,
-    /learning goals/i,
-    /assignment/i,
-    /tree diagram/i,
-    /fundamental principle/i,
-    /tackle.*together/i,
-    // Enhanced fraction detection
+    // Math problems - ANY arithmetic
+    /\d+\s*[\+\-\*×÷\/]\s*\d+/,
+    /what\s+is\s+\d+[\+\-\*×÷\/]\d+/i,
+    /\*\*[^*]*\d+[^*]*\*\*/,  // Bold text with numbers
+    
+    // Fractions
+    /\\frac\{.*\}\{.*\}/,
+    /\d+\/\d+.*[×\*].*\d+\/\d+/,
     /multiply.*numerator/i,
     /multiply.*denominator/i,
-    /\\frac\{.*\}\{.*\}/i,
-    /\d+\/\d+.*×.*\d+\/\d+/i,
-    /step.*multiply/i,
-    /multiplying fractions.*fun/i,  // For your specific message
-    /quick refresher.*how to/i
+    
+    // Problem indicators
+    /problem\s*\d+/i,
+    /question\s*\d+/i,
+    
+    // Learning content
+    /learning goals/i,
+    /assignment/i,
+    
+    // Step-by-step content
+    /step\s*\d+/i,
+    /first.*second/i,
+    /\d+\.\s*\*\*/,
+    
+    // Educational patterns
+    /tackle.*together/i,
+    /let's.*solve/i,
+    /practice.*problem/i,
+    /warm.*up.*problem/i,
+    
+    // Math instruction patterns
+    /multiply.*together/i,
+    /add.*numbers/i,
+    /solve.*equation/i,
+    /calculate/i,
+    
+    // Tree diagrams and visual content
+    /tree diagram/i,
+    /fundamental principle/i
   ];
   
-  return indicators.some(pattern => pattern.test(content));
+  const hasIndicator = indicators.some(pattern => pattern.test(content));
+  
+  // Additional check for multiple numbers that might be problems
+  const numberCount = (content.match(/\d+/g) || []).length;
+  const hasMultipleNumbers = numberCount >= 2;
+  
+  // Check for math-related keywords
+  const mathKeywords = ['solve', 'calculate', 'multiply', 'add', 'subtract', 'divide', 'problem', 'equation', 'answer'];
+  const hasMathKeywords = mathKeywords.some(keyword => content.toLowerCase().includes(keyword));
+  
+  const result = hasIndicator || (hasMultipleNumbers && hasMathKeywords);
+  
+  if (result) {
+    console.log('✅ Structured content detected in:', content.substring(0, 100));
+  }
+  
+  return result;
 };
 
 // Function to automatically style Klio's structured responses
@@ -88,6 +132,12 @@ function formatKlioMessage(content) {
     '<strong>$1</strong>'
   );
   
+  // Style math problems in bold
+  formattedContent = formattedContent.replace(
+    /(\*\*[^*]+\*\*)/g,
+    '<span class="math-problem-highlight">$1</span>'
+  );
+  
   return formattedContent;
 }
 
@@ -115,17 +165,13 @@ export default function ChatMessage({ message, onSendToWorkspace }) {
       timestampClasses += ' text-[var(--accent-red)]/70 self-start';
     } else {
       // Klio's Normal Message: Left and Bottom border in Accent Blue
-      // We want the bubble to be rounded, but the border to only show on specific sides before rounding.
-      // Tailwind applies borders before rounding.
       borderBubbleClasses = `border-l-[3px] border-b-[3px] border-[var(--accent-blue)]`;
-      // Specific rounding: top-right and bottom-right fully rounded, top-left rounded, bottom-left more "square" due to border.
       roundedClasses = 'rounded-tr-xl rounded-br-xl rounded-tl-xl';
       timestampClasses += ' text-[var(--text-secondary)] self-start';
     }
   } else {
     // Child's Message: Right and Bottom border in Accent Yellow
     borderBubbleClasses = `border-r-[3px] border-b-[3px] border-[var(--accent-yellow)]`;
-    // Specific rounding: top-left and bottom-left fully rounded, top-right rounded, bottom-right more "square"
     roundedClasses = 'rounded-tl-xl rounded-bl-xl rounded-tr-xl';
     timestampClasses += ' text-[var(--text-secondary)] self-end';
   }
@@ -140,6 +186,19 @@ export default function ChatMessage({ message, onSendToWorkspace }) {
 
   // Determine if we should use HTML rendering or plain text
   const shouldUseHTML = isKlio && !message.isError && displayContent !== message.content;
+
+  // Check if this message has structured content
+  const hasStructured = hasStructuredContent(message.content);
+
+  // Handle the workspace button click
+  const handleSendToWorkspace = () => {
+    console.log('🔄 Sending message to workspace:', message.content.substring(0, 100));
+    if (onSendToWorkspace) {
+      onSendToWorkspace(message);
+    } else {
+      console.warn('⚠️ onSendToWorkspace not provided');
+    }
+  };
 
   return (
     <motion.div
@@ -169,13 +228,14 @@ export default function ChatMessage({ message, onSendToWorkspace }) {
             </div>
           )}
           
-          {/* Send to Workspace Button - NOW PROPERLY INSIDE THE COMPONENT */}
-          {isKlio && hasStructuredContent(message.content) && onSendToWorkspace && (
+          {/* ENHANCED: Send to Workspace Button - Shows for ANY structured content */}
+          {isKlio && hasStructured && onSendToWorkspace && (
             <button
-              onClick={() => onSendToWorkspace(message)}
-              className="mt-2 text-xs bg-[var(--accent-blue-10-opacity)] text-[var(--accent-blue)] px-3 py-1 rounded-full hover:bg-[var(--accent-blue-20-opacity)] transition-colors flex items-center"
+              onClick={handleSendToWorkspace}
+              className="mt-3 text-xs bg-[var(--accent-blue-10-opacity)] text-[var(--accent-blue)] px-3 py-1.5 rounded-full hover:bg-[var(--accent-blue-20-opacity)] transition-all duration-200 flex items-center space-x-1 border border-[var(--accent-blue-40-opacity-for-border)] hover:border-[var(--accent-blue)] transform hover:scale-105"
             >
-              📋 Send to Workspace
+              <span>📋</span>
+              <span>Send to Workspace</span>
             </button>
           )}
         </div>

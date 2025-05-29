@@ -115,6 +115,12 @@ export default function ChatPage() {
     }
   };
 
+  // 🆕 NEW FUNCTION: Handle workspace-to-chat communication
+  const handleWorkspaceToChat = (message) => {
+    console.log('📤 Workspace sending to chat:', message);
+    handleSendMessage(message);
+  };
+
   // UPDATED FUNCTION: Enhanced message sending with workspace integration
   const handleSendMessage = async (messageText) => {
     if (!messageText.trim() || isLoading) return;
@@ -346,7 +352,7 @@ export default function ChatPage() {
           </div>
         </main>
 
-        {/* NEW: Workspace Panel - Only show when there's content */}
+        {/* 🆕 UPDATED: Workspace Panel with Chat Integration */}
         <AnimatePresence>
           {workspaceContent && (
             <motion.div 
@@ -362,7 +368,8 @@ export default function ChatPage() {
                 workspaceContent={workspaceContent}
                 onToggleSize={handleToggleWorkspaceSize}
                 isExpanded={isWorkspaceExpanded}
-                onClose={() => setWorkspaceContent(null)} // NEW: Allow closing workspace
+                onClose={() => setWorkspaceContent(null)}
+                onSendToChat={handleWorkspaceToChat} // 🆕 NEW: Chat integration prop
               />
             </motion.div>
           )}

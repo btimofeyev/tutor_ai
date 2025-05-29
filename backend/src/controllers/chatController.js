@@ -839,7 +839,29 @@ exports.getLessonHelp = async (req, res) => {
     });
   }
 };
-
+const shouldIncludeWorkspaceContent = (aiResponse, mcpContext) => {
+  const response = aiResponse.toLowerCase();
+  
+  // Check for assignment-related content
+  if (response.includes('assignment') && response.includes('learning goals')) {
+    return {
+      type: 'assignment_hint',
+      lessonContext: mcpContext?.currentFocus
+    };
+  }
+  
+  // Check for specific question requests
+  const questionMatch = response.match(/question\s*(\d+)/i);
+  if (questionMatch && mcpContext?.currentFocus?.lesson_json) {
+    return {
+      type: 'specific_question',
+      questionNumber: questionMatch[1],
+      lessonContext: mcpContext.currentFocus
+    };
+  }
+  
+  return null;
+};
 // Report concerning message (safety feature) - Enhanced with memory context
 exports.reportMessage = async (req, res) => {
   const childId = req.child?.child_id;

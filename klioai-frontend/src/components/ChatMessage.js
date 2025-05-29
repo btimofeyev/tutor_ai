@@ -15,6 +15,27 @@ const KlioAvatar = () => (
   </div>
 );
 
+const hasStructuredContent = (content) => {
+  const indicators = [
+    /(?:problem|question)\s*\d+/i,
+    /learning goals/i,
+    /assignment/i,
+    /tree diagram/i,
+    /fundamental principle/i,
+    /tackle.*together/i,
+    // Enhanced fraction detection
+    /multiply.*numerator/i,
+    /multiply.*denominator/i,
+    /\\frac\{.*\}\{.*\}/i,
+    /\d+\/\d+.*×.*\d+\/\d+/i,
+    /step.*multiply/i,
+    /multiplying fractions.*fun/i,  // For your specific message
+    /quick refresher.*how to/i
+  ];
+  
+  return indicators.some(pattern => pattern.test(content));
+};
+
 // Function to automatically style Klio's structured responses
 function formatKlioMessage(content) {
   if (!content) return content;
@@ -70,7 +91,7 @@ function formatKlioMessage(content) {
   return formattedContent;
 }
 
-export default function ChatMessage({ message }) {
+export default function ChatMessage({ message, onSendToWorkspace }) {
   const isKlio = message.role === 'klio';
 
   const messageVariants = {
@@ -146,6 +167,16 @@ export default function ChatMessage({ message }) {
             <div className="text-sm sm:text-base whitespace-pre-wrap font-fredoka break-words chat-message-content">
               {displayContent}
             </div>
+          )}
+          
+          {/* Send to Workspace Button - NOW PROPERLY INSIDE THE COMPONENT */}
+          {isKlio && hasStructuredContent(message.content) && onSendToWorkspace && (
+            <button
+              onClick={() => onSendToWorkspace(message)}
+              className="mt-2 text-xs bg-[var(--accent-blue-10-opacity)] text-[var(--accent-blue)] px-3 py-1 rounded-full hover:bg-[var(--accent-blue-20-opacity)] transition-colors flex items-center"
+            >
+              📋 Send to Workspace
+            </button>
           )}
         </div>
         <time className={timestampClasses}>

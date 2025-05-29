@@ -1,3 +1,5 @@
+// klioai-frontend/src/app/chat/page.js - COMPLETE UPDATED VERSION
+
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,11 +9,11 @@ import ChatHeader from '../../components/ChatHeader';
 import ChatMessage from '../../components/ChatMessage'; 
 import ChatInput from '../../components/ChatInput';
 import SuggestionBubbles from '../../components/SuggestionBubbles'; 
-import LessonContextBar from '../../components/LessonContextBar'; 
+import LessonContextBar from '../../components/LessonContextBar';
+import WorkspacePanel from '../../components/WorkspacePanel'; // NEW IMPORT
 import { useAuth } from '../../contexts/AuthContext'; 
 import { chatService } from '../../utils/chatService';
-
-// const KLIO_AVATAR_EMOJI = '🤖'; // Already defined if needed by ChatMessage
+import { parseWorkspaceContent, parseFractionMessage, extractQuestionFromLesson } from '../../utils/workspaceParser'; // NEW IMPORT
 
 export default function ChatPage() {
   const { child, logout } = useAuth();
@@ -25,6 +27,10 @@ export default function ChatPage() {
   const [isKlioTyping, setIsKlioTyping] = useState(false);
   const [currentTopic, setCurrentTopic] = useState("General Conversation");
   const [currentLessonContext, setCurrentLessonContext] = useState(null);
+  
+  // NEW WORKSPACE STATE
+  const [workspaceContent, setWorkspaceContent] = useState(null);
+  const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(false);
 
   useEffect(() => {
     const savedMessages = sessionStorage.getItem('klio_chat_history');
@@ -52,7 +58,6 @@ export default function ChatPage() {
   useEffect(() => {
     const fetchSuggestions = async () => {
         try {
-            // Using existing fallback suggestions that are fairly neutral
             const data = await (chatService.getSuggestions ? chatService.getSuggestions() : Promise.resolve({suggestions: ["Can you help me with my homework? 📚", "Let's practice math problems! 🧮", "Tell me a fun fact! ☀️", "Can we play a learning game? 🎮"]}));
             setSuggestions(data.suggestions || []);
         } catch (error) {
@@ -81,9 +86,40 @@ export default function ChatPage() {
     }
   }, [messages, isKlioTyping]);
 
+  const handleSendToWorkspace = (message) => {
+    console.log('Sending to workspace:', message);
+    
+    // Try the specific fraction message parser first
+    let parsedContent = parseFractionMessage(message.content);
+    
+    // Fall back to general parser
+    if (!parsedContent) {
+      parsedContent = parseWorkspaceContent(message.content, currentLessonContext);
+    }
+    
+    if (parsedContent) {
+      setWorkspaceContent(parsedContent);
+      console.log('Workspace content set:', parsedContent);
+    } else {
+      console.log('No structured content found in message');
+    }
+  };
+  
+  // NEW FUNCTION: Handle specific question requests
+  const handleQuestionRequest = (questionNumber, lessonContext) => {
+    if (lessonContext?.lesson_json) {
+      const questionContent = extractQuestionFromLesson(lessonContext.lesson_json, questionNumber);
+      if (questionContent) {
+        setWorkspaceContent(questionContent);
+      }
+    }
+  };
+
+  // UPDATED FUNCTION: Enhanced message sending with workspace integration
   const handleSendMessage = async (messageText) => {
     if (!messageText.trim() || isLoading) return;
     setShowSuggestions(false);
+    
     const userMessage = {
       id: `msg-${Date.now()}-child`,
       role: 'child',
@@ -95,6 +131,7 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
+      // Enhanced chat service call
       const response = await chatService.sendMessage(messageText, messages.slice(-10), currentLessonContext);
 
       const klioMessage = {
@@ -103,12 +140,28 @@ export default function ChatPage() {
         content: response.message,
         timestamp: response.timestamp || new Date().toISOString(),
         lessonContext: response.lessonContext || null,
+        workspaceHint: response.workspaceHint || null, // NEW: Workspace hint from backend
       };
+      
       setMessages(prev => [...prev, klioMessage]);
 
+      // Handle lesson context updates
       if (response.lessonContext) {
         setCurrentLessonContext(response.lessonContext);
       }
+
+      // NEW: Handle workspace content from backend hints
+      if (response.workspaceHint) {
+        handleWorkspaceHint(response.workspaceHint, klioMessage);
+      }
+
+      // NEW: Auto-detect and parse workspace content from message
+      setTimeout(() => {
+        const autoDetectedContent = parseWorkspaceContent(response.message, currentLessonContext);
+        if (autoDetectedContent && !response.workspaceHint) {
+          setWorkspaceContent(autoDetectedContent);
+        }
+      }, 500);
 
     } catch (error) {
       console.error('Chat error:', error);
@@ -122,6 +175,49 @@ export default function ChatPage() {
     } finally {
       setIsKlioTyping(false);
       setIsLoading(false);
+    }
+  };
+
+  // NEW FUNCTION: Handle workspace hints from backend
+  const handleWorkspaceHint = (workspaceHint, klioMessage) => {
+    console.log('Processing workspace hint:', workspaceHint);
+    
+    switch (workspaceHint.type) {
+      case 'assignment_hint':
+        if (workspaceHint.lessonContext) {
+          const assignmentContent = {
+            type: 'assignment',
+            data: {
+              title: workspaceHint.lessonContext.title || 'Current Assignment',
+              type: workspaceHint.lessonContext.content_type || 'lesson',
+              learningGoals: workspaceHint.lessonContext.lesson_json?.learning_objectives || [],
+              problems: workspaceHint.lessonContext.lesson_json?.tasks_or_questions?.slice(0, 8) || [],
+              estimatedTime: workspaceHint.lessonContext.lesson_json?.estimated_completion_time_minutes
+            }
+          };
+          setWorkspaceContent(assignmentContent);
+        }
+        break;
+        
+      case 'specific_question':
+        handleQuestionRequest(workspaceHint.questionNumber, workspaceHint.lessonContext);
+        break;
+        
+      case 'math_problems':
+        if (workspaceHint.problems) {
+          setWorkspaceContent({
+            type: 'math_problems',
+            problems: workspaceHint.problems
+          });
+        }
+        break;
+        
+      default:
+        // Try auto-parsing the message
+        const parsedContent = parseWorkspaceContent(klioMessage.content, currentLessonContext);
+        if (parsedContent) {
+          setWorkspaceContent(parsedContent);
+        }
     }
   };
 
@@ -149,32 +245,42 @@ export default function ChatPage() {
       sessionStorage.removeItem('klio_chat_history');
       setShowSuggestions(true);
       setCurrentLessonContext(null);
+      setWorkspaceContent(null); // NEW: Clear workspace on chat clear
     }
   };
 
   const handleLogoutConfirmed = async () => {
     if (window.confirm('Are you sure you want to sign out?')) {
-      await logout(); // Assuming logout redirects or ProtectedRoute handles this
+      await logout();
     }
+  };
+
+  // NEW FUNCTION: Toggle workspace size
+  const handleToggleWorkspaceSize = () => {
+    setIsWorkspaceExpanded(!isWorkspaceExpanded);
   };
 
   return (
     <ProtectedRoute>
-      {/* Main container uses theme variables from body for font and base text color */}
+      {/* UPDATED: Main container with workspace consideration */}
       <div className="flex h-screen overflow-hidden bg-[var(--background-main)]">
-        {/* Sidebar needs to be themed according to our established Klio AI Sidebar style */}
+        {/* Sidebar - unchanged */}
         <Sidebar
           childName={child?.name}
           onLogout={handleLogoutConfirmed}
           onClearChat={handleClearChat}
         />
 
-        {/* Chat area main content */}
-        <main className="flex-1 flex flex-col bg-[var(--background-card)] overflow-hidden"> {/* Or --background-main if chat messages are on cards */}
-          {/* ChatAreaHeader needs theming */}
+        {/* UPDATED: Chat area with dynamic width based on workspace */}
+        <main className={`flex-1 flex flex-col bg-[var(--background-card)] overflow-hidden transition-all duration-300 ${
+          workspaceContent 
+            ? (isWorkspaceExpanded ? 'w-1/2' : 'w-2/3') 
+            : 'w-full'
+        }`}>
+          {/* ChatHeader - unchanged */}
           <ChatHeader currentTopic={currentTopic} />
 
-          {/* LessonContextBar needs theming */}
+          {/* LessonContextBar - unchanged */}
           {currentLessonContext && (
             <LessonContextBar
               lessonContext={currentLessonContext}
@@ -185,21 +291,21 @@ export default function ChatPage() {
             />
           )}
 
-          {/* Chat messages area */}
-          <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-[var(--background-main)]"> {/* If messages are on cards, this can be --background-main */}
+          {/* Chat messages area - unchanged except for workspace prop */}
+          <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-[var(--background-main)]">
             <AnimatePresence initial={false}>
               {messages.map((message) => (
-                // ChatMessage component is CRITICAL for theming individual messages
                 <ChatMessage
                   key={message.id}
                   message={message}
                   lessonContext={message.lessonContext}
                   onLessonClick={handleLessonHelp}
+                  onSendToWorkspace={handleSendToWorkspace} 
                 />
               ))}
             </AnimatePresence>
 
-            {/* Klio Typing Indicator - Themed */}
+            {/* Klio Typing Indicator - unchanged */}
             {isKlioTyping && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -207,9 +313,8 @@ export default function ChatPage() {
                 exit={{ opacity: 0 }}
                 className="flex items-end py-1"
               >
-                {/* Klio's typing bubble style (should match Klio's ChatMessage bubble) */}
                 <div className="p-3 rounded-lg rounded-bl-md bg-[var(--accent-blue)]/20 text-[var(--text-primary)] shadow-sm">
-                  <div className="loading-dots text-[var(--accent-blue)]"> {/* Dots themed with accent blue */}
+                  <div className="loading-dots text-[var(--accent-blue)]">
                     <span></span><span></span><span></span>
                   </div>
                 </div>
@@ -218,11 +323,10 @@ export default function ChatPage() {
             <div ref={messagesEndRef} className="h-1"/>
           </div>
           
-          {/* Suggestion Bubbles - Themed */}
+          {/* Suggestion Bubbles - unchanged */}
           {showSuggestions && suggestions.length > 0 && (
-             <div className="w-full flex justify-center px-4 sm:px-6 pb-2 pt-1 border-t border-[var(--border-subtle)] bg-[var(--background-card)]"> {/* Ensure bg for suggestions area */}
+             <div className="w-full flex justify-center px-4 sm:px-6 pb-2 pt-1 border-t border-[var(--border-subtle)] bg-[var(--background-card)]">
                 <div className="max-w-3xl w-full">
-                    {/* SuggestionBubbles component needs to use themed buttons/styles */}
                     <SuggestionBubbles
                         suggestions={suggestions}
                         onSuggestionClick={handleSuggestionClick}
@@ -231,10 +335,9 @@ export default function ChatPage() {
             </div>
           )}
 
-          {/* Chat Input Area - Themed */}
+          {/* Chat Input Area - unchanged */}
           <div className="bg-[var(--background-card)] p-3 sm:p-4 border-t border-[var(--border-subtle)]">
             <div className="max-w-3xl mx-auto">
-                {/* ChatInput component needs to use .input-base or themed styles */}
                 <ChatInput
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading}
@@ -242,6 +345,28 @@ export default function ChatPage() {
             </div>
           </div>
         </main>
+
+        {/* NEW: Workspace Panel - Only show when there's content */}
+        <AnimatePresence>
+          {workspaceContent && (
+            <motion.div 
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className={`${
+                isWorkspaceExpanded ? 'w-1/2' : 'w-1/3'
+              } bg-[var(--background-card)] border-l border-[var(--border-subtle)] transition-all duration-300`}
+            >
+              <WorkspacePanel 
+                workspaceContent={workspaceContent}
+                onToggleSize={handleToggleWorkspaceSize}
+                isExpanded={isWorkspaceExpanded}
+                onClose={() => setWorkspaceContent(null)} // NEW: Allow closing workspace
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </ProtectedRoute>
   );

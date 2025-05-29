@@ -19,8 +19,11 @@ class ChatService {
         sessionHistory: sessionHistory.slice(-10),
         lessonContext
       });
-
-      return response.data;
+  
+      return {
+        ...response.data,
+        workspaceHint: response.data.workspaceHint // Pass through workspace hint
+      };
     } catch (error) {
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);
@@ -28,7 +31,6 @@ class ChatService {
       throw new Error('Failed to send message. Please try again!');
     }
   }
-
   async getSuggestions() {
     try {
       const response = await this.api.get('/suggestions');

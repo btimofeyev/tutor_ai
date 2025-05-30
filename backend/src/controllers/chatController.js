@@ -534,7 +534,7 @@ exports.chat = async (req, res) => {
     let response;
     try {
       response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4.1-mini",
         messages: openaiMessages,
         temperature: 0.7,
         max_tokens: 1024,

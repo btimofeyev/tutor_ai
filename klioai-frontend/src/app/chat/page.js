@@ -1,3 +1,4 @@
+// klioai-frontend/src/app/chat/page.js - Enhanced with Structured Workspace
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,7 +12,6 @@ import LessonContextBar from '../../components/LessonContextBar';
 import WorkspacePanel from '../../components/WorkspacePanel';
 import { useAuth } from '../../contexts/AuthContext'; 
 import { chatService } from '../../utils/chatService';
-import { parseWorkspaceContent, extractQuestionFromLesson } from '../../utils/workspaceParser';
 
 const INITIAL_SUGGESTIONS = [
   "Can you help me with my homework? 📚", 
@@ -102,19 +102,122 @@ export default function ChatPage() {
     }
   }, [messages, isKlioTyping]);
 
-  const handleSendToWorkspace = (message) => {
-    const parsedContent = parseWorkspaceContent(message.content, currentLessonContext);
-    if (parsedContent) {
-      setWorkspaceContent(parsedContent);
+  // ENHANCED: Handle structured workspace content from LLM response
+  const handleStructuredWorkspaceContent = (workspaceData) => {
+    if (!workspaceData || workspaceData.type === 'none') {
+      console.log('❌ No workspace content in structured response');
+      return;
+    }
+
+    console.log('✅ Processing structured workspace content:', workspaceData);
+
+    // Convert structured data to workspace format
+    let processedContent = null;
+
+    switch (workspaceData.type) {
+      case 'math_problems':
+        processedContent = {
+          type: 'math_problems',
+          problems: workspaceData.problems.map((problem, index) => ({
+            id: `structured-problem-${index}`,
+            text: problem.display_text || problem.text,
+            type: problem.type,
+            hint: problem.hint,
+            difficulty: problem.difficulty,
+            isStructured: true
+          }))
+        };
+        break;
+
+      case 'mixed':
+        processedContent = {
+          type: 'mixed',
+          content: [
+            ...(workspaceData.explanation ? [{
+              type: 'explanation',
+              title: workspaceData.explanation.title,
+              content: workspaceData.explanation.content
+            }] : []),
+            ...workspaceData.problems.map((problem, index) => ({
+              type: 'math_problem',
+              id: `structured-problem-${index}`,
+              text: problem.display_text || problem.text,
+              problemType: problem.type,
+              hint: problem.hint,
+              difficulty: problem.difficulty,
+              isStructured: true
+            }))
+          ]
+        };
+        break;
+
+      case 'assignment':
+        processedContent = {
+          type: 'assignment',
+          data: workspaceData.assignment_data || workspaceData
+        };
+        break;
+
+      default:
+        console.log('Unknown workspace content type:', workspaceData.type);
+        return;
+    }
+
+    if (processedContent) {
+      console.log('🎯 Setting structured workspace content:', processedContent);
+      setWorkspaceContent(processedContent);
     }
   };
-  
-  const handleQuestionRequest = (questionNumber, lessonContext) => {
-    if (lessonContext?.lesson_json) {
-      const questionContent = extractQuestionFromLesson(lessonContext.lesson_json, questionNumber);
-      if (questionContent) {
-        setWorkspaceContent(questionContent);
-      }
+
+  // ENHANCED: Handle structured workspace content from LLM response OR message
+  const handleSendToWorkspace = (message, structuredContent = null) => {
+    console.log('🔄 Processing workspace request');
+    
+    // PRIORITY 1: Use structured content if provided
+    if (structuredContent) {
+      console.log('✅ Using provided structured content:', structuredContent);
+      handleStructuredWorkspaceContent(structuredContent);
+      return;
+    }
+    
+    // PRIORITY 2: Use message's structured content if available
+    if (message.workspaceContent) {
+      console.log('✅ Using message structured content:', message.workspaceContent);
+      handleStructuredWorkspaceContent(message.workspaceContent);
+      return;
+    }
+    
+    // PRIORITY 3: Legacy parsing fallback
+    console.log('📝 Falling back to legacy parsing for message:', message.content.substring(0, 100));
+    
+    const problems = [];
+    
+    // Look for simple patterns like "7 + 5" or "What is 7 + 5?"
+    const simplePattern = /what\s+is\s+(\d+\s*[\+\-\*×÷\/]\s*\d+)/gi;
+    const matches = message.content.match(simplePattern);
+    
+    if (matches) {
+      matches.forEach((match, index) => {
+        const cleanMatch = match.replace(/what\s+is\s+/i, '').trim();
+        problems.push({
+          id: `legacy-problem-${index}`,
+          text: cleanMatch,
+          type: 'arithmetic',
+          hint: 'Work through this step by step!',
+          isLegacy: true
+        });
+      });
+    }
+
+    if (problems.length > 0) {
+      const legacyContent = {
+        type: 'math_problems',
+        problems: problems
+      };
+      console.log('📋 Setting legacy workspace content:', legacyContent);
+      setWorkspaceContent(legacyContent);
+    } else {
+      console.log('❌ No workspace content found in any method');
     }
   };
 
@@ -139,7 +242,14 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
+      // ENHANCED: Use structured chat service
       const response = await chatService.sendMessage(messageText, messages.slice(-10), currentLessonContext);
+
+      console.log('📨 Received structured response:', {
+        hasWorkspaceContent: !!response.workspaceContent,
+        workspaceType: response.workspaceContent?.type,
+        problemsCount: response.workspaceContent?.problems?.length
+      });
 
       const klioMessage = {
         id: `msg-${Date.now()}-klio`,
@@ -147,26 +257,24 @@ export default function ChatPage() {
         content: response.message,
         timestamp: response.timestamp || new Date().toISOString(),
         lessonContext: response.lessonContext || null,
-        workspaceHint: response.workspaceHint || null,
+        workspaceContent: response.workspaceContent || null, // NEW: Store structured content
       };
       
       setMessages(prev => [...prev, klioMessage]);
 
+      // Handle lesson context
       if (response.lessonContext) {
         setCurrentLessonContext(response.lessonContext);
       }
 
-      if (response.workspaceHint) {
-        handleWorkspaceHint(response.workspaceHint, klioMessage);
+      // ENHANCED: Handle structured workspace content
+      if (response.workspaceContent) {
+        console.log('🎯 Processing structured workspace content from response');
+        handleStructuredWorkspaceContent(response.workspaceContent);
+      } else {
+        console.log('📝 No structured workspace content in response');
+        // Don't do fallback parsing here - let the user click the button if they want workspace
       }
-
-      // Auto-detect workspace content
-      setTimeout(() => {
-        const autoDetectedContent = parseWorkspaceContent(response.message, currentLessonContext);
-        if (autoDetectedContent && !response.workspaceHint) {
-          setWorkspaceContent(autoDetectedContent);
-        }
-      }, 500);
 
     } catch (error) {
       console.error('Chat error:', error);
@@ -180,44 +288,6 @@ export default function ChatPage() {
     } finally {
       setIsKlioTyping(false);
       setIsLoading(false);
-    }
-  };
-
-  const handleWorkspaceHint = (workspaceHint, klioMessage) => {
-    switch (workspaceHint.type) {
-      case 'assignment_hint':
-        if (workspaceHint.lessonContext) {
-          setWorkspaceContent({
-            type: 'assignment',
-            data: {
-              title: workspaceHint.lessonContext.title || 'Current Assignment',
-              type: workspaceHint.lessonContext.content_type || 'lesson',
-              learningGoals: workspaceHint.lessonContext.lesson_json?.learning_objectives || [],
-              problems: workspaceHint.lessonContext.lesson_json?.tasks_or_questions?.slice(0, 8) || [],
-              estimatedTime: workspaceHint.lessonContext.lesson_json?.estimated_completion_time_minutes
-            }
-          });
-        }
-        break;
-        
-      case 'specific_question':
-        handleQuestionRequest(workspaceHint.questionNumber, workspaceHint.lessonContext);
-        break;
-        
-      case 'math_problems':
-        if (workspaceHint.problems) {
-          setWorkspaceContent({
-            type: 'math_problems',
-            problems: workspaceHint.problems
-          });
-        }
-        break;
-        
-      default:
-        const parsedContent = parseWorkspaceContent(klioMessage.content, currentLessonContext);
-        if (parsedContent) {
-          setWorkspaceContent(parsedContent);
-        }
     }
   };
 
@@ -291,7 +361,9 @@ export default function ChatPage() {
                   message={message}
                   lessonContext={message.lessonContext}
                   onLessonClick={handleLessonHelp}
-                  onSendToWorkspace={handleSendToWorkspace} 
+                  onSendToWorkspace={handleSendToWorkspace}
+                  // NEW: Pass structured workspace content
+                  hasStructuredWorkspace={!!message.workspaceContent}
                 />
               ))}
             </AnimatePresence>

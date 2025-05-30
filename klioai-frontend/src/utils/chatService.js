@@ -1,3 +1,4 @@
+// klioai-frontend/src/utils/chatService.js - Enhanced for Structured Responses
 import axios from 'axios';
 import { authService } from './auth';
 
@@ -14,23 +15,43 @@ class ChatService {
 
   async sendMessage(message, sessionHistory = [], lessonContext = null) {
     try {
+      console.log('📤 Sending message to structured chat endpoint...');
+      
       const response = await this.api.post('/message', {
         message,
         sessionHistory: sessionHistory.slice(-10),
         lessonContext
       });
-  
+
+      console.log('📥 Received structured response:', {
+        hasMessage: !!response.data.message,
+        hasWorkspaceContent: !!response.data.workspaceContent,
+        workspaceType: response.data.workspaceContent?.type,
+        problemsCount: response.data.workspaceContent?.problems?.length
+      });
+
+      // Enhanced response structure
       return {
-        ...response.data,
-        workspaceHint: response.data.workspaceHint // Pass through workspace hint
+        message: response.data.message,
+        timestamp: response.data.timestamp,
+        lessonContext: response.data.lessonContext,
+        // NEW: Structured workspace content
+        workspaceContent: response.data.workspaceContent,
+        // Debug info
+        debugInfo: response.data.debugInfo,
+        // Legacy compatibility
+        workspaceHint: response.data.workspaceHint // Keep for backward compatibility
       };
     } catch (error) {
+      console.error('❌ Structured chat service error:', error);
+      
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);
       }
       throw new Error('Failed to send message. Please try again!');
     }
   }
+
   async getSuggestions() {
     try {
       const response = await this.api.get('/suggestions');

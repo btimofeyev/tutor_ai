@@ -1,5 +1,4 @@
 // klioai-frontend/src/utils/workspaceParser.js - ENHANCED VERSION
-// Supports ALL math problems, not just fractions
 
 export const parseWorkspaceContent = (message, lessonContext = null) => {
     if (!message || typeof message !== 'string') return null;
@@ -8,16 +7,19 @@ export const parseWorkspaceContent = (message, lessonContext = null) => {
     
     console.log('🔍 Parsing workspace content:', message.substring(0, 100) + '...');
     
-    // Enhanced detection patterns for ALL math problems
+    // Enhanced detection patterns for ALL math problems including LaTeX
     const mathIndicators = [
+        // LaTeX expressions
+        /\\?\(\s*[^)]*[\+\-\*×÷\/\\]\s*[^)]*\s*\\?\)/g, // \( 7 + 5 \) or ( 7 + 5 )
+        /\\frac\{[^}]+\}\{[^}]+\}/g, // \frac{2}{3}
+        /\\\(\s*\\?\s*\d+[^)]*\\\)/g, // \( 4 \times \frac{2}{5} \)
+        
         // Basic math operations
         /\d+\s*[\+\-\*×÷\/]\s*\d+/g,
         // Word problems with numbers
         /what\s+is\s+\d+[\+\-\*×÷\/]\d+/gi,
-        // Fraction operations
+        // Regular fraction operations
         /\d+\/\d+\s*[×\*]\s*\d+\/\d+/g,
-        // LaTeX fractions
-        /\\frac\{\d+\}\{\d+\}/g,
         // Decimal operations
         /\d+\.\d+\s*[\+\-\*×÷\/]\s*\d+\.?\d*/g,
         // Problem numbers
@@ -39,7 +41,44 @@ export const parseWorkspaceContent = (message, lessonContext = null) => {
     // Extract different types of problems
     const problems = [];
     
-    // 1. Extract bold problems (like **What is 27 + 15?**)
+    // 1. Extract LaTeX expressions (PRIORITY - handle these first)
+    const latexMatches = message.match(/\\?\(\s*([^)]+)\s*\\?\)/g);
+    if (latexMatches) {
+        latexMatches.forEach(latexExpr => {
+            // Clean up the LaTeX expression
+            let cleanExpr = latexExpr.replace(/\\?\(|\\\)/g, '').trim();
+            
+            // Check if it contains math operations
+            if (/[\+\-\*×÷\/]|\\frac|\\times/.test(cleanExpr)) {
+                problems.push({
+                    text: cleanExpr,
+                    type: determineProblemType(cleanExpr),
+                    hint: getHintForOperation(cleanExpr),
+                    isLatex: true
+                });
+            }
+        });
+    }
+    
+    // 2. Extract numbered problems from list format
+    const numberedListMatches = message.match(/^\s*\d+\.\s*(.+)$/gm);
+    if (numberedListMatches) {
+        numberedListMatches.forEach(listItem => {
+            const cleanText = listItem.replace(/^\s*\d+\.\s*/, '').trim();
+            
+            // Check if it's a math problem
+            if (/[\+\-\*×÷\/]|\\frac|\\times|\d/.test(cleanText)) {
+                problems.push({
+                    text: cleanText,
+                    type: determineProblemType(cleanText),
+                    hint: getHintForOperation(cleanText),
+                    isLatex: cleanText.includes('\\')
+                });
+            }
+        });
+    }
+    
+    // 3. Extract bold problems (like **What is 27 + 15?**)
     const boldProblems = message.match(/\*\*([^*]+)\*\*/g);
     if (boldProblems) {
         boldProblems.forEach(boldText => {
@@ -54,47 +93,31 @@ export const parseWorkspaceContent = (message, lessonContext = null) => {
         });
     }
     
-    // 2. Extract numbered problems
-    const numberedProblems = message.match(/(?:problem|question)\s*\d+[:\.]?\s*([^\n.!?]+)/gi);
-    if (numberedProblems) {
-        numberedProblems.forEach(problem => {
-            const cleanText = problem.replace(/(?:problem|question)\s*\d+[:\.]?\s*/i, '').trim();
-            if (/\d/.test(cleanText)) {
-                problems.push({
-                    text: cleanText,
-                    type: determineProblemType(cleanText),
-                    hint: getHintForOperation(cleanText)
-                });
-            }
-        });
-    }
-    
-    // 3. Extract fraction problems
+    // 4. Extract fraction problems
     const fractionProblems = message.match(/(?:\\frac\{\d+\}\{\d+\}|\d+\/\d+)\s*[×\*]\s*(?:\\frac\{\d+\}\{\d+\}|\d+\/\d+)/g);
     if (fractionProblems) {
         fractionProblems.forEach(fraction => {
             problems.push({
                 text: fraction,
                 type: 'fraction_multiplication',
-                hint: "Multiply numerators together, then denominators together"
+                hint: "Multiply numerators together, then denominators together",
+                isLatex: fraction.includes('\\frac')
             });
         });
     }
     
-    // 4. Extract simple arithmetic from text
-    const arithmeticMatches = message.match(/\d+\s*[\+\-\*×÷\/]\s*\d+(?:\s*=\s*\?)?/g);
-    if (arithmeticMatches) {
-        arithmeticMatches.forEach(math => {
-            // Don't duplicate if already found in bold or numbered problems
-            const isDuplicate = problems.some(p => p.text.includes(math.replace(/\s*=\s*\?/, '')));
-            if (!isDuplicate) {
+    // 5. Extract simple arithmetic from text (if no other problems found)
+    if (problems.length === 0) {
+        const arithmeticMatches = message.match(/\d+\s*[\+\-\*×÷\/]\s*\d+(?:\s*=\s*\?)?/g);
+        if (arithmeticMatches) {
+            arithmeticMatches.forEach(math => {
                 problems.push({
                     text: math.replace(/\s*=\s*\?/, ''),
                     type: determineProblemType(math),
                     hint: getHintForOperation(math)
                 });
-            }
-        });
+            });
+        }
     }
     
     // If we found problems, create workspace content
@@ -105,7 +128,9 @@ export const parseWorkspaceContent = (message, lessonContext = null) => {
         const hasExplanation = content.includes('steps') || 
                               content.includes('multiply') && content.includes('together') ||
                               content.includes('first') || content.includes('second') ||
-                              /\d+\.\s*\*\*/.test(message);
+                              /\d+\.\s*\*\*/.test(message) ||
+                              content.includes('work through') ||
+                              content.includes('let me know what');
         
         if (hasExplanation && problems.length > 0) {
             return {
@@ -116,8 +141,9 @@ export const parseWorkspaceContent = (message, lessonContext = null) => {
                         content: message,
                         title: getExplanationTitle(message)
                     },
-                    ...problems.map(problem => ({
+                    ...problems.map((problem, index) => ({
                         type: 'math_problem',
+                        id: `problem-${index}`,
                         ...problem
                     }))
                 ]
@@ -125,7 +151,10 @@ export const parseWorkspaceContent = (message, lessonContext = null) => {
         } else {
             return {
                 type: 'math_problems',
-                problems: problems
+                problems: problems.map((problem, index) => ({
+                    ...problem,
+                    id: `problem-${index}`
+                }))
             };
         }
     }
@@ -133,7 +162,8 @@ export const parseWorkspaceContent = (message, lessonContext = null) => {
     // Check for assignment content as fallback
     const hasAssignmentContent = content.includes('assignment') || 
                                 content.includes('learning goals') ||
-                                content.includes('tackle');
+                                content.includes('tackle') ||
+                                content.includes('practice');
     
     if (lessonContext && hasAssignmentContent) {
         return {
@@ -156,9 +186,9 @@ export const parseWorkspaceContent = (message, lessonContext = null) => {
 function determineProblemType(text) {
     if (/[\+]/.test(text)) return 'addition';
     if (/[\-]/.test(text)) return 'subtraction';
-    if (/[\*×]/.test(text)) return 'multiplication';
+    if (/[\*×]|\\times/.test(text)) return 'multiplication';
     if (/[÷\/]/.test(text)) return 'division';
-    if (/\d+\/\d+/.test(text)) return 'fractions';
+    if (/\\frac|\d+\/\d+/.test(text)) return 'fractions';
     if (/\d+\.\d+/.test(text)) return 'decimals';
     return 'arithmetic';
 }
@@ -173,8 +203,8 @@ function getHintForOperation(text) {
     if (/[\-]/.test(text)) {
         return "Subtract the second number from the first. Borrow if needed!";
     }
-    if (/[\*×]/.test(text)) {
-        if (/\d+\/\d+/.test(text)) {
+    if (/[\*×]|\\times/.test(text)) {
+        if (/\\frac|\d+\/\d+/.test(text)) {
             return "Multiply numerators together, then denominators together";
         }
         return "Multiply the numbers. Think of it as repeated addition!";
@@ -182,31 +212,43 @@ function getHintForOperation(text) {
     if (/[÷\/]/.test(text)) {
         return "Divide the first number by the second. How many times does it go in?";
     }
+    if (/\\frac/.test(text)) {
+        return "Work with the fractions step by step - multiply numerators, then denominators";
+    }
     return "Take your time and work step by step!";
 }
 
+
 // Helper function to get explanation title
 function getExplanationTitle(message) {
-    if (message.includes('fraction')) return 'How to Multiply Fractions';
+    if (/fraction|\\frac/.test(message)) return 'How to Work with Fractions';
     if (message.includes('addition')) return 'Addition Practice';
     if (message.includes('subtraction')) return 'Subtraction Practice';
-    if (message.includes('multiplication')) return 'Multiplication Practice';
+    if (message.includes('multiplication') || message.includes('\\times')) return 'Multiplication Practice';
     if (message.includes('division')) return 'Division Practice';
-    return 'Math Explanation';
+    if (message.includes('warm up')) return 'Warm-up Problems';
+    if (message.includes('practice')) return 'Practice Problems';
+    return 'Math Practice';
 }
-
 // Enhanced function to detect structured content in chat messages
 export const hasStructuredContent = (content) => {
     if (!content || typeof content !== 'string') return false;
     
     const indicators = [
+        // LaTeX expressions (PRIORITY)
+        /\\?\(\s*[^)]*[\+\-\*×÷\/\\]\s*[^)]*\s*\\?\)/,
+        /\\frac\{[^}]+\}\{[^}]+\}/,
+        /\\times/,
+        
         // Math problems
         /\d+\s*[\+\-\*×÷\/]\s*\d+/,
         /what\s+is\s+\d+/i,
         /\*\*[^*]*\d+[^*]*\*\*/,
         
+        // Numbered lists with math
+        /^\s*\d+\.\s*[^.]*[\+\-\*×÷\/\\]/m,
+        
         // Fractions
-        /\\frac\{.*\}\{.*\}/,
         /\d+\/\d+.*×.*\d+\/\d+/,
         /multiply.*numerator/i,
         
@@ -224,11 +266,22 @@ export const hasStructuredContent = (content) => {
         // Educational patterns
         /tackle.*together/i,
         /let's.*solve/i,
-        /practice.*problem/i
+        /practice.*problem/i,
+        /warm.*up/i,
+        /work through/i,
+        /give.*try/i,
+        /let me know what.*come up with/i
     ];
     
-    return indicators.some(pattern => pattern.test(content));
+    const hasIndicator = indicators.some(pattern => pattern.test(content));
+    
+    if (hasIndicator) {
+        console.log('✅ Structured content detected in:', content.substring(0, 100));
+    }
+    
+    return hasIndicator;
 };
+
 
 // Extract specific question from lesson JSON
 export const extractQuestionFromLesson = (lessonJson, questionNumber) => {
@@ -249,7 +302,8 @@ export const extractQuestionFromLesson = (lessonJson, questionNumber) => {
                 text: cleanText,
                 type: determineProblemType(cleanText),
                 hint: getHintForOperation(cleanText),
-                questionNumber: questionNumber
+                questionNumber: questionNumber,
+                id: `question-${questionNumber}`
             }]
         };
     }
@@ -260,6 +314,8 @@ export const extractQuestionFromLesson = (lessonJson, questionNumber) => {
 // Quick test function to validate parsing
 export const testWorkspaceParser = () => {
     const testMessages = [
+        "What is \\( 7 + 5 \\)?",
+        "Let's try these problems:\n1. \\( 4 \\times \\frac{2}{5} \\)\n2. \\( 7 \\times \\frac{3}{8} \\)\n3. \\( 5 \\times \\frac{1}{2} \\)",
         "**What is 27 + 15?**",
         "Let's multiply fractions: \\frac{2}{3} \\times \\frac{4}{5}",
         "Here are some practice problems: 45 + 23 and 67 - 34",

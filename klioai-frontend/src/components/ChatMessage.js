@@ -15,18 +15,25 @@ const KlioAvatar = () => (
   </div>
 );
 
-// ENHANCED: Better detection for ALL types of structured content
+// ENHANCED: Better detection for ALL types of structured content including LaTeX
 const hasStructuredContent = (content) => {
   if (!content || typeof content !== 'string') return false;
   
   const indicators = [
+    // LaTeX expressions (PRIORITY - these are very common in math)
+    /\\?\(\s*[^)]*[\+\-\*×÷\/\\]\s*[^)]*\s*\\?\)/,  // \( 7 + 5 \) or ( 7 + 5 )
+    /\\frac\{[^}]+\}\{[^}]+\}/,  // \frac{2}{3}
+    /\\times/,  // \times
+    
+    // Numbered lists with math content
+    /^\s*\d+\.\s*[^.]*[\+\-\*×÷\/\\]/m,  // 1. 4 × something
+    
     // Math problems - ANY arithmetic
     /\d+\s*[\+\-\*×÷\/]\s*\d+/,
     /what\s+is\s+\d+[\+\-\*×÷\/]\d+/i,
     /\*\*[^*]*\d+[^*]*\*\*/,  // Bold text with numbers
     
     // Fractions
-    /\\frac\{.*\}\{.*\}/,
     /\d+\/\d+.*[×\*].*\d+\/\d+/,
     /multiply.*numerator/i,
     /multiply.*denominator/i,
@@ -44,11 +51,15 @@ const hasStructuredContent = (content) => {
     /first.*second/i,
     /\d+\.\s*\*\*/,
     
-    // Educational patterns
+    // Educational patterns that suggest practice/workspace
     /tackle.*together/i,
     /let's.*solve/i,
     /practice.*problem/i,
     /warm.*up.*problem/i,
+    /give.*try/i,
+    /let me know what.*come up with/i,
+    /work through/i,
+    /try solving/i,
     
     // Math instruction patterns
     /multiply.*together/i,
@@ -68,13 +79,20 @@ const hasStructuredContent = (content) => {
   const hasMultipleNumbers = numberCount >= 2;
   
   // Check for math-related keywords
-  const mathKeywords = ['solve', 'calculate', 'multiply', 'add', 'subtract', 'divide', 'problem', 'equation', 'answer'];
+  const mathKeywords = ['solve', 'calculate', 'multiply', 'add', 'subtract', 'divide', 'problem', 'equation', 'answer', 'practice', 'try'];
   const hasMathKeywords = mathKeywords.some(keyword => content.toLowerCase().includes(keyword));
   
-  const result = hasIndicator || (hasMultipleNumbers && hasMathKeywords);
+  // Special check for numbered lists that look like practice problems
+  const hasNumberedMathList = /^\s*\d+\.\s*\\?\(/m.test(content) || // 1. \( or 1. (
+                              /^\s*\d+\.\s*[^.]*[\+\-\*×÷\/]/m.test(content); // 1. something with math
+  
+  const result = hasIndicator || hasNumberedMathList || (hasMultipleNumbers && hasMathKeywords);
   
   if (result) {
     console.log('✅ Structured content detected in:', content.substring(0, 100));
+    console.log('   - Has math indicators:', hasIndicator);
+    console.log('   - Has numbered math list:', hasNumberedMathList);
+    console.log('   - Has multiple numbers + keywords:', hasMultipleNumbers && hasMathKeywords);
   }
   
   return result;
@@ -132,16 +150,22 @@ function formatKlioMessage(content) {
     '<strong>$1</strong>'
   );
   
-  // Style math problems in bold
+  // Style math problems in bold and LaTeX expressions
   formattedContent = formattedContent.replace(
     /(\*\*[^*]+\*\*)/g,
+    '<span class="math-problem-highlight">$1</span>'
+  );
+  
+  // Style LaTeX expressions
+  formattedContent = formattedContent.replace(
+    /(\\?\([^)]*[\+\-\*×÷\/\\][^)]*\\?\))/g,
     '<span class="math-problem-highlight">$1</span>'
   );
   
   return formattedContent;
 }
 
-export default function ChatMessage({ message, onSendToWorkspace }) {
+export default function ChatMessage({ message, onSendToWorkspace, hasStructuredWorkspace = false }) {
   const isKlio = message.role === 'klio';
 
   const messageVariants = {
@@ -187,12 +211,25 @@ export default function ChatMessage({ message, onSendToWorkspace }) {
   // Determine if we should use HTML rendering or plain text
   const shouldUseHTML = isKlio && !message.isError && displayContent !== message.content;
 
-  // Check if this message has structured content
-  const hasStructured = hasStructuredContent(message.content);
+  // Check if this message has structured content - ENHANCED detection
+  const hasStructured = hasStructuredWorkspace || hasStructuredContent(message.content);
 
   // Handle the workspace button click
   const handleSendToWorkspace = () => {
     console.log('🔄 Sending message to workspace:', message.content.substring(0, 100));
+    
+    // NEW: If we have structured workspace content, use it directly
+    if (message.workspaceContent) {
+      console.log('✅ Using structured workspace content from message');
+      // For structured content, we could trigger a different handler
+      // or pass the structured content directly
+      if (onSendToWorkspace) {
+        onSendToWorkspace(message, message.workspaceContent);
+      }
+      return;
+    }
+    
+    // LEGACY: Fallback to parsing message content
     if (onSendToWorkspace) {
       onSendToWorkspace(message);
     } else {
@@ -233,6 +270,7 @@ export default function ChatMessage({ message, onSendToWorkspace }) {
             <button
               onClick={handleSendToWorkspace}
               className="mt-3 text-xs bg-[var(--accent-blue-10-opacity)] text-[var(--accent-blue)] px-3 py-1.5 rounded-full hover:bg-[var(--accent-blue-20-opacity)] transition-all duration-200 flex items-center space-x-1 border border-[var(--accent-blue-40-opacity-for-border)] hover:border-[var(--accent-blue)] transform hover:scale-105"
+              title="Send these problems to your workspace for practice"
             >
               <span>📋</span>
               <span>Send to Workspace</span>

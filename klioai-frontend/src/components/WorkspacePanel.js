@@ -1,542 +1,445 @@
-// Enhanced WorkspacePanel with better math formatting and state management
+// Enhanced WorkspacePanel with Session Management and Progress Tracking
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMaximize2, FiMinimize2, FiCopy, FiCheck, FiBookOpen, FiGrid, FiPenTool, FiTrash2, FiEdit3, FiPlus, FiMinus, FiX, FiDivide, FiSend, FiHelpCircle, FiRotateCcw } from 'react-icons/fi';
+import { 
+  FiMaximize2, FiMinimize2, FiCopy, FiCheck, FiBookOpen, 
+  FiGrid, FiPenTool, FiTrash2, FiEdit3, FiPlus, FiMinus, 
+  FiX, FiDivide, FiSend, FiHelpCircle, FiRotateCcw, 
+  FiCheckCircle, FiTarget, FiTrendingUp, FiAward 
+} from 'react-icons/fi';
 
 const WorkspacePanel = ({ workspaceContent, onToggleSize, isExpanded, onClose, onSendToChat }) => {
-  const [copied, setCopied] = useState(false);
+  const [sessionState, setSessionState] = useState({
+    sessionId: null,
+    problems: [],
+    completedProblems: new Set(),
+    currentProblemIndex: 0,
+    sessionStartTime: null,
+    totalCorrect: 0,
+    totalAttempts: 0,
+    streak: 0,
+    bestStreak: 0
+  });
+  
   const [workNotes, setWorkNotes] = useState({});
-  const [currentWorkspaceId, setCurrentWorkspaceId] = useState(null);
+  const [problemStates, setProblemStates] = useState({}); // 'pending', 'checking', 'correct', 'incorrect', 'helped'
 
-  // Clear work when new workspace content arrives
+  // Initialize new session when workspace content changes
   useEffect(() => {
-    if (workspaceContent) {
-      const newWorkspaceId = JSON.stringify(workspaceContent);
-      if (newWorkspaceId !== currentWorkspaceId) {
-        console.log('🔄 New workspace content detected, clearing previous work');
-        setWorkNotes({});
-        setCurrentWorkspaceId(newWorkspaceId);
-      }
-    }
-  }, [workspaceContent, currentWorkspaceId]);
+    if (workspaceContent && workspaceContent.problems?.length > 0) {
+      const newSessionId = `session-${Date.now()}`;
+      const problems = workspaceContent.problems.map((problem, index) => ({
+        ...problem,
+        id: problem.id || `problem-${index}`,
+        sessionIndex: index
+      }));
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+      console.log('🎯 Starting new problem session:', newSessionId);
+      
+      setSessionState({
+        sessionId: newSessionId,
+        problems: problems,
+        completedProblems: new Set(),
+        currentProblemIndex: 0,
+        sessionStartTime: Date.now(),
+        totalCorrect: 0,
+        totalAttempts: 0,
+        streak: 0,
+        bestStreak: 0
+      });
+      
+      // Reset problem states
+      const initialStates = {};
+      problems.forEach(problem => {
+        initialStates[problem.id] = 'pending';
+      });
+      setProblemStates(initialStates);
+      setWorkNotes({});
+    }
+  }, [workspaceContent]);
+
+  // Check if all problems are completed
+  const isSessionComplete = sessionState.completedProblems.size === sessionState.problems.length && sessionState.problems.length > 0;
+  
+  // Calculate progress percentage
+  const progressPercentage = sessionState.problems.length > 0 
+    ? (sessionState.completedProblems.size / sessionState.problems.length) * 100 
+    : 0;
+
+  // Send work to chat with session context
+  const sendWorkToChat = (problemIndex, problemText, workNote) => {
+    if (!workNote.trim()) return;
+    
+    const problem = sessionState.problems[problemIndex];
+    const message = `Can you check my work on Problem ${problemIndex + 1} from this session?\n\nProblem: ${problemText}\nMy work: ${workNote}`;
+    
+    // Update state to show we're checking
+    setProblemStates(prev => ({
+      ...prev,
+      [problem.id]: 'checking'
+    }));
+    
+    if (onSendToChat) {
+      onSendToChat(message, {
+        type: 'check_work',
+        sessionId: sessionState.sessionId,
+        problemId: problem.id,
+        problemIndex: problemIndex,
+        studentWork: workNote,
+        problemText: problemText
+      });
+    }
   };
 
-  const updateWorkNote = (problemId, note) => {
-    setWorkNotes(prev => ({
+  // Mark problem as correct (called when AI confirms correct answer)
+  const markProblemCorrect = (problemId) => {
+    const problem = sessionState.problems.find(p => p.id === problemId);
+    if (!problem) return;
+
+    setSessionState(prev => {
+      const newCompleted = new Set(prev.completedProblems);
+      newCompleted.add(problemId);
+      
+      const newStreak = prev.streak + 1;
+      const newBestStreak = Math.max(newStreak, prev.bestStreak);
+      
+      return {
+        ...prev,
+        completedProblems: newCompleted,
+        totalCorrect: prev.totalCorrect + 1,
+        totalAttempts: prev.totalAttempts + 1,
+        streak: newStreak,
+        bestStreak: newBestStreak,
+        currentProblemIndex: Math.min(prev.currentProblemIndex + 1, prev.problems.length - 1)
+      };
+    });
+
+    setProblemStates(prev => ({
       ...prev,
-      [problemId]: note
+      [problemId]: 'correct'
+    }));
+
+    // Celebration effect
+    setTimeout(() => {
+      const problemElement = document.getElementById(`problem-${problemId}`);
+      if (problemElement) {
+        problemElement.classList.add('celebrate');
+        setTimeout(() => problemElement.classList.remove('celebrate'), 1000);
+      }
+    }, 100);
+  };
+
+  // Mark problem as incorrect
+  const markProblemIncorrect = (problemId) => {
+    setSessionState(prev => ({
+      ...prev,
+      totalAttempts: prev.totalAttempts + 1,
+      streak: 0 // Reset streak on incorrect answer
+    }));
+
+    setProblemStates(prev => ({
+      ...prev,
+      [problemId]: 'incorrect'
     }));
   };
 
-  const clearWorkNote = (problemId) => {
-    setWorkNotes(prev => {
-      const newNotes = { ...prev };
-      delete newNotes[problemId];
-      return newNotes;
-    });
+  // Mark problem as helped (when student asks for help)
+  const markProblemHelped = (problemId) => {
+    setProblemStates(prev => ({
+      ...prev,
+      [problemId]: 'helped'
+    }));
   };
 
-  // NEW: Send work to chat for checking
-  const sendWorkToChat = (problemIndex, problemText, workNote) => {
-    if (!workNote.trim()) {
-      return;
-    }
-    
-    const message = `Can you check my work on this problem?\n\nProblem: ${problemText}\nMy work: ${workNote}`;
-    
-    if (onSendToChat) {
-      onSendToChat(message);
-    }
-  };
-
-  // NEW: Ask for help with specific problem
+  // Ask for help with specific problem
   const askForHelp = (problemIndex, problemText) => {
-    const message = `I need help with this problem: ${problemText}`;
+    const problem = sessionState.problems[problemIndex];
+    const message = `I need help with Problem ${problemIndex + 1}: ${problemText}`;
+    
+    markProblemHelped(problem.id);
     
     if (onSendToChat) {
-      onSendToChat(message);
+      onSendToChat(message, {
+        type: 'request_help',
+        sessionId: sessionState.sessionId,
+        problemId: problem.id,
+        problemIndex: problemIndex,
+        problemText: problemText
+      });
     }
   };
 
-  // Get operation icon based on problem type
-  const getOperationIcon = (type) => {
-    switch (type) {
-      case 'addition': return <FiPlus className="text-[var(--accent-green)]" size={20} />;
-      case 'subtraction': return <FiMinus className="text-[var(--accent-orange)]" size={20} />;
-      case 'multiplication': return <FiX className="text-[var(--accent-blue)]" size={20} />;
-      case 'division': return <FiDivide className="text-[var(--accent-red)]" size={20} />;
-      case 'fractions': return <span className="text-[var(--accent-blue)] font-bold">⁄</span>;
-      default: return <FiGrid className="text-[var(--text-secondary)]" size={16} />;
+  // Skip to next problem
+  const skipToNextProblem = () => {
+    if (sessionState.currentProblemIndex < sessionState.problems.length - 1) {
+      setSessionState(prev => ({
+        ...prev,
+        currentProblemIndex: prev.currentProblemIndex + 1
+      }));
     }
   };
 
-  // Get color scheme based on problem type
-  const getTypeColors = (type) => {
-    const colorMap = {
-      addition: {
-        bg: 'rgba(167, 243, 208, 0.15)',
-        border: 'rgba(167, 243, 208, 0.5)',
-        accent: '#A7F3D0'
-      },
-      subtraction: {
-        bg: 'rgba(253, 230, 138, 0.15)',
-        border: 'rgba(253, 230, 138, 0.5)',
-        accent: '#FDE68A'
-      },
-      multiplication: {
-        bg: 'rgba(179, 224, 248, 0.15)',
-        border: 'rgba(179, 224, 248, 0.4)',
-        accent: '#B3E0F8'
-      },
-      division: {
-        bg: 'rgba(253, 164, 175, 0.15)',
-        border: 'rgba(253, 164, 175, 0.3)',
-        accent: '#FDA4AF'
-      },
-      fractions: {
-        bg: 'rgba(179, 224, 248, 0.15)',
-        border: 'rgba(179, 224, 248, 0.4)',
-        accent: '#B3E0F8'
-      }
-    };
+  // Request more similar problems
+  const requestMoreProblems = () => {
+    const completedTypes = sessionState.problems
+      .filter(p => sessionState.completedProblems.has(p.id))
+      .map(p => p.type);
     
-    return colorMap[type] || colorMap.multiplication;
-  };
-
-  // Enhanced math work area with better formatting
-  const renderMathWorkArea = (problem, index) => {
-    const colors = getTypeColors(problem.type);
-    const currentWork = workNotes[`problem-${index}`] || '';
-    const problemId = `problem-${index}`;
-
-    // Determine if this needs vertical layout
-    const needsVerticalLayout = ['addition', 'subtraction', 'multiplication', 'division'].includes(problem.type);
+    const message = `Great job! Can you give me more ${completedTypes.join(' and ')} problems to practice?`;
     
-    return (
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <h4 className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
-            <FiEdit3 size={14} className="mr-2" />
-            Your Work:
-          </h4>
-          <div className="flex items-center space-x-2">
-            {currentWork.trim() && (
-              <button
-                onClick={() => sendWorkToChat(index, problem.text, currentWork)}
-                className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full hover:bg-green-200 transition-colors flex items-center space-x-1 border border-green-300"
-                title="Send your work to Klio for checking"
-              >
-                <FiSend size={12} />
-                <span>Check My Work</span>
-              </button>
-            )}
-            {currentWork.trim() && (
-              <button
-                onClick={() => clearWorkNote(problemId)}
-                className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full hover:bg-gray-200 transition-colors"
-                title="Clear your work"
-              >
-                <FiRotateCcw size={12} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {needsVerticalLayout ? (
-          <VerticalMathWorkArea 
-            problem={problem}
-            value={currentWork}
-            onChange={(value) => updateWorkNote(problemId, value)}
-            colors={colors}
-          />
-        ) : (
-          <textarea
-            value={currentWork}
-            onChange={(e) => updateWorkNote(problemId, e.target.value)}
-            placeholder={getPlaceholderForType(problem.type)}
-            className="w-full h-32 p-4 border-2 rounded-lg bg-white font-mono text-[var(--text-primary)] resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            style={{ 
-              borderColor: colors.border,
-              backgroundImage: 'linear-gradient(transparent 31px, #e5e7eb 32px)',
-              backgroundSize: '100% 32px',
-              lineHeight: '32px'
-            }}
-          />
-        )}
-      </div>
-    );
-  };
-
-  // Vertical math work area for proper alignment
-  const VerticalMathWorkArea = ({ problem, value, onChange, colors }) => {
-    const [steps, setSteps] = useState([]);
-    
-    // Parse the problem to extract numbers
-    const parseNumbers = (problemText) => {
-      const match = problemText.match(/(\d+(?:\.\d+)?)\s*([+\-×÷*\/])\s*(\d+(?:\.\d+)?)/);
-      if (match) {
-        return {
-          num1: match[1],
-          operator: match[2],
-          num2: match[3]
-        };
-      }
-      return null;
-    };
-
-    const parsed = parseNumbers(problem.text);
-    
-    if (!parsed) {
-      // Fallback to regular textarea for complex problems
-      return (
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={getPlaceholderForType(problem.type)}
-          className="w-full h-32 p-4 border-2 rounded-lg bg-white font-mono resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          style={{ borderColor: colors.border }}
-        />
-      );
-    }
-
-    return (
-      <div 
-        className="p-6 border-2 rounded-lg bg-white"
-        style={{ borderColor: colors.border }}
-      >
-        {problem.type === 'addition' && (
-          <VerticalAddition 
-            num1={parsed.num1} 
-            num2={parsed.num2} 
-            value={value} 
-            onChange={onChange}
-          />
-        )}
-        {problem.type === 'subtraction' && (
-          <VerticalSubtraction 
-            num1={parsed.num1} 
-            num2={parsed.num2} 
-            value={value} 
-            onChange={onChange}
-          />
-        )}
-        {problem.type === 'multiplication' && (
-          <VerticalMultiplication 
-            num1={parsed.num1} 
-            num2={parsed.num2} 
-            value={value} 
-            onChange={onChange}
-          />
-        )}
-        {(problem.type === 'division') && (
-          <LongDivision 
-            dividend={parsed.num1} 
-            divisor={parsed.num2} 
-            value={value} 
-            onChange={onChange}
-          />
-        )}
-      </div>
-    );
-  };
-
-  // Vertical addition layout
-  const VerticalAddition = ({ num1, num2, value, onChange }) => (
-    <div className="font-mono text-xl space-y-2">
-      <div className="text-right pr-4">
-        <div className="border-b border-gray-400 pb-1">
-          <div>{num1.padStart(Math.max(num1.length, num2.length + 1), ' ')}</div>
-          <div>+ {num2}</div>
-        </div>
-      </div>
-      <div className="text-right pr-4">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-24 text-right border-none outline-none bg-transparent text-xl font-mono"
-          placeholder="___"
-        />
-      </div>
-    </div>
-  );
-
-  // Vertical subtraction layout
-  const VerticalSubtraction = ({ num1, num2, value, onChange }) => (
-    <div className="font-mono text-xl space-y-2">
-      <div className="text-right pr-4">
-        <div className="border-b border-gray-400 pb-1">
-          <div>{num1.padStart(Math.max(num1.length, num2.length + 1), ' ')}</div>
-          <div>- {num2}</div>
-        </div>
-      </div>
-      <div className="text-right pr-4">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-24 text-right border-none outline-none bg-transparent text-xl font-mono"
-          placeholder="___"
-        />
-      </div>
-    </div>
-  );
-
-  // Vertical multiplication layout
-  const VerticalMultiplication = ({ num1, num2, value, onChange }) => (
-    <div className="font-mono text-xl space-y-2">
-      <div className="text-right pr-4">
-        <div className="border-b border-gray-400 pb-1">
-          <div>{num1.padStart(Math.max(num1.length, num2.length + 1), ' ')}</div>
-          <div>× {num2}</div>
-        </div>
-      </div>
-      <div className="text-right pr-4">
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-32 h-24 text-right border-none outline-none bg-transparent text-lg font-mono resize-none"
-          placeholder="Show your work..."
-        />
-      </div>
-    </div>
-  );
-
-  // Long division layout
-  const LongDivision = ({ dividend, divisor, value, onChange }) => (
-    <div className="font-mono text-xl">
-      <div className="flex items-start">
-        <div className="mr-4">
-          <div className="border-b border-r border-gray-400 pb-1 pr-2">
-            <span>{divisor}</span>
-          </div>
-        </div>
-        <div>
-          <div className="border-b border-gray-400 pb-1">
-            <input
-              type="text"
-              value={value.split('\n')[0] || ''}
-              onChange={(e) => {
-                const lines = value.split('\n');
-                lines[0] = e.target.value;
-                onChange(lines.join('\n'));
-              }}
-              className="w-24 text-center border-none outline-none bg-transparent"
-              placeholder="quotient"
-            />
-          </div>
-          <div className="pt-1">{dividend}</div>
-          <div className="mt-2">
-            <textarea
-              value={value.split('\n').slice(1).join('\n')}
-              onChange={(e) => {
-                const lines = value.split('\n');
-                const newValue = [lines[0] || '', ...e.target.value.split('\n')].join('\n');
-                onChange(newValue);
-              }}
-              className="w-32 h-20 border-none outline-none bg-transparent text-sm resize-none"
-              placeholder="Show your work..."
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Get placeholder text for different problem types
-  const getPlaceholderForType = (type) => {
-    switch (type) {
-      case 'addition': return 'Line up the numbers and add from right to left...';
-      case 'subtraction': return 'Line up the numbers and subtract from right to left...';
-      case 'multiplication': return 'Show your multiplication work...';
-      case 'division': return 'Show your division work...';
-      case 'fractions': return 'e.g., 2 × 4 = 8, 3 × 5 = 15, so 8/15';
-      default: return 'Show your work here...';
+    if (onSendToChat) {
+      onSendToChat(message, {
+        type: 'request_more_problems',
+        sessionId: sessionState.sessionId,
+        completedTypes: completedTypes,
+        sessionStats: {
+          totalCorrect: sessionState.totalCorrect,
+          totalAttempts: sessionState.totalAttempts,
+          bestStreak: sessionState.bestStreak
+        }
+      });
     }
   };
 
-  // Render individual problem with enhanced work area
+  // Progress Bar Component
+  const ProgressBar = () => (
+    <div className="mb-6 p-4 bg-white rounded-xl border-2 border-blue-200">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+          <FiTarget className="mr-2 text-blue-500" />
+          Session Progress
+        </h3>
+        <span className="text-sm font-medium text-gray-600">
+          {sessionState.completedProblems.size} of {sessionState.problems.length} completed
+        </span>
+      </div>
+      
+      <div className="w-full bg-gray-200 rounded-full h-3 mb-3 overflow-hidden">
+        <motion.div
+          className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full"
+          initial={{ width: 0 }}
+          animate={{ width: `${progressPercentage}%` }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        />
+      </div>
+      
+      <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="p-2 bg-green-50 rounded-lg">
+          <div className="text-lg font-bold text-green-600">{sessionState.totalCorrect}</div>
+          <div className="text-xs text-green-600">Correct</div>
+        </div>
+        <div className="p-2 bg-orange-50 rounded-lg">
+          <div className="text-lg font-bold text-orange-600">{sessionState.streak}</div>
+          <div className="text-xs text-orange-600">Current Streak</div>
+        </div>
+        <div className="p-2 bg-purple-50 rounded-lg">
+          <div className="text-lg font-bold text-purple-600">{sessionState.bestStreak}</div>
+          <div className="text-xs text-purple-600">Best Streak</div>
+        </div>
+      </div>
+      
+      {isSessionComplete && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4 p-3 bg-gradient-to-r from-green-400 to-blue-500 rounded-lg text-white text-center"
+        >
+          <FiAward className="inline-block mr-2" size={20} />
+          <span className="font-semibold">Session Complete! Great work! 🎉</span>
+        </motion.div>
+      )}
+    </div>
+  );
+
+  // Problem status indicator
+  const getStatusIndicator = (problemId) => {
+    const state = problemStates[problemId];
+    
+    switch (state) {
+      case 'correct':
+        return <FiCheckCircle className="text-green-500" size={20} />;
+      case 'incorrect':
+        return <FiX className="text-red-500" size={20} />;
+      case 'checking':
+        return <div className="loading-dots text-blue-500"><span></span><span></span><span></span></div>;
+      case 'helped':
+        return <FiHelpCircle className="text-orange-500" size={20} />;
+      default:
+        return <div className="w-5 h-5 border-2 border-gray-300 rounded-full"></div>;
+    }
+  };
+
+  // Enhanced problem rendering with session context
   const renderMathProblem = (problem, index) => {
-    const colors = getTypeColors(problem.type);
-    const steps = getStepsForType(problem.type, problem.text);
+    const isCompleted = sessionState.completedProblems.has(problem.id);
+    const isCurrent = index === sessionState.currentProblemIndex;
+    const status = problemStates[problem.id];
     
     return (
       <motion.div
-        key={index}
+        key={problem.id}
+        id={`problem-${problem.id}`}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: index * 0.1 }}
-        className="bg-white border-2 rounded-xl p-6 mb-4 shadow-lg"
-        style={{ 
-          borderColor: colors.border,
-          backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(0,0,0,0.05) 1px, transparent 0)',
-          backgroundSize: '20px 20px'
-        }}
+        className={`bg-white border-2 rounded-xl p-6 mb-4 shadow-lg transition-all duration-300 ${
+          isCurrent ? 'ring-2 ring-blue-400 border-blue-400' : 
+          isCompleted ? 'border-green-400 bg-green-50' : 'border-gray-200'
+        }`}
       >
-        {/* Problem Header */}
+        {/* Enhanced Problem Header with Status */}
         <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center space-x-2">
-            <span 
-              className="text-sm font-semibold text-white px-3 py-1 rounded-full flex items-center space-x-1"
-              style={{ backgroundColor: colors.accent.replace('0.15', '1') }}
-            >
-              {getOperationIcon(problem.type)}
-              <span>Problem {index + 1}</span>
-            </span>
-            <span className="text-xs text-[var(--text-secondary)] capitalize bg-[var(--background-card)] px-2 py-1 rounded">
-              {problem.type.replace('_', ' ')}
-            </span>
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              {getStatusIndicator(problem.id)}
+              <span className={`text-lg font-bold ${isCompleted ? 'text-green-600' : 'text-gray-800'}`}>
+                Problem {index + 1}
+              </span>
+            </div>
+            {isCurrent && !isCompleted && (
+              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                Current
+              </span>
+            )}
+            {isCompleted && (
+              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                ✓ Complete
+              </span>
+            )}
           </div>
+          
           <div className="flex items-center space-x-1">
-            <button
-              onClick={() => askForHelp(index, problem.text)}
-              className="text-[var(--text-tertiary)] hover:text-orange-500 transition-colors p-1"
-              title="Ask Klio for help"
-            >
-              <FiHelpCircle size={18} />
-            </button>
-            <button
-              onClick={() => copyToClipboard(problem.text)}
-              className="text-[var(--text-tertiary)] hover:text-blue-500 transition-colors p-1"
-              title="Copy problem"
-            >
-              {copied ? <FiCheck size={14} /> : <FiCopy size={14} />}
-            </button>
+            {!isCompleted && (
+              <button
+                onClick={() => askForHelp(index, problem.text)}
+                className="text-gray-400 hover:text-orange-500 transition-colors p-1"
+                title="Ask Klio for help"
+              >
+                <FiHelpCircle size={18} />
+              </button>
+            )}
           </div>
         </div>
 
         {/* Problem Statement */}
         <div className="mb-6">
-          <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3">Problem:</h4>
-          <div 
-            className="p-6 rounded-xl border-2 text-center"
-            style={{ 
-              backgroundColor: colors.bg,
-              borderColor: colors.border 
-            }}
-          >
-            <div className="text-4xl font-bold text-[var(--text-primary)]">
+          <div className={`p-6 rounded-xl border-2 text-center ${
+            isCompleted ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'
+          }`}>
+            <div className="text-4xl font-bold text-gray-800">
               {problem.text}
             </div>
           </div>
         </div>
 
-        {/* Steps to solve */}
-        <div className="mb-6">
-          <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3">Steps to solve:</h4>
-          <div className="space-y-2">
-            {steps.map((step, stepIndex) => (
-              <div
-                key={stepIndex}
-                className="p-3 rounded-lg border-l-4 text-sm"
-                style={{
-                  backgroundColor: colors.bg,
-                  borderLeftColor: colors.accent
-                }}
-              >
-                <strong>Step {stepIndex + 1}:</strong> {step.text}
+        {/* Work Area - only show if not completed */}
+        {!isCompleted && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-gray-600 flex items-center">
+                <FiEdit3 size={14} className="mr-2" />
+                Your Work:
+              </h4>
+              <div className="flex items-center space-x-2">
+                {workNotes[problem.id]?.trim() && status !== 'checking' && (
+                  <button
+                    onClick={() => sendWorkToChat(index, problem.text, workNotes[problem.id])}
+                    className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full hover:bg-green-200 transition-colors flex items-center space-x-1 border border-green-300"
+                    title="Send your work to Klio for checking"
+                  >
+                    <FiSend size={12} />
+                    <span>Check My Work</span>
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* Enhanced Work Area */}
-        {renderMathWorkArea(problem, index)}
+            <textarea
+              value={workNotes[problem.id] || ''}
+              onChange={(e) => setWorkNotes(prev => ({ ...prev, [problem.id]: e.target.value }))}
+              placeholder="Show your work here..."
+              disabled={status === 'checking'}
+              className={`w-full h-32 p-4 border-2 rounded-lg bg-white font-mono text-gray-800 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+                status === 'checking' ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            />
+          </div>
+        )}
+
+        {/* Feedback Area */}
+        {status === 'correct' && (
+          <div className="p-4 bg-green-100 border border-green-300 rounded-lg text-green-800">
+            <FiCheckCircle className="inline-block mr-2" />
+            <strong>Correct! Great job! 🎉</strong>
+          </div>
+        )}
+        
+        {status === 'incorrect' && (
+          <div className="p-4 bg-red-100 border border-red-300 rounded-lg text-red-800">
+            <FiX className="inline-block mr-2" />
+            <strong>Not quite right. Try again or ask for help! 💪</strong>
+          </div>
+        )}
 
         {/* Hint */}
-        {problem.hint && (
-          <div 
-            className="text-sm p-4 rounded-lg border-l-4 mt-4"
-            style={{
-              backgroundColor: colors.bg,
-              borderLeftColor: colors.accent
-            }}
-          >
-            <strong style={{ color: colors.accent.replace('0.15', '1') }}>💡 Hint:</strong> {problem.hint}
+        {problem.hint && !isCompleted && (
+          <div className="text-sm p-4 bg-blue-50 border-l-4 border-blue-400 rounded-lg mt-4">
+            <strong className="text-blue-600">💡 Hint:</strong> {problem.hint}
           </div>
         )}
       </motion.div>
     );
   };
 
-  // Get steps based on problem type (same as before)
-  const getStepsForType = (type, text) => {
-    switch (type) {
-      case 'addition':
-        return [
-          { text: 'Line up the numbers by place value (ones, tens, hundreds)' },
-          { text: 'Start adding from the rightmost column (ones place)' },
-          { text: 'If the sum is 10 or more, carry over to the next column' },
-          { text: 'Continue adding each column from right to left' }
-        ];
-      case 'subtraction':
-        return [
-          { text: 'Line up the numbers by place value' },
-          { text: 'Start subtracting from the rightmost column' },
-          { text: 'If you need to borrow, take 1 from the next column' },
-          { text: 'Continue subtracting each column from right to left' }
-        ];
-      case 'multiplication':
-        return [
-          { text: 'Multiply each digit of the bottom number by the top number' },
-          { text: 'Start with the ones place, then tens, then hundreds' },
-          { text: 'Add all the partial products together' },
-          { text: 'Check your answer by estimating' }
-        ];
-      case 'division':
-        return [
-          { text: 'Set up the division: dividend ÷ divisor' },
-          { text: 'How many times does the divisor go into the first digits?' },
-          { text: 'Multiply and subtract, then bring down the next digit' },
-          { text: 'Repeat until all digits are used' }
-        ];
-      case 'fractions':
-        return [
-          { text: 'Multiply the numerators (top numbers) together' },
-          { text: 'Multiply the denominators (bottom numbers) together' },
-          { text: 'Simplify the fraction if possible' }
-        ];
-      default:
-        return [
-          { text: 'Read the problem carefully' },
-          { text: 'Identify what operation you need to use' },
-          { text: 'Work step by step' },
-          { text: 'Check your answer' }
-        ];
-    }
-  };
+  // Session Complete Actions
+  const SessionCompleteActions = () => (
+    <div className="mb-6 p-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-xl border-2 border-green-200">
+      <div className="text-center mb-4">
+        <FiAward className="text-4xl text-yellow-500 mx-auto mb-2" />
+        <h3 className="text-xl font-bold text-gray-800">Fantastic Work!</h3>
+        <p className="text-gray-600">You completed all {sessionState.problems.length} problems!</p>
+      </div>
+      
+      <div className="flex flex-col gap-3">
+        <button
+          onClick={requestMoreProblems}
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"
+        >
+          <FiPlus className="mr-2" />
+          Practice More Similar Problems
+        </button>
+        
+        <button
+          onClick={() => onSendToChat("What other topics can we practice?")}
+          className="w-full bg-purple-500 hover:bg-purple-600 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"
+        >
+          <FiTrendingUp className="mr-2" />
+          Try Different Topics
+        </button>
+      </div>
+    </div>
+  );
 
-  // Rest of component (empty state, etc.) remains the same
   if (!workspaceContent) {
     return (
-      <div className="flex flex-col h-full bg-[var(--background-main)]">
-        <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)] bg-white">
-          <h3 className="font-semibold text-[var(--text-primary)] flex items-center">
-            <FiPenTool className="mr-2 text-[var(--accent-blue)]" size={18} />
-            Math Workspace
+      <div className="flex flex-col h-full bg-gray-50">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+          <h3 className="font-semibold text-gray-800 flex items-center">
+            <FiPenTool className="mr-2 text-blue-500" size={18} />
+            Practice Workspace
           </h3>
           <button
             onClick={onToggleSize}
-            className="text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition-colors p-2 rounded-lg hover:bg-[var(--accent-blue-10-opacity)]"
+            className="text-gray-500 hover:text-blue-500 transition-colors p-2 rounded-lg hover:bg-blue-50"
           >
             {isExpanded ? <FiMinimize2 size={16} /> : <FiMaximize2 size={16} />}
           </button>
         </div>
-        <div className="flex-1 flex items-center justify-center p-8 text-center"
-             style={{ 
-               backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(0,0,0,0.05) 1px, transparent 0)',
-               backgroundSize: '20px 20px'
-             }}>
-          <div className="text-[var(--text-tertiary)]">
-            <FiPenTool size={64} className="mx-auto mb-6 opacity-30" />
-            <h4 className="text-lg font-medium mb-2 text-[var(--text-secondary)]">Math Workspace</h4>
-            <p className="text-sm">Math problems and visual aids will appear here</p>
-            <p className="text-xs mt-2 text-[var(--text-tertiary)]">Your digital whiteboard for problem solving! ✨</p>
+        <div className="flex-1 flex items-center justify-center p-8 text-center">
+          <div className="text-gray-400">
+            <FiTarget size={64} className="mx-auto mb-6 opacity-30" />
+            <h4 className="text-lg font-medium mb-2 text-gray-600">Ready to Practice!</h4>
+            <p className="text-sm">Math problems and progress tracking will appear here</p>
           </div>
         </div>
       </div>
@@ -544,17 +447,18 @@ const WorkspacePanel = ({ workspaceContent, onToggleSize, isExpanded, onClose, o
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--background-main)]">
-      <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)] bg-white">
-        <h3 className="font-semibold text-[var(--text-primary)] flex items-center">
-          <FiPenTool className="mr-2 text-[var(--accent-blue)]" size={18} />
-          Math Workspace
+    <div className="flex flex-col h-full bg-gray-50">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+        <h3 className="font-semibold text-gray-800 flex items-center">
+          <FiPenTool className="mr-2 text-blue-500" size={18} />
+          Practice Session
         </h3>
         <div className="flex items-center space-x-2">
           {onClose && (
             <button
               onClick={onClose}
-              className="text-[var(--text-tertiary)] hover:text-[var(--accent-red)] transition-colors p-2 rounded-lg hover:bg-[var(--accent-red-10-opacity)]"
+              className="text-gray-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50"
               title="Close workspace"
             >
               <FiTrash2 size={14} />
@@ -562,31 +466,21 @@ const WorkspacePanel = ({ workspaceContent, onToggleSize, isExpanded, onClose, o
           )}
           <button
             onClick={onToggleSize}
-            className="text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition-colors p-2 rounded-lg hover:bg-[var(--accent-blue-10-opacity)]"
+            className="text-gray-500 hover:text-blue-500 transition-colors p-2 rounded-lg hover:bg-blue-50"
           >
             {isExpanded ? <FiMinimize2 size={16} /> : <FiMaximize2 size={16} />}
           </button>
         </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4" 
-           style={{ 
-             backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(0,0,0,0.05) 1px, transparent 0)',
-             backgroundSize: '20px 20px'
-           }}>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {sessionState.problems.length > 0 && <ProgressBar />}
+        
+        {isSessionComplete && <SessionCompleteActions />}
+        
         <AnimatePresence>
-          {/* Handle math problems */}
-          {workspaceContent.type === 'math_problems' && 
-            workspaceContent.problems.map((problem, i) => renderMathProblem(problem, i))
-          }
-          
-          {/* Handle mixed content */}
-          {workspaceContent.type === 'mixed' && 
-            workspaceContent.content.map((item, i) => {
-              if (item.type === 'math_problem') return renderMathProblem(item, i);
-              return null;
-            })
-          }
+          {sessionState.problems.map((problem, i) => renderMathProblem(problem, i))}
         </AnimatePresence>
       </div>
     </div>

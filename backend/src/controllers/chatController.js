@@ -1,4 +1,4 @@
-// backend/src/controllers/chatController.js - Enhanced with Structured Output & Comprehensive Memory Logging
+// backend/src/controllers/chatController.js - FIXED with MCP Integration
 const { OpenAI } = require('openai');
 const supabase = require('../utils/supabaseClient');
 const mcpClient = require('../services/mcpClient');
@@ -130,59 +130,9 @@ You MUST respond with a JSON object that follows this exact schema:
 3. **Use encouraging language** - "I've set up some problems for you", "Check out your workspace"
 4. **Provide context** - mention what type of problems they'll find
 
-**EXAMPLES OF GOOD MESSAGES:**
+Remember: Your message should be natural and conversational, the workspace_content should contain clean, workable math problems, always set has_workspace_content appropriately, and convert all LaTeX notation to simple readable format`;
 
-Math Practice:
-"Great! Let's practice some addition and subtraction! 🧮 I've set up some problems in your workspace on the right. Take your time and let me know if you need help with any of them!"
-
-Fraction Work:
-"Perfect! Time for some fraction practice! I've prepared a few multiplication problems in your workspace. Remember: multiply the numerator by the whole number, then divide by the denominator. You've got this! 💪"
-
-Mixed Problems:
-"Awesome! I've set up a variety of math problems for you to practice. Check out your workspace - there are addition, subtraction, and even some fraction problems! Start with whichever one feels most comfortable. 😊"
-{
-  "message": "Great! Let's practice some math problems together! I've set up a few problems in your workspace on the right. \\n\\nClick the workspace to see:\\n• Addition problems\\n• Subtraction problems\\n\\nTry solving them and let me know how it goes! 😊",
-  "workspace_content": {
-    "type": "math_problems",
-    "problems": [
-      {
-        "text": "4 × 2/3",
-        "display_text": "4 × 2/3",
-        "type": "fractions", 
-        "hint": "Multiply the whole number by the numerator, then divide by the denominator",
-        "difficulty": "medium"
-      },
-      {
-        "text": "7 × 3/8", 
-        "display_text": "7 × 3/8",
-        "type": "fractions",
-        "hint": "Multiply 7 by 3, then divide by 8",
-        "difficulty": "medium"
-      },
-      {
-        "text": "5 × 1/2",
-        "display_text": "5 × 1/2", 
-        "type": "fractions",
-        "hint": "Half of 5 is what number?",
-        "difficulty": "easy"
-      }
-    ]
-  },
-  "has_workspace_content": true
-}
-
-Example 2 - Simple Conversation:
-{
-  "message": "Hi! I'm here to help you learn. What would you like to work on today?",
-  "has_workspace_content": false
-}
-
-**REMEMBER:** 
-- Your message should be natural and conversational
-- The workspace_content should contain clean, workable math problems
-- Always set has_workspace_content appropriately
-- Convert all LaTeX notation to simple readable format`;
-
+// 🔧 FIXED: Parse specific question requests
 function parseSpecificQuestionRequest(message) {
   // Look for patterns like "question 5", "number 5", "problem 5"
   const questionMatch = message.match(/(?:question|number|problem)\s*(\d+)/i);
@@ -217,32 +167,82 @@ function parseSpecificQuestionRequest(message) {
     originalMessage: message
   };
 }
-
-async function getMaterialWithContent(childId, materialRef) {
+async function findRecentMaterialWithQuestions(childId, questionNumber) {
+  try {
+    console.log(`🔍 Looking for recent materials with question ${questionNumber}...`);
+    
+    // Search for recent assignments
+    const searchResult = await mcpClient.search(childId, '', 'assignments');
+    const assignments = searchResult.results.assignments || [];
+    
+    if (assignments.length === 0) {
+      console.log('❌ No assignments found');
+      return null;
+    }
+    
+    // Check each assignment for the question number
+    for (const assignment of assignments.slice(0, 5)) { // Check up to 5 recent assignments
+      console.log(`🔍 Checking "${assignment.title}" for question ${questionNumber}...`);
+      
+      const materialContent = await mcpClient.getMaterialContent(childId, assignment.title);
+      if (materialContent && materialContent.questions) {
+        const questionPattern = new RegExp(`^${questionNumber}\\.\\s*`);
+        const hasQuestion = materialContent.questions.some(q => 
+          questionPattern.test(q.toString().trim())
+        );
+        
+        if (hasQuestion) {
+          console.log(`✅ Found question ${questionNumber} in "${assignment.title}"`);
+          return {
+            materialData: materialContent,
+            materialTitle: assignment.title
+          };
+        }
+      }
+    }
+    
+    console.log(`❌ Question ${questionNumber} not found in any recent materials`);
+    return null;
+  } catch (error) {
+    console.error('❌ Error finding recent material:', error);
+    return null;
+  }
+}
+// 🔧 FIXED: Get material with content using MCP
+async function getMaterialWithContent(childId, materialRef, questionNumber = null) {
   try {
     console.log(`🔍 Searching for material: "${materialRef}"`);
 
-    // First try to get full content directly
-    const materialContent = await mcpClient.getMaterialContent(childId, materialRef);
-    if (materialContent) {
-      console.log(`✅ Found material content: "${materialContent.material.title}"`);
-      return materialContent;
+    // Strategy 1: Direct material lookup
+    if (materialRef) {
+      const materialContent = await mcpClient.getMaterialContent(childId, materialRef);
+      if (materialContent) {
+        console.log(`✅ Found material content: "${materialContent.material.title}"`);
+        return materialContent;
+      }
+
+      // Strategy 2: Search for material by name
+      const searchResult = await mcpClient.search(childId, materialRef, 'assignments');
+      const assignments = searchResult.results.assignments || [];
+
+      if (assignments.length > 0) {
+        const bestMatch = assignments.find(a =>
+          a.title.toLowerCase().includes(materialRef.toLowerCase())
+        ) || assignments[0];
+
+        console.log(`🔍 Found material via search: "${bestMatch.title}"`);
+        const fullContent = await mcpClient.getMaterialContent(childId, bestMatch.title);
+        return fullContent;
+      }
     }
 
-    // If direct lookup fails, try searching
-    const searchResult = await mcpClient.search(childId, materialRef, 'assignments');
-    const assignments = searchResult.results.assignments || [];
-
-    if (assignments.length > 0) {
-      const bestMatch = assignments.find(a =>
-        a.title.toLowerCase().includes(materialRef.toLowerCase())
-      ) || assignments[0];
-
-      console.log(`🔍 Found material via search: "${bestMatch.title}"`);
-
-      // Try to get full content for the found material
-      const fullContent = await mcpClient.getMaterialContent(childId, bestMatch.title);
-      return fullContent;
+    // Strategy 3: If we have a question number but no material ref, search recent materials
+    if (questionNumber && !materialRef) {
+      console.log(`🔍 No material specified, searching recent materials for question ${questionNumber}...`);
+      const recentMaterial = await findRecentMaterialWithQuestions(childId, questionNumber);
+      if (recentMaterial) {
+        return recentMaterial.materialData;
+      }
     }
 
     console.log(`❌ Material not found: "${materialRef}"`);
@@ -252,6 +252,7 @@ async function getMaterialWithContent(childId, materialRef) {
     return null;
   }
 }
+// 🔧 FIXED: Format material content for AI
 function formatMaterialContentForAI(materialData, questionNumber = null) {
   if (!materialData) return '';
 
@@ -325,6 +326,7 @@ function formatMaterialContentForAI(materialData, questionNumber = null) {
 
   return content;
 }
+
 // Enhanced helper function to build memory context for AI prompt
 function buildMemoryContext(memories, profile) {
   if (!memories || memories.length === 0) {
@@ -362,7 +364,6 @@ function buildMemoryContext(memories, profile) {
   return context;
 }
 
-
 // Enhanced helper function to extract topic from message
 function extractTopic(message) {
   const commonTopics = [
@@ -396,7 +397,7 @@ async function updateLearningMemories(childId, userMessage, aiResponse, mcpConte
 
     console.log(`✅ Updated interaction count: ${learningProfile.total_interactions} → ${learningProfile.total_interactions + 1}`);
 
-    // Detect and store learning moments (same logic as before)
+    // Detect and store learning moments
     const messageLower = userMessage.toLowerCase();
     const subject = mcpContext?.currentFocus?.lesson?.unit?.child_subject?.subject?.name || 
                    mcpContext?.currentFocus?.lesson?.unit?.child_subject?.custom_subject_name_override ||
@@ -428,7 +429,6 @@ async function updateLearningMemories(childId, userMessage, aiResponse, mcpConte
       }
     }
 
-    // Add other memory patterns...
     console.log(`Updated learning memories for child ${childId}: ${subject} - ${topic}`);
 
   } catch (error) {
@@ -436,8 +436,7 @@ async function updateLearningMemories(childId, userMessage, aiResponse, mcpConte
   }
 }
 
-
-// Main chat handler - Enhanced with Memory System & Structured Output
+// 🚀 MAIN CHAT HANDLER - FIXED WITH MCP INTEGRATION
 exports.chat = async (req, res) => {
   const childId = req.child?.child_id;
   const { message, sessionHistory = [], lessonContext = null } = req.body;
@@ -465,7 +464,95 @@ exports.chat = async (req, res) => {
       .eq('id', childId)
       .single();
 
-    // Get memory context (same as before)
+    // 🔧 ENHANCED: Better specific question detection
+    const specificQuestionRequest = parseSpecificQuestionRequest(message);
+    let materialContentForAI = '';
+    let foundMaterialTitle = '';
+
+    if (specificQuestionRequest) {
+      console.log('🎯 Specific question request detected:', specificQuestionRequest);
+      
+      let materialRef = specificQuestionRequest.materialRef;
+      
+      // Strategy 1: Use material ref from message
+      if (materialRef) {
+        console.log(`📖 Using material ref from message: "${materialRef}"`);
+      }
+      // Strategy 2: Use current focus as fallback
+      else if (mcpContext?.currentFocus?.title) {
+        materialRef = mcpContext.currentFocus.title;
+        console.log(`📖 Using current focus as material ref: "${materialRef}"`);
+      }
+      // Strategy 3: Search recent materials for the question
+      else {
+        console.log(`🔍 No material ref found, will search recent materials for question ${specificQuestionRequest.questionNumber}`);
+      }
+      
+      // Get material content using enhanced method
+      console.log(`🔍 Getting material content for question ${specificQuestionRequest.questionNumber}...`);
+      const materialData = await getMaterialWithContent(
+        childId, 
+        materialRef, 
+        specificQuestionRequest.questionNumber
+      );
+      
+      if (materialData) {
+        foundMaterialTitle = materialData.material.title;
+        materialContentForAI = formatMaterialContentForAI(
+          materialData, 
+          specificQuestionRequest.questionNumber
+        );
+        console.log(`✅ Added material content to AI context: "${foundMaterialTitle}"`);
+        console.log(`📝 Question ${specificQuestionRequest.questionNumber} context prepared`);
+      } else {
+        console.log('❌ Could not retrieve material content');
+        materialContentForAI = `\n⚠️ **MATERIAL ACCESS ISSUE**: Could not find a material containing question ${specificQuestionRequest.questionNumber}. 
+
+**IMPORTANT**: When helping with specific numbered questions, you need to:
+1. Ask the student which assignment they're working on (e.g., "Which assignment is question ${specificQuestionRequest.questionNumber} from?")
+2. Or provide general guidance: "Without seeing the specific question, I can help you with general problem-solving strategies."
+
+The student is asking about question ${specificQuestionRequest.questionNumber} but didn't specify which assignment.\n`;
+      }
+    }
+
+    // 🔧 ENHANCED: Better material search for general requests
+    if (!specificQuestionRequest && (message.toLowerCase().includes('review') || 
+                                    message.toLowerCase().includes('work on') ||
+                                    message.toLowerCase().includes('help with'))) {
+      
+      // Try to find material mentioned in the message
+      const materialPatterns = [
+        /chapter\s*(\d+)/i,
+        /(assessment|test|quiz|worksheet)/i,
+        /(lesson\s*\d+)/i
+      ];
+
+      for (const pattern of materialPatterns) {
+        const match = message.match(pattern);
+        if (match) {
+          const potentialMaterial = match[0];
+          console.log(`🔍 Searching for mentioned material: "${potentialMaterial}"`);
+          
+          const searchResult = await mcpClient.search(childId, potentialMaterial, 'assignments');
+          if (searchResult.results.assignments?.length > 0) {
+            const material = searchResult.results.assignments[0];
+            const materialData = await mcpClient.getMaterialContent(childId, material.title);
+            
+            if (materialData) {
+              foundMaterialTitle = materialData.material.title;
+              materialContentForAI = formatMaterialContentForAI(materialData);
+              console.log(`✅ Added found material content to AI context: "${foundMaterialTitle}"`);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Rest of your existing chat handler code...
+    // (memory context, system prompt building, OpenAI call, etc.)
+    
     const [recentMemories, learningProfile] = await Promise.all([
       memoryService.getRelevantMemories(childId, message, mcpContext, 4).catch(e => {
         console.error('❌ Error getting memories:', e);
@@ -509,7 +596,9 @@ exports.chat = async (req, res) => {
       You have been tutoring ${child?.name} for ${daysTogether} day${daysTogether !== 1 ? 's' : ''} with ${learningProfile.total_interactions} total interactions.
       
       **RELEVANT LEARNING MEMORIES:**
-      ${memoryContext}`;
+      ${memoryContext}
+      
+      ${materialContentForAI}`;
 
     // Prepare conversation history
     const recentHistory = sessionHistory.slice(-8);
@@ -530,6 +619,7 @@ exports.chat = async (req, res) => {
 
     // Call OpenAI with structured output
     console.log('🎯 Requesting structured response from OpenAI...');
+    console.log(`📊 Context includes: ${materialContentForAI ? `Material Content ✅ (${foundMaterialTitle})` : 'No Material Content ❌'}`);
     
     let response;
     try {
@@ -563,7 +653,6 @@ exports.chat = async (req, res) => {
     } catch (parseError) {
       console.error('❌ Failed to parse structured response:', parseError);
       
-      // Fallback to simple response
       const fallbackMessage = response.choices[0].message.content || 
         "Sorry, I couldn't generate a response right now. Please try again!";
       
@@ -573,10 +662,10 @@ exports.chat = async (req, res) => {
       };
     }
 
-    // Update memory (same as before)
+    // Update memory
     await updateLearningMemories(childId, message, structuredResponse.message, mcpContext, learningProfile);
 
-    // Log interaction
+    // Log interaction with enhanced tracking
     try {
       await supabase
         .from('chat_interactions')
@@ -589,7 +678,11 @@ exports.chat = async (req, res) => {
           has_overdue_assignments: mcpContext?.overdue?.length > 0,
           has_memory_context: recentMemories.length > 0,
           has_workspace_content: structuredResponse.has_workspace_content,
-          response_type: 'structured'
+          response_type: 'structured',
+          has_material_content: !!materialContentForAI,
+          specific_question_request: !!specificQuestionRequest,
+          material_found: !!foundMaterialTitle,
+          question_number: specificQuestionRequest?.questionNumber || null
         }]);
     } catch (logError) {
       console.error('Failed to log interaction:', logError);
@@ -599,6 +692,8 @@ exports.chat = async (req, res) => {
     console.log(`Response Length: ${structuredResponse.message.length} characters`);
     console.log(`Has Workspace Content: ${structuredResponse.has_workspace_content}`);
     console.log(`Problems Count: ${structuredResponse.workspace_content?.problems?.length || 0}`);
+    console.log(`Material Content Used: ${!!materialContentForAI}`);
+    console.log(`Found Material: ${foundMaterialTitle || 'None'}`);
 
     // Return structured response
     res.json({
@@ -606,7 +701,6 @@ exports.chat = async (req, res) => {
       message: structuredResponse.message,
       timestamp: new Date().toISOString(),
       provider: 'openai',
-      // NEW: Include workspace content directly
       workspaceContent: structuredResponse.has_workspace_content ? structuredResponse.workspace_content : null,
       debugInfo: {
         currentDate,
@@ -614,7 +708,11 @@ exports.chat = async (req, res) => {
         totalMaterials: mcpContext?.allMaterials?.length || 0,
         contextLength: formattedLearningContext.length,
         hasWorkspaceContent: structuredResponse.has_workspace_content,
-        problemsCount: structuredResponse.workspace_content?.problems?.length || 0
+        problemsCount: structuredResponse.workspace_content?.problems?.length || 0,
+        hasMaterialContent: !!materialContentForAI,
+        specificQuestionDetected: !!specificQuestionRequest,
+        foundMaterial: foundMaterialTitle,
+        questionNumber: specificQuestionRequest?.questionNumber
       }
     });
 
@@ -627,7 +725,7 @@ exports.chat = async (req, res) => {
     });
   }
 };
-// Get chat suggestions based on current context with memory awareness
+// 🔧 FIXED: Get suggestions with MCP integration
 exports.getSuggestions = async (req, res) => {
     const childId = req.child?.child_id;
     const mcpContext = req.mcpContext;
@@ -650,6 +748,35 @@ exports.getSuggestions = async (req, res) => {
       ]);
 
       const suggestions = [];
+
+      // 🔧 FIXED: Use MCP to get current materials for suggestions
+      try {
+        const currentMaterials = await mcpClient.getCurrentMaterials(childId);
+        
+        if (currentMaterials && currentMaterials.length > 0) {
+          // Add specific material suggestions
+          const urgentMaterial = currentMaterials.find(m => 
+            m.due_date && new Date(m.due_date) <= new Date()
+          );
+          
+          if (urgentMaterial) {
+            suggestions.unshift(`Help me with "${urgentMaterial.title}" (overdue!) 🚨`);
+          }
+          
+          const todayMaterial = currentMaterials.find(m => {
+            if (!m.due_date) return false;
+            const dueDate = new Date(m.due_date);
+            const today = new Date();
+            return dueDate.toDateString() === today.toDateString();
+          });
+          
+          if (todayMaterial) {
+            suggestions.push(`Help me with "${todayMaterial.title}" (due today!) ⚠️`);
+          }
+        }
+      } catch (mcpError) {
+        console.error('Error getting materials for suggestions:', mcpError);
+      }
 
       // Memory-based suggestions
       if (recentMemories.length > 0) {
@@ -674,7 +801,6 @@ exports.getSuggestions = async (req, res) => {
 
       // Enhanced with context if available
       if (mcpContext && !mcpContext.error) {
-        // Current focus suggestion (highest priority)
         if (mcpContext.currentFocus?.title) {
           const focus = mcpContext.currentFocus;
           let suggestion = `Help me with "${focus.title}"`;
@@ -694,7 +820,6 @@ exports.getSuggestions = async (req, res) => {
           suggestions.unshift(suggestion + " 📖");
         }
 
-        // Upcoming assignments suggestion
         if (mcpContext.upcomingAssignments?.length > 0) {
           const nextAssignment = mcpContext.upcomingAssignments[0];
           const dueDate = new Date(nextAssignment.due_date);
@@ -708,23 +833,20 @@ exports.getSuggestions = async (req, res) => {
           }
         }
 
-        // Subject-specific suggestion
         if (mcpContext.childSubjects?.length > 0) {
-          const subjects = mcpContext.childSubjects.map(cs => cs.subjects?.name || cs.subject?.name).filter(Boolean); // Added cs.subject.name
+          const subjects = mcpContext.childSubjects.map(cs => cs.subjects?.name || cs.subject?.name).filter(Boolean);
           if (subjects.length > 0) {
             const randomSubject = subjects[Math.floor(Math.random() * subjects.length)];
             suggestions.push(`Let's practice ${randomSubject}! 🎯`);
           }
         }
 
-        // Progress-based suggestions
         if (mcpContext.progress?.summary) {
           if (mcpContext.progress.summary.totalCompletedMaterials > 0) {
             suggestions.push("Show me my progress! 📊");
           }
         }
 
-        // Active lessons suggestion
         if (mcpContext.currentMaterials?.length > 1) {
           suggestions.push("What lessons do I have? 📚");
         }
@@ -771,7 +893,7 @@ exports.getSuggestions = async (req, res) => {
     }
 };
 
-// Get lesson help (enhanced with memory awareness)
+// 🔧 FIXED: Get lesson help with enhanced MCP access
 exports.getLessonHelp = async (req, res) => {
   const childId = req.child?.child_id;
   const { lessonId } = req.params;
@@ -781,38 +903,37 @@ exports.getLessonHelp = async (req, res) => {
   }
 
   try {
-    // Check access using enhanced MCP client
+    // 🔧 FIXED: Use enhanced MCP client methods
     const hasAccess = await mcpClient.checkMaterialAccess(childId, lessonId);
     if (!hasAccess) {
       return res.status(403).json({ error: 'Access denied to this lesson' });
     }
 
-    // Get detailed lesson information
-    const lessonDetails = await mcpClient.getMaterialDetails(lessonId);
+    // 🔧 FIXED: Get detailed lesson information with full content
+    const lessonDetails = await mcpClient.getMaterialDetailsWithChild(childId, lessonId);
     if (!lessonDetails) {
       return res.status(404).json({ error: 'Lesson not found' });
     }
 
     // Get relevant memories for this lesson/subject
-    const subject = lessonDetails.lesson?.unit?.child_subject?.subject?.name || lessonDetails.subject || 'general'; // Added lessonDetails.subject
-    const lessonMemories = await memoryService.getRelevantMemories(childId, lessonDetails.title, null, 3)
+    const subject = lessonDetails.material?.subject || 'general';
+    const lessonMemories = await memoryService.getRelevantMemories(childId, lessonDetails.material?.title || '', null, 3)
       .catch(e => {
         console.error('Error getting lesson memories:', e);
         return [];
       });
 
     // Generate helpful content based on lesson
-    const lessonJson = lessonDetails.lesson_json || {};
+    const lessonJson = lessonDetails.lesson_content || {};
 
     const helpContent = {
-      lessonTitle: lessonDetails.title,
-      lessonType: lessonDetails.content_type,
-      subjectName: lessonDetails.lesson?.unit?.child_subject?.subject?.name || lessonDetails.subject,
+      lessonTitle: lessonDetails.material?.title,
+      lessonType: lessonDetails.material?.content_type,
+      subjectName: lessonDetails.material?.subject,
       tips: [],
       encouragement: "You're doing great! Let's work through this together! 🌟",
       learningGoals: [],
       nextSteps: [],
-      // Memory-informed guidance
       pastExperience: null,
       personalizedTips: []
     };
@@ -830,7 +951,7 @@ exports.getLessonHelp = async (req, res) => {
     }
 
     // Add specific tips based on content type
-    switch (lessonDetails.content_type) {
+    switch (lessonDetails.material?.content_type) {
       case 'worksheet':
       case 'assignment':
         helpContent.tips = [
@@ -840,7 +961,6 @@ exports.getLessonHelp = async (req, res) => {
           "Take your time - there's no rush! ⏰"
         ];
 
-        // Add memory-informed tips
         if (struggles.some(s => s.content.specificQuestion)) {
           helpContent.personalizedTips.push("If you get stuck on a specific question, just ask me about that question number! 🎯");
         }
@@ -877,12 +997,12 @@ exports.getLessonHelp = async (req, res) => {
     }
 
     // Add estimated time and difficulty info
-    if (lessonJson.estimated_completion_time_minutes) {
-      helpContent.estimatedTime = lessonJson.estimated_completion_time_minutes;
+    if (lessonDetails.estimated_time) {
+      helpContent.estimatedTime = lessonDetails.estimated_time;
     }
 
-    if (lessonDetails.difficulty_level) {
-      helpContent.difficultyLevel = lessonDetails.difficulty_level;
+    if (lessonDetails.material?.difficulty_level) {
+      helpContent.difficultyLevel = lessonDetails.material.difficulty_level;
     }
 
     // Add next steps based on lesson content

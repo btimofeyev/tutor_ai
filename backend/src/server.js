@@ -13,6 +13,8 @@ const unitsRoutes = require('./routes/unitsRoutes');
 const childAuthRoutes = require('./routes/childAuthRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 
+const progressRoutes = require('./routes/progressRoutes');
+
 const app = express();
 
 app.use(cors());
@@ -32,6 +34,8 @@ app.use('/api/weights', weightsRoutes);
 app.use('/api/auth/child', childAuthRoutes);
 
 app.use('/api/chat', chatRoutes);
+app.use('/api/progressRoutes', progressRoutes);
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

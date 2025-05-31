@@ -1,4 +1,4 @@
-// klioai-frontend/src/app/chat/page.js - Enhanced with Structured Workspace
+// klioai-frontend/src/app/chat/page.js - Enhanced with Structured Workspace and Progress Tracking
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +12,7 @@ import LessonContextBar from '../../components/LessonContextBar';
 import WorkspacePanel from '../../components/WorkspacePanel';
 import { useAuth } from '../../contexts/AuthContext'; 
 import { chatService } from '../../utils/chatService';
+import { analyzeKlioResponse } from '../../utils/workspaceProgress';
 
 const INITIAL_SUGGESTIONS = [
   "Can you help me with my homework? 📚", 
@@ -37,6 +38,7 @@ export default function ChatPage() {
   // Workspace state
   const [workspaceContent, setWorkspaceContent] = useState(null);
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(false);
+  const workspaceRef = useRef(null); // Reference to workspace component
 
   // Load initial messages
   useEffect(() => {
@@ -276,6 +278,30 @@ export default function ChatPage() {
         // Don't do fallback parsing here - let the user click the button if they want workspace
       }
 
+      // 🆕 AUTO-DETECT PROGRESS UPDATES
+      if (workspaceContent && workspaceRef?.current) {
+        console.log('🔍 Analyzing Klio response for progress updates...');
+        
+        const progressUpdate = analyzeKlioResponse(response.message, {
+          problems: workspaceContent.problems,
+          problemStates: workspaceRef.current.getProblemStates?.()
+        });
+        
+        if (progressUpdate && progressUpdate.problemContext) {
+          console.log('📊 Detected progress update:', progressUpdate);
+          
+          if (progressUpdate.isCorrect && progressUpdate.problemContext.problemId) {
+            console.log('✅ Auto-marking problem correct:', progressUpdate.problemContext.problemId);
+            workspaceRef.current.markProblemCorrect?.(progressUpdate.problemContext.problemId);
+          } else if (!progressUpdate.isCorrect && progressUpdate.problemContext.problemId) {
+            console.log('❌ Auto-marking problem incorrect:', progressUpdate.problemContext.problemId);
+            workspaceRef.current.markProblemIncorrect?.(progressUpdate.problemContext.problemId);
+          }
+        } else {
+          console.log('ℹ️ No progress update detected in Klio response');
+        }
+      }
+
     } catch (error) {
       console.error('Chat error:', error);
       setMessages(prev => [...prev, {
@@ -421,6 +447,7 @@ export default function ChatPage() {
                 isExpanded={isWorkspaceExpanded}
                 onClose={() => setWorkspaceContent(null)}
                 onSendToChat={handleWorkspaceToChat}
+                ref={workspaceRef} // NEW: Reference to workspace for progress tracking
               />
             </motion.div>
           )}

@@ -1,5 +1,5 @@
 // Enhanced WorkspacePanel with Session Management and Progress Tracking
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiMaximize2, FiMinimize2, FiCopy, FiCheck, FiBookOpen, 
@@ -7,8 +7,9 @@ import {
   FiX, FiDivide, FiSend, FiHelpCircle, FiRotateCcw, 
   FiCheckCircle, FiTarget, FiTrendingUp, FiAward 
 } from 'react-icons/fi';
+import { progressService } from '../utils/progressService';
 
-const WorkspacePanel = ({ workspaceContent, onToggleSize, isExpanded, onClose, onSendToChat }) => {
+const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded, onClose, onSendToChat }, ref) => {
   const [sessionState, setSessionState] = useState({
     sessionId: null,
     problems: [],
@@ -22,39 +23,86 @@ const WorkspacePanel = ({ workspaceContent, onToggleSize, isExpanded, onClose, o
   });
   
   const [workNotes, setWorkNotes] = useState({});
-  const [problemStates, setProblemStates] = useState({}); // 'pending', 'checking', 'correct', 'incorrect', 'helped'
+  const [problemStates, setProblemStates] = useState({});
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    markProblemCorrect: (problemId) => markProblemCorrect(problemId),
+    markProblemIncorrect: (problemId) => markProblemIncorrect(problemId),
+    getProblemStates: () => problemStates,
+    getSessionState: () => sessionState
+  }));
 
   // Initialize new session when workspace content changes
   useEffect(() => {
     if (workspaceContent && workspaceContent.problems?.length > 0) {
-      const newSessionId = `session-${Date.now()}`;
-      const problems = workspaceContent.problems.map((problem, index) => ({
-        ...problem,
-        id: problem.id || `problem-${index}`,
-        sessionIndex: index
-      }));
+      const startNewSession = async () => {
+        try {
+          console.log('🎯 Starting new practice session...');
+          
+          const response = await progressService.startSession('practice', workspaceContent.problems.length);
+          const newSessionId = response.session.id;
+          
+          const problems = workspaceContent.problems.map((problem, index) => ({
+            ...problem,
+            id: problem.id || `problem-${index}`,
+            sessionIndex: index
+          }));
 
-      console.log('🎯 Starting new problem session:', newSessionId);
-      
-      setSessionState({
-        sessionId: newSessionId,
-        problems: problems,
-        completedProblems: new Set(),
-        currentProblemIndex: 0,
-        sessionStartTime: Date.now(),
-        totalCorrect: 0,
-        totalAttempts: 0,
-        streak: 0,
-        bestStreak: 0
-      });
-      
-      // Reset problem states
-      const initialStates = {};
-      problems.forEach(problem => {
-        initialStates[problem.id] = 'pending';
-      });
-      setProblemStates(initialStates);
-      setWorkNotes({});
+          console.log('✅ Practice session started:', newSessionId);
+          
+          setSessionState({
+            sessionId: newSessionId,
+            problems: problems,
+            completedProblems: new Set(),
+            currentProblemIndex: 0,
+            sessionStartTime: Date.now(),
+            totalCorrect: 0,
+            totalAttempts: 0,
+            streak: 0,
+            bestStreak: 0
+          });
+          
+          // Reset problem states
+          const initialStates = {};
+          problems.forEach(problem => {
+            initialStates[problem.id] = 'pending';
+          });
+          setProblemStates(initialStates);
+          setWorkNotes({});
+          
+        } catch (error) {
+          console.error('Failed to start practice session:', error);
+          // Fallback to local-only tracking
+          const fallbackSessionId = `local-session-${Date.now()}`;
+          const problems = workspaceContent.problems.map((problem, index) => ({
+            ...problem,
+            id: problem.id || `problem-${index}`,
+            sessionIndex: index
+          }));
+
+          setSessionState({
+            sessionId: fallbackSessionId,
+            problems: problems,
+            completedProblems: new Set(),
+            currentProblemIndex: 0,
+            sessionStartTime: Date.now(),
+            totalCorrect: 0,
+            totalAttempts: 0,
+            streak: 0,
+            bestStreak: 0
+          });
+          
+          const initialStates = {};
+          problems.forEach(problem => {
+            initialStates[problem.id] = 'pending';
+          });
+          setProblemStates(initialStates);
+          setWorkNotes({});
+        }
+      };
+
+      startNewSession();
     }
   }, [workspaceContent]);
 
@@ -92,27 +140,63 @@ const WorkspacePanel = ({ workspaceContent, onToggleSize, isExpanded, onClose, o
   };
 
   // Mark problem as correct (called when AI confirms correct answer)
-  const markProblemCorrect = (problemId) => {
+  const markProblemCorrect = async (problemId) => {
     const problem = sessionState.problems.find(p => p.id === problemId);
     if (!problem) return;
 
-    setSessionState(prev => {
-      const newCompleted = new Set(prev.completedProblems);
-      newCompleted.add(problemId);
+    try {
+      // Record the correct attempt
+      console.log('✅ Recording correct attempt for problem:', problemId);
       
-      const newStreak = prev.streak + 1;
-      const newBestStreak = Math.max(newStreak, prev.bestStreak);
-      
-      return {
-        ...prev,
-        completedProblems: newCompleted,
-        totalCorrect: prev.totalCorrect + 1,
-        totalAttempts: prev.totalAttempts + 1,
-        streak: newStreak,
-        bestStreak: newBestStreak,
-        currentProblemIndex: Math.min(prev.currentProblemIndex + 1, prev.problems.length - 1)
-      };
-    });
+      const attemptResponse = await progressService.recordAttempt(
+        sessionState.sessionId,
+        problem.text,
+        true, // is_correct
+        workNotes[problemId] || '',
+        problem.type || 'general'
+      );
+
+      if (attemptResponse.success) {
+        const stats = attemptResponse.session_stats;
+        
+        setSessionState(prev => {
+          const newCompleted = new Set(prev.completedProblems);
+          newCompleted.add(problemId);
+          
+          return {
+            ...prev,
+            completedProblems: newCompleted,
+            totalCorrect: stats.totalCorrect,
+            totalAttempts: stats.totalAttempts,
+            streak: stats.currentStreak,
+            bestStreak: stats.bestStreak,
+            currentProblemIndex: Math.min(prev.currentProblemIndex + 1, prev.problems.length - 1)
+          };
+        });
+        
+        console.log('📊 Updated session stats:', stats);
+      }
+    } catch (error) {
+      console.error('Failed to record correct attempt:', error);
+      // Fallback to local tracking
+      setSessionState(prev => {
+        const newCompleted = new Set(prev.completedProblems);
+        newCompleted.add(problemId);
+        
+        const newStreak = prev.streak + 1;
+        const newBestStreak = Math.max(newStreak, prev.bestStreak);
+        
+        return {
+          ...prev,
+          completedProblems: newCompleted,
+          totalCorrect: prev.totalCorrect + 1,
+          totalAttempts: prev.totalAttempts + 1,
+          streak: newStreak,
+          bestStreak: newBestStreak,
+          currentProblemIndex: Math.min(prev.currentProblemIndex + 1, prev.problems.length - 1)
+        };
+      });
+    }
 
     setProblemStates(prev => ({
       ...prev,
@@ -130,12 +214,44 @@ const WorkspacePanel = ({ workspaceContent, onToggleSize, isExpanded, onClose, o
   };
 
   // Mark problem as incorrect
-  const markProblemIncorrect = (problemId) => {
-    setSessionState(prev => ({
-      ...prev,
-      totalAttempts: prev.totalAttempts + 1,
-      streak: 0 // Reset streak on incorrect answer
-    }));
+  const markProblemIncorrect = async (problemId) => {
+    const problem = sessionState.problems.find(p => p.id === problemId);
+    if (!problem) return;
+
+    try {
+      // Record the incorrect attempt
+      console.log('❌ Recording incorrect attempt for problem:', problemId);
+      
+      const attemptResponse = await progressService.recordAttempt(
+        sessionState.sessionId,
+        problem.text,
+        false, // is_correct
+        workNotes[problemId] || '',
+        problem.type || 'general'
+      );
+
+      if (attemptResponse.success) {
+        const stats = attemptResponse.session_stats;
+        
+        setSessionState(prev => ({
+          ...prev,
+          totalCorrect: stats.totalCorrect,
+          totalAttempts: stats.totalAttempts,
+          streak: stats.currentStreak, // This will be 0 due to incorrect answer
+          bestStreak: stats.bestStreak
+        }));
+        
+        console.log('📊 Updated session stats after incorrect:', stats);
+      }
+    } catch (error) {
+      console.error('Failed to record incorrect attempt:', error);
+      // Fallback to local tracking
+      setSessionState(prev => ({
+        ...prev,
+        totalAttempts: prev.totalAttempts + 1,
+        streak: 0 // Reset streak on incorrect answer
+      }));
+    }
 
     setProblemStates(prev => ({
       ...prev,
@@ -485,6 +601,8 @@ const WorkspacePanel = ({ workspaceContent, onToggleSize, isExpanded, onClose, o
       </div>
     </div>
   );
-};
+});
+
+WorkspacePanel.displayName = 'WorkspacePanel';
 
 export default WorkspacePanel;

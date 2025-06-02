@@ -2,9 +2,21 @@
 "use client";
 import { useSession } from "@supabase/auth-helpers-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import api from "../../utils/api";
 
+// Extracted hooks and utilities
+import { useChildrenData } from "../../hooks/useChildrenData";
+import { useLessonManagement } from "../../hooks/useLessonManagement";
+import { useFiltersAndSorting } from "../../hooks/useFiltersAndSorting";
+import { 
+  APP_CONTENT_TYPES, 
+  formInputStyles, 
+  formLabelStyles 
+} from "../../utils/dashboardConstants";
+import { isDateOverdue, isDateDueSoon } from "../../utils/dashboardHelpers";
+
+// Components
 import StudentSidebar from "./components/StudentSidebar";
 import StudentHeader from "./components/StudentHeader";
 import SubjectCard from "./components/SubjectCard";
@@ -40,98 +52,33 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 
-export const APP_CONTENT_TYPES = [
-  "lesson",
-  "worksheet",
-  "assignment",
-  "test",
-  "quiz",
-  "notes",
-  "reading_material",
-  "other",
-];
-export const APP_GRADABLE_CONTENT_TYPES = [
-  "worksheet",
-  "assignment",
-  "test",
-  "quiz",
-];
-
-const defaultWeightsForNewSubject = APP_CONTENT_TYPES.map((ct) => ({
-  content_type: ct,
-  weight: APP_GRADABLE_CONTENT_TYPES.includes(ct) ? 0.1 : 0.0,
-}));
-
-const isDateOverdue = (dateString) => {
-  if (!dateString) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dueDate = new Date(dateString + "T00:00:00Z"); // Assuming UTC date from DB
-  return dueDate < today;
-};
-const isDateDueSoon = (dateString, days = 7) => {
-  if (!dateString) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dueDate = new Date(dateString + "T00:00:00Z"); // Assuming UTC date from DB
-  const soonCutoff = new Date(today);
-  soonCutoff.setDate(today.getDate() + days);
-  return dueDate >= today && dueDate <= soonCutoff;
-};
-
-// Helper for input styling
-const inputBaseClass = "block w-full border-border-input focus:outline-none focus:ring-1 focus:ring-accent-blue focus:border-accent-blue rounded-lg bg-background-card text-text-primary placeholder-text-tertiary shadow-sm";
-const inputPaddingClass = "py-2 px-3";
-const inputSizeClass = "text-sm";
-const formInputStyles = `${inputBaseClass} ${inputPaddingClass} ${inputSizeClass}`;
-const formLabelStyles = "block text-xs font-medium text-text-secondary mb-1";
-
 
 export default function DashboardPage() {
   const session = useSession();
   const router = useRouter();
 
-  const [children, setChildren] = useState([]);
-  const [subjectsData, setSubjectsData] = useState([]);
-  const [selectedChild, setSelectedChild] = useState(null);
-  const [childSubjects, setChildSubjects] = useState({});
-  const [lessonsByUnit, setLessonsByUnit] = useState({});
-  const [lessonsBySubject, setLessonsBySubject] = useState({});
-  const [gradeWeights, setGradeWeights] = useState({});
-  const [unitsBySubject, setUnitsBySubject] = useState({});
-
-  const [showAddChild, setShowAddChild] = useState(false);
-  const [newChildNameState, setNewChildNameState] = useState("");
-  const [newChildGradeState, setNewChildGradeState] = useState("");
-
-  const [addLessonSubject, setAddLessonSubject] = useState("");
-  const [addLessonFile, setAddLessonFile] = useState(null);
-  const [addLessonUserContentType, setAddLessonUserContentType] = useState(
-    APP_CONTENT_TYPES[0]
+  // Use extracted custom hooks
+  const childrenData = useChildrenData(session);
+  const lessonManagement = useLessonManagement(childrenData.refreshChildSpecificData);
+  const filtersAndSorting = useFiltersAndSorting(
+    childrenData.lessonsBySubject, 
+    childrenData.gradeWeights, 
+    childrenData.childSubjects, 
+    childrenData.selectedChild
   );
-  const [lessonJsonForApproval, setLessonJsonForApproval] = useState(null);
-  const [lessonTitleForApproval, setLessonTitleForApproval] = useState("");
-  const [lessonContentTypeForApproval, setLessonContentTypeForApproval] =
-    useState(APP_CONTENT_TYPES[0]);
-  const [lessonMaxPointsForApproval, setLessonMaxPointsForApproval] =
-    useState("");
-  const [lessonDueDateForApproval, setLessonDueDateForApproval] = useState("");
-  const [lessonCompletedForApproval, setLessonCompletedForApproval] =
-    useState(false);
 
-  const [editingLesson, setEditingLesson] = useState(null);
-  const [editForm, setEditForm] = useState({});
-
+  // Remaining local state (significantly reduced!)
+  const [subjectsData, setSubjectsData] = useState([]);
+  
+  // Unit management modal state
   const [isManageUnitsModalOpen, setIsManageUnitsModalOpen] = useState(false);
   const [managingUnitsForSubject, setManagingUnitsForSubject] = useState(null);
-  const [currentSubjectUnitsInModal, setCurrentSubjectUnitsInModal] = useState(
-    []
-  );
+  const [currentSubjectUnitsInModal, setCurrentSubjectUnitsInModal] = useState([]);
   const [newUnitNameModalState, setNewUnitNameModalState] = useState("");
   const [editingUnit, setEditingUnit] = useState(null);
 
-  const [isChildLoginSettingsModalOpen, setIsChildLoginSettingsModalOpen] =
-    useState(false);
+  // Child credentials modal state
+  const [isChildLoginSettingsModalOpen, setIsChildLoginSettingsModalOpen] = useState(false);
   const [editingChildCredentials, setEditingChildCredentials] = useState(null);
   const [childUsernameInput, setChildUsernameInput] = useState("");
   const [childPinInput, setChildPinInput] = useState("");
@@ -140,202 +87,25 @@ export default function DashboardPage() {
   const [credentialFormSuccess, setCredentialFormSuccess] = useState("");
   const [isSavingCredentials, setIsSavingCredentials] = useState(false);
 
-  const [uploading, setUploading] = useState(false);
-  const [savingLesson, setSavingLesson] = useState(false);
-  const [isSavingEdit, setIsSavingEdit] = useState(false);
-  const [loadingInitial, setLoadingInitial] = useState(true);
-  const [loadingChildData, setLoadingChildData] = useState(false);
-
   // Upgrade prompt state
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState('');
   const [upgrading, setUpgrading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState('free');
 
-  // Lesson Container Selection State
-  const [selectedLessonContainer, setSelectedLessonContainer] = useState("");
+  // Lesson container state
   const [newLessonContainerTitle, setNewLessonContainerTitle] = useState("");
 
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterContentType, setFilterContentType] = useState("all");
-  const [sortBy, setSortBy] = useState("createdAtDesc");
+  // Get computed values from custom hooks
+  const { assignedSubjectsForCurrentChild } = childrenData;
+  const { totalStats } = filtersAndSorting;
 
-  const dashboardStats = useMemo(() => {
-    if (
-      !selectedChild ||
-      !selectedChild.id ||
-      Object.keys(lessonsBySubject).length === 0
-    ) {
-      return {
-        dueSoon: 0,
-        overdue: 0,
-        overallCompletionPercent: 0,
-        totalItems: 0,
-        completedItems: 0,
-      };
-    }
-    let dueSoon = 0,
-      overdue = 0,
-      completedItems = 0,
-      totalItems = 0;
-    Object.values(lessonsBySubject)
-      .flat()
-      .forEach((item) => {
-        totalItems++;
-        if (item.completed_at) completedItems++;
-        else if (item.due_date) {
-          if (isDateOverdue(item.due_date)) overdue++;
-          else if (isDateDueSoon(item.due_date, 7)) dueSoon++;
-        }
-      });
-    const overallCompletionPercent =
-      totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-    return {
-      dueSoon,
-      overdue,
-      overallCompletionPercent,
-      totalItems,
-      completedItems,
-    };
-  }, [selectedChild, lessonsBySubject]);
-
-  const subjectStats = useMemo(() => {
-    const stats = {};
-    if (!selectedChild || !selectedChild.id) return stats;
-    const currentChildAssignedSubjects = childSubjects[selectedChild.id] || [];
-    currentChildAssignedSubjects.forEach((subj) => {
-      if (subj.child_subject_id) {
-        const items = lessonsBySubject[subj.child_subject_id] || [];
-        const currentSubjectWeightsArray =
-          gradeWeights[subj.child_subject_id] || defaultWeightsForNewSubject;
-        const weightsMap = new Map(
-          currentSubjectWeightsArray.map((w) => [
-            w.content_type,
-            parseFloat(w.weight),
-          ])
-        );
-        let completed = 0,
-          gradableItemsCount = 0,
-          weightedScoreSum = 0,
-          totalWeightOfGradedItems = 0;
-        items.forEach((item) => {
-          if (item.completed_at) completed++;
-          const itemWeight = weightsMap.get(item.content_type);
-          const effectiveWeight =
-            itemWeight === undefined || isNaN(itemWeight) ? 0.0 : itemWeight;
-          if (
-            APP_GRADABLE_CONTENT_TYPES.includes(item.content_type) &&
-            item.grade_value !== null &&
-            String(item.grade_value).trim() !== "" &&
-            item.grade_max_value !== null &&
-            String(item.grade_max_value).trim() !== "" &&
-            effectiveWeight > 0
-          ) {
-            const gradeVal = parseFloat(item.grade_value),
-              maxGradeVal = parseFloat(item.grade_max_value);
-            if (!isNaN(gradeVal) && !isNaN(maxGradeVal) && maxGradeVal > 0) {
-              weightedScoreSum += (gradeVal / maxGradeVal) * effectiveWeight;
-              totalWeightOfGradedItems += effectiveWeight;
-              gradableItemsCount++;
-            }
-          }
-        });
-        const avgWeightedGradePercent =
-          totalWeightOfGradedItems > 0
-            ? Math.round((weightedScoreSum / totalWeightOfGradedItems) * 100)
-            : null;
-        stats[subj.child_subject_id] = {
-          total: items.length,
-          completed,
-          avgGradePercent: avgWeightedGradePercent,
-          gradableItemsCount,
-        };
-      }
-    });
-    return stats;
-  }, [selectedChild, lessonsBySubject, gradeWeights, childSubjects]);
-
-  const filteredAndSortedLessonsBySubject = useMemo(() => {
-    if (Object.keys(lessonsBySubject).length === 0) return {};
-    const result = {};
-    for (const childSubjectId in lessonsBySubject) {
-      let subjectLessons = [...(lessonsBySubject[childSubjectId] || [])];
-      if (filterStatus !== "all") {
-        subjectLessons = subjectLessons.filter((lesson) => {
-          if (filterStatus === "complete") return !!lesson.completed_at;
-          if (filterStatus === "incomplete") return !lesson.completed_at;
-          if (filterStatus === "overdue")
-            return !lesson.completed_at && isDateOverdue(lesson.due_date);
-          if (filterStatus === "dueSoon")
-            return (
-              !lesson.completed_at &&
-              isDateDueSoon(lesson.due_date, 7) &&
-              !isDateOverdue(lesson.due_date)
-            );
-          return true;
-        });
-      }
-      if (filterContentType !== "all") {
-        subjectLessons = subjectLessons.filter(
-          (lesson) => lesson.content_type === filterContentType
-        );
-      }
-      switch (sortBy) {
-        case "dueDateAsc":
-          subjectLessons.sort((a, b) =>
-            a.due_date && b.due_date
-              ? new Date(a.due_date + "T00:00:00Z") -
-                new Date(b.due_date + "T00:00:00Z")
-              : a.due_date
-              ? -1
-              : b.due_date
-              ? 1
-              : 0
-          );
-          break;
-        case "dueDateDesc":
-          subjectLessons.sort((a, b) =>
-            a.due_date && b.due_date
-              ? new Date(b.due_date + "T00:00:00Z") -
-                new Date(a.due_date + "T00:00:00Z")
-              : b.due_date
-              ? -1
-              : a.due_date
-              ? 1
-              : 0
-          );
-          break;
-        case "createdAtAsc":
-          subjectLessons.sort(
-            (a, b) => new Date(a.created_at) - new Date(b.created_at)
-          );
-          break;
-        case "titleAsc":
-          subjectLessons.sort((a, b) =>
-            (a.title || "").localeCompare(b.title || "")
-          );
-          break;
-        case "titleDesc":
-          subjectLessons.sort((a, b) =>
-            (b.title || "").localeCompare(a.title || "")
-          );
-          break;
-        case "createdAtDesc":
-        default:
-          subjectLessons.sort(
-            (a, b) => new Date(b.created_at) - new Date(a.created_at)
-          );
-      }
-      result[childSubjectId] = subjectLessons;
-    }
-    return result;
-  }, [lessonsBySubject, filterStatus, filterContentType, sortBy]);
-
+  // Get lesson containers for selected unit (this one stays as it's UI-specific)
   const currentLessonContainersForUnit = useMemo(() => {
-    const selectedUnitId = lessonJsonForApproval?.unit_id;
+    const selectedUnitId = lessonManagement.lessonJsonForApproval?.unit_id;
     if (!selectedUnitId) return [];
-    return lessonsByUnit[selectedUnitId] || [];
-  }, [lessonJsonForApproval?.unit_id, lessonsByUnit]);
+    return childrenData.lessonsByUnit[selectedUnitId] || [];
+  }, [lessonManagement.lessonJsonForApproval?.unit_id, childrenData.lessonsByUnit]);
 
   const refreshChildSpecificData = useCallback(async () => { 
     if (!selectedChild || !selectedChild.id || !session) return;

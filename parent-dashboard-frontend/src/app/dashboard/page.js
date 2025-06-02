@@ -107,167 +107,51 @@ export default function DashboardPage() {
     return childrenData.lessonsByUnit[selectedUnitId] || [];
   }, [lessonManagement.lessonJsonForApproval?.unit_id, childrenData.lessonsByUnit]);
 
-  const refreshChildSpecificData = useCallback(async () => { 
-    if (!selectedChild || !selectedChild.id || !session) return;
-    setLoadingChildData(true);
-    
-    try {
-      const childSubjectsRes = await api.get(`/child-subjects/child/${selectedChild.id}`);
-      const currentChildAssignedSubjects = childSubjectsRes.data || [];
-      setChildSubjects(cs => ({ ...cs, [selectedChild.id]: currentChildAssignedSubjects }));
-  
-      let newMaterialsBySubject = {}, newGradeWeights = {}, newUnitsBySubject = {}, newLessonsByUnit = {};
-      
-      for (const subject of currentChildAssignedSubjects) {
-        if (subject.child_subject_id) {
-          try {
-            const unitsRes = await api.get(`/units/subject/${subject.child_subject_id}`);
-            const subjectUnits = unitsRes.data || [];
-            newUnitsBySubject[subject.child_subject_id] = subjectUnits;
-            
-            for (const unit of subjectUnits) {
-              try {
-                const lessonsRes = await api.get(`/lesson-containers/unit/${unit.id}`);
-                const unitLessons = lessonsRes.data || [];
-                newLessonsByUnit[unit.id] = unitLessons;
-                
-                for (const lesson of unitLessons) {
-                  try {
-                    const materialsRes = await api.get(`/materials/lesson/${lesson.id}`);
-                    const lessonMaterials = materialsRes.data || [];
-                    
-                    if (!newMaterialsBySubject[subject.child_subject_id]) {
-                      newMaterialsBySubject[subject.child_subject_id] = [];
-                    }
-                    newMaterialsBySubject[subject.child_subject_id].push(...lessonMaterials);
-                  } catch (materialsError) {
-                    console.error(`Materials fetch failed for lesson ${lesson.title}:`, materialsError);
-                  }
-                }
-              } catch (lessonsError) {
-                console.error(`Lesson containers fetch failed for unit ${unit.name}:`, lessonsError);
-                newLessonsByUnit[unit.id] = [];
-              }
-            }
-            
-            try {
-              const weightsRes = await api.get(`/weights/${subject.child_subject_id}`);
-              const fetchedWeightsMap = new Map((weightsRes.data || []).map(w => [w.content_type, parseFloat(w.weight)]));
-              newGradeWeights[subject.child_subject_id] = APP_CONTENT_TYPES.map(ct => ({
-                  content_type: ct,
-                  weight: fetchedWeightsMap.get(ct) ?? (APP_GRADABLE_CONTENT_TYPES.includes(ct) ? 0.10 : 0.00)
-              }));
-            } catch (weightsError) {
-              console.error(`Weights fetch failed for ${subject.name}:`, weightsError);
-              newGradeWeights[subject.child_subject_id] = [...defaultWeightsForNewSubject];
-            }
-            
-          } catch (err) {
-            console.error(`Error fetching hierarchy for subject ${subject.name}:`, err);
-            newMaterialsBySubject[subject.child_subject_id] = [];
-            newGradeWeights[subject.child_subject_id] = [...defaultWeightsForNewSubject];
-            newUnitsBySubject[subject.child_subject_id] = [];
-          }
-        } else {
-          console.warn(`Subject missing child_subject_id:`, subject);
-        }
-      }
-      
-      setUnitsBySubject(newUnitsBySubject);
-      setLessonsByUnit(newLessonsByUnit); 
-      setLessonsBySubject(newMaterialsBySubject); 
-      setGradeWeights(newGradeWeights);
-      
-    } catch (error) { 
-      console.error("Error in refreshChildSpecificData:", error);
-    } finally { 
-      setLoadingChildData(false); 
-    }
-  }, [selectedChild, session]);
+  // All child data management now handled by useChildrenData hook
 
 
+  // Redirect to login if no session
   useEffect(() => {
-    if (session === undefined) return;
-    if (!session) {
+    if (session === false) {
       router.replace("/login");
-      return;
     }
-    setLoadingInitial(true);
-    Promise.all([api.get("/children"), api.get("/subjects")])
-      .then(([childrenRes, allSubjectsRes]) => {
-        const currentChildren = childrenRes.data || [];
-        setChildren(currentChildren);
-        setSubjectsData(allSubjectsRes.data || []);
-        if (currentChildren.length > 0) {
-          if (
-            !selectedChild ||
-            !currentChildren.find((c) => c.id === selectedChild.id)
-          ) {
-            setSelectedChild(currentChildren[0]);
-          }
-        } else {
-          setSelectedChild(null);
-          setChildSubjects({});
-          setLessonsBySubject({});
-          setGradeWeights({});
-          setUnitsBySubject({});
-        }
-      })
-      .catch((error) =>
-        console.error("Error loading initial page data:", error)
-      )
-      .finally(() => setLoadingInitial(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, router]);
 
+  // Fetch subjects data (only data not handled by custom hooks)
   useEffect(() => {
-    if (!session || !selectedChild || !selectedChild.id) {
-      if (selectedChild === null) {
-        setChildSubjects({});
-        setLessonsBySubject({});
-        setGradeWeights({});
-        setUnitsBySubject({});
-      }
-      setLoadingChildData(false);
-      return;
+    if (session) {
+      api.get("/subjects")
+        .then(res => setSubjectsData(res.data || []))
+        .catch(error => console.error("Error loading subjects:", error));
     }
-    refreshChildSpecificData();
-  }, [selectedChild, session, refreshChildSpecificData]);
+  }, [session]);
 
+  // Reset lesson container selection when lesson approval changes
   useEffect(() => {
-    setSelectedLessonContainer("");
-  }, [lessonJsonForApproval?.unit_id]);
+    lessonManagement.setSelectedLessonContainer("");
+  }, [lessonManagement.lessonJsonForApproval?.unit_id, lessonManagement.setSelectedLessonContainer]);
 
   const handleAddChildSubmit = async (e) => {
     e.preventDefault();
-    setLoadingInitial(true);
-    try {
-      const newChildData = {
-        name: newChildNameState,
-        grade: newChildGradeState,
-      };
-      const createdChildRes = await api.post("/children", newChildData);
-      const createdChild = createdChildRes.data;
-      setNewChildNameState("");
-      setNewChildGradeState("");
-      setShowAddChild(false);
-      const childrenRes = await api.get("/children");
-      const updatedChildren = childrenRes.data || [];
-      setChildren(updatedChildren);
-      setSelectedChild(
-        createdChild || updatedChildren[updatedChildren.length - 1] || null
-      );
-    } catch (error) {
+    const childData = {
+      name: childrenData.newChildName,
+      grade: childrenData.newChildGrade,
+    };
+    
+    const result = await childrenData.handleAddChild(childData);
+    
+    if (result.success) {
+      // Success is handled by the hook
+      childrenData.setShowAddChild(false);
+    } else {
       // Check if this is a child limit error
-      if (error.response?.data?.code === 'CHILD_LIMIT_EXCEEDED') {
-        setCurrentPlan(error.response.data.currentPlan || 'free');
+      if (result.code === 'CHILD_LIMIT_EXCEEDED') {
+        setCurrentPlan('free'); // Default plan for limit errors
         setUpgradeFeature('children');
         setShowUpgradePrompt(true);
       } else {
-        alert(error.response?.data?.error || "Failed to add child.");
+        alert(result.error);
       }
-    } finally {
-      setLoadingInitial(false);
     }
   };
 

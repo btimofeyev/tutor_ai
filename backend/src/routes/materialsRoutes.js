@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const materialsController = require('../controllers/materialsController');
-const { enforceMaterialLimit } = require('../middleware/subscriptionEnforcement');
+// Material limits removed - no enforcement needed
 const multer = require('multer');
 
 // Configure multer (same as before)
@@ -16,11 +16,11 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Upload and process file(s) - ENFORCE MATERIAL LIMIT
-router.post('/upload', upload.array('files', 10), enforceMaterialLimit, materialsController.uploadMaterial);
+// Upload and process file(s) - No material limits
+router.post('/upload', upload.array('files', 10), materialsController.uploadMaterial);
 
-// Save a material - ENFORCE MATERIAL LIMIT  
-router.post('/save', enforceMaterialLimit, materialsController.saveMaterial);
+// Save a material - No material limits
+router.post('/save', materialsController.saveMaterial);
 
 // Other routes (no enforcement needed for reading)
 router.get('/lesson/:lesson_id', materialsController.listMaterialsForLesson);

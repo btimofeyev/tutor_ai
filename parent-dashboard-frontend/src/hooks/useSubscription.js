@@ -51,9 +51,6 @@ export function useSubscription() {
     // Child limits
     maxChildren: isAcademyPlan ? 10 : isFamilyPlan ? 3 : 1,
     
-    // Material limits
-    maxMaterialsPerChild: isFreePlan ? 50 : hasAIAddon ? 100 : 500,
-    
     // Other limits
     hasUnlimitedStorage: isFamilyPlan || isAcademyPlan,
     hasPrioritySupport: isFamilyPlan || isAcademyPlan,

@@ -11,6 +11,7 @@ import SubjectCard from "./components/SubjectCard";
 import AddMaterialForm from "./components/AddMaterialForm";
 import EditMaterialModal from "./components/EditMaterialModal";
 import ChildLoginSettingsModal from "./components/ChildLoginSettingsModal";
+import UpgradePrompt from "../../components/UpgradePrompt";
 
 
 import {
@@ -144,6 +145,12 @@ export default function DashboardPage() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingChildData, setLoadingChildData] = useState(false);
+
+  // Upgrade prompt state
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState('');
+  const [upgrading, setUpgrading] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState('free');
 
   // Lesson Container Selection State
   const [selectedLessonContainer, setSelectedLessonContainer] = useState("");
@@ -475,9 +482,39 @@ export default function DashboardPage() {
         createdChild || updatedChildren[updatedChildren.length - 1] || null
       );
     } catch (error) {
-      alert(error.response?.data?.error || "Failed to add child.");
+      // Check if this is a child limit error
+      if (error.response?.data?.code === 'CHILD_LIMIT_EXCEEDED') {
+        setCurrentPlan(error.response.data.currentPlan || 'free');
+        setUpgradeFeature('children');
+        setShowUpgradePrompt(true);
+      } else {
+        alert(error.response?.data?.error || "Failed to add child.");
+      }
     } finally {
       setLoadingInitial(false);
+    }
+  };
+
+  const handleUpgrade = async (targetPlan) => {
+    setUpgrading(true);
+    try {
+      const priceIds = {
+        klio_addon: 'price_1RVZczD8TZAZUMMAQWokffCi',
+        family: 'price_1RVZT4D8TZAZUMMA3YIJeWWE',
+        academy: 'price_1RVZTrD8TZAZUMMAiUuoU72d'
+      };
+
+      const response = await api.post('/stripe/create-checkout-session', {
+        price_id: priceIds[targetPlan],
+        success_url: `${window.location.origin}/dashboard?upgraded=true`,
+        cancel_url: window.location.href
+      });
+      
+      window.location.href = response.data.checkout_url;
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      alert('Failed to start upgrade process. Please try again.');
+      setUpgrading(false);
     }
   };
 
@@ -1513,6 +1550,17 @@ export default function DashboardPage() {
           errorMsg={credentialFormError}
           successMsg={credentialFormSuccess}
           clearMessages={clearCredentialMessages}
+        />
+      )}
+
+      {/* Upgrade Prompt Modal */}
+      {showUpgradePrompt && (
+        <UpgradePrompt
+          feature={upgradeFeature}
+          currentPlan={currentPlan}
+          onUpgrade={handleUpgrade}
+          onClose={() => setShowUpgradePrompt(false)}
+          upgrading={upgrading}
         />
       )}
     </div>

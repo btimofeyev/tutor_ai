@@ -54,7 +54,6 @@ function getPlanPermissions(subscription) {
     
     // Limits
     maxChildren: planType === 'academy' ? 10 : planType === 'family' ? 3 : 1,
-    maxMaterialsPerChild: !hasActiveSubscription ? 50 : planType === 'klio_addon' ? 100 : 500,
   };
 }
 
@@ -174,44 +173,7 @@ exports.enforceChildLoginAccess = async (req, res, next) => {
   }
 };
 
-// Middleware to enforce material limits
-exports.enforceMaterialLimit = async (req, res, next) => {
-  const parentId = req.header('x-parent-id');
-  const childSubjectId = req.body.child_subject_id || req.params.child_subject_id;
-  
-  if (!parentId || !childSubjectId) {
-    return res.status(401).json({ error: 'Unauthorized or missing child subject' });
-  }
-
-  try {
-    const subscription = await getParentSubscription(parentId);
-    const permissions = getPlanPermissions(subscription);
-    
-    // Count current materials for this child subject
-    const { count: materialCount } = await supabase
-      .from('materials')
-      .select('*', { count: 'exact', head: true })
-      .eq('child_subject_id', childSubjectId);
-
-    if (materialCount >= permissions.maxMaterialsPerChild) {
-      return res.status(403).json({ 
-        error: `Material limit reached: ${permissions.maxMaterialsPerChild} materials per child maximum`,
-        code: 'MATERIAL_LIMIT_EXCEEDED',
-        currentPlan: subscription?.plan_type || 'free',
-        maxMaterials: permissions.maxMaterialsPerChild,
-        currentMaterials: materialCount
-      });
-    }
-
-    req.subscription = subscription;
-    req.permissions = permissions;
-    req.materialCount = materialCount;
-    next();
-  } catch (error) {
-    console.error('Error in material limit enforcement:', error);
-    return res.status(500).json({ error: 'Failed to verify material limits' });
-  }
-};
+// Material limits removed - no longer enforced
 
 // Helper function to check subscription for controllers
 exports.checkSubscription = async (parentId) => {

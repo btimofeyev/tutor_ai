@@ -10,11 +10,11 @@ import { useChildrenData } from "../../hooks/useChildrenData";
 import { useLessonManagement } from "../../hooks/useLessonManagement";
 import { useFiltersAndSorting } from "../../hooks/useFiltersAndSorting";
 import { 
-  APP_CONTENT_TYPES, 
+  APP_CONTENT_TYPES,
+  APP_GRADABLE_CONTENT_TYPES,
   formInputStyles, 
   formLabelStyles 
 } from "../../utils/dashboardConstants";
-import { isDateOverdue, isDateDueSoon } from "../../utils/dashboardHelpers";
 
 // Components
 import StudentSidebar from "./components/StudentSidebar";
@@ -179,7 +179,7 @@ export default function DashboardPage() {
   };
 
   const handleUpdateLessonJsonForApprovalField = (fieldName, value) => {
-    setLessonJsonForApproval((prevJson) => {
+    lessonManagement.setLessonJsonForApproval((prevJson) => {
       const baseJson =
         prevJson && typeof prevJson === "object" && !prevJson.error
           ? prevJson
@@ -196,62 +196,33 @@ export default function DashboardPage() {
     let originalLesson = null;
     let subjectIdToUpdate = null;
     let lessonIndexToUpdate = -1;
-    Object.keys(lessonsBySubject).forEach((subjId) => {
-      const index = lessonsBySubject[subjId].findIndex(
+    Object.keys(childrenData.lessonsBySubject).forEach((subjId) => {
+      const index = childrenData.lessonsBySubject[subjId].findIndex(
         (l) => l.id === lessonId
       );
       if (index !== -1) {
         subjectIdToUpdate = subjId;
         lessonIndexToUpdate = index;
-        originalLesson = { ...lessonsBySubject[subjId][index] };
+        originalLesson = { ...childrenData.lessonsBySubject[subjId][index] };
       }
     });
     if (subjectIdToUpdate && lessonIndexToUpdate !== -1) {
-      setLessonsBySubject((prevLBS) => {
-        const newLBS = { ...prevLBS };
-        newLBS[subjectIdToUpdate] = [...newLBS[subjectIdToUpdate]];
-        newLBS[subjectIdToUpdate][lessonIndexToUpdate] = {
-          ...originalLesson,
-          completed_at: !currentCompletedStatus
-            ? new Date().toISOString()
-            : null,
-        };
-        return newLBS;
-      });
+      // Optimistic update - we'll refresh from server after API call
+      // This is handled by refreshChildSpecificData() below
     }
     try {
       const payload = grade !== null ? { grade } : {};
       const updatedLessonFromServer = await api.put(`/materials/${lessonId}/toggle-complete`, payload);
 
-      setLessonsBySubject((prevLBS) => {
-        const newLBS = { ...prevLBS };
-        if (subjectIdToUpdate && newLBS[subjectIdToUpdate]) {
-          const lessonIdx = newLBS[subjectIdToUpdate].findIndex(
-            (l) => l.id === lessonId
-          );
-          if (lessonIdx !== -1) {
-            newLBS[subjectIdToUpdate][lessonIdx] = updatedLessonFromServer.data;
-          } else {
-            refreshChildSpecificData();
-          }
-        } else {
-          refreshChildSpecificData();
-        }
-        return newLBS;
-      });
+      // Refresh all child data to get updated lesson state
+      await childrenData.refreshChildSpecificData();
     } catch (error) {
       console.error("Failed to toggle lesson completion:", error);
       alert(
         error.response?.data?.error || "Could not update completion status."
       );
-      if (subjectIdToUpdate && lessonIndexToUpdate !== -1 && originalLesson) {
-        setLessonsBySubject((prevLBS) => {
-          const newLBS = { ...prevLBS };
-          newLBS[subjectIdToUpdate] = [...newLBS[subjectIdToUpdate]];
-          newLBS[subjectIdToUpdate][lessonIndexToUpdate] = originalLesson;
-          return newLBS;
-        });
-      }
+      // Refresh data to revert optimistic update on error
+      await childrenData.refreshChildSpecificData();
     }
   };
 
@@ -276,126 +247,126 @@ export default function DashboardPage() {
     setLessonDueDateForApproval("");
     setLessonCompletedForApproval(false);
   
-    const currentAssignedSubjects = childSubjects[selectedChild?.id] || [];
+    const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
     const subjectInfo = currentAssignedSubjects.find(
-      (s) => s.child_subject_id === addLessonSubject
+      (s) => s.child_subject_id === lessonManagement.addLessonSubject
     );
   
     if (!subjectInfo || !subjectInfo.child_subject_id) {
       alert("Selected subject is invalid.");
-      setUploading(false);
+      // setUploading will be handled by lesson management hook
       return;
     }
   
     const formData = new FormData();
     formData.append("child_subject_id", subjectInfo.child_subject_id);
-    formData.append("user_content_type", addLessonUserContentType);
+    formData.append("user_content_type", lessonManagement.addLessonUserContentType);
   
-    if (addLessonFile instanceof FileList && addLessonFile.length > 0) {
-      for (let i = 0; i < addLessonFile.length; i++) {
-        formData.append("files", addLessonFile[i], addLessonFile[i].name);
+    if (lessonManagement.addLessonFile instanceof FileList && lessonManagement.addLessonFile.length > 0) {
+      for (let i = 0; i < lessonManagement.addLessonFile.length; i++) {
+        formData.append("files", lessonManagement.addLessonFile[i], lessonManagement.addLessonFile[i].name);
       }
     } else {
       alert("File selection error.");
-      setUploading(false);
+      // setUploading will be handled by lesson management hook
       return;
     }
   
     try {
       const res = await api.post("/materials/upload", formData);
       const receivedLessonJson = res.data.lesson_json || {};
-      setLessonJsonForApproval(receivedLessonJson);
-      const firstFileName = addLessonFile[0]?.name?.split(".")[0];
-      setLessonTitleForApproval(
+      lessonManagement.setLessonJsonForApproval(receivedLessonJson);
+      const firstFileName = lessonManagement.addLessonFile[0]?.name?.split(".")[0];
+      lessonManagement.setLessonTitleForApproval(
         receivedLessonJson?.title || firstFileName || "Untitled Material"
       );
       const llmContentType = receivedLessonJson?.content_type_suggestion;
       const finalContentType =
         llmContentType && APP_CONTENT_TYPES.includes(llmContentType)
           ? llmContentType
-          : addLessonUserContentType &&
-            APP_CONTENT_TYPES.includes(addLessonUserContentType)
-          ? addLessonUserContentType
+          : lessonManagement.addLessonUserContentType &&
+            APP_CONTENT_TYPES.includes(lessonManagement.addLessonUserContentType)
+          ? lessonManagement.addLessonUserContentType
           : APP_CONTENT_TYPES[0];
-      setLessonContentTypeForApproval(finalContentType);
+      lessonManagement.setLessonContentTypeForApproval(finalContentType);
   
       if (
         receivedLessonJson?.total_possible_points_suggestion !== null &&
         receivedLessonJson?.total_possible_points_suggestion !== undefined
       ) {
-        setLessonMaxPointsForApproval(
+        lessonManagement.setLessonMaxPointsForApproval(
           String(receivedLessonJson.total_possible_points_suggestion)
         );
       } else {
-        setLessonMaxPointsForApproval("");
+        lessonManagement.setLessonMaxPointsForApproval("");
       }
   
-      setLessonDueDateForApproval("");
-      setLessonCompletedForApproval(false);
+      lessonManagement.setLessonDueDateForApproval("");
+      lessonManagement.setLessonCompletedForApproval(false);
     } catch (error) {
       const errorMsg =
         error.response?.data?.error || error.message || "Upload failed.";
       alert(`Upload Error: ${errorMsg}`);
       console.error("Upload error:", error.response || error);
-      setLessonJsonForApproval({ error: errorMsg, title: "Error" });
-      setLessonTitleForApproval("Error");
-      setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
-      setLessonMaxPointsForApproval("");
-      setLessonDueDateForApproval("");
-      setLessonCompletedForApproval(false);
+      lessonManagement.setLessonJsonForApproval({ error: errorMsg, title: "Error" });
+      lessonManagement.setLessonTitleForApproval("Error");
+      lessonManagement.setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
+      lessonManagement.setLessonMaxPointsForApproval("");
+      lessonManagement.setLessonDueDateForApproval("");
+      lessonManagement.setLessonCompletedForApproval(false);
     }
-    setUploading(false);
+    // setUploading will be handled by lesson management hook
   };
 
   const handleApproveNewLesson = async () => {
-    setSavingLesson(true);
-    const currentAssignedSubjects = childSubjects[selectedChild?.id] || [];
+    // setSavingLesson will be handled by lesson management hook
+    const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
     const subjectInfo = currentAssignedSubjects.find(
-      (s) => s.child_subject_id === addLessonSubject
+      (s) => s.child_subject_id === lessonManagement.addLessonSubject
     );
   
     if (!subjectInfo || !subjectInfo.child_subject_id) {
       alert("Selected subject invalid.");
-      setSavingLesson(false);
+      // setSavingLesson will be handled by lesson management hook
       return;
     }
   
     if (
-      !lessonJsonForApproval ||
-      !lessonTitleForApproval ||
-      !lessonContentTypeForApproval
+      !lessonManagement.lessonJsonForApproval ||
+      !lessonManagement.lessonTitleForApproval ||
+      !lessonManagement.lessonContentTypeForApproval
     ) {
       alert("Missing data for approval.");
-      setSavingLesson(false);
+      // setSavingLesson will be handled by lesson management hook
       return;
     }
 
-    if (!selectedLessonContainer || selectedLessonContainer === '__create_new__') {
+    if (!lessonManagement.selectedLessonContainer || lessonManagement.selectedLessonContainer === '__create_new__') {
       alert("Please select or create a lesson container.");
-      setSavingLesson(false);
+      // setSavingLesson will be handled by lesson management hook
       return;
     }
   
-    const unitIdForPayload = lessonJsonForApproval.unit_id || null;
-    const lessonJsonToSave = { ...lessonJsonForApproval };
+    const unitIdForPayload = lessonManagement.lessonJsonForApproval.unit_id || null;
+    const lessonJsonToSave = { ...lessonManagement.lessonJsonForApproval };
     delete lessonJsonToSave.unit_id;
   
     const payload = {
-      lesson_id: selectedLessonContainer, 
+      lesson_id: lessonManagement.selectedLessonContainer, 
       child_subject_id: subjectInfo.child_subject_id,
-      title: lessonTitleForApproval,
-      content_type: lessonContentTypeForApproval,
+      title: lessonManagement.lessonTitleForApproval,
+      content_type: lessonManagement.lessonContentTypeForApproval,
       lesson_json: lessonJsonToSave,
       grade_max_value:
-        APP_GRADABLE_CONTENT_TYPES.includes(lessonContentTypeForApproval) &&
-        lessonMaxPointsForApproval.trim() !== ""
-          ? lessonMaxPointsForApproval.trim()
+        APP_GRADABLE_CONTENT_TYPES.includes(lessonManagement.lessonContentTypeForApproval) &&
+        lessonManagement.lessonMaxPointsForApproval.trim() !== ""
+          ? lessonManagement.lessonMaxPointsForApproval.trim()
           : null,
       due_date:
-        lessonDueDateForApproval.trim() !== ""
-          ? lessonDueDateForApproval
+        lessonManagement.lessonDueDateForApproval.trim() !== ""
+          ? lessonManagement.lessonDueDateForApproval
           : null,
-      completed_at: lessonCompletedForApproval
+      completed_at: lessonManagement.lessonCompletedForApproval
         ? new Date().toISOString()
         : null,
       unit_id: unitIdForPayload,
@@ -403,29 +374,29 @@ export default function DashboardPage() {
   
     try {
       await api.post("/materials/save", payload);
-      await refreshChildSpecificData();
-      setLessonJsonForApproval(null);
-      setLessonTitleForApproval("");
-      setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
-      setLessonMaxPointsForApproval("");
-      setLessonDueDateForApproval("");
-      setLessonCompletedForApproval(false);
-      setAddLessonFile(null);
-      setSelectedLessonContainer(""); 
+      await childrenData.refreshChildSpecificData();
+      lessonManagement.setLessonJsonForApproval(null);
+      lessonManagement.setLessonTitleForApproval("");
+      lessonManagement.setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
+      lessonManagement.setLessonMaxPointsForApproval("");
+      lessonManagement.setLessonDueDateForApproval("");
+      lessonManagement.setLessonCompletedForApproval(false);
+      lessonManagement.setAddLessonFile(null);
+      lessonManagement.setSelectedLessonContainer(""); 
   
       const fileInput = document.getElementById("lesson-file-input-main");
       if (fileInput) fileInput.value = "";
-      setAddLessonSubject("");
-      setAddLessonUserContentType(APP_CONTENT_TYPES[0]);
+      lessonManagement.setAddLessonSubject("");
+      lessonManagement.setAddLessonUserContentType(APP_CONTENT_TYPES[0]);
     } catch (error) {
       alert(error.response?.data?.error || "Lesson save failed.");
     }
-    setSavingLesson(false);
+    // setSavingLesson will be handled by lesson management hook
   };
 
   const handleLessonContainerChange = (e) => {
     const value = e.target.value;
-    setSelectedLessonContainer(value);
+    lessonManagement.setSelectedLessonContainer(value);
     
     if (value === '__create_new__') {
       setNewLessonContainerTitle('');
@@ -433,7 +404,7 @@ export default function DashboardPage() {
   };
 
   const handleCreateNewLessonContainer = async (newTitleFromForm) => { 
-    const unitId = lessonJsonForApproval?.unit_id; 
+    const unitId = lessonManagement.lessonJsonForApproval?.unit_id; 
   
     if (!unitId) {
       console.error('Unit ID is missing for new lesson container creation.'); 
@@ -455,12 +426,12 @@ export default function DashboardPage() {
       const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
       const updatedLessonContainersForUnit = lessonsRes.data || [];
       
-      setLessonsByUnit(prev => ({
+      childrenData.setLessonsByUnit(prev => ({
         ...prev,
         [unitId]: updatedLessonContainersForUnit
       }));
       
-      setSelectedLessonContainer(response.data.id); 
+      lessonManagement.setSelectedLessonContainer(response.data.id); 
   
     } catch (error) {
       console.error('Failed to create lesson container:', error.response?.data || error.message); 
@@ -469,8 +440,8 @@ export default function DashboardPage() {
   };
 
   const handleOpenEditModal = (lesson) => {
-    setEditingLesson(lesson);
-    setEditForm({
+    lessonManagement.setEditingLesson(lesson);
+    lessonManagement.setEditForm({
       title: lesson.title || "",
       content_type: lesson.content_type || APP_CONTENT_TYPES[0],
       grade_value:
@@ -488,50 +459,50 @@ export default function DashboardPage() {
   const handleEditModalFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name === "completed_toggle")
-      setEditForm((prev) => ({
+      lessonManagement.setEditForm((prev) => ({
         ...prev,
         completed_at: checked ? new Date().toISOString() : null,
       }));
-    else setEditForm((prev) => ({ ...prev, [name]: value }));
+    else lessonManagement.setEditForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSaveLessonEdit = async () => {
-    if (!editingLesson) return;
-    setIsSavingEdit(true);
+    if (!lessonManagement.editingLesson) return;
+    // setIsSavingEdit will be handled by lesson management hook
     let lesson_json_parsed;
     try {
-      lesson_json_parsed = JSON.parse(editForm.lesson_json_string);
+      lesson_json_parsed = JSON.parse(lessonManagement.editForm.lesson_json_string);
     } catch (e) {
       alert("Invalid JSON in 'Extracted Data'.");
-      setIsSavingEdit(false);
+      // setIsSavingEdit will be handled by lesson management hook
       return;
     }
     const payload = {
-      title: editForm.title,
-      content_type: editForm.content_type,
+      title: lessonManagement.editForm.title,
+      content_type: lessonManagement.editForm.content_type,
       lesson_json: lesson_json_parsed,
       grade_value:
-        editForm.grade_value.trim() === "" ? null : editForm.grade_value,
+        lessonManagement.editForm.grade_value.trim() === "" ? null : lessonManagement.editForm.grade_value,
       grade_max_value:
-        editForm.grade_max_value.trim() === ""
+        lessonManagement.editForm.grade_max_value.trim() === ""
           ? null
-          : editForm.grade_max_value,
+          : lessonManagement.editForm.grade_max_value,
       grading_notes:
-        editForm.grading_notes.trim() === "" ? null : editForm.grading_notes,
-      completed_at: editForm.completed_at,
-      due_date: editForm.due_date.trim() === "" ? null : editForm.due_date,
-      unit_id: editForm.unit_id || null,
+        lessonManagement.editForm.grading_notes.trim() === "" ? null : lessonManagement.editForm.grading_notes,
+      completed_at: lessonManagement.editForm.completed_at,
+      due_date: lessonManagement.editForm.due_date.trim() === "" ? null : lessonManagement.editForm.due_date,
+      unit_id: lessonManagement.editForm.unit_id || null,
     };
     if (payload.lesson_json && "unit_id" in payload.lesson_json)
       delete payload.lesson_json.unit_id;
     try {
-      await api.put(`/materials/${editingLesson.id}`, payload);
-      await refreshChildSpecificData();
-      setEditingLesson(null);
+      await api.put(`/materials/${lessonManagement.editingLesson.id}`, payload);
+      await childrenData.refreshChildSpecificData();
+      lessonManagement.setEditingLesson(null);
     } catch (error) {
       alert(error.response?.data?.error || "Failed to save changes.");
     }
-    setIsSavingEdit(false);
+    // setIsSavingEdit will be handled by lesson management hook
   };
 
   const openManageUnitsModal = (subject) => {
@@ -540,7 +511,7 @@ export default function DashboardPage() {
       name: subject.name,
     });
     setCurrentSubjectUnitsInModal(
-      unitsBySubject[subject.child_subject_id] || []
+      childrenData.unitsBySubject[subject.child_subject_id] || []
     );
     setNewUnitNameModalState("");
     setEditingUnit(null);
@@ -560,7 +531,7 @@ export default function DashboardPage() {
       const newUnit = res.data;
 
       const updatedUnitsForSubject = [
-        ...(unitsBySubject[managingUnitsForSubject.id] || []),
+        ...(childrenData.unitsBySubject[managingUnitsForSubject.id] || []),
         newUnit,
       ].sort(
         (a, b) =>
@@ -568,7 +539,7 @@ export default function DashboardPage() {
           a.name.localeCompare(b.name)
       );
 
-      setUnitsBySubject((prev) => ({
+      childrenData.setUnitsBySubject((prev) => ({
         ...prev,
         [managingUnitsForSubject.id]: updatedUnitsForSubject,
       }));
@@ -593,7 +564,7 @@ export default function DashboardPage() {
       const updatedUnit = res.data;
 
       const updatedUnitsList = (
-        unitsBySubject[managingUnitsForSubject.id] || []
+        childrenData.unitsBySubject[managingUnitsForSubject.id] || []
       )
         .map((u) => (u.id === editingUnit.id ? updatedUnit : u))
         .sort(
@@ -602,7 +573,7 @@ export default function DashboardPage() {
             a.name.localeCompare(b.name)
         );
 
-      setUnitsBySubject((prev) => ({
+      childrenData.setUnitsBySubject((prev) => ({
         ...prev,
         [managingUnitsForSubject.id]: updatedUnitsList,
       }));
@@ -625,17 +596,17 @@ export default function DashboardPage() {
     try {
       await api.delete(`/units/${unitId}`);
       const updatedUnitsList = (
-        unitsBySubject[managingUnitsForSubject.id] || []
+        childrenData.unitsBySubject[managingUnitsForSubject.id] || []
       ).filter((u) => u.id !== unitId);
 
-      setUnitsBySubject((prev) => ({
+      childrenData.setUnitsBySubject((prev) => ({
         ...prev,
         [managingUnitsForSubject.id]: updatedUnitsList,
       }));
       setCurrentSubjectUnitsInModal(updatedUnitsList);
 
       if (editingUnit?.id === unitId) setEditingUnit(null);
-      await refreshChildSpecificData();
+      await childrenData.refreshChildSpecificData();
     } catch (error) {
       alert(error.response?.data?.error || "Could not delete unit.");
     }
@@ -681,14 +652,14 @@ export default function DashboardPage() {
       );
       setCredentialFormSuccess(res.data.message || "Username updated!");
       const updatedUsername = childUsernameInput.trim();
-      const updatedChildren = children.map((c) =>
+      const updatedChildren = childrenData.children.map((c) =>
         c.id === editingChildCredentials.id
           ? { ...c, child_username: updatedUsername }
           : c
       );
-      setChildren(updatedChildren);
-      if (selectedChild?.id === editingChildCredentials.id)
-        setSelectedChild((prev) => ({
+      childrenData.setChildren(updatedChildren);
+      if (childrenData.selectedChild?.id === editingChildCredentials.id)
+        childrenData.setSelectedChild((prev) => ({
           ...prev,
           child_username: updatedUsername,
         }));
@@ -727,14 +698,14 @@ export default function DashboardPage() {
       setCredentialFormSuccess(res.data.message || "PIN updated successfully!");
       setChildPinInput("");
       setChildPinConfirmInput("");
-      const updatedChildren = children.map((c) =>
+      const updatedChildren = childrenData.children.map((c) =>
         c.id === editingChildCredentials.id
           ? { ...c, access_pin_hash: "set" }
           : c
       ); 
-      setChildren(updatedChildren);
-      if (selectedChild?.id === editingChildCredentials.id)
-        setSelectedChild((prev) => ({ ...prev, access_pin_hash: "set" }));
+      childrenData.setChildren(updatedChildren);
+      if (childrenData.selectedChild?.id === editingChildCredentials.id)
+        childrenData.setSelectedChild((prev) => ({ ...prev, access_pin_hash: "set" }));
       setEditingChildCredentials((prev) => ({
         ...prev,
         access_pin_hash: "set",
@@ -749,7 +720,7 @@ export default function DashboardPage() {
   };
 
 
-  if (loadingInitial && session === undefined) {
+  if (childrenData.loadingInitial && session === undefined) {
     return (
       <div className="flex items-center justify-center h-screen bg-background-main">
         <div className="text-xl text-text-secondary">Initializing Dashboard...</div>
@@ -758,51 +729,50 @@ export default function DashboardPage() {
   }
   if (!session) return null;
 
-  const assignedSubjectsForCurrentChild =
-    childSubjects[selectedChild?.id] || [];
-    const currentUnitsForAddFormSubject = addLessonSubject && selectedChild && childSubjects[selectedChild.id]
-    ? unitsBySubject[addLessonSubject] || [] 
+  // Get current units for add form subject
+  const currentUnitsForAddFormSubject = lessonManagement.addLessonSubject && childrenData.selectedChild && childrenData.childSubjects[childrenData.selectedChild.id]
+    ? childrenData.unitsBySubject[lessonManagement.addLessonSubject] || [] 
     : [];
 
   return (
     <div className="flex h-screen bg-background-main overflow-hidden">
       <div className="w-64 flex-shrink-0 bg-background-card border-r border-border-subtle shadow-lg">
         <StudentSidebar
-          childrenList={children}
-          selectedChild={selectedChild}
-          onSelectChild={setSelectedChild}
-          showAddChild={showAddChild}
-          onToggleShowAddChild={setShowAddChild}
-          newChildName={newChildNameState}
-          onNewChildNameChange={(e) => setNewChildNameState(e.target.value)}
-          newChildGrade={newChildGradeState}
-          onNewChildGradeChange={(e) => setNewChildGradeState(e.target.value)}
+          childrenList={childrenData.children}
+          selectedChild={childrenData.selectedChild}
+          onSelectChild={childrenData.setSelectedChild}
+          showAddChild={childrenData.showAddChild}
+          onToggleShowAddChild={childrenData.setShowAddChild}
+          newChildName={childrenData.newChildName}
+          onNewChildNameChange={(e) => childrenData.setNewChildName(e.target.value)}
+          newChildGrade={childrenData.newChildGrade}
+          onNewChildGradeChange={(e) => childrenData.setNewChildGrade(e.target.value)}
           onAddChildSubmit={handleAddChildSubmit}
           onOpenChildLoginSettings={handleOpenChildLoginSettingsModal}
         />
       </div>
 
       <div className="flex-1 flex flex-col overflow-y-auto p-6 sm:p-8 lg:p-10">
-        {loadingInitial && !selectedChild && children.length > 0 && (
+        {childrenData.loadingInitial && !childrenData.selectedChild && childrenData.children.length > 0 && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-xl text-text-secondary">Loading Student Data...</div>
           </div>
         )}
-        {!selectedChild && !loadingInitial && (
+        {!childrenData.selectedChild && !childrenData.loadingInitial && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-text-secondary italic text-xl text-center">
-              {children.length > 0
+              {childrenData.children.length > 0
                 ? "Select a student to get started."
                 : "No students found. Please add a student to begin."}
             </div>
           </div>
         )}
 
-        {selectedChild && (
+        {childrenData.selectedChild && (
           <>
             <StudentHeader
-              selectedChild={selectedChild}
-              dashboardStats={dashboardStats}
+              selectedChild={childrenData.selectedChild}
+              dashboardStats={totalStats}
             />
             <div className="my-6 card p-4"> {/* Use card class */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -815,8 +785,8 @@ export default function DashboardPage() {
                   </label>
                   <select
                     id="filterStatus"
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
+                    value={filtersAndSorting.filterStatus}
+                    onChange={(e) => filtersAndSorting.setFilterStatus(e.target.value)}
                     className={`${formInputStyles} mt-1`}
                   >
                     <option value="all">All Statuses</option>
@@ -835,8 +805,8 @@ export default function DashboardPage() {
                   </label>
                   <select
                     id="filterContentType"
-                    value={filterContentType}
-                    onChange={(e) => setFilterContentType(e.target.value)}
+                    value={filtersAndSorting.filterContentType}
+                    onChange={(e) => filtersAndSorting.setFilterContentType(e.target.value)}
                     className={`${formInputStyles} mt-1`}
                   >
                     <option value="all">All Types</option>
@@ -857,8 +827,8 @@ export default function DashboardPage() {
                   </label>
                   <select
                     id="sortBy"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
+                    value={filtersAndSorting.sortBy}
+                    onChange={(e) => filtersAndSorting.setSortBy(e.target.value)}
                     className={`${formInputStyles} mt-1`}
                   >
                     <option value="createdAtDesc">Most Recent</option>
@@ -871,9 +841,9 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            {loadingChildData ? (
+            {childrenData.loadingChildData ? (
               <div className="text-center py-10 text-text-secondary">
-                Loading {selectedChild.name}'s curriculum...
+                Loading {childrenData.selectedChild.name}'s curriculum...
               </div>
             ) : (
               <div className="mt-0">
@@ -884,7 +854,7 @@ export default function DashboardPage() {
                 </div>
                 {assignedSubjectsForCurrentChild.length === 0 ? (
                   <div className="italic text-text-secondary p-4 bg-background-card rounded-lg shadow border border-border-subtle"> {/* Matches card but might not need full 'card' class features */}
-                    No subjects assigned to {selectedChild.name}.
+                    No subjects assigned to {childrenData.selectedChild.name}.
                     <button
                       onClick={() => router.push("/subject-management")}
                       className="ml-2 text-accent-blue hover:text-[var(--accent-blue-hover)] underline font-medium transition-colors"
@@ -899,16 +869,16 @@ export default function DashboardPage() {
                         key={subject.child_subject_id || subject.id}
                         subject={subject}
                         lessons={
-                          filteredAndSortedLessonsBySubject[
+                          filtersAndSorting.filteredAndSortedLessonsBySubject[
                             subject.child_subject_id
                           ] || []
                         }
-                        units={unitsBySubject[subject.child_subject_id] || []}
-                        lessonsByUnit={lessonsByUnit}
+                        units={childrenData.unitsBySubject[subject.child_subject_id] || []}
+                        lessonsByUnit={childrenData.lessonsByUnit}
                         subjectStats={
                           subject.child_subject_id &&
-                          subjectStats[subject.child_subject_id]
-                            ? subjectStats[subject.child_subject_id]
+                          filtersAndSorting.dashboardStats[subject.child_subject_id]
+                            ? filtersAndSorting.dashboardStats[subject.child_subject_id]
                             : {
                                 total: 0,
                                 completed: 0,
@@ -931,7 +901,7 @@ export default function DashboardPage() {
 
       <div
         className={`w-full md:w-1/3 lg:w-2/5 xl:w-1/3 flex-shrink-0 border-l border-border-subtle bg-background-card shadow-lg overflow-y-auto p-6 transition-opacity duration-300 ${
-          selectedChild && !loadingChildData
+          childrenData.selectedChild && !childrenData.loadingChildData
             ? "opacity-100"
             : "opacity-50 pointer-events-none"
         }`}
@@ -939,56 +909,56 @@ export default function DashboardPage() {
         <div className="sticky top-0 bg-background-card z-10 pt-0 pb-4 -mx-6 px-6 border-b border-border-subtle mb-6">
           <h2 className="text-lg font-semibold text-text-primary">Actions</h2>
         </div>
-        {selectedChild && !loadingChildData ? (
+        {childrenData.selectedChild && !childrenData.loadingChildData ? (
           <AddMaterialForm
             childSubjectsForSelectedChild={assignedSubjectsForCurrentChild}
             onFormSubmit={handleAddLessonFormSubmit}
             onApprove={handleApproveNewLesson}
-            uploading={uploading}
-            savingLesson={savingLesson}
-            lessonJsonForApproval={lessonJsonForApproval}
+            uploading={lessonManagement.uploading}
+            savingLesson={lessonManagement.savingLesson}
+            lessonJsonForApproval={lessonManagement.lessonJsonForApproval}
             onUpdateLessonJsonField={handleUpdateLessonJsonForApprovalField}
-            lessonTitleForApproval={lessonTitleForApproval}
+            lessonTitleForApproval={lessonManagement.lessonTitleForApproval}
             onLessonTitleForApprovalChange={(e) =>
-              setLessonTitleForApproval(e.target.value)
+              lessonManagement.setLessonTitleForApproval(e.target.value)
             }
-            lessonContentTypeForApproval={lessonContentTypeForApproval}
+            lessonContentTypeForApproval={lessonManagement.lessonContentTypeForApproval}
             onLessonContentTypeForApprovalChange={(e) =>
-              setLessonContentTypeForApproval(e.target.value)
+              lessonManagement.setLessonContentTypeForApproval(e.target.value)
             }
-            lessonMaxPointsForApproval={lessonMaxPointsForApproval}
+            lessonMaxPointsForApproval={lessonManagement.lessonMaxPointsForApproval}
             onLessonMaxPointsForApprovalChange={(e) =>
-              setLessonMaxPointsForApproval(e.target.value)
+              lessonManagement.setLessonMaxPointsForApproval(e.target.value)
             }
-            lessonDueDateForApproval={lessonDueDateForApproval}
+            lessonDueDateForApproval={lessonManagement.lessonDueDateForApproval}
             onLessonDueDateForApprovalChange={(e) =>
-              setLessonDueDateForApproval(e.target.value)
+              lessonManagement.setLessonDueDateForApproval(e.target.value)
             }
-            lessonCompletedForApproval={lessonCompletedForApproval}
+            lessonCompletedForApproval={lessonManagement.lessonCompletedForApproval}
             onLessonCompletedForApprovalChange={(e) =>
-              setLessonCompletedForApproval(e.target.checked)
+              lessonManagement.setLessonCompletedForApproval(e.target.checked)
             }
-            currentAddLessonSubject={addLessonSubject}
+            currentAddLessonSubject={lessonManagement.addLessonSubject}
             onAddLessonSubjectChange={(e) =>
-              setAddLessonSubject(e.target.value)
+              lessonManagement.setAddLessonSubject(e.target.value)
             }
-            currentAddLessonUserContentType={addLessonUserContentType}
+            currentAddLessonUserContentType={lessonManagement.addLessonUserContentType}
             onAddLessonUserContentTypeChange={(e) =>
-              setAddLessonUserContentType(e.target.value)
+              lessonManagement.setAddLessonUserContentType(e.target.value)
             }
-            onAddLessonFileChange={(e) => setAddLessonFile(e.target.files)}
-            currentAddLessonFile={addLessonFile}
+            onAddLessonFileChange={(e) => lessonManagement.setAddLessonFile(e.target.files)}
+            currentAddLessonFile={lessonManagement.addLessonFile}
             appContentTypes={APP_CONTENT_TYPES}
             appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
             unitsForSelectedSubject={currentUnitsForAddFormSubject}
             lessonContainersForSelectedUnit={currentLessonContainersForUnit}
-            selectedLessonContainer={selectedLessonContainer}
+            selectedLessonContainer={lessonManagement.selectedLessonContainer}
             onLessonContainerChange={handleLessonContainerChange}
             onCreateNewLessonContainer={handleCreateNewLessonContainer}
           />
         ) : (
           <p className="text-sm text-text-tertiary italic text-center">
-            {selectedChild && loadingChildData
+            {childrenData.selectedChild && childrenData.loadingChildData
               ? "Loading actions..."
               : "Select student to enable actions."}
           </p>
@@ -1160,17 +1130,17 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {editingLesson && (
+      {lessonManagement.editingLesson && (
         <EditMaterialModal
-          editingLesson={editingLesson}
-          editForm={editForm}
+          editingLesson={lessonManagement.editingLesson}
+          editForm={lessonManagement.editForm}
           onFormChange={handleEditModalFormChange}
           onSave={handleSaveLessonEdit}
-          onClose={() => setEditingLesson(null)}
-          isSaving={isSavingEdit}
+          onClose={() => lessonManagement.setEditingLesson(null)}
+          isSaving={lessonManagement.isSavingEdit}
           unitsForSubject={
-            editingLesson && unitsBySubject[editingLesson.child_subject_id]
-              ? unitsBySubject[editingLesson.child_subject_id]
+            lessonManagement.editingLesson && childrenData.unitsBySubject[lessonManagement.editingLesson.child_subject_id]
+              ? childrenData.unitsBySubject[lessonManagement.editingLesson.child_subject_id]
               : []
           }
           appContentTypes={APP_CONTENT_TYPES}

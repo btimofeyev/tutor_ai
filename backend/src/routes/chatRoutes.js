@@ -1,29 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const chatController = require('../controllers/chatController');
-const { verifyChildToken } = require('../middleware/childAuth');
 const { enrichWithMCPContext } = require('../middleware/mcpContext');
+const { enforceAIAccess } = require('../middleware/subscriptionEnforcement');
 
-const rateLimit = require('express-rate-limit');
+// All chat routes require AI access
+router.use(enforceAIAccess);
 
-// Rate limiting for chat messages
-const chatLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 30, // 30 messages per minute max
-  message: "Whoa, slow down! Let's take a breath. Try again in a minute! 🐢",
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Chat endpoint with MCP context
+router.post('/chat', enrichWithMCPContext, chatController.chat);
 
-// Apply rate limiting and auth to all routes
-router.use(verifyChildToken);
-router.use(enrichWithMCPContext);
-
-
-// Chat endpoints
-router.post('/message', chatLimiter, chatController.chat);
-router.get('/suggestions', chatController.getSuggestions);
-router.get('/lesson/:lessonId/help', chatController.getLessonHelp);
+// Other endpoints
+router.get('/suggestions', enrichWithMCPContext, chatController.getSuggestions);
+router.get('/lesson-help/:lessonId', chatController.getLessonHelp);
 router.post('/report', chatController.reportMessage);
 
 module.exports = router;

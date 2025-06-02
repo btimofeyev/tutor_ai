@@ -1,35 +1,30 @@
-// backend/src/routes/materialsRoutes.js
 const express = require('express');
 const router = express.Router();
 const materialsController = require('../controllers/materialsController');
+const { enforceMaterialLimit } = require('../middleware/subscriptionEnforcement');
 const multer = require('multer');
 
-// Configure multer for temporary storage of uploaded files
+// Configure multer (same as before)
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'tmp/') // Ensure 'tmp/' directory exists
+        cb(null, 'tmp/')
     },
     filename: function (req, file, cb) {
-        // Preserve original extension, add timestamp for uniqueness
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
         cb(null, file.fieldname + '-' + uniqueSuffix + '.' + file.originalname.split('.').pop())
     }
 });
 const upload = multer({ storage: storage });
 
-// Upload and process file(s) - analyze with AI
-router.post('/upload', upload.array('files', 10), materialsController.uploadMaterial);
+// Upload and process file(s) - ENFORCE MATERIAL LIMIT
+router.post('/upload', upload.array('files', 10), enforceMaterialLimit, materialsController.uploadMaterial);
 
-// Save a material (after analysis/approval)
-router.post('/save', materialsController.saveMaterial);
+// Save a material - ENFORCE MATERIAL LIMIT  
+router.post('/save', enforceMaterialLimit, materialsController.saveMaterial);
 
-// List materials for a specific lesson container
+// Other routes (no enforcement needed for reading)
 router.get('/lesson/:lesson_id', materialsController.listMaterialsForLesson);
-
-// List materials for a child subject (backward compatibility)
 router.get('/subject/:child_subject_id', materialsController.listMaterialsForChildSubject);
-
-// Get, update, delete specific material
 router.put('/:material_id', materialsController.updateMaterialDetails);
 router.put('/:material_id/toggle-complete', materialsController.toggleMaterialCompletion);
 router.delete('/:material_id', materialsController.deleteMaterial);

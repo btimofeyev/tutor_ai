@@ -28,43 +28,50 @@ exports.listChildren = async (req, res) => {
 };
 
 exports.createChild = async (req, res) => {
-  const parent_id = getParentId(req);
+  const parent_id = req.header('x-parent-id');
   const { name, grade, birthdate } = req.body;
   
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
   if (!name || !name.trim()) return res.status(400).json({ error: 'Child name is required' });
 
-  // Limit children per parent
-  const { count } = await supabase
-      .from('children')
-      .select('*', { count: 'exact', head: true })
-      .eq('parent_id', parent_id);
-      
-  if (count >= 10 && process.env.NODE_ENV !== 'development') {
-      return res.status(400).json({ error: 'Maximum children limit reached.' });
+  // Note: Child limit is already enforced by middleware
+  // req.permissions and req.childrenCount are available from middleware
+  
+  try {
+    // Create child
+    const { data, error } = await supabase
+        .from('children')
+        .insert([{ 
+          parent_id, 
+          name: name.trim(), 
+          grade: grade ? grade.trim() : null, 
+          birthdate: birthdate || null 
+        }])
+        .select()
+        .single();
+        
+    if (error) return res.status(400).json({ error: error.message });
+    
+    // Sanitize response
+    const sanitizedChild = {
+      ...data,
+      access_pin_hash: !!data.access_pin_hash
+    };
+    
+    res.status(201).json({
+      ...sanitizedChild,
+      // Include helpful subscription info
+      planInfo: {
+        currentChildren: req.childrenCount + 1, // +1 for the new child
+        maxChildren: req.permissions.maxChildren,
+        remainingSlots: req.permissions.maxChildren - (req.childrenCount + 1)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error creating child:', error);
+    res.status(500).json({ error: 'Failed to create child' });
   }
-  
-  // Create child without username and PIN initially
-  const { data, error } = await supabase
-      .from('children')
-      .insert([{ 
-        parent_id, 
-        name: name.trim(), 
-        grade: grade ? grade.trim() : null, 
-        birthdate: birthdate || null 
-      }])
-      .select()
-      .single();
-      
-  if (error) return res.status(400).json({ error: error.message });
-  
-  // Sanitize response
-  const sanitizedChild = {
-    ...data,
-    access_pin_hash: !!data.access_pin_hash
-  };
-  
-  res.status(201).json(sanitizedChild);
 };
 
 exports.updateChild = async (req, res) => {

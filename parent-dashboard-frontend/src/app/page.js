@@ -1,9 +1,11 @@
+// parent-dashboard-frontend/src/app/page.js
 'use client';
 import React from 'react';
 import Image from 'next/image';
 import { useRef } from 'react';
 import { ArrowDownCircleIcon, SparklesIcon, UserGroupIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import Button from '../components/ui/Button';
+import Link from 'next/link';
 
 export default function LandingPage() {
   const featuresRef = useRef(null);
@@ -42,6 +44,42 @@ export default function LandingPage() {
 
   return (
     <main className="min-h-screen bg-background-main text-text-primary flex flex-col items-center">
+      {/* HEADER WITH NAVIGATION */}
+      <header className="w-full border-b border-border-subtle bg-background-card">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <Link href="/" className="flex items-center">
+              <Image
+                src="/klio_logo.png"
+                alt="Klio AI Logo"
+                width={32}
+                height={32}
+                className="mr-2"
+                priority
+              />
+              <span className="text-2xl font-bold text-accent-blue">Klio AI</span>
+            </Link>
+            <nav className="hidden md:flex items-center space-x-6">
+              <Link href="/pricing" className="text-text-secondary hover:text-text-primary font-medium transition-colors">
+                Pricing
+              </Link>
+              <Link href="/login" className="text-text-secondary hover:text-text-primary">
+                Log In
+              </Link>
+              <Button as="link" href="/signup" variant="primary" size="sm">
+                Sign Up Free
+              </Button>
+            </nav>
+            {/* Mobile menu button */}
+            <div className="md:hidden">
+              <Button as="link" href="/signup" variant="primary" size="sm">
+                Get Started
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
       {/* HERO PANEL */}
       <section className="flex flex-col justify-center items-center w-full py-20 md:py-32 px-4 animate-fade-in">
         {/* LOGO */}
@@ -67,12 +105,12 @@ export default function LandingPage() {
             <Button href="/signup" as="link" className="btn-primary text-lg px-7 py-3">
               Get Started Free
             </Button>
-            <Button href="/login" as="link" className="btn-secondary text-lg px-7 py-3">
-              Log In
+            <Button href="/pricing" as="link" className="btn-secondary text-lg px-7 py-3">
+              View Pricing
             </Button>
           </div>
           <p className="text-xs text-text-tertiary">
-            No credit card required.
+            No credit card required. <Link href="/pricing" className="underline hover:text-text-secondary">See all plans</Link>
           </p>
         </div>
         <button
@@ -113,6 +151,72 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* PRICING PREVIEW */}
+      <section className="w-full max-w-5xl px-4 pb-20 md:pb-32">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-text-primary mb-4">
+            Plans That Grow With Your Family
+          </h2>
+          <p className="text-lg text-text-secondary">
+            Start free and add AI tutoring when you're ready
+          </p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          <div className="card p-6 text-center">
+            <h3 className="text-xl font-semibold text-text-primary mb-2">Free</h3>
+            <div className="text-3xl font-bold text-text-primary mb-4">$0</div>
+            <p className="text-text-secondary text-sm mb-4">Perfect for getting started</p>
+            <ul className="text-left space-y-2 text-sm text-text-secondary mb-6">
+              <li>• 1 child account</li>
+              <li>• Curriculum tracking</li>
+              <li>• Progress monitoring</li>
+              <li>• Grade tracking</li>
+            </ul>
+            <Button as="link" href="/signup" variant="secondary" className="w-full">
+              Get Started
+            </Button>
+          </div>
+          
+          <div className="card p-6 text-center ring-2 ring-accent-blue relative">
+            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-accent-yellow text-text-primary px-3 py-1 rounded-full text-xs font-semibold">
+              Most Popular
+            </div>
+            <h3 className="text-xl font-semibold text-text-primary mb-2">Starter + AI</h3>
+            <div className="text-3xl font-bold text-text-primary mb-4">$9.99<span className="text-base font-normal text-text-secondary">/mo</span></div>
+            <p className="text-text-secondary text-sm mb-4">Add intelligent AI tutoring</p>
+            <ul className="text-left space-y-2 text-sm text-text-secondary mb-6">
+              <li>• Everything in Free</li>
+              <li>• 🤖 Klio AI personal tutor</li>
+              <li>• Interactive homework help</li>
+              <li>• 24/7 AI availability</li>
+            </ul>
+            <Button as="link" href="/pricing" variant="primary" className="w-full">
+              Add AI Tutoring
+            </Button>
+          </div>
+          
+          <div className="card p-6 text-center">
+            <h3 className="text-xl font-semibold text-text-primary mb-2">Family Plan</h3>
+            <div className="text-3xl font-bold text-text-primary mb-4">$19<span className="text-base font-normal text-text-secondary">/mo</span></div>
+            <p className="text-text-secondary text-sm mb-4">Complete family solution</p>
+            <ul className="text-left space-y-2 text-sm text-text-secondary mb-6">
+              <li>• Everything in Starter + AI</li>
+              <li>• Up to 3 children</li>
+              <li>• Child login accounts</li>
+              <li>• Advanced analytics</li>
+            </ul>
+            <Button as="link" href="/pricing" variant="secondary" className="w-full">
+              Best Value
+            </Button>
+          </div>
+        </div>
+        <div className="text-center mt-8">
+          <Button as="link" href="/pricing" variant="outline" size="lg">
+            Compare All Plans & Features
+          </Button>
+        </div>
+      </section>
+
       {/* TESTIMONIAL SECTION */}
       <section className="w-full py-16 md:py-20">
         <div className="max-w-3xl mx-auto px-4 text-center">
@@ -140,8 +244,8 @@ export default function LandingPage() {
             <p className="text-sm text-text-secondary leading-relaxed">Bring it on! Upload PDFs, images, or even text files. Klio AI helps you digitize and organize it all.</p>
           </div>
           <div>
-            <h4 className="font-medium text-lg text-text-primary mb-1.5">Is there a trial period?</h4>
-            <p className="text-sm text-text-secondary leading-relaxed">You can start with our free plan to explore core features. Upgrade when you're ready for more.</p>
+            <h4 className="font-medium text-lg text-text-primary mb-1.5">How does pricing work?</h4>
+            <p className="text-sm text-text-secondary leading-relaxed">Start free with 1 child. Add AI tutoring for $9.99/month, or get our Family Plan for $19/month with up to 3 children. <Link href="/pricing" className="text-accent-blue hover:underline">See all plans</Link>.</p>
           </div>
         </div>
       </section>
@@ -155,11 +259,18 @@ export default function LandingPage() {
           <p className="text-md text-text-secondary mb-8 max-w-md mx-auto">
             Join Klio AI today and experience the future of <span className="text-highlight-yellow">personalized family learning.</span>
           </p>
-          <Button href="/signup" as="link" className="btn-primary font-semibold text-lg px-7 py-3">
-            Sign Up for Free
-          </Button>
-          <div className="mt-8 text-xs text-text-tertiary">
-            © {new Date().getFullYear()} Klio AI. All rights reserved.
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button href="/signup" as="link" className="btn-primary font-semibold text-lg px-7 py-3">
+              Sign Up for Free
+            </Button>
+            <Button href="/pricing" as="link" className="btn-secondary font-semibold text-lg px-7 py-3">
+              View Pricing
+            </Button>
+          </div>
+          <div className="mt-8 text-xs text-text-tertiary space-x-6">
+            <Link href="/pricing" className="hover:text-text-secondary">Pricing</Link>
+            <span>•</span>
+            <span>© {new Date().getFullYear()} Klio AI. All rights reserved.</span>
           </div>
         </div>
       </footer>

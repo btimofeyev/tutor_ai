@@ -151,11 +151,9 @@ export default function SubjectsPage() {
       <div className="max-w-4xl mx-auto">
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-800">Manage Subjects</h1>
-          <Link href="/dashboard" legacyBehavior>
-            <a className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium">
-              <ArrowLeftIcon className="h-4 w-4 mr-1.5" />
-              Back to Dashboard
-            </a>
+          <Link href="/dashboard" className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium">
+            <ArrowLeftIcon className="h-4 w-4 mr-1.5" />
+            Back to Dashboard
           </Link>
         </div>
 

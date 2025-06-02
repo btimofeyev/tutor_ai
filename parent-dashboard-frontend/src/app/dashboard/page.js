@@ -331,6 +331,12 @@ export default function DashboardPage() {
     return result;
   }, [lessonsBySubject, filterStatus, filterContentType, sortBy]);
 
+  const currentLessonContainersForUnit = useMemo(() => {
+    const selectedUnitId = lessonJsonForApproval?.unit_id;
+    if (!selectedUnitId) return [];
+    return lessonsByUnit[selectedUnitId] || [];
+  }, [lessonJsonForApproval?.unit_id, lessonsByUnit]);
+
   const refreshChildSpecificData = useCallback(async () => { 
     if (!selectedChild || !selectedChild.id || !session) return;
     setLoadingChildData(true);
@@ -1103,12 +1109,6 @@ export default function DashboardPage() {
     const currentUnitsForAddFormSubject = addLessonSubject && selectedChild && childSubjects[selectedChild.id]
     ? unitsBySubject[addLessonSubject] || [] 
     : [];
-
-  const currentLessonContainersForUnit = useMemo(() => {
-    const selectedUnitId = lessonJsonForApproval?.unit_id;
-    if (!selectedUnitId) return [];
-    return lessonsByUnit[selectedUnitId] || [];
-  }, [lessonJsonForApproval?.unit_id, lessonsByUnit]);
 
   return (
     <div className="flex h-screen bg-background-main overflow-hidden">

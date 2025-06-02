@@ -88,10 +88,8 @@ const Button = React.forwardRef(
 
     if (as === 'link' && href) {
       return (
-        <Link href={href} legacyBehavior>
-          <a ref={ref} className={combinedClassName} {...props}>
-            {children}
-          </a>
+        <Link href={href} ref={ref} className={combinedClassName} {...props}>
+          {children}
         </Link>
       );
     }

@@ -27,26 +27,6 @@ import UpgradePrompt from "../../components/UpgradePrompt";
 
 
 import {
-  Chart as ChartJS,
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-} from "chart.js";
-ChartJS.register(
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title
-);
-
-import {
   PlusCircleIcon,
   PencilIcon,
   TrashIcon,
@@ -68,7 +48,6 @@ export default function DashboardPage() {
   );
 
   // Remaining local state (significantly reduced!)
-  const [subjectsData, setSubjectsData] = useState([]);
   
   // Unit management modal state
   const [isManageUnitsModalOpen, setIsManageUnitsModalOpen] = useState(false);
@@ -117,19 +96,93 @@ export default function DashboardPage() {
     }
   }, [session, router]);
 
-  // Fetch subjects data (only data not handled by custom hooks)
-  useEffect(() => {
-    if (session) {
-      api.get("/subjects")
-        .then(res => setSubjectsData(res.data || []))
-        .catch(error => console.error("Error loading subjects:", error));
-    }
-  }, [session]);
+  // All subjects data now handled by useChildrenData hook
 
   // Reset lesson container selection when lesson approval changes
   useEffect(() => {
     lessonManagement.setSelectedLessonContainer("");
   }, [lessonManagement.lessonJsonForApproval?.unit_id, lessonManagement.setSelectedLessonContainer]);
+
+  const handleAddLessonFormSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!lessonManagement.addLessonSubject || !lessonManagement.addLessonFile || lessonManagement.addLessonFile.length === 0 || !lessonManagement.addLessonUserContentType) {
+      alert("Please select subject, at least one file, and an initial content type.");
+      return;
+    }
+
+    // Find subject info
+    const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
+    const subjectInfo = currentAssignedSubjects.find(
+      (s) => s.child_subject_id === lessonManagement.addLessonSubject
+    );
+
+    if (!subjectInfo || !subjectInfo.child_subject_id) {
+      alert("Selected subject is invalid.");
+      return;
+    }
+
+    // Create form data
+    const formData = new FormData();
+    formData.append("child_subject_id", subjectInfo.child_subject_id);
+    formData.append("user_content_type", lessonManagement.addLessonUserContentType);
+
+    if (lessonManagement.addLessonFile instanceof FileList && lessonManagement.addLessonFile.length > 0) {
+      for (let i = 0; i < lessonManagement.addLessonFile.length; i++) {
+        formData.append("files", lessonManagement.addLessonFile[i], lessonManagement.addLessonFile[i].name);
+      }
+    } else {
+      alert("File selection error.");
+      return;
+    }
+
+    // Use the lesson management hook's upload function
+    const result = await lessonManagement.handleLessonUpload(formData);
+    
+    if (!result.success) {
+      alert(`Upload Error: ${result.error}`);
+      lessonManagement.setLessonJsonForApproval({ error: result.error, title: "Error" });
+      lessonManagement.setLessonTitleForApproval("Error");
+      lessonManagement.setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
+      lessonManagement.setLessonMaxPointsForApproval("");
+      lessonManagement.setLessonDueDateForApproval("");
+      lessonManagement.setLessonCompletedForApproval(false);
+    } else {
+      // Process successful upload
+      const receivedLessonJson = result.data.lesson_json || {};
+      lessonManagement.setLessonJsonForApproval(receivedLessonJson);
+      
+      const firstFileName = lessonManagement.addLessonFile[0]?.name?.split(".")[0];
+      lessonManagement.setLessonTitleForApproval(
+        receivedLessonJson?.title || firstFileName || "Untitled Material"
+      );
+      
+      const llmContentType = receivedLessonJson?.content_type_suggestion;
+      const finalContentType =
+        llmContentType && APP_CONTENT_TYPES.includes(llmContentType)
+          ? llmContentType
+          : lessonManagement.addLessonUserContentType &&
+            APP_CONTENT_TYPES.includes(lessonManagement.addLessonUserContentType)
+          ? lessonManagement.addLessonUserContentType
+          : APP_CONTENT_TYPES[0];
+      lessonManagement.setLessonContentTypeForApproval(finalContentType);
+
+      if (
+        receivedLessonJson?.total_possible_points_suggestion !== null &&
+        receivedLessonJson?.total_possible_points_suggestion !== undefined
+      ) {
+        lessonManagement.setLessonMaxPointsForApproval(
+          String(receivedLessonJson.total_possible_points_suggestion)
+        );
+      } else {
+        lessonManagement.setLessonMaxPointsForApproval("");
+      }
+
+      lessonManagement.setLessonDueDateForApproval("");
+      lessonManagement.setLessonCompletedForApproval(false);
+    }
+  };
 
   const handleAddChildSubmit = async (e) => {
     e.preventDefault();
@@ -226,97 +279,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleAddLessonFormSubmit = async (e) => {
-    e.preventDefault();
-    if (
-      !addLessonSubject ||
-      !addLessonFile ||
-      addLessonFile.length === 0 ||
-      !addLessonUserContentType
-    ) {
-      alert(
-        "Please select subject, at least one file, and an initial content type."
-      );
-      return;
-    }
-    setUploading(true);
-    setLessonJsonForApproval(null);
-    setLessonTitleForApproval("");
-    setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
-    setLessonMaxPointsForApproval("");
-    setLessonDueDateForApproval("");
-    setLessonCompletedForApproval(false);
-  
-    const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
-    const subjectInfo = currentAssignedSubjects.find(
-      (s) => s.child_subject_id === lessonManagement.addLessonSubject
-    );
-  
-    if (!subjectInfo || !subjectInfo.child_subject_id) {
-      alert("Selected subject is invalid.");
-      // setUploading will be handled by lesson management hook
-      return;
-    }
-  
-    const formData = new FormData();
-    formData.append("child_subject_id", subjectInfo.child_subject_id);
-    formData.append("user_content_type", lessonManagement.addLessonUserContentType);
-  
-    if (lessonManagement.addLessonFile instanceof FileList && lessonManagement.addLessonFile.length > 0) {
-      for (let i = 0; i < lessonManagement.addLessonFile.length; i++) {
-        formData.append("files", lessonManagement.addLessonFile[i], lessonManagement.addLessonFile[i].name);
-      }
-    } else {
-      alert("File selection error.");
-      // setUploading will be handled by lesson management hook
-      return;
-    }
-  
-    try {
-      const res = await api.post("/materials/upload", formData);
-      const receivedLessonJson = res.data.lesson_json || {};
-      lessonManagement.setLessonJsonForApproval(receivedLessonJson);
-      const firstFileName = lessonManagement.addLessonFile[0]?.name?.split(".")[0];
-      lessonManagement.setLessonTitleForApproval(
-        receivedLessonJson?.title || firstFileName || "Untitled Material"
-      );
-      const llmContentType = receivedLessonJson?.content_type_suggestion;
-      const finalContentType =
-        llmContentType && APP_CONTENT_TYPES.includes(llmContentType)
-          ? llmContentType
-          : lessonManagement.addLessonUserContentType &&
-            APP_CONTENT_TYPES.includes(lessonManagement.addLessonUserContentType)
-          ? lessonManagement.addLessonUserContentType
-          : APP_CONTENT_TYPES[0];
-      lessonManagement.setLessonContentTypeForApproval(finalContentType);
-  
-      if (
-        receivedLessonJson?.total_possible_points_suggestion !== null &&
-        receivedLessonJson?.total_possible_points_suggestion !== undefined
-      ) {
-        lessonManagement.setLessonMaxPointsForApproval(
-          String(receivedLessonJson.total_possible_points_suggestion)
-        );
-      } else {
-        lessonManagement.setLessonMaxPointsForApproval("");
-      }
-  
-      lessonManagement.setLessonDueDateForApproval("");
-      lessonManagement.setLessonCompletedForApproval(false);
-    } catch (error) {
-      const errorMsg =
-        error.response?.data?.error || error.message || "Upload failed.";
-      alert(`Upload Error: ${errorMsg}`);
-      console.error("Upload error:", error.response || error);
-      lessonManagement.setLessonJsonForApproval({ error: errorMsg, title: "Error" });
-      lessonManagement.setLessonTitleForApproval("Error");
-      lessonManagement.setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
-      lessonManagement.setLessonMaxPointsForApproval("");
-      lessonManagement.setLessonDueDateForApproval("");
-      lessonManagement.setLessonCompletedForApproval(false);
-    }
-    // setUploading will be handled by lesson management hook
-  };
 
   const handleApproveNewLesson = async () => {
     // setSavingLesson will be handled by lesson management hook

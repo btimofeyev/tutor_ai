@@ -68,7 +68,7 @@ export function useChildrenData(session) {
         if (subject.child_subject_id) {
           try {
             // Fetch units for this subject
-            const unitsRes = await api.get(`/units/child-subject/${subject.child_subject_id}`);
+            const unitsRes = await api.get(`/units/subject/${subject.child_subject_id}`);
             const units = unitsRes.data || [];
             newUnitsBySubject[subject.child_subject_id] = units;
             
@@ -83,7 +83,7 @@ export function useChildrenData(session) {
             newLessonsBySubject[subject.child_subject_id] = materialsRes.data || [];
             
             // Fetch grade weights for this subject
-            const weightsRes = await api.get(`/weights/child-subject/${subject.child_subject_id}`);
+            const weightsRes = await api.get(`/weights/${subject.child_subject_id}`);
             newGradeWeights[subject.child_subject_id] = weightsRes.data || [...defaultWeightsForNewSubject];
             
           } catch (err) {

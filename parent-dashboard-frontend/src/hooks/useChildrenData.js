@@ -107,7 +107,7 @@ export function useChildrenData(session) {
     } finally {
       setLoadingChildData(false);
     }
-  }, [selectedChild, session, lessonsByUnit, lessonsBySubject, gradeWeights, unitsBySubject]);
+  }, [selectedChild, session]);
 
   // Add new child
   const handleAddChild = useCallback(async (childData) => {

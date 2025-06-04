@@ -110,7 +110,7 @@ export default function ManualMaterialForm({
 
   const handleUnitChangeInThisForm = (e) => {
     const newUnitId = e.target.value;
-    // console.log('ManualForm: Unit Dropdown Changed. New Unit ID:', newUnitId);
+    console.log('ManualForm: Unit Dropdown Changed. New Unit ID:', newUnitId);
     if (onManualFormUnitChange) { // Ensure prop exists
         onManualFormUnitChange(newUnitId); 
     }
@@ -175,10 +175,12 @@ export default function ManualMaterialForm({
     if (!currentSubject) { alert("A subject must be selected before creating a new unit."); return; }
     
     const result = await onCreateNewUnit(newUnitName.trim(), currentSubject);
+    console.log('ManualForm: Unit creation result:', result);
     if (result && result.success) {
         setNewUnitName('');
         // Select the newly created unit
         if (onManualFormUnitChange && result.data) {
+          console.log('ManualForm: Auto-selecting new unit:', result.data.id);
           onManualFormUnitChange(result.data.id);
         }
     } else {

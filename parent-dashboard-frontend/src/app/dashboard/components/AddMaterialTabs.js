@@ -71,14 +71,15 @@ export default function AddMaterialTabs(props) {
     // When manual form's unit changes, reset the global lesson container selection
     // as it's no longer relevant if it belonged to a different unit.
     if (onLessonContainerChange) { // Check if prop exists before calling
+        console.log('AddMaterialTabs: Resetting lesson container selection');
         onLessonContainerChange({ target: { value: '' } }); 
     }
   }, [onLessonContainerChange]); // Dependency: onLessonContainerChange prop
 
   // For debugging:
-  // console.log("AddMaterialTabs rendering. manualFormSelectedUnitId:", manualFormSelectedUnitId);
-  // console.log("AddMaterialTabs unitsForSelectedSubject:", unitsForSelectedSubject);
-  // console.log("AddMaterialTabs lessonsByUnit:", lessonsByUnit);
+  console.log("AddMaterialTabs rendering. manualFormSelectedUnitId:", manualFormSelectedUnitId);
+  console.log("AddMaterialTabs unitsForSelectedSubject:", unitsForSelectedSubject);
+  console.log("AddMaterialTabs lessonsByUnit:", lessonsByUnit);
 
 
   return (

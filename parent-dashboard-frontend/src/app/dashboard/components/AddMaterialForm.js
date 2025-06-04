@@ -1,7 +1,13 @@
 // app/dashboard/components/AddMaterialForm.js
 'use client';
 import React, { useState, useEffect } from 'react';
-import { DocumentArrowUpIcon, CheckCircleIcon as CheckSolidIcon, ArrowPathIcon, PlusIcon, BookOpenIcon } from '@heroicons/react/24/outline';
+import { 
+  DocumentArrowUpIcon, 
+  CheckCircleIcon as CheckSolidIcon, 
+  ArrowPathIcon, 
+  PlusIcon, 
+  BookOpenIcon 
+} from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 
 function formatContentTypeName(contentType) {
@@ -11,11 +17,29 @@ function formatContentTypeName(contentType) {
 
 export default function AddMaterialForm({
   childSubjectsForSelectedChild,
+  currentAddLessonSubject, 
+  onAddLessonSubjectChange, 
+
+  unitsForSelectedSubject,  
+  
+  selectedLessonContainer, 
+  onLessonContainerChange, 
+
+  onCreateNewLessonContainer, 
+
+  appContentTypes = [],
+  appGradableContentTypes = [],
+  
   onFormSubmit,
-  onApprove,
   uploading,
+  currentAddLessonUserContentType,
+  onAddLessonUserContentTypeChange,
+  onAddLessonFileChange,
+  currentAddLessonFile,
+  
+  onApprove,
   savingLesson,
-  lessonJsonForApproval,
+  lessonJsonForApproval, 
   onUpdateLessonJsonField,
   lessonTitleForApproval,
   onLessonTitleForApprovalChange,
@@ -27,24 +51,27 @@ export default function AddMaterialForm({
   onLessonDueDateForApprovalChange,
   lessonCompletedForApproval,
   onLessonCompletedForApprovalChange,
-  currentAddLessonSubject,
-  onAddLessonSubjectChange,
-  currentAddLessonUserContentType,
-  onAddLessonUserContentTypeChange,
-  onAddLessonFileChange,
-  currentAddLessonFile,
-  appContentTypes = [],
-  appGradableContentTypes = [],
-  unitsForSelectedSubject = [],
-  lessonContainersForSelectedUnit = [],
-  onLessonContainerChange,
-  selectedLessonContainer,
-  onCreateNewLessonContainer, // THIS IS THE PROP FROM dashboard/page.js
+
+  lessonContainersForSelectedUnit, 
 }) {
 
   const [newLessonGroupTitle, setNewLessonGroupTitle] = useState('');
   const [isCreatingLessonGroup, setIsCreatingLessonGroup] = useState(false);
 
+  // Unit in this approval form is driven by lessonJsonForApproval.unit_id
+  const unitIdInApprovalForm = lessonJsonForApproval?.unit_id || '';
+
+  // Effect to reset lesson container when the unit in lessonJsonForApproval changes
+  useEffect(() => {
+    // onLessonContainerChange is a global handler
+    if(onLessonContainerChange) { // Ensure prop exists
+        onLessonContainerChange({ target: { value: '' } }); 
+    }
+    setIsCreatingLessonGroup(false); 
+    setNewLessonGroupTitle('');
+  }, [unitIdInApprovalForm, onLessonContainerChange]);
+  
+  // Sync isCreatingLessonGroup with the global selectedLessonContainer state
   useEffect(() => {
     setIsCreatingLessonGroup(selectedLessonContainer === '__create_new__');
     if (selectedLessonContainer !== '__create_new__') {
@@ -52,14 +79,12 @@ export default function AddMaterialForm({
     }
   }, [selectedLessonContainer]);
 
-
   const handleJsonFieldChange = (e, fieldName) => {
-    onUpdateLessonJsonField(fieldName, e.target.value);
-  };
-
+    if(onUpdateLessonJsonField) onUpdateLessonJsonField(fieldName, e.target.value);
+  }
   const handleJsonArrayFieldChange = (e, fieldName) => {
     const newArray = e.target.value.split('\n').map(item => item.trim()).filter(item => item);
-    onUpdateLessonJsonField(fieldName, newArray);
+    if(onUpdateLessonJsonField) onUpdateLessonJsonField(fieldName, newArray);
   };
   
   const json = lessonJsonForApproval || {};
@@ -68,17 +93,18 @@ export default function AddMaterialForm({
   const commonLabelClasses = "block text-xs font-medium text-text-secondary mb-1";
   const commonSelectClasses = `${commonInputClasses} h-10`;
 
-  const handleInternalCreateNewLessonGroup = async () => { // Renamed to avoid confusion
-    if (!newLessonGroupTitle.trim()) {
-      alert("Please enter a title for the new lesson group.");
-      return;
+  const handleInternalCreateNewLessonGroup = async () => { 
+    if (!newLessonGroupTitle.trim()) { alert("Please enter a title for the new lesson group."); return; }
+    if (!unitIdInApprovalForm) { alert("A unit must be selected in the approval form before creating a new lesson group."); return; }
+    
+    // `onCreateNewLessonContainer` is already correctly wrapped by `AddMaterialTabs`
+    // to use `unitIdInApprovalForm` (which is `lessonJsonForApproval.unit_id`).
+    const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim());
+    if (result && result.success) {
+        setNewLessonGroupTitle(''); 
     }
-    // CORRECTLY CALL THE PROP PASSED FROM THE PARENT
-    await onCreateNewLessonContainer(newLessonGroupTitle.trim()); 
-    // setNewLessonGroupTitle(''); // Parent will reset selectedLessonContainer, which hides this input
   };
 
-  // ... (rest of the component: JSX for form, inputs, etc. remains the same as the previous version)
   return (
     <div className="space-y-6"> 
       <div>
@@ -86,11 +112,10 @@ export default function AddMaterialForm({
         <p className="text-sm text-text-secondary mb-4">Upload files and let Klio AI structure them for you.</p>
       </div>
       <form onSubmit={onFormSubmit} className="space-y-4">
-        {/* ... (Subject, Content Type Hint, File Input - unchanged) ... */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
           <div>
             <label htmlFor="add-lesson-subject" className={commonLabelClasses}>Subject *</label>
-            <select id="add-lesson-subject" value={currentAddLessonSubject} onChange={onAddLessonSubjectChange} className={commonSelectClasses} required>
+            <select id="add-lesson-subject" value={currentAddLessonSubject || ''} onChange={onAddLessonSubjectChange} className={commonSelectClasses} required>
               <option value="">Select subject…</option>
               {(childSubjectsForSelectedChild || []).filter(s => s.child_subject_id).map(subject => (
                 <option key={subject.child_subject_id} value={subject.child_subject_id}>{subject.name}</option>
@@ -99,8 +124,8 @@ export default function AddMaterialForm({
           </div>
           <div>
             <label htmlFor="add-lesson-content-type" className={commonLabelClasses}>Content Type (Initial Hint) *</label>
-            <select id="add-lesson-content-type" value={currentAddLessonUserContentType} onChange={onAddLessonUserContentTypeChange} className={commonSelectClasses} required>
-              {appContentTypes.map(type => (
+            <select id="add-lesson-content-type" value={currentAddLessonUserContentType || ''} onChange={onAddLessonUserContentTypeChange} className={commonSelectClasses} required>
+              {(appContentTypes || []).map(type => (
                 <option key={type} value={type}>{formatContentTypeName(type)}</option>
               ))}
             </select>
@@ -164,18 +189,18 @@ export default function AddMaterialForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
               <div>
                 <label htmlFor="lesson-title-approval" className={commonLabelClasses}>Title *</label>
-                <input id="lesson-title-approval" value={lessonTitleForApproval} onChange={onLessonTitleForApprovalChange} className={commonInputClasses} required/>
+                <input id="lesson-title-approval" value={lessonTitleForApproval || ''} onChange={onLessonTitleForApprovalChange} className={commonInputClasses} required/>
               </div>
               <div>
                 <label htmlFor="lesson-content-type-approval" className={commonLabelClasses}>Content Type *</label>
-                <select id="lesson-content-type-approval" value={lessonContentTypeForApproval} onChange={onLessonContentTypeForApprovalChange} className={commonSelectClasses} required>
-                  {appContentTypes.map(type => ( <option key={type} value={type}>{formatContentTypeName(type)}</option> ))}
+                <select id="lesson-content-type-approval" value={lessonContentTypeForApproval || ''} onChange={onLessonContentTypeForApprovalChange} className={commonSelectClasses} required>
+                  {(appContentTypes || []).map(type => ( <option key={type} value={type}>{formatContentTypeName(type)}</option> ))}
                 </select>
               </div>
-              {appGradableContentTypes.includes(lessonContentTypeForApproval) && (
+              {(appGradableContentTypes || []).includes(lessonContentTypeForApproval) && (
                 <div>
                     <label htmlFor="lesson-max-points-approval" className={commonLabelClasses}>Max Score</label>
-                    <input type="number" id="lesson-max-points-approval" value={lessonMaxPointsForApproval} onChange={onLessonMaxPointsForApprovalChange} className={commonInputClasses} placeholder="e.g., 100"/>
+                    <input type="number" id="lesson-max-points-approval" value={lessonMaxPointsForApproval || ''} onChange={onLessonMaxPointsForApprovalChange} className={commonInputClasses} placeholder="e.g., 100"/>
                     {json.total_possible_points_suggestion !== null && json.total_possible_points_suggestion !== undefined && String(json.total_possible_points_suggestion) !== lessonMaxPointsForApproval && (
                         <p className="text-xs text-text-tertiary mt-0.5">AI Suggestion: {json.total_possible_points_suggestion}</p>
                     )}
@@ -183,22 +208,28 @@ export default function AddMaterialForm({
               )}
                <div>
                     <label htmlFor="lesson-due-date-approval" className={commonLabelClasses}>Due Date</label>
-                    <input type="date" id="lesson-due-date-approval" value={lessonDueDateForApproval} onChange={onLessonDueDateForApprovalChange} className={commonInputClasses}/>
+                    <input type="date" id="lesson-due-date-approval" value={lessonDueDateForApproval || ''} onChange={onLessonDueDateForApprovalChange} className={commonInputClasses}/>
                 </div>
             </div>
             <div>
                 <label htmlFor="lesson-unit-approval" className={`${commonLabelClasses} mt-2`}>Assign to Unit *</label>
-                <select id="lesson-unit-approval" value={json.unit_id || ''} onChange={(e) => onUpdateLessonJsonField('unit_id', e.target.value || null)}
-                    className={commonSelectClasses} disabled={unitsForSelectedSubject.length === 0} required> 
+                <select 
+                    id="lesson-unit-approval" 
+                    value={unitIdInApprovalForm} 
+                    onChange={(e) => onUpdateLessonJsonField('unit_id', e.target.value || null)}
+                    className={commonSelectClasses} 
+                    disabled={!currentAddLessonSubject || (unitsForSelectedSubject && unitsForSelectedSubject.length === 0)} 
+                    required
+                > 
                     <option value="">-- Select a Unit --</option>
-                    {unitsForSelectedSubject.map(unit => ( <option key={unit.id} value={unit.id}>{unit.name}</option> ))}
+                    {(unitsForSelectedSubject || []).map(unit => ( <option key={unit.id} value={unit.id}>{unit.name}</option> ))}
                 </select>
-                {unitsForSelectedSubject.length === 0 && <p className="text-xs text-text-tertiary italic mt-0.5">No units for this subject. Add via "Manage Units".</p>}
+                {currentAddLessonSubject && unitsForSelectedSubject && unitsForSelectedSubject.length === 0 && <p className="text-xs text-text-tertiary italic mt-0.5">No units for this subject. Add via "Manage Units".</p>}
             </div>
             
             <div className="mt-3">
                 <label htmlFor="lesson-container-approval" className={commonLabelClasses}>
-                    Lesson Group * <span className="text-highlight-yellow">(e.g., "Week 1 Algebra", "Photosynthesis Project")</span>
+                    Lesson Group * <span className="text-highlight-yellow">(e.g., "Week 1 Algebra")</span>
                 </label>
                 <select 
                     id="lesson-container-approval" 
@@ -206,24 +237,24 @@ export default function AddMaterialForm({
                     onChange={onLessonContainerChange}
                     className={commonSelectClasses} 
                     required
-                    disabled={!json.unit_id}
+                    disabled={!unitIdInApprovalForm}
                 >
                     <option value="">-- Choose or Create Lesson Group --</option>
                     <option value="__create_new__" className="font-medium text-accent-blue">+ Create New Lesson Group</option>
-                    {lessonContainersForSelectedUnit.map(lesson => ( 
+                    {(lessonContainersForSelectedUnit || []).map(lesson => ( 
                         <option key={lesson.id} value={lesson.id}>{lesson.title}</option> 
                     ))}
                 </select>
-                {!json.unit_id && <p className="text-xs text-text-tertiary italic mt-0.5">Select a unit first to manage lesson groups.</p>}
+                {!unitIdInApprovalForm && <p className="text-xs text-text-tertiary italic mt-0.5">Select a unit first to manage lesson groups.</p>}
             </div>
 
-            {isCreatingLessonGroup && json.unit_id && (
+            {isCreatingLessonGroup && unitIdInApprovalForm && (
               <div className="mt-2 p-3 border border-dashed border-blue-300 rounded-md bg-blue-50/50 animate-fade-in">
-                <label htmlFor="new-lesson-group-title" className={`${commonLabelClasses} text-accent-blue`}>New Lesson Group Title *</label>
+                <label htmlFor="new-lesson-group-title-approval" className={`${commonLabelClasses} text-accent-blue`}>New Lesson Group Title *</label>
                 <div className="flex gap-2 mt-1 items-center">
                   <input
                     type="text"
-                    id="new-lesson-group-title"
+                    id="new-lesson-group-title-approval"
                     value={newLessonGroupTitle}
                     onChange={(e) => setNewLessonGroupTitle(e.target.value)}
                     className={`${commonInputClasses} flex-1`}
@@ -232,11 +263,11 @@ export default function AddMaterialForm({
                   />
                   <Button
                     type="button"
-                    variant="primary" // Changed to primary to match other creation buttons
-                    size="md" 
-                    onClick={handleInternalCreateNewLessonGroup} // Make sure this calls the correct function
+                    variant="primary" 
+                    size="sm" 
+                    onClick={handleInternalCreateNewLessonGroup}
                     className="h-10 whitespace-nowrap"
-                    disabled={!newLessonGroupTitle.trim()}
+                    disabled={!newLessonGroupTitle.trim() || savingLesson}
                   >
                     <PlusIcon className="h-4 w-4 mr-1.5"/> Create
                   </Button>
@@ -253,7 +284,6 @@ export default function AddMaterialForm({
           {!json.error && (
              <div className="space-y-3">
                 <h4 className="text-sm font-semibold text-text-primary mb-2 border-b border-border-subtle pb-1.5">Additional Extracted Details (Editable)</h4>
-                {/* ... (Additional details inputs - unchanged) ... */}
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                         <label className={commonLabelClasses}>Lesson/Assignment Number</label>
@@ -303,13 +333,12 @@ export default function AddMaterialForm({
             </div>
           )}
           
-          {/* UPDATED APPROVE BUTTON STYLING */}
           <Button 
             onClick={onApprove} 
             variant="primary" 
             size="md"
-            className="w-full !bg-[#ABEBC6] !text-green-900 !border-b-[#7DCEA0] hover:!bg-[#A2E4B9] hover:!border-b-[#68C38B] active:!bg-[#7DCEA0] focus:!ring-[#7DCEA0]" // Pastel Green
-            disabled={savingLesson || !lessonTitleForApproval || !lessonContentTypeForApproval || !selectedLessonContainer || isCreatingLessonGroup || (json && json.error) || !json.unit_id }>
+            className="w-full !bg-[#ABEBC6] !text-green-900 !border-b-[#7DCEA0] hover:!bg-[#A2E4B9] hover:!border-b-[#68C38B] active:!bg-[#7DCEA0] focus:!ring-[#7DCEA0]"
+            disabled={savingLesson || !lessonTitleForApproval || !lessonContentTypeForApproval || !selectedLessonContainer || (selectedLessonContainer === '__create_new__') || (json && json.error) || !unitIdInApprovalForm }>
             {savingLesson ? (
                 <><ArrowPathIcon className="h-5 w-5 mr-2 animate-spin"/>Saving...</>
             ) : (

@@ -28,5 +28,7 @@ router.get('/subject/:child_subject_id', materialsController.listMaterialsForChi
 router.put('/:material_id', materialsController.updateMaterialDetails);
 router.put('/:material_id/toggle-complete', materialsController.toggleMaterialCompletion);
 router.delete('/:material_id', materialsController.deleteMaterial);
+router.post('/create-manual', materialsController.createMaterialManually);
+
 
 module.exports = router;

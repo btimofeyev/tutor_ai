@@ -63,13 +63,6 @@ export default function SubjectCard({
     setExpandedLessonContainers(prev => ({ ...prev, [lessonContainerId]: !prev[lessonContainerId] }));
   };
 
-  // If you use the <Button> component, these local styles might not be needed as much.
-  // However, they are here for direct button elements if you choose that path.
-  // const commonButtonStyles = "flex items-center text-xs px-2.5 py-1.5 rounded-[var(--radius-md)] font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1";
-  // const primaryButtonStyles = `${commonButtonStyles} bg-[var(--accent-blue)] text-[var(--text-on-accent)] hover:bg-[var(--accent-blue-hover)] focus:ring-[var(--accent-blue)]`;
-  // const secondaryButtonStyles = `${commonButtonStyles} bg-[var(--accent-yellow)] text-[var(--text-primary)] hover:bg-[var(--accent-yellow-hover)] focus:ring-[var(--accent-yellow)]`;
-
-
   const renderLessonContainerMaterials = (lessonContainer, materials) => {
     const isExpanded = !!expandedLessonContainers[lessonContainer.id];
     const materialCount = materials.length;

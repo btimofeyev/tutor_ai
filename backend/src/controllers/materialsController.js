@@ -606,3 +606,92 @@ exports.deleteMaterial = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete material' });
   }
 };
+
+exports.createMaterialManually = async (req, res) => {
+  const parent_id = getParentId(req);
+  const { 
+    lesson_id, 
+    child_subject_id, 
+    title, 
+    content_type, 
+    lesson_json, 
+    grade_max_value, 
+    due_date, 
+    completed_at 
+  } = req.body;
+
+  if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
+  if (!lesson_id) return res.status(400).json({ error: 'lesson_id is required' });
+  if (!child_subject_id) return res.status(400).json({ error: 'child_subject_id is required' });
+  if (!title || !content_type) {
+    return res.status(400).json({ error: 'Missing required data: title, content_type' });
+  }
+
+  try {
+    // Verify parent owns the lesson container
+    const isOwner = await verifyLessonOwnership(parent_id, lesson_id);
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Access denied to this lesson' });
+    }
+
+    let finalLessonJson = lesson_json;
+    if (typeof lesson_json === 'string') {
+      try { 
+        finalLessonJson = JSON.parse(lesson_json); 
+      } catch (e) { 
+        return res.status(400).json({ error: "Invalid lesson_json format." }); 
+      }
+    }
+
+    // Ensure the lesson_json has required fields for manual entry
+    if (!finalLessonJson || typeof finalLessonJson !== 'object') {
+      finalLessonJson = {};
+    }
+
+    // Set defaults for manual entries
+    finalLessonJson = {
+      title: title,
+      content_type_suggestion: content_type,
+      main_content_summary_or_extract: 'Manually created material',
+      learning_objectives: [],
+      subject_keywords_or_subtopics: [],
+      page_count_or_length_indicator: 'Manual entry',
+      tasks_or_questions: [],
+      created_manually: true,
+      ...finalLessonJson // Override with provided data
+    };
+
+    const insertPayload = {
+      lesson_id: normalizeStringOrNull(lesson_id),
+      child_subject_id: normalizeStringOrNull(child_subject_id),
+      title: normalizeStringOrNull(title), 
+      content_type: normalizeStringOrNull(content_type),
+      lesson_json: finalLessonJson, 
+      status: 'approved',
+      grade_max_value: normalizeStringOrNull(grade_max_value),
+      due_date: normalizeStringOrNull(due_date),
+      completed_at: completed_at ? new Date(completed_at).toISOString() : null
+    };
+
+    const { data, error } = await supabase
+      .from('materials')
+      .insert([insertPayload])
+      .select()
+      .single();
+
+    if (error) { 
+      console.error("Error saving manual material to Supabase:", error);
+      return res.status(400).json({ error: error.message }); 
+    }
+
+    res.status(201).json({
+      success: true,
+      material: data,
+      message: 'Material created successfully'
+    });
+
+  } catch (error) {
+    console.error('Error creating manual material:', error);
+    res.status(500).json({ error: 'Failed to create material' });
+  }
+};

@@ -13,6 +13,7 @@ const childAuthRoutes = require('./routes/childAuthRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 
+
 // Import Stripe routes
 const stripeRoutes = require('./routes/stripeRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
@@ -29,11 +30,14 @@ app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
 
 // Mount all the routes
+
 app.use('/api/children', childrenRoutes);
 app.use('/api/subjects', subjectsRoutes);
 app.use('/api/child-subjects', childSubjectsRoutes);
 app.use('/api/units', unitsRoutes); 
 app.use('/api/lesson-containers', lessonContainersRoutes);
+
+
 app.use('/api/materials', materialsRoutes); 
 app.use('/api/weights', weightsRoutes);
 app.use('/api/auth/child', childAuthRoutes);

@@ -7,7 +7,7 @@ import api from "../../utils/api";
 
 // Extracted hooks and utilities
 import { useChildrenData } from "../../hooks/useChildrenData";
-import { useLessonManagement } from "../../hooks/useLessonManagement";
+import { useMaterialManagement } from "../../hooks/useMaterialManagement"; // UPDATED
 import { useFiltersAndSorting } from "../../hooks/useFiltersAndSorting";
 import { 
   APP_CONTENT_TYPES,
@@ -20,11 +20,10 @@ import {
 import StudentSidebar from "./components/StudentSidebar";
 import StudentHeader from "./components/StudentHeader";
 import SubjectCard from "./components/SubjectCard";
-import AddMaterialForm from "./components/AddMaterialForm";
+import AddMaterialTabs from "./components/AddMaterialTabs";
 import EditMaterialModal from "./components/EditMaterialModal";
 import ChildLoginSettingsModal from "./components/ChildLoginSettingsModal";
 import UpgradePrompt from "../../components/UpgradePrompt";
-
 
 import {
   PlusCircleIcon,
@@ -39,15 +38,13 @@ export default function DashboardPage() {
 
   // Use extracted custom hooks
   const childrenData = useChildrenData(session);
-  const lessonManagement = useLessonManagement(childrenData.refreshChildSpecificData);
+  const materialManagement = useMaterialManagement(childrenData.refreshChildSpecificData); // UPDATED
   const filtersAndSorting = useFiltersAndSorting(
     childrenData.lessonsBySubject, 
     childrenData.gradeWeights, 
     childrenData.childSubjects, 
     childrenData.selectedChild
   );
-
-  // Remaining local state (significantly reduced!)
   
   // Unit management modal state
   const [isManageUnitsModalOpen, setIsManageUnitsModalOpen] = useState(false);
@@ -72,22 +69,16 @@ export default function DashboardPage() {
   const [upgrading, setUpgrading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState('free');
 
-  // Lesson container state
-  const [newLessonContainerTitle, setNewLessonContainerTitle] = useState("");
-
   // Get computed values from custom hooks
   const { assignedSubjectsForCurrentChild } = childrenData;
   const { totalStats } = filtersAndSorting;
 
-  // Get lesson containers for selected unit (this one stays as it's UI-specific)
+  // Get lesson containers for selected unit
   const currentLessonContainersForUnit = useMemo(() => {
-    const selectedUnitId = lessonManagement.lessonJsonForApproval?.unit_id;
+    const selectedUnitId = materialManagement.lessonJsonForApproval?.unit_id; // UPDATED
     if (!selectedUnitId) return [];
     return childrenData.lessonsByUnit[selectedUnitId] || [];
-  }, [lessonManagement.lessonJsonForApproval?.unit_id, childrenData.lessonsByUnit]);
-
-  // All child data management now handled by useChildrenData hook
-
+  }, [materialManagement.lessonJsonForApproval?.unit_id, childrenData.lessonsByUnit]); // UPDATED
 
   // Redirect to login if no session
   useEffect(() => {
@@ -96,26 +87,22 @@ export default function DashboardPage() {
     }
   }, [session, router]);
 
-  // All subjects data now handled by useChildrenData hook
-
-  // Reset lesson container selection when lesson approval changes
+  // Reset lesson container selection when lesson approval unit changes
   useEffect(() => {
-    lessonManagement.setSelectedLessonContainer("");
-  }, [lessonManagement.lessonJsonForApproval?.unit_id, lessonManagement.setSelectedLessonContainer]);
+    materialManagement.setSelectedLessonContainer(""); // UPDATED
+  }, [materialManagement.lessonJsonForApproval?.unit_id, materialManagement.setSelectedLessonContainer]); // UPDATED
 
   const handleAddLessonFormSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate required fields
-    if (!lessonManagement.addLessonSubject || !lessonManagement.addLessonFile || lessonManagement.addLessonFile.length === 0 || !lessonManagement.addLessonUserContentType) {
+    if (!materialManagement.addLessonSubject || !materialManagement.addLessonFile || materialManagement.addLessonFile.length === 0 || !materialManagement.addLessonUserContentType) { // UPDATED
       alert("Please select subject, at least one file, and an initial content type.");
       return;
     }
 
-    // Find subject info
     const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
     const subjectInfo = currentAssignedSubjects.find(
-      (s) => s.child_subject_id === lessonManagement.addLessonSubject
+      (s) => s.child_subject_id === materialManagement.addLessonSubject // UPDATED
     );
 
     if (!subjectInfo || !subjectInfo.child_subject_id) {
@@ -123,38 +110,35 @@ export default function DashboardPage() {
       return;
     }
 
-    // Create form data
     const formData = new FormData();
     formData.append("child_subject_id", subjectInfo.child_subject_id);
-    formData.append("user_content_type", lessonManagement.addLessonUserContentType);
+    formData.append("user_content_type", materialManagement.addLessonUserContentType); // UPDATED
 
-    if (lessonManagement.addLessonFile instanceof FileList && lessonManagement.addLessonFile.length > 0) {
-      for (let i = 0; i < lessonManagement.addLessonFile.length; i++) {
-        formData.append("files", lessonManagement.addLessonFile[i], lessonManagement.addLessonFile[i].name);
+    if (materialManagement.addLessonFile instanceof FileList && materialManagement.addLessonFile.length > 0) { // UPDATED
+      for (let i = 0; i < materialManagement.addLessonFile.length; i++) { // UPDATED
+        formData.append("files", materialManagement.addLessonFile[i], materialManagement.addLessonFile[i].name); // UPDATED
       }
     } else {
       alert("File selection error.");
       return;
     }
 
-    // Use the lesson management hook's upload function
-    const result = await lessonManagement.handleLessonUpload(formData);
+    const result = await materialManagement.handleLessonUpload(formData); // UPDATED
     
     if (!result.success) {
       alert(`Upload Error: ${result.error}`);
-      lessonManagement.setLessonJsonForApproval({ error: result.error, title: "Error" });
-      lessonManagement.setLessonTitleForApproval("Error");
-      lessonManagement.setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
-      lessonManagement.setLessonMaxPointsForApproval("");
-      lessonManagement.setLessonDueDateForApproval("");
-      lessonManagement.setLessonCompletedForApproval(false);
+      materialManagement.setLessonJsonForApproval({ error: result.error, title: "Error" }); // UPDATED
+      materialManagement.setLessonTitleForApproval("Error"); // UPDATED
+      materialManagement.setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]); // UPDATED
+      materialManagement.setLessonMaxPointsForApproval(""); // UPDATED
+      materialManagement.setLessonDueDateForApproval(""); // UPDATED
+      materialManagement.setLessonCompletedForApproval(false); // UPDATED
     } else {
-      // Process successful upload
       const receivedLessonJson = result.data.lesson_json || {};
-      lessonManagement.setLessonJsonForApproval(receivedLessonJson);
+      // materialManagement.setLessonJsonForApproval(receivedLessonJson); // Hook's handleLessonUpload does this
       
-      const firstFileName = lessonManagement.addLessonFile[0]?.name?.split(".")[0];
-      lessonManagement.setLessonTitleForApproval(
+      const firstFileName = materialManagement.addLessonFile[0]?.name?.split(".")[0]; // UPDATED
+      materialManagement.setLessonTitleForApproval( // UPDATED
         receivedLessonJson?.title || firstFileName || "Untitled Material"
       );
       
@@ -162,25 +146,43 @@ export default function DashboardPage() {
       const finalContentType =
         llmContentType && APP_CONTENT_TYPES.includes(llmContentType)
           ? llmContentType
-          : lessonManagement.addLessonUserContentType &&
-            APP_CONTENT_TYPES.includes(lessonManagement.addLessonUserContentType)
-          ? lessonManagement.addLessonUserContentType
+          : materialManagement.addLessonUserContentType && // UPDATED
+            APP_CONTENT_TYPES.includes(materialManagement.addLessonUserContentType) // UPDATED
+          ? materialManagement.addLessonUserContentType // UPDATED
           : APP_CONTENT_TYPES[0];
-      lessonManagement.setLessonContentTypeForApproval(finalContentType);
+      materialManagement.setLessonContentTypeForApproval(finalContentType); // UPDATED
 
       if (
         receivedLessonJson?.total_possible_points_suggestion !== null &&
         receivedLessonJson?.total_possible_points_suggestion !== undefined
       ) {
-        lessonManagement.setLessonMaxPointsForApproval(
+        materialManagement.setLessonMaxPointsForApproval( // UPDATED
           String(receivedLessonJson.total_possible_points_suggestion)
         );
       } else {
-        lessonManagement.setLessonMaxPointsForApproval("");
+        materialManagement.setLessonMaxPointsForApproval(""); // UPDATED
       }
 
-      lessonManagement.setLessonDueDateForApproval("");
-      lessonManagement.setLessonCompletedForApproval(false);
+      materialManagement.setLessonDueDateForApproval(""); // UPDATED
+      materialManagement.setLessonCompletedForApproval(false); // UPDATED
+    }
+  };
+
+  const handleManualMaterialSubmit = async (materialDataFromForm) => {
+    // Assuming materialDataFromForm from AddMaterialTabs includes:
+    // title, content_type, child_subject_id, lesson_container_id, unit_id (if any), etc.
+    const result = await materialManagement.handleManualMaterialCreation(materialDataFromForm); // UPDATED
+    
+    if (result.success) {
+      alert('Material added successfully!');
+      // AddMaterialTabs should clear its own manual form on success
+      return { success: true };
+    } else {
+      alert(result.error || 'Failed to create material');
+      return { 
+        success: false, 
+        error: result.error || 'Failed to create material' 
+      };
     }
   };
 
@@ -194,12 +196,10 @@ export default function DashboardPage() {
     const result = await childrenData.handleAddChild(childData);
     
     if (result.success) {
-      // Success is handled by the hook
       childrenData.setShowAddChild(false);
     } else {
-      // Check if this is a child limit error
       if (result.code === 'CHILD_LIMIT_EXCEEDED') {
-        setCurrentPlan('free'); // Default plan for limit errors
+        setCurrentPlan('free'); 
         setUpgradeFeature('children');
         setShowUpgradePrompt(true);
       } else {
@@ -232,141 +232,70 @@ export default function DashboardPage() {
   };
 
   const handleUpdateLessonJsonForApprovalField = (fieldName, value) => {
-    lessonManagement.setLessonJsonForApproval((prevJson) => {
-      const baseJson =
-        prevJson && typeof prevJson === "object" && !prevJson.error
-          ? prevJson
-          : {};
-      return { ...baseJson, [fieldName]: value };
-    });
+    materialManagement.updateLessonApprovalField(fieldName, value); // UPDATED
   };
 
-  const handleToggleLessonComplete = async (
-    lessonId,
-    currentCompletedStatus,
-    grade = null
-  ) => {
-    let originalLesson = null;
-    let subjectIdToUpdate = null;
-    let lessonIndexToUpdate = -1;
-    Object.keys(childrenData.lessonsBySubject).forEach((subjId) => {
-      const index = childrenData.lessonsBySubject[subjId].findIndex(
-        (l) => l.id === lessonId
-      );
-      if (index !== -1) {
-        subjectIdToUpdate = subjId;
-        lessonIndexToUpdate = index;
-        originalLesson = { ...childrenData.lessonsBySubject[subjId][index] };
-      }
-    });
-    if (subjectIdToUpdate && lessonIndexToUpdate !== -1) {
-      // Optimistic update - we'll refresh from server after API call
-      // This is handled by refreshChildSpecificData() below
+  const handleToggleLessonComplete = async (lessonId, grade = null) => { // Renamed from materialId to lessonId for consistency
+    const result = await materialManagement.toggleLessonCompletion(lessonId, grade); // UPDATED
+    if (!result.success) {
+      alert(result.error || "Could not update completion status.");
     }
-    try {
-      const payload = grade !== null ? { grade } : {};
-      const updatedLessonFromServer = await api.put(`/materials/${lessonId}/toggle-complete`, payload);
-
-      // Refresh all child data to get updated lesson state
-      await childrenData.refreshChildSpecificData();
-    } catch (error) {
-      console.error("Failed to toggle lesson completion:", error);
-      alert(
-        error.response?.data?.error || "Could not update completion status."
-      );
-      // Refresh data to revert optimistic update on error
-      await childrenData.refreshChildSpecificData();
-    }
+    // Data refresh is handled by the hook
   };
 
 
   const handleApproveNewLesson = async () => {
-    // setSavingLesson will be handled by lesson management hook
     const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
-    const subjectInfo = currentAssignedSubjects.find(
-      (s) => s.child_subject_id === lessonManagement.addLessonSubject
+    const subjectInfo = currentAssignedSubjects.find( // This check is still useful here for early exit
+      (s) => s.child_subject_id === materialManagement.addLessonSubject // UPDATED
     );
   
     if (!subjectInfo || !subjectInfo.child_subject_id) {
       alert("Selected subject invalid.");
-      // setSavingLesson will be handled by lesson management hook
       return;
     }
   
     if (
-      !lessonManagement.lessonJsonForApproval ||
-      !lessonManagement.lessonTitleForApproval ||
-      !lessonManagement.lessonContentTypeForApproval
+      !materialManagement.lessonJsonForApproval || // UPDATED
+      !materialManagement.lessonTitleForApproval || // UPDATED
+      !materialManagement.lessonContentTypeForApproval // UPDATED
     ) {
       alert("Missing data for approval.");
-      // setSavingLesson will be handled by lesson management hook
       return;
     }
 
-    if (!lessonManagement.selectedLessonContainer || lessonManagement.selectedLessonContainer === '__create_new__') {
+    if (!materialManagement.selectedLessonContainer || materialManagement.selectedLessonContainer === '__create_new__') { // UPDATED
       alert("Please select or create a lesson container.");
-      // setSavingLesson will be handled by lesson management hook
       return;
     }
+    
+    // The hook's handleSaveLesson should use its internal state for payload construction
+    // (addLessonSubject, selectedLessonContainer, lessonJsonForApproval.unit_id, etc.)
+    const result = await materialManagement.handleSaveLesson(); // UPDATED
   
-    const unitIdForPayload = lessonManagement.lessonJsonForApproval.unit_id || null;
-    const lessonJsonToSave = { ...lessonManagement.lessonJsonForApproval };
-    delete lessonJsonToSave.unit_id;
-  
-    const payload = {
-      lesson_id: lessonManagement.selectedLessonContainer, 
-      child_subject_id: subjectInfo.child_subject_id,
-      title: lessonManagement.lessonTitleForApproval,
-      content_type: lessonManagement.lessonContentTypeForApproval,
-      lesson_json: lessonJsonToSave,
-      grade_max_value:
-        APP_GRADABLE_CONTENT_TYPES.includes(lessonManagement.lessonContentTypeForApproval) &&
-        lessonManagement.lessonMaxPointsForApproval.trim() !== ""
-          ? lessonManagement.lessonMaxPointsForApproval.trim()
-          : null,
-      due_date:
-        lessonManagement.lessonDueDateForApproval.trim() !== ""
-          ? lessonManagement.lessonDueDateForApproval
-          : null,
-      completed_at: lessonManagement.lessonCompletedForApproval
-        ? new Date().toISOString()
-        : null,
-      unit_id: unitIdForPayload,
-    };
-  
-    try {
-      await api.post("/materials/save", payload);
-      await childrenData.refreshChildSpecificData();
-      lessonManagement.setLessonJsonForApproval(null);
-      lessonManagement.setLessonTitleForApproval("");
-      lessonManagement.setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
-      lessonManagement.setLessonMaxPointsForApproval("");
-      lessonManagement.setLessonDueDateForApproval("");
-      lessonManagement.setLessonCompletedForApproval(false);
-      lessonManagement.setAddLessonFile(null);
-      lessonManagement.setSelectedLessonContainer(""); 
-  
-      const fileInput = document.getElementById("lesson-file-input-main");
+    if (result.success) {
+      // Hook's handleSaveLesson resets form fields and refreshes data.
+      // Clear the main file input if necessary (ID might change with AddMaterialTabs)
+      const fileInput = document.getElementById("lesson-file-input-main"); 
       if (fileInput) fileInput.value = "";
-      lessonManagement.setAddLessonSubject("");
-      lessonManagement.setAddLessonUserContentType(APP_CONTENT_TYPES[0]);
-    } catch (error) {
-      alert(error.response?.data?.error || "Lesson save failed.");
+      // alert("Lesson approved and saved!"); // Optional: Hook handles refresh
+    } else {
+      alert(result.error || "Lesson save failed.");
     }
-    // setSavingLesson will be handled by lesson management hook
   };
 
   const handleLessonContainerChange = (e) => {
     const value = e.target.value;
-    lessonManagement.setSelectedLessonContainer(value);
+    materialManagement.setSelectedLessonContainer(value); // UPDATED
     
-    if (value === '__create_new__') {
-      setNewLessonContainerTitle('');
-    }
+    // if (value === '__create_new__') { // This state is not part of materialManagement
+    //   setNewLessonContainerTitle(''); // This local state is for the "create new container" UI element
+    // }
+    // The above logic for setNewLessonContainerTitle seems fine as it's for a UI element not directly tied to the hook's core state.
   };
 
-  const handleCreateNewLessonContainer = async (newTitleFromForm) => { 
-    const unitId = lessonManagement.lessonJsonForApproval?.unit_id; 
+  const handleCreateNewLessonContainer = async (newTitleFromForm, unitIdForCreation) => { // Add unitIdForCreation
+    const unitId = unitIdForCreation; // Use the passed unitId
   
     if (!unitId) {
       console.error('Unit ID is missing for new lesson container creation.'); 
@@ -393,7 +322,7 @@ export default function DashboardPage() {
         [unitId]: updatedLessonContainersForUnit
       }));
       
-      lessonManagement.setSelectedLessonContainer(response.data.id); 
+      materialManagement.setSelectedLessonContainer(response.data.id); 
   
     } catch (error) {
       console.error('Failed to create lesson container:', error.response?.data || error.message); 
@@ -402,69 +331,28 @@ export default function DashboardPage() {
   };
 
   const handleOpenEditModal = (lesson) => {
-    lessonManagement.setEditingLesson(lesson);
-    lessonManagement.setEditForm({
-      title: lesson.title || "",
-      content_type: lesson.content_type || APP_CONTENT_TYPES[0],
-      grade_value:
-        lesson.grade_value === null ? "" : String(lesson.grade_value),
-      grade_max_value:
-        lesson.grade_max_value === null ? "" : String(lesson.grade_max_value),
-      grading_notes: lesson.grading_notes || "",
-      completed_at: lesson.completed_at,
-      due_date: lesson.due_date || "",
-      unit_id: lesson.unit_id || "",
-      lesson_json_string: JSON.stringify(lesson.lesson_json || {}, null, 2),
-    });
+    materialManagement.startEditingLesson(lesson); // UPDATED
   };
 
   const handleEditModalFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name === "completed_toggle")
-      lessonManagement.setEditForm((prev) => ({
+      materialManagement.setEditForm((prev) => ({ // UPDATED
         ...prev,
         completed_at: checked ? new Date().toISOString() : null,
       }));
-    else lessonManagement.setEditForm((prev) => ({ ...prev, [name]: value }));
+    else materialManagement.setEditForm((prev) => ({ ...prev, [name]: value })); // UPDATED
   };
 
   const handleSaveLessonEdit = async () => {
-    if (!lessonManagement.editingLesson) return;
-    // setIsSavingEdit will be handled by lesson management hook
-    let lesson_json_parsed;
-    try {
-      lesson_json_parsed = JSON.parse(lessonManagement.editForm.lesson_json_string);
-    } catch (e) {
-      alert("Invalid JSON in 'Extracted Data'.");
-      // setIsSavingEdit will be handled by lesson management hook
-      return;
+    if (!materialManagement.editingLesson) return; // UPDATED
+    
+    const result = await materialManagement.saveEditedLesson(); // UPDATED
+    
+    if (!result.success) {
+      alert(result.error || "Failed to save changes.");
     }
-    const payload = {
-      title: lessonManagement.editForm.title,
-      content_type: lessonManagement.editForm.content_type,
-      lesson_json: lesson_json_parsed,
-      grade_value:
-        lessonManagement.editForm.grade_value.trim() === "" ? null : lessonManagement.editForm.grade_value,
-      grade_max_value:
-        lessonManagement.editForm.grade_max_value.trim() === ""
-          ? null
-          : lessonManagement.editForm.grade_max_value,
-      grading_notes:
-        lessonManagement.editForm.grading_notes.trim() === "" ? null : lessonManagement.editForm.grading_notes,
-      completed_at: lessonManagement.editForm.completed_at,
-      due_date: lessonManagement.editForm.due_date.trim() === "" ? null : lessonManagement.editForm.due_date,
-      unit_id: lessonManagement.editForm.unit_id || null,
-    };
-    if (payload.lesson_json && "unit_id" in payload.lesson_json)
-      delete payload.lesson_json.unit_id;
-    try {
-      await api.put(`/materials/${lessonManagement.editingLesson.id}`, payload);
-      await childrenData.refreshChildSpecificData();
-      lessonManagement.setEditingLesson(null);
-    } catch (error) {
-      alert(error.response?.data?.error || "Failed to save changes.");
-    }
-    // setIsSavingEdit will be handled by lesson management hook
+    // Data refresh and state reset handled by the hook.
   };
 
   const openManageUnitsModal = (subject) => {
@@ -692,8 +580,8 @@ export default function DashboardPage() {
   if (!session) return null;
 
   // Get current units for add form subject
-  const currentUnitsForAddFormSubject = lessonManagement.addLessonSubject && childrenData.selectedChild && childrenData.childSubjects[childrenData.selectedChild.id]
-    ? childrenData.unitsBySubject[lessonManagement.addLessonSubject] || [] 
+  const currentUnitsForAddFormSubject = materialManagement.addLessonSubject && childrenData.selectedChild && childrenData.childSubjects[childrenData.selectedChild.id] // UPDATED
+    ? childrenData.unitsBySubject[materialManagement.addLessonSubject] || []  // UPDATED
     : [];
 
   return (
@@ -736,7 +624,7 @@ export default function DashboardPage() {
               selectedChild={childrenData.selectedChild}
               dashboardStats={totalStats}
             />
-            <div className="my-6 card p-4"> {/* Use card class */}
+            <div className="my-6 card p-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div>
                   <label
@@ -815,7 +703,7 @@ export default function DashboardPage() {
                   </h2>
                 </div>
                 {assignedSubjectsForCurrentChild.length === 0 ? (
-                  <div className="italic text-text-secondary p-4 bg-background-card rounded-lg shadow border border-border-subtle"> {/* Matches card but might not need full 'card' class features */}
+                  <div className="italic text-text-secondary p-4 bg-background-card rounded-lg shadow border border-border-subtle">
                     No subjects assigned to {childrenData.selectedChild.name}.
                     <button
                       onClick={() => router.push("/subject-management")}
@@ -872,51 +760,57 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold text-text-primary">Actions</h2>
         </div>
         {childrenData.selectedChild && !childrenData.loadingChildData ? (
-          <AddMaterialForm
+          <AddMaterialTabs
             childSubjectsForSelectedChild={assignedSubjectsForCurrentChild}
-            onFormSubmit={handleAddLessonFormSubmit}
-            onApprove={handleApproveNewLesson}
-            uploading={lessonManagement.uploading}
-            savingLesson={lessonManagement.savingLesson}
-            lessonJsonForApproval={lessonManagement.lessonJsonForApproval}
-            onUpdateLessonJsonField={handleUpdateLessonJsonForApprovalField}
-            lessonTitleForApproval={lessonManagement.lessonTitleForApproval}
+            onFormSubmit={handleAddLessonFormSubmit} // For upload tab
+            onApprove={handleApproveNewLesson}       // For upload tab approval
+            onManualSubmit={handleManualMaterialSubmit} // For manual tab
+            
+            uploading={materialManagement.uploading} // UPDATED
+            savingLesson={materialManagement.savingLesson} // UPDATED
+            
+            lessonJsonForApproval={materialManagement.lessonJsonForApproval} // UPDATED
+            onUpdateLessonJsonField={handleUpdateLessonJsonForApprovalField} // Wrapper updated
+            
+            lessonTitleForApproval={materialManagement.lessonTitleForApproval} // UPDATED
             onLessonTitleForApprovalChange={(e) =>
-              lessonManagement.setLessonTitleForApproval(e.target.value)
+              materialManagement.setLessonTitleForApproval(e.target.value) // UPDATED
             }
-            lessonContentTypeForApproval={lessonManagement.lessonContentTypeForApproval}
+            lessonContentTypeForApproval={materialManagement.lessonContentTypeForApproval} // UPDATED
             onLessonContentTypeForApprovalChange={(e) =>
-              lessonManagement.setLessonContentTypeForApproval(e.target.value)
+              materialManagement.setLessonContentTypeForApproval(e.target.value) // UPDATED
             }
-            lessonMaxPointsForApproval={lessonManagement.lessonMaxPointsForApproval}
+            lessonMaxPointsForApproval={materialManagement.lessonMaxPointsForApproval} // UPDATED
             onLessonMaxPointsForApprovalChange={(e) =>
-              lessonManagement.setLessonMaxPointsForApproval(e.target.value)
+              materialManagement.setLessonMaxPointsForApproval(e.target.value) // UPDATED
             }
-            lessonDueDateForApproval={lessonManagement.lessonDueDateForApproval}
+            lessonDueDateForApproval={materialManagement.lessonDueDateForApproval} // UPDATED
             onLessonDueDateForApprovalChange={(e) =>
-              lessonManagement.setLessonDueDateForApproval(e.target.value)
+              materialManagement.setLessonDueDateForApproval(e.target.value) // UPDATED
             }
-            lessonCompletedForApproval={lessonManagement.lessonCompletedForApproval}
+            lessonCompletedForApproval={materialManagement.lessonCompletedForApproval} // UPDATED
             onLessonCompletedForApprovalChange={(e) =>
-              lessonManagement.setLessonCompletedForApproval(e.target.checked)
+              materialManagement.setLessonCompletedForApproval(e.target.checked) // UPDATED
             }
-            currentAddLessonSubject={lessonManagement.addLessonSubject}
+            
+            currentAddLessonSubject={materialManagement.addLessonSubject} // UPDATED
             onAddLessonSubjectChange={(e) =>
-              lessonManagement.setAddLessonSubject(e.target.value)
+              materialManagement.setAddLessonSubject(e.target.value) // UPDATED
             }
-            currentAddLessonUserContentType={lessonManagement.addLessonUserContentType}
+            currentAddLessonUserContentType={materialManagement.addLessonUserContentType} // UPDATED
             onAddLessonUserContentTypeChange={(e) =>
-              lessonManagement.setAddLessonUserContentType(e.target.value)
+              materialManagement.setAddLessonUserContentType(e.target.value) // UPDATED
             }
-            onAddLessonFileChange={(e) => lessonManagement.setAddLessonFile(e.target.files)}
-            currentAddLessonFile={lessonManagement.addLessonFile}
+            onAddLessonFileChange={(e) => materialManagement.setAddLessonFile(e.target.files)} // UPDATED
+            currentAddLessonFile={materialManagement.addLessonFile} // UPDATED
+            
             appContentTypes={APP_CONTENT_TYPES}
             appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
-            unitsForSelectedSubject={currentUnitsForAddFormSubject}
-            lessonContainersForSelectedUnit={currentLessonContainersForUnit}
-            selectedLessonContainer={lessonManagement.selectedLessonContainer}
-            onLessonContainerChange={handleLessonContainerChange}
-            onCreateNewLessonContainer={handleCreateNewLessonContainer}
+            unitsForSelectedSubject={currentUnitsForAddFormSubject} // Uses materialManagement state
+            lessonContainersForSelectedUnit={currentLessonContainersForUnit} // Uses materialManagement state
+            selectedLessonContainer={materialManagement.selectedLessonContainer} // UPDATED
+            onLessonContainerChange={handleLessonContainerChange} // Wrapper updated
+            onCreateNewLessonContainer={handleCreateNewLessonContainer} // Wrapper updated
           />
         ) : (
           <p className="text-sm text-text-tertiary italic text-center">
@@ -939,7 +833,7 @@ export default function DashboardPage() {
               </h3>
               <button
                 onClick={() => setIsManageUnitsModalOpen(false)}
-                className="text-text-secondary hover:text-text-primary text-2xl p-1 rounded-full hover:bg-gray-100 transition-colors" /* Using gray-100 for hover as it's neutral */
+                className="text-text-secondary hover:text-text-primary text-2xl p-1 rounded-full hover:bg-gray-100 transition-colors"
               >
                 ×
               </button>
@@ -955,8 +849,8 @@ export default function DashboardPage() {
                   key={unit.id}
                   className={`p-3 border border-border-subtle rounded-md transition-all duration-150 ${
                     editingUnit?.id === unit.id
-                      ? "bg-accent-blue/10 border-accent-blue" /* Light accent bg for editing */
-                      : "hover:bg-gray-50" /* Subtle hover */
+                      ? "bg-accent-blue/10 border-accent-blue"
+                      : "hover:bg-gray-50"
                   }`}
                 >
                   {editingUnit?.id === unit.id ? (
@@ -1013,7 +907,7 @@ export default function DashboardPage() {
                         </button>
                         <button
                           type="submit"
-                          className="btn-primary text-xs px-3 py-1.5" /* Using btn-primary */
+                          className="btn-primary text-xs px-3 py-1.5"
                         >
                           Save Changes
                         </button>
@@ -1068,7 +962,7 @@ export default function DashboardPage() {
                 >
                   Add New Unit
                 </label>
-                <div className="mt-1 flex rounded-lg shadow-sm"> {/* Changed to rounded-lg for consistency */}
+                <div className="mt-1 flex rounded-lg shadow-sm">
                   <input
                     type="text"
                     id="newUnitNameModalState"
@@ -1080,9 +974,9 @@ export default function DashboardPage() {
                   />
                   <button
                     type="submit"
-                    className="btn-primary inline-flex items-center px-4 py-2 rounded-l-none text-sm" /* Using btn-primary, adjusted rounding */
+                    className="btn-primary inline-flex items-center px-4 py-2 rounded-l-none text-sm"
                   >
-                    <PlusCircleIcon className="h-5 w-5 mr-1.5 sm:mr-2 text-text-primary" /> {/* Icon color from btn-primary */}
+                    <PlusCircleIcon className="h-5 w-5 mr-1.5 sm:mr-2 text-text-primary" />
                     Add
                   </button>
                 </div>
@@ -1092,17 +986,17 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {lessonManagement.editingLesson && (
+      {materialManagement.editingLesson && ( // UPDATED
         <EditMaterialModal
-          editingLesson={lessonManagement.editingLesson}
-          editForm={lessonManagement.editForm}
-          onFormChange={handleEditModalFormChange}
-          onSave={handleSaveLessonEdit}
-          onClose={() => lessonManagement.setEditingLesson(null)}
-          isSaving={lessonManagement.isSavingEdit}
+          editingLesson={materialManagement.editingLesson} // UPDATED
+          editForm={materialManagement.editForm} // UPDATED
+          onFormChange={handleEditModalFormChange} // Wrapper updated
+          onSave={handleSaveLessonEdit} // Wrapper updated
+          onClose={() => materialManagement.cancelEditingLesson()} // UPDATED (using hook's cancel function)
+          isSaving={materialManagement.isSavingEdit} // UPDATED
           unitsForSubject={
-            lessonManagement.editingLesson && childrenData.unitsBySubject[lessonManagement.editingLesson.child_subject_id]
-              ? childrenData.unitsBySubject[lessonManagement.editingLesson.child_subject_id]
+            materialManagement.editingLesson && childrenData.unitsBySubject[materialManagement.editingLesson.child_subject_id] // UPDATED
+              ? childrenData.unitsBySubject[materialManagement.editingLesson.child_subject_id] // UPDATED
               : []
           }
           appContentTypes={APP_CONTENT_TYPES}
@@ -1139,7 +1033,6 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Upgrade Prompt Modal */}
       {showUpgradePrompt && (
         <UpgradePrompt
           feature={upgradeFeature}

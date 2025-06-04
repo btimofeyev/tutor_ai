@@ -110,7 +110,13 @@ export default function AddMaterialForm({
     
     const result = await onCreateNewUnit(newUnitName.trim(), currentAddLessonSubject);
     if (result && result.success) {
-        setNewUnitName(''); 
+        setNewUnitName('');
+        // Select the newly created unit in the approval form
+        if (onUpdateLessonJsonField && result.data) {
+          onUpdateLessonJsonField('unit_id', result.data.id);
+        }
+    } else {
+        alert(result?.error || 'Failed to create unit. Please try again.');
     }
   };
 
@@ -123,6 +129,8 @@ export default function AddMaterialForm({
     const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim());
     if (result && result.success) {
         setNewLessonGroupTitle(''); 
+    } else {
+        alert(result?.error || 'Failed to create lesson group. Please try again.');
     }
   };
 

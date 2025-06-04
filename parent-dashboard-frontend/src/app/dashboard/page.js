@@ -326,6 +326,12 @@ export default function DashboardPage() {
         [childSubjectId]: updatedUnitsForSubject,
       }));
       
+      // Initialize empty lesson containers for the new unit
+      childrenData.setLessonsByUnit(prev => ({
+        ...prev,
+        [response.data.id]: []
+      }));
+      
       // Update the lesson JSON for approval to use the new unit
       if (materialManagement.lessonJsonForApproval) {
         materialManagement.updateLessonApprovalField('unit_id', response.data.id);
@@ -335,7 +341,6 @@ export default function DashboardPage() {
   
     } catch (error) {
       console.error('Failed to create unit:', error.response?.data || error.message); 
-      alert(error.response?.data?.error || 'Failed to create unit. Please try again.');
       return { success: false, error: error.response?.data?.error || error.message };
     }
   };
@@ -374,7 +379,6 @@ export default function DashboardPage() {
   
     } catch (error) {
       console.error('Failed to create lesson container:', error.response?.data || error.message); 
-      alert(error.response?.data?.error || 'Failed to create lesson group. Please try again.');
       return { success: false, error: error.response?.data?.error || error.message };
     }
   };

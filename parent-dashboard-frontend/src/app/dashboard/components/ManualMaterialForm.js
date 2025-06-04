@@ -176,7 +176,13 @@ export default function ManualMaterialForm({
     
     const result = await onCreateNewUnit(newUnitName.trim(), currentSubject);
     if (result && result.success) {
-        setNewUnitName(''); 
+        setNewUnitName('');
+        // Select the newly created unit
+        if (onManualFormUnitChange && result.data) {
+          onManualFormUnitChange(result.data.id);
+        }
+    } else {
+        alert(result?.error || 'Failed to create unit. Please try again.');
     }
   };
 
@@ -187,6 +193,8 @@ export default function ManualMaterialForm({
     const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim()); 
     if (result && result.success) {
         setNewLessonGroupTitle(''); 
+    } else {
+        alert(result?.error || 'Failed to create lesson group. Please try again.');
     }
   };
 
@@ -275,7 +283,7 @@ export default function ManualMaterialForm({
               onChange={onLessonContainerChange} 
               className={commonSelectStyles} 
               required
-              disabled={!selectedUnitInManualForm} 
+              disabled={!selectedUnitInManualForm || selectedUnitInManualForm === '__create_new__'} 
             >
               <option value="">-- Choose or Create Lesson Group --</option>
               <option value="__create_new__" className="font-medium text-accent-blue">+ Create New Lesson Group</option>

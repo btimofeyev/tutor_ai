@@ -294,18 +294,64 @@ export default function DashboardPage() {
     // The above logic for setNewLessonContainerTitle seems fine as it's for a UI element not directly tied to the hook's core state.
   };
 
+  const handleCreateNewUnit = async (newUnitName, childSubjectId) => {
+    if (!childSubjectId) {
+      console.error('Child subject ID is missing for new unit creation.'); 
+      alert('Error: A subject must be selected before creating a new unit.');
+      return { success: false }; 
+    }
+    if (!newUnitName || !newUnitName.trim()) {
+      console.error('New unit name is empty.'); 
+      alert('Error: New unit name cannot be empty.');
+      return { success: false }; 
+    }
+    
+    try {
+      const response = await api.post('/units', {
+        child_subject_id: childSubjectId,
+        name: newUnitName.trim()
+      });
+      
+      const updatedUnitsForSubject = [
+        ...(childrenData.unitsBySubject[childSubjectId] || []),
+        response.data,
+      ].sort(
+        (a, b) =>
+          (a.sequence_order || 0) - (b.sequence_order || 0) ||
+          a.name.localeCompare(b.name)
+      );
+
+      childrenData.setUnitsBySubject((prev) => ({
+        ...prev,
+        [childSubjectId]: updatedUnitsForSubject,
+      }));
+      
+      // Update the lesson JSON for approval to use the new unit
+      if (materialManagement.lessonJsonForApproval) {
+        materialManagement.updateLessonApprovalField('unit_id', response.data.id);
+      }
+      
+      return { success: true, data: response.data };
+  
+    } catch (error) {
+      console.error('Failed to create unit:', error.response?.data || error.message); 
+      alert(error.response?.data?.error || 'Failed to create unit. Please try again.');
+      return { success: false, error: error.response?.data?.error || error.message };
+    }
+  };
+
   const handleCreateNewLessonContainer = async (newTitleFromForm, unitIdForCreation) => { // Add unitIdForCreation
     const unitId = unitIdForCreation; // Use the passed unitId
   
     if (!unitId) {
       console.error('Unit ID is missing for new lesson container creation.'); 
       alert('Error: A unit must be selected before creating a new lesson group.');
-      return; 
+      return { success: false }; 
     }
     if (!newTitleFromForm || !newTitleFromForm.trim()) {
       console.error('New lesson container title is empty.'); 
       alert('Error: New lesson group title cannot be empty.');
-      return; 
+      return { success: false }; 
     }
     
     try {
@@ -323,10 +369,13 @@ export default function DashboardPage() {
       }));
       
       materialManagement.setSelectedLessonContainer(response.data.id); 
+      
+      return { success: true, data: response.data };
   
     } catch (error) {
       console.error('Failed to create lesson container:', error.response?.data || error.message); 
       alert(error.response?.data?.error || 'Failed to create lesson group. Please try again.');
+      return { success: false, error: error.response?.data?.error || error.message };
     }
   };
 
@@ -807,6 +856,7 @@ export default function DashboardPage() {
             appContentTypes={APP_CONTENT_TYPES}
             appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
             unitsForSelectedSubject={currentUnitsForAddFormSubject} // Uses materialManagement state
+            onCreateNewUnit={handleCreateNewUnit}
             lessonContainersForSelectedUnit={currentLessonContainersForUnit} // Uses materialManagement state
             selectedLessonContainer={materialManagement.selectedLessonContainer} // UPDATED
             onLessonContainerChange={handleLessonContainerChange} // Wrapper updated

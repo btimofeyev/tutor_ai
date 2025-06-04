@@ -21,6 +21,7 @@ export default function AddMaterialForm({
   onAddLessonSubjectChange, 
 
   unitsForSelectedSubject,  
+  onCreateNewUnit,
   
   selectedLessonContainer, 
   onLessonContainerChange, 
@@ -57,6 +58,8 @@ export default function AddMaterialForm({
 
   const [newLessonGroupTitle, setNewLessonGroupTitle] = useState('');
   const [isCreatingLessonGroup, setIsCreatingLessonGroup] = useState(false);
+  const [newUnitName, setNewUnitName] = useState('');
+  const [isCreatingUnit, setIsCreatingUnit] = useState(false);
 
   // Unit in this approval form is driven by lessonJsonForApproval.unit_id
   const unitIdInApprovalForm = lessonJsonForApproval?.unit_id || '';
@@ -79,6 +82,14 @@ export default function AddMaterialForm({
     }
   }, [selectedLessonContainer]);
 
+  // Sync isCreatingUnit with the approval form's unit selection
+  useEffect(() => {
+    setIsCreatingUnit(unitIdInApprovalForm === '__create_new__');
+    if (unitIdInApprovalForm !== '__create_new__') {
+      setNewUnitName('');
+    }
+  }, [unitIdInApprovalForm]);
+
   const handleJsonFieldChange = (e, fieldName) => {
     if(onUpdateLessonJsonField) onUpdateLessonJsonField(fieldName, e.target.value);
   }
@@ -92,6 +103,16 @@ export default function AddMaterialForm({
   const commonInputClasses = "w-full border-border-input rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-accent-blue focus:border-accent-blue placeholder-text-tertiary shadow-sm";
   const commonLabelClasses = "block text-xs font-medium text-text-secondary mb-1";
   const commonSelectClasses = `${commonInputClasses} h-10`;
+
+  const handleInternalCreateNewUnit = async () => { 
+    if (!newUnitName.trim()) { alert("Please enter a name for the new unit."); return; }
+    if (!currentAddLessonSubject) { alert("A subject must be selected before creating a new unit."); return; }
+    
+    const result = await onCreateNewUnit(newUnitName.trim(), currentAddLessonSubject);
+    if (result && result.success) {
+        setNewUnitName(''); 
+    }
+  };
 
   const handleInternalCreateNewLessonGroup = async () => { 
     if (!newLessonGroupTitle.trim()) { alert("Please enter a title for the new lesson group."); return; }
@@ -218,14 +239,42 @@ export default function AddMaterialForm({
                     value={unitIdInApprovalForm} 
                     onChange={(e) => onUpdateLessonJsonField('unit_id', e.target.value || null)}
                     className={commonSelectClasses} 
-                    disabled={!currentAddLessonSubject || (unitsForSelectedSubject && unitsForSelectedSubject.length === 0)} 
+                    disabled={!currentAddLessonSubject} 
                     required
                 > 
                     <option value="">-- Select a Unit --</option>
+                    <option value="__create_new__" className="font-medium text-accent-blue">+ Create New Unit</option>
                     {(unitsForSelectedSubject || []).map(unit => ( <option key={unit.id} value={unit.id}>{unit.name}</option> ))}
                 </select>
-                {currentAddLessonSubject && unitsForSelectedSubject && unitsForSelectedSubject.length === 0 && <p className="text-xs text-text-tertiary italic mt-0.5">No units for this subject. Add via "Manage Units".</p>}
+                {!currentAddLessonSubject && <p className="text-xs text-text-tertiary italic mt-0.5">Select a subject first to manage units.</p>}
             </div>
+
+            {isCreatingUnit && currentAddLessonSubject && (
+              <div className="mt-2 p-3 border border-dashed border-blue-300 rounded-md bg-blue-50/50 animate-fade-in">
+                <label htmlFor="new-unit-name-approval" className={`${commonLabelClasses} text-accent-blue`}>New Unit Name *</label>
+                <div className="flex gap-2 mt-1 items-center">
+                  <input
+                    type="text"
+                    id="new-unit-name-approval"
+                    value={newUnitName}
+                    onChange={(e) => setNewUnitName(e.target.value)}
+                    className={`${commonInputClasses} flex-1`}
+                    placeholder="e.g., Unit 3: Fractions"
+                    required={isCreatingUnit}
+                  />
+                  <Button
+                    type="button"
+                    variant="primary" 
+                    size="sm" 
+                    onClick={handleInternalCreateNewUnit}
+                    className="h-10 whitespace-nowrap"
+                    disabled={!newUnitName.trim() || savingLesson}
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1.5"/> Create
+                  </Button>
+                </div>
+              </div>
+            )}
             
             <div className="mt-3">
                 <label htmlFor="lesson-container-approval" className={commonLabelClasses}>
@@ -338,7 +387,7 @@ export default function AddMaterialForm({
             variant="primary" 
             size="md"
             className="w-full !bg-[#ABEBC6] !text-green-900 !border-b-[#7DCEA0] hover:!bg-[#A2E4B9] hover:!border-b-[#68C38B] active:!bg-[#7DCEA0] focus:!ring-[#7DCEA0]"
-            disabled={savingLesson || !lessonTitleForApproval || !lessonContentTypeForApproval || !selectedLessonContainer || (selectedLessonContainer === '__create_new__') || (json && json.error) || !unitIdInApprovalForm }>
+            disabled={savingLesson || !lessonTitleForApproval || !lessonContentTypeForApproval || !selectedLessonContainer || (selectedLessonContainer === '__create_new__') || (json && json.error) || !unitIdInApprovalForm || (unitIdInApprovalForm === '__create_new__') }>
             {savingLesson ? (
                 <><ArrowPathIcon className="h-5 w-5 mr-2 animate-spin"/>Saving...</>
             ) : (

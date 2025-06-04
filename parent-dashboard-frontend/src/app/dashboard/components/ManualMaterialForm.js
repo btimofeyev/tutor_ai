@@ -36,6 +36,7 @@ export default function ManualMaterialForm({
   onSubjectChange,        
 
   unitsForSelectedSubject,  
+  onCreateNewUnit,
 
   selectedUnitInManualForm, 
   onManualFormUnitChange, 
@@ -58,6 +59,8 @@ export default function ManualMaterialForm({
 
   const [isCreatingLessonGroup, setIsCreatingLessonGroup] = useState(false);
   const [newLessonGroupTitle, setNewLessonGroupTitle] = useState('');
+  const [isCreatingUnit, setIsCreatingUnit] = useState(false);
+  const [newUnitName, setNewUnitName] = useState('');
 
   // Ref to store the previous subject to compare against currentSubject
   const prevSubjectRef = useRef(currentSubject);
@@ -92,6 +95,14 @@ export default function ManualMaterialForm({
     }
   }, [selectedLessonContainer]);
 
+  // Sync isCreatingUnit with the manual form's unit selection
+  useEffect(() => {
+    setIsCreatingUnit(selectedUnitInManualForm === '__create_new__');
+    if (selectedUnitInManualForm !== '__create_new__') {
+      setNewUnitName('');
+    }
+  }, [selectedUnitInManualForm]);
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
@@ -110,6 +121,9 @@ export default function ManualMaterialForm({
     if (!formData.title.trim()) { alert('Please enter a title for the material.'); return; }
     if (!currentSubject) { alert('Please select a subject.'); return; }
     if (!selectedUnitInManualForm) { alert('Please select a unit.'); return; }
+    if (selectedUnitInManualForm === '__create_new__') { 
+        alert('Please click "Create" for the new unit first, then save the material.'); return;
+    }
     if (!selectedLessonContainer) { alert('Please select a lesson group.'); return; }
     if (selectedLessonContainer === '__create_new__' && !newLessonGroupTitle.trim()) {
         alert('Please enter a title for the new lesson group or select an existing one.'); return;
@@ -153,6 +167,16 @@ export default function ManualMaterialForm({
       if (onLessonContainerChange) onLessonContainerChange({ target: { value: '' } }); 
       setNewLessonGroupTitle('');
       setIsCreatingLessonGroup(false);
+    }
+  };
+
+  const handleCreateNewUnit = async () => {
+    if (!newUnitName.trim()) { alert("Please enter a name for the new unit."); return; }
+    if (!currentSubject) { alert("A subject must be selected before creating a new unit."); return; }
+    
+    const result = await onCreateNewUnit(newUnitName.trim(), currentSubject);
+    if (result && result.success) {
+        setNewUnitName(''); 
     }
   };
 
@@ -219,19 +243,29 @@ export default function ManualMaterialForm({
               value={selectedUnitInManualForm || ''} // Ensure value is not undefined
               onChange={handleUnitChangeInThisForm} 
               className={commonSelectStyles} 
-              disabled={!currentSubject || (unitsForSelectedSubject && unitsForSelectedSubject.length === 0)} 
+              disabled={!currentSubject} 
               required
             > 
               <option value="">-- Select a Unit --</option>
+              <option value="__create_new__" className="font-medium text-accent-blue">+ Create New Unit</option>
               {(unitsForSelectedSubject || []).map(unit => (<option key={unit.id} value={unit.id}>{unit.name}</option>))}
             </select>
-            {currentSubject && unitsForSelectedSubject && unitsForSelectedSubject.length === 0 && (
-              <p className="text-xs text-text-tertiary italic mt-0.5">No units for this subject. Add via "Manage Units".</p>
-            )}
              {!currentSubject && (
                 <p className="text-xs text-text-tertiary italic mt-0.5">Select a subject first.</p>
             )}
           </div>
+
+          {isCreatingUnit && currentSubject && (
+            <div className="p-3 border border-dashed border-blue-300 rounded-md bg-blue-50/50 animate-fade-in">
+              <label htmlFor="new-unit-manual" className={`${commonLabelStyles} text-accent-blue`}>New Unit Name *</label>
+              <div className="flex gap-2 mt-1 items-center">
+                <input type="text" id="new-unit-manual" value={newUnitName} onChange={(e) => setNewUnitName(e.target.value)} className={`${commonInputStyles} flex-1`} placeholder="e.g., Unit 4: Geometry" required={isCreatingUnit} />
+                <Button type="button" variant="primary" size="sm" onClick={handleCreateNewUnit} className="h-10 whitespace-nowrap" disabled={!newUnitName.trim() || savingMaterial}>
+                  <PlusIcon className="h-4 w-4 mr-1" /> Create
+                </Button>
+              </div>
+            </div>
+          )}
           
           <div>
             <label htmlFor="manual-lesson-container" className={commonLabelStyles}>Lesson Group *</label>
@@ -278,7 +312,7 @@ Solve word problems"/><p className="text-xs text-text-tertiary mt-1">Enter one o
           variant="primary" 
           size="md" 
           className="w-full" 
-          disabled={savingMaterial || !currentSubject || !selectedUnitInManualForm || !selectedLessonContainer || (selectedLessonContainer === '__create_new__')}
+          disabled={savingMaterial || !currentSubject || !selectedUnitInManualForm || (selectedUnitInManualForm === '__create_new__') || !selectedLessonContainer || (selectedLessonContainer === '__create_new__')}
         >
           {savingMaterial ? (<><ArrowPathIcon className="h-5 w-5 mr-2 animate-spin"/>Saving Material...</>) : (<><DocumentPlusIcon className="h-5 w-5 mr-2"/>Add Material</>)}
         </Button>

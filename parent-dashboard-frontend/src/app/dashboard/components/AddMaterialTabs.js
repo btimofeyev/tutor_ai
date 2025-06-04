@@ -19,6 +19,7 @@ export default function AddMaterialTabs(props) {
     selectedLessonContainer,  
     onLessonContainerChange,  
     onCreateNewLessonContainer, 
+    onCreateNewUnit,
     appContentTypes,
     appGradableContentTypes,
 
@@ -105,6 +106,7 @@ export default function AddMaterialTabs(props) {
           currentAddLessonSubject={currentAddLessonSubject}
           onAddLessonSubjectChange={onAddLessonSubjectChange}
           unitsForSelectedSubject={unitsForSelectedSubject} 
+          onCreateNewUnit={onCreateNewUnit}
           selectedLessonContainer={selectedLessonContainer}
           onLessonContainerChange={onLessonContainerChange}
           onCreateNewLessonContainer={(newTitle) => 
@@ -143,6 +145,7 @@ export default function AddMaterialTabs(props) {
           onSubjectChange={onAddLessonSubjectChange} 
           
           unitsForSelectedSubject={unitsForSelectedSubject} 
+          onCreateNewUnit={onCreateNewUnit}
           
           selectedUnitInManualForm={manualFormSelectedUnitId}
           onManualFormUnitChange={handleManualFormUnitChange} 

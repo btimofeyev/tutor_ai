@@ -190,7 +190,9 @@ export default function ManualMaterialForm({
     if (!newLessonGroupTitle.trim()) { alert("Please enter a title for the new lesson group."); return; }
     if (!selectedUnitInManualForm) { alert("A unit must be selected before creating a lesson group."); return; }
     
+    console.log('ManualForm: Creating lesson group for unit:', selectedUnitInManualForm);
     const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim()); 
+    console.log('ManualForm: Lesson group creation result:', result);
     if (result && result.success) {
         setNewLessonGroupTitle(''); 
     } else {
@@ -204,11 +206,11 @@ export default function ManualMaterialForm({
   const isGradableType = appGradableContentTypes.includes(formData.content_type);
 
   // For debugging:
-  // console.log("ManualMaterialForm rendering. currentSubject:", currentSubject);
-  // console.log("ManualMaterialForm unitsForSelectedSubject:", unitsForSelectedSubject);
-  // console.log("ManualMaterialForm selectedUnitInManualForm:", selectedUnitInManualForm);
-  // console.log("ManualMaterialForm lessonContainersForSelectedUnit:", lessonContainersForSelectedUnit);
-  // console.log("ManualMaterialForm selectedLessonContainer:", selectedLessonContainer);
+  console.log("ManualMaterialForm rendering. currentSubject:", currentSubject);
+  console.log("ManualMaterialForm unitsForSelectedSubject:", unitsForSelectedSubject);
+  console.log("ManualMaterialForm selectedUnitInManualForm:", selectedUnitInManualForm);
+  console.log("ManualMaterialForm lessonContainersForSelectedUnit:", lessonContainersForSelectedUnit);
+  console.log("ManualMaterialForm selectedLessonContainer:", selectedLessonContainer);
 
 
   return (

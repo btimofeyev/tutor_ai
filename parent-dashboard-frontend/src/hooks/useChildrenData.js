@@ -156,9 +156,11 @@ export function useChildrenData(session) {
     // Child-specific data
     childSubjects,
     lessonsByUnit,
+    setLessonsByUnit,
     lessonsBySubject,
     gradeWeights,
     unitsBySubject,
+    setUnitsBySubject,
     
     // Loading states
     loadingInitial,

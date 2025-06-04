@@ -77,7 +77,7 @@ export default function AddMaterialTabs(props) {
     if (unitId && (!lessonsByUnit[unitId] || !Array.isArray(lessonsByUnit[unitId]))) {
       console.log('AddMaterialTabs: Fetching lesson containers for unit:', unitId);
       try {
-        const api = (await import('../../utils/api')).default;
+        const api = (await import('../../../utils/api')).default;
         const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
         const lessonContainers = lessonsRes.data || [];
         console.log('AddMaterialTabs: Fetched lesson containers:', lessonContainers);

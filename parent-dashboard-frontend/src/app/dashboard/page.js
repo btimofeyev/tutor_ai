@@ -286,6 +286,7 @@ export default function DashboardPage() {
 
   const handleLessonContainerChange = (e) => {
     const value = e.target.value;
+    console.log('Dashboard: Lesson container changed to:', value);
     materialManagement.setSelectedLessonContainer(value); // UPDATED
     
     // if (value === '__create_new__') { // This state is not part of materialManagement

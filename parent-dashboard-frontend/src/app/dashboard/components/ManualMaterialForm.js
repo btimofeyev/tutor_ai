@@ -208,11 +208,11 @@ export default function ManualMaterialForm({
   const isGradableType = appGradableContentTypes.includes(formData.content_type);
 
   // For debugging:
-  console.log("ManualMaterialForm rendering. currentSubject:", currentSubject);
-  console.log("ManualMaterialForm unitsForSelectedSubject:", unitsForSelectedSubject);
-  console.log("ManualMaterialForm selectedUnitInManualForm:", selectedUnitInManualForm);
-  console.log("ManualMaterialForm lessonContainersForSelectedUnit:", lessonContainersForSelectedUnit);
-  console.log("ManualMaterialForm selectedLessonContainer:", selectedLessonContainer);
+  // console.log("ManualMaterialForm rendering. currentSubject:", currentSubject);
+  // console.log("ManualMaterialForm unitsForSelectedSubject:", unitsForSelectedSubject);
+  // console.log("ManualMaterialForm selectedUnitInManualForm:", selectedUnitInManualForm);
+  // console.log("ManualMaterialForm lessonContainersForSelectedUnit:", lessonContainersForSelectedUnit);
+  // console.log("ManualMaterialForm selectedLessonContainer:", selectedLessonContainer);
 
 
   return (

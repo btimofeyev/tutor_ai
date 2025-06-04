@@ -71,6 +71,7 @@ export default function AddMaterialTabs(props) {
   // This function is passed to ManualMaterialForm
   const handleManualFormUnitChange = useCallback(async (unitId) => {
     console.log('AddMaterialTabs: Setting manualFormSelectedUnitId to:', unitId);
+    const previousUnitId = manualFormSelectedUnitId;
     setManualFormSelectedUnitId(unitId);
     
     // If this unit doesn't have lesson containers loaded, fetch them
@@ -102,18 +103,17 @@ export default function AddMaterialTabs(props) {
       }
     }
     
-    // When manual form's unit changes, reset the global lesson container selection
-    // as it's no longer relevant if it belonged to a different unit.
-    if (onLessonContainerChange) { // Check if prop exists before calling
-        console.log('AddMaterialTabs: Resetting lesson container selection');
+    // Only reset lesson container selection if the unit actually changed
+    if (unitId !== previousUnitId && onLessonContainerChange) {
+        console.log('AddMaterialTabs: Unit changed from', previousUnitId, 'to', unitId, '- resetting lesson container selection');
         onLessonContainerChange({ target: { value: '' } }); 
     }
-  }, [onLessonContainerChange, lessonsByUnit, setLessonsByUnit]); // Updated dependencies
+  }, [onLessonContainerChange, setLessonsByUnit, manualFormSelectedUnitId, lessonsByUnit]);
 
   // For debugging:
-  console.log("AddMaterialTabs rendering. manualFormSelectedUnitId:", manualFormSelectedUnitId);
-  console.log("AddMaterialTabs unitsForSelectedSubject:", unitsForSelectedSubject);
-  console.log("AddMaterialTabs lessonsByUnit:", lessonsByUnit);
+  // console.log("AddMaterialTabs rendering. manualFormSelectedUnitId:", manualFormSelectedUnitId);
+  // console.log("AddMaterialTabs unitsForSelectedSubject:", unitsForSelectedSubject);
+  // console.log("AddMaterialTabs lessonsByUnit:", lessonsByUnit);
 
 
   return (

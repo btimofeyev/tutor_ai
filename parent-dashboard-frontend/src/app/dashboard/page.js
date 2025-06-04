@@ -862,6 +862,8 @@ export default function DashboardPage() {
             unitsForSelectedSubject={currentUnitsForAddFormSubject} // Uses materialManagement state
             onCreateNewUnit={handleCreateNewUnit}
             lessonContainersForSelectedUnit={currentLessonContainersForUnit} // Uses materialManagement state
+            lessonsByUnit={childrenData.lessonsByUnit}
+            setLessonsByUnit={childrenData.setLessonsByUnit}
             selectedLessonContainer={materialManagement.selectedLessonContainer} // UPDATED
             onLessonContainerChange={handleLessonContainerChange} // Wrapper updated
             onCreateNewLessonContainer={handleCreateNewLessonContainer} // Wrapper updated

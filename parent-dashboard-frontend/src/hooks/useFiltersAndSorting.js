@@ -6,7 +6,9 @@ import {
   filterLessonsByContentType, 
   sortLessons,
   calculateGradeStats,
-  calculateCompletionStats
+  calculateCompletionStats,
+  isDateOverdue,
+  isDateDueSoon
 } from '../utils/dashboardHelpers';
 
 export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjects, selectedChild) {
@@ -74,6 +76,8 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
     let totalGradableItems = 0;
     let totalWeightedScore = 0;
     let totalWeight = 0;
+    let dueSoonCount = 0;
+    let overdueCount = 0;
     
     subjectsForChild.forEach(subject => {
       const subjectLessons = lessonsBySubject[subject.child_subject_id] || [];
@@ -81,6 +85,17 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
       
       totalLessons += subjectLessons.length;
       completedLessons += subjectLessons.filter(lesson => lesson.completed_at).length;
+      
+      // Calculate due soon and overdue counts (only for incomplete lessons)
+      subjectLessons.forEach(lesson => {
+        if (!lesson.completed_at && lesson.due_date) {
+          if (isDateOverdue(lesson.due_date)) {
+            overdueCount++;
+          } else if (isDateDueSoon(lesson.due_date, 7)) {
+            dueSoonCount++;
+          }
+        }
+      });
       
       const gradableItems = subjectLessons.filter(lesson => 
         lesson.grade !== null && 
@@ -104,11 +119,16 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
     const overallGradePercent = totalWeight > 0 ? Math.round((totalWeightedScore / totalWeight) * 100) / 100 : 0;
     
     return {
-      totalLessons,
-      completedLessons,
+      totalItems: totalLessons,
+      completedItems: completedLessons,
       overallCompletionPercent,
+      dueSoon: dueSoonCount,
+      overdue: overdueCount,
       totalGradableItems,
-      overallGradePercent
+      overallGradePercent,
+      // Keep legacy names for backward compatibility
+      totalLessons,
+      completedLessons
     };
   }, [selectedChild, lessonsBySubject, gradeWeights, childSubjects]);
 

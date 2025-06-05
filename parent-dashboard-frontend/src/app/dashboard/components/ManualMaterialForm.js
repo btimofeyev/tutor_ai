@@ -7,7 +7,12 @@ import {
   BookOpenIcon,
   ClockIcon,
   AcademicCapIcon,
-  PlusIcon
+  PlusIcon,
+  SparklesIcon,
+  XMarkIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 
@@ -50,6 +55,7 @@ export default function ManualMaterialForm({
   
   appContentTypes = QUICK_CONTENT_TYPES,
   appGradableContentTypes = [],
+  selectedChild, // Add this prop to access child info
 }) {
   const [formData, setFormData] = useState({
     title: '', content_type: 'lesson', description: '', difficulty_level: 'intermediate',
@@ -67,23 +73,20 @@ export default function ManualMaterialForm({
 
   // Effect to reset unit selection when the global subject changes
   useEffect(() => {
-    // console.log('ManualForm: currentSubject changed or onManualFormUnitChange changed.', currentSubject, prevSubjectRef.current);
     if (currentSubject !== prevSubjectRef.current) {
-      // console.log('ManualForm: Subject actually changed. Resetting unit.');
-      if (onManualFormUnitChange) { // Ensure prop exists
+      if (onManualFormUnitChange) {
         onManualFormUnitChange(''); 
       }
-      prevSubjectRef.current = currentSubject; // Update the ref to the new current subject
+      prevSubjectRef.current = currentSubject;
     }
-  }, [currentSubject, onManualFormUnitChange]); // Removed prevSubjectRef from deps as ref changes don't trigger effects
+  }, [currentSubject, onManualFormUnitChange]);
 
   // Store previous unit to only reset when unit actually changes
   const prevUnitRefForForm = useRef(selectedUnitInManualForm);
-  
+
   // Effect to reset lesson container when this form's unit selection changes
   useEffect(() => {
     if (selectedUnitInManualForm !== prevUnitRefForForm.current) {
-      console.log('ManualForm: Unit changed from', prevUnitRefForForm.current, 'to', selectedUnitInManualForm, '- resetting lesson container');
       if (onLessonContainerChange) { 
           onLessonContainerChange({ target: { value: '' } }); 
       }
@@ -116,8 +119,7 @@ export default function ManualMaterialForm({
 
   const handleUnitChangeInThisForm = (e) => {
     const newUnitId = e.target.value;
-    console.log('ManualForm: Unit Dropdown Changed. New Unit ID:', newUnitId);
-    if (onManualFormUnitChange) { // Ensure prop exists
+    if (onManualFormUnitChange) {
         onManualFormUnitChange(newUnitId); 
     }
   };
@@ -144,7 +146,8 @@ export default function ManualMaterialForm({
       title: formData.title.trim(), 
       content_type: formData.content_type,
       lesson_json: { 
-        title: formData.title.trim(), created_manually: true,
+        title: formData.title.trim(), 
+        created_manually: true,
         content_type_suggestion: formData.content_type,
         main_content_summary_or_extract: formData.description.trim() || 'Manually created material',
         learning_objectives: formData.learning_objectives ? formData.learning_objectives.split('\n').map(obj => obj.trim()).filter(obj => obj) : [],
@@ -181,12 +184,9 @@ export default function ManualMaterialForm({
     if (!currentSubject) { alert("A subject must be selected before creating a new unit."); return; }
     
     const result = await onCreateNewUnit(newUnitName.trim(), currentSubject);
-    console.log('ManualForm: Unit creation result:', result);
     if (result && result.success) {
         setNewUnitName('');
-        // Select the newly created unit
         if (onManualFormUnitChange && result.data) {
-          console.log('ManualForm: Auto-selecting new unit:', result.data.id);
           onManualFormUnitChange(result.data.id);
         }
     } else {
@@ -198,9 +198,7 @@ export default function ManualMaterialForm({
     if (!newLessonGroupTitle.trim()) { alert("Please enter a title for the new lesson group."); return; }
     if (!selectedUnitInManualForm) { alert("A unit must be selected before creating a lesson group."); return; }
     
-    console.log('ManualForm: Creating lesson group for unit:', selectedUnitInManualForm);
     const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim()); 
-    console.log('ManualForm: Lesson group creation result:', result);
     if (result && result.success) {
         setNewLessonGroupTitle(''); 
     } else {
@@ -213,28 +211,30 @@ export default function ManualMaterialForm({
   const commonSelectStyles = `${commonInputStyles} h-10`;
   const isGradableType = appGradableContentTypes.includes(formData.content_type);
 
-  // For debugging:
-  // console.log("ManualMaterialForm rendering. currentSubject:", currentSubject);
-  // console.log("ManualMaterialForm unitsForSelectedSubject:", unitsForSelectedSubject);
-  // console.log("ManualMaterialForm selectedUnitInManualForm:", selectedUnitInManualForm);
-  // console.log("ManualMaterialForm lessonContainersForSelectedUnit:", lessonContainersForSelectedUnit);
-  // console.log("ManualMaterialForm selectedLessonContainer:", selectedLessonContainer);
-
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center mb-4">
-        <BookOpenIcon className="h-5 w-5 text-accent-blue mr-2" />
-        <h3 className="text-lg font-semibold text-text-primary">Quick Material Entry</h3>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center">
+          <BookOpenIcon className="h-5 w-5 text-accent-blue mr-2" />
+          <h3 className="text-lg font-semibold text-text-primary">Quick Material Entry</h3>
+        </div>
       </div>
-      
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="manual-subject" className={commonLabelStyles}>Subject *</label>
-          <select id="manual-subject" value={currentSubject || ''} onChange={onSubjectChange} className={commonSelectStyles} required>
+          <select 
+            id="manual-subject" 
+            value={currentSubject || ''} 
+            onChange={onSubjectChange} 
+            className={commonSelectStyles} 
+            required
+          >
             <option value="">Select subject…</option>
             {(childSubjectsForSelectedChild || []).filter(s => s.child_subject_id).map(subject => (
-              <option key={subject.child_subject_id} value={subject.child_subject_id}>{subject.name}</option>
+              <option key={subject.child_subject_id} value={subject.child_subject_id}>
+                {subject.name}
+              </option>
             ))}
           </select>
         </div>
@@ -242,23 +242,44 @@ export default function ManualMaterialForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="manual-title" className={commonLabelStyles}>Title *</label>
-            <input type="text" id="manual-title" name="title" value={formData.title} onChange={handleInputChange} className={commonInputStyles} placeholder="e.g., Chapter 3 Review" required />
+            <input 
+              type="text" 
+              id="manual-title" 
+              name="title" 
+              value={formData.title} 
+              onChange={handleInputChange} 
+              className={commonInputStyles} 
+              placeholder="e.g., Chapter 3 Review" 
+              required 
+            />
           </div>
           <div>
             <label htmlFor="manual-content-type" className={commonLabelStyles}>Content Type *</label>
-            <select id="manual-content-type" name="content_type" value={formData.content_type} onChange={handleInputChange} className={commonSelectStyles} required>
-              {appContentTypes.map(type => (<option key={type} value={type}>{formatContentTypeName(type)}</option>))}
+            <select 
+              id="manual-content-type" 
+              name="content_type" 
+              value={formData.content_type} 
+              onChange={handleInputChange} 
+              className={commonSelectStyles} 
+              required
+            >
+              {appContentTypes.map(type => (
+                <option key={type} value={type}>
+                  {formatContentTypeName(type)}
+                </option>
+              ))}
             </select>
           </div>
         </div>
 
+        {/* Unit and Lesson Group Selection */}
         <div className="space-y-3 p-3 border border-blue-100 rounded-lg bg-blue-50/30">
           <div>
             <label htmlFor="manual-form-unit" className={commonLabelStyles}>Assign to Unit *</label>
             <select 
               id="manual-form-unit" 
-              name="unit_id_manual_form_select" // Changed name to be unique for select
-              value={selectedUnitInManualForm || ''} // Ensure value is not undefined
+              name="unit_id_manual_form_select"
+              value={selectedUnitInManualForm || ''}
               onChange={handleUnitChangeInThisForm} 
               className={commonSelectStyles} 
               disabled={!currentSubject} 
@@ -266,7 +287,9 @@ export default function ManualMaterialForm({
             > 
               <option value="">-- Select a Unit --</option>
               <option value="__create_new__" className="font-medium text-accent-blue">+ Create New Unit</option>
-              {(unitsForSelectedSubject || []).map(unit => (<option key={unit.id} value={unit.id}>{unit.name}</option>))}
+              {(unitsForSelectedSubject || []).map(unit => (
+                <option key={unit.id} value={unit.id}>{unit.name}</option>
+              ))}
             </select>
              {!currentSubject && (
                 <p className="text-xs text-text-tertiary italic mt-0.5">Select a subject first.</p>
@@ -277,8 +300,23 @@ export default function ManualMaterialForm({
             <div className="p-3 border border-dashed border-blue-300 rounded-md bg-blue-50/50 animate-fade-in">
               <label htmlFor="new-unit-manual" className={`${commonLabelStyles} text-accent-blue`}>New Unit Name *</label>
               <div className="flex gap-2 mt-1 items-center">
-                <input type="text" id="new-unit-manual" value={newUnitName} onChange={(e) => setNewUnitName(e.target.value)} className={`${commonInputStyles} flex-1`} placeholder="e.g., Unit 4: Geometry" required={isCreatingUnit} />
-                <Button type="button" variant="primary" size="sm" onClick={handleCreateNewUnit} className="h-10 whitespace-nowrap" disabled={!newUnitName.trim() || savingMaterial}>
+                <input 
+                  type="text" 
+                  id="new-unit-manual" 
+                  value={newUnitName} 
+                  onChange={(e) => setNewUnitName(e.target.value)} 
+                  className={`${commonInputStyles} flex-1`} 
+                  placeholder="e.g., Unit 4: Geometry" 
+                  required={isCreatingUnit} 
+                />
+                <Button 
+                  type="button" 
+                  variant="primary" 
+                  size="sm" 
+                  onClick={handleCreateNewUnit} 
+                  className="h-10 whitespace-nowrap" 
+                  disabled={!newUnitName.trim() || savingMaterial}
+                >
                   <PlusIcon className="h-4 w-4 mr-1" /> Create
                 </Button>
               </div>
@@ -297,17 +335,36 @@ export default function ManualMaterialForm({
             >
               <option value="">-- Choose or Create Lesson Group --</option>
               <option value="__create_new__" className="font-medium text-accent-blue">+ Create New Lesson Group</option>
-              {(lessonContainersForSelectedUnit || []).map(lesson => (<option key={lesson.id} value={lesson.id}>{lesson.title}</option>))}
+              {(lessonContainersForSelectedUnit || []).map(lesson => (
+                <option key={lesson.id} value={lesson.id}>{lesson.title}</option>
+              ))}
             </select>
-            {!selectedUnitInManualForm && (<p className="text-xs text-text-tertiary italic mt-0.5">Select a unit first to manage lesson groups.</p>)}
+            {!selectedUnitInManualForm && (
+              <p className="text-xs text-text-tertiary italic mt-0.5">Select a unit first to manage lesson groups.</p>
+            )}
           </div>
 
           {isCreatingLessonGroup && selectedUnitInManualForm && (
             <div className="p-3 border border-dashed border-blue-300 rounded-md bg-blue-50/50">
               <label htmlFor="new-manual-lesson-group" className={`${commonLabelStyles} text-accent-blue`}>New Lesson Group Title *</label>
               <div className="flex gap-2 mt-1 items-center">
-                <input type="text" id="new-manual-lesson-group" value={newLessonGroupTitle} onChange={(e) => setNewLessonGroupTitle(e.target.value)} className={`${commonInputStyles} flex-1`} placeholder="e.g., Week 3 Activities" required={isCreatingLessonGroup} />
-                <Button type="button" variant="primary" size="sm" onClick={handleCreateNewLessonGroup} className="h-10 whitespace-nowrap" disabled={!newLessonGroupTitle.trim() || savingMaterial}>
+                <input 
+                  type="text" 
+                  id="new-manual-lesson-group" 
+                  value={newLessonGroupTitle} 
+                  onChange={(e) => setNewLessonGroupTitle(e.target.value)} 
+                  className={`${commonInputStyles} flex-1`} 
+                  placeholder="e.g., Week 3 Activities" 
+                  required={isCreatingLessonGroup} 
+                />
+                <Button 
+                  type="button" 
+                  variant="primary" 
+                  size="sm" 
+                  onClick={handleCreateNewLessonGroup} 
+                  className="h-10 whitespace-nowrap" 
+                  disabled={!newLessonGroupTitle.trim() || savingMaterial}
+                >
                   <PlusIcon className="h-4 w-4 mr-1" /> Create
                 </Button>
               </div>
@@ -315,16 +372,142 @@ export default function ManualMaterialForm({
           )}
         </div>
 
-        <div><label htmlFor="manual-description" className={commonLabelStyles}>Description</label><textarea id="manual-description" name="description" value={formData.description} onChange={handleInputChange} rows="3" className={commonInputStyles} placeholder="Brief description of what this material covers..."/></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label htmlFor="manual-difficulty" className={commonLabelStyles}><AcademicCapIcon className="h-4 w-4 inline mr-1" />Difficulty Level</label><select id="manual-difficulty" name="difficulty_level" value={formData.difficulty_level} onChange={handleInputChange} className={commonSelectStyles}>{DIFFICULTY_LEVELS.map(level => (<option key={level} value={level}>{level.charAt(0).toUpperCase() + level.slice(1)}</option>))}</select></div><div><label htmlFor="manual-time" className={commonLabelStyles}><ClockIcon className="h-4 w-4 inline mr-1" />Estimated Time</label><select id="manual-time" name="estimated_time_minutes" value={formData.estimated_time_minutes} onChange={handleInputChange} className={commonSelectStyles}>{TIME_ESTIMATES.map(time => (<option key={time.value} value={time.value}>{time.label}</option>))}</select></div></div>
-        <div><label htmlFor="manual-objectives" className={commonLabelStyles}>Learning Objectives</label><textarea id="manual-objectives" name="learning_objectives" value={formData.learning_objectives} onChange={handleInputChange} rows="2" className={commonInputStyles} placeholder="One objective per line, e.g.
-Understand basic multiplication
-Solve word problems"/><p className="text-xs text-text-tertiary mt-1">Enter one objective per line</p></div>
-        <div><label htmlFor="manual-topics" className={commonLabelStyles}>Topics & Keywords</label><input type="text" id="manual-topics" name="topics" value={formData.topics} onChange={handleInputChange} className={commonInputStyles} placeholder="multiplication, word problems (comma-separated)"/></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label htmlFor="manual-due-date" className={commonLabelStyles}>Due Date</label><input type="date" id="manual-due-date" name="due_date" value={formData.due_date} onChange={handleInputChange} className={commonInputStyles} /></div>{isGradableType && (<div><label htmlFor="manual-max-score" className={commonLabelStyles}>Max Score/Points</label><input type="number" id="manual-max-score" name="max_score" value={formData.max_score} onChange={handleInputChange} className={commonInputStyles} placeholder="e.g., 100" min="1" /></div>)}</div>
-        <div><label htmlFor="manual-notes" className={commonLabelStyles}>Additional Notes</label><textarea id="manual-notes" name="notes" value={formData.notes} onChange={handleInputChange} rows="2" className={commonInputStyles} placeholder="Any additional notes or instructions..."/></div>
-        <div className="flex items-center"><input type="checkbox" id="manual-completed" name="completed" checked={formData.completed} onChange={handleInputChange} className="h-4 w-4 text-accent-blue border-border-input rounded focus:ring-accent-blue" /><label htmlFor="manual-completed" className="ml-2 block text-sm font-medium text-text-primary">Mark as completed</label></div>
+        <div>
+          <label htmlFor="manual-description" className={commonLabelStyles}>Description</label>
+          <textarea 
+            id="manual-description" 
+            name="description" 
+            value={formData.description} 
+            onChange={handleInputChange} 
+            rows="3" 
+            className={commonInputStyles} 
+            placeholder="Brief description of what this material covers..."
+          />
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="manual-difficulty" className={commonLabelStyles}>
+              <AcademicCapIcon className="h-4 w-4 inline mr-1" />
+              Difficulty Level
+            </label>
+            <select 
+              id="manual-difficulty" 
+              name="difficulty_level" 
+              value={formData.difficulty_level} 
+              onChange={handleInputChange} 
+              className={commonSelectStyles}
+            >
+              {DIFFICULTY_LEVELS.map(level => (
+                <option key={level} value={level}>
+                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="manual-time" className={commonLabelStyles}>
+              <ClockIcon className="h-4 w-4 inline mr-1" />
+              Estimated Time
+            </label>
+            <select 
+              id="manual-time" 
+              name="estimated_time_minutes" 
+              value={formData.estimated_time_minutes} 
+              onChange={handleInputChange} 
+              className={commonSelectStyles}
+            >
+              {TIME_ESTIMATES.map(time => (
+                <option key={time.value} value={time.value}>{time.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="manual-objectives" className={commonLabelStyles}>Learning Objectives</label>
+          <textarea 
+            id="manual-objectives" 
+            name="learning_objectives" 
+            value={formData.learning_objectives} 
+            onChange={handleInputChange} 
+            rows="2" 
+            className={commonInputStyles} 
+            placeholder="One objective per line, e.g.
+Understand basic multiplication
+Solve word problems"
+          />
+          <p className="text-xs text-text-tertiary mt-1">Enter one objective per line</p>
+        </div>
+
+        <div>
+          <label htmlFor="manual-topics" className={commonLabelStyles}>Topics & Keywords</label>
+          <input 
+            type="text" 
+            id="manual-topics" 
+            name="topics" 
+            value={formData.topics} 
+            onChange={handleInputChange} 
+            className={commonInputStyles} 
+            placeholder="multiplication, word problems (comma-separated)"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="manual-due-date" className={commonLabelStyles}>Due Date</label>
+            <input 
+              type="date" 
+              id="manual-due-date" 
+              name="due_date" 
+              value={formData.due_date} 
+              onChange={handleInputChange} 
+              className={commonInputStyles} 
+            />
+          </div>
+          {isGradableType && (
+            <div>
+              <label htmlFor="manual-max-score" className={commonLabelStyles}>Max Score/Points</label>
+              <input 
+                type="number" 
+                id="manual-max-score" 
+                name="max_score" 
+                value={formData.max_score} 
+                onChange={handleInputChange} 
+                className={commonInputStyles} 
+                placeholder="e.g., 100" 
+                min="1" 
+              />
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="manual-notes" className={commonLabelStyles}>Additional Notes</label>
+          <textarea 
+            id="manual-notes" 
+            name="notes" 
+            value={formData.notes} 
+            onChange={handleInputChange} 
+            rows="2" 
+            className={commonInputStyles} 
+            placeholder="Any additional notes or instructions..."
+          />
+        </div>
+
+        <div className="flex items-center">
+          <input 
+            type="checkbox" 
+            id="manual-completed" 
+            name="completed" 
+            checked={formData.completed} 
+            onChange={handleInputChange} 
+            className="h-4 w-4 text-accent-blue border-border-input rounded focus:ring-accent-blue" 
+          />
+          <label htmlFor="manual-completed" className="ml-2 block text-sm font-medium text-text-primary">
+            Mark as completed
+          </label>
+        </div>
         <Button 
           type="submit" 
           variant="primary" 
@@ -332,7 +515,17 @@ Solve word problems"/><p className="text-xs text-text-tertiary mt-1">Enter one o
           className="w-full" 
           disabled={savingMaterial || !currentSubject || !selectedUnitInManualForm || (selectedUnitInManualForm === '__create_new__') || !selectedLessonContainer || (selectedLessonContainer === '__create_new__')}
         >
-          {savingMaterial ? (<><ArrowPathIcon className="h-5 w-5 mr-2 animate-spin"/>Saving Material...</>) : (<><DocumentPlusIcon className="h-5 w-5 mr-2"/>Add Material</>)}
+          {savingMaterial ? (
+            <>
+              <ArrowPathIcon className="h-5 w-5 mr-2 animate-spin"/>
+              Saving Material...
+            </>
+          ) : (
+            <>
+              <DocumentPlusIcon className="h-5 w-5 mr-2"/>
+              Add Material
+            </>
+          )}
         </Button>
       </form>
     </div>

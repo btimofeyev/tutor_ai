@@ -1,6 +1,6 @@
 // app/dashboard/components/ManualMaterialForm.js
 'use client';
-import React, { useState, useEffect, useRef } from 'react'; // Added useRef
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   DocumentPlusIcon, 
   ArrowPathIcon,
@@ -77,14 +77,20 @@ export default function ManualMaterialForm({
     }
   }, [currentSubject, onManualFormUnitChange]); // Removed prevSubjectRef from deps as ref changes don't trigger effects
 
+  // Store previous unit to only reset when unit actually changes
+  const prevUnitRefForForm = useRef(selectedUnitInManualForm);
+  
   // Effect to reset lesson container when this form's unit selection changes
   useEffect(() => {
-    // console.log('ManualForm: selectedUnitInManualForm changed or onLessonContainerChange changed.', selectedUnitInManualForm);
-    if (onLessonContainerChange) { // Ensure prop exists
-        onLessonContainerChange({ target: { value: '' } }); 
+    if (selectedUnitInManualForm !== prevUnitRefForForm.current) {
+      console.log('ManualForm: Unit changed from', prevUnitRefForForm.current, 'to', selectedUnitInManualForm, '- resetting lesson container');
+      if (onLessonContainerChange) { 
+          onLessonContainerChange({ target: { value: '' } }); 
+      }
+      setIsCreatingLessonGroup(false); 
+      setNewLessonGroupTitle('');
+      prevUnitRefForForm.current = selectedUnitInManualForm;
     }
-    setIsCreatingLessonGroup(false); 
-    setNewLessonGroupTitle('');
   }, [selectedUnitInManualForm, onLessonContainerChange]);
 
   // Sync isCreatingLessonGroup with the global selectedLessonContainer state

@@ -49,7 +49,7 @@ function getPlanPermissions(subscription) {
     
     // Feature permissions
     hasAIAccess: hasActiveSubscription && ['klio_addon', 'family', 'academy'].includes(planType),
-    hasChildLogin: hasActiveSubscription && ['family', 'academy'].includes(planType),
+    hasChildLogin: hasActiveSubscription && ['klio_addon', 'family', 'academy'].includes(planType),
     hasAdvancedFeatures: hasActiveSubscription && ['family', 'academy'].includes(planType),
     
     // Limits

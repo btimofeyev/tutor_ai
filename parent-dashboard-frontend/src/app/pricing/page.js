@@ -112,19 +112,19 @@ export default function PricingPage() {
       id: 'klio_addon',
       price: '$9.99',
       period: 'per month',
-      description: 'Add AI tutoring to your free account',
+      description: 'Add AI tutoring and child login to your free account',
       icon: <SparklesIcon className="h-8 w-8" />,
       features: [
         'Everything in Free plan',
         '🤖 Klio AI personal tutor',
+        '🔐 Child login account',
         'Interactive homework help',
         'Instant explanations',
         'Study session tracking',
         '24/7 AI availability'
       ],
       limitations: [
-        'Still limited to 1 child',
-        'No child login accounts'
+        'Still limited to 1 child'
       ],
       buttonText: 'Add AI Tutoring',
       buttonAction: () => handleUpgrade(PRICE_IDS.klio_addon, 'klio_addon'),

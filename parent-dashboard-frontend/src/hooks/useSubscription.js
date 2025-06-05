@@ -47,7 +47,7 @@ export function useSubscription() {
   // Feature permissions
   const permissions = {
     hasAIAccess: hasAIAddon || isFamilyPlan || isAcademyPlan,
-    hasChildLogin: isFamilyPlan || isAcademyPlan,
+    hasChildLogin: hasAIAddon || isFamilyPlan || isAcademyPlan,
     hasAdvancedFeatures: isFamilyPlan || isAcademyPlan,
     hasAdvancedReporting: isAcademyPlan,
     maxChildren: isAcademyPlan ? 10 : isFamilyPlan ? 3 : 1,
@@ -70,7 +70,7 @@ export function useSubscription() {
     ? "Upgrade to Family Plan for AI access for all children"
     : "Add the Klio AI Pack for $9.99/month to unlock AI tutoring",
     children: "Upgrade your plan to add more children",
-    childLogin: "Upgrade to Family Plan to enable child login accounts",
+    childLogin: "Add Klio AI Pack for $9.99/month to enable child login accounts",
     advanced: "Upgrade to Family Plan for advanced features"
     };
     return messages[feature] || "Upgrade your plan to access this feature";

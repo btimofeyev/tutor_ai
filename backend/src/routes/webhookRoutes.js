@@ -67,11 +67,11 @@ async function handleCheckoutCompleted(session) {
   const price_id = subscription.items.data[0].price.id;
   let plan_type = 'unknown';
   
-  // You'll need to map your actual Stripe price IDs here
+  // Map Stripe price IDs to internal plan names
   const priceToplan = {
-    'price_klio_addon': 'klio_addon',
-    'price_family_plan': 'family',
-    'price_academy_plan': 'academy'
+    'price_1RVZczD8TZAZUMMAQWokffCi': 'klio_addon',
+    'price_1RVZT4D8TZAZUMMA3YIJeWWE': 'family',
+    'price_1RVZTrD8TZAZUMMAiUuoU72d': 'academy'
   };
   
   plan_type = priceToplan[price_id] || 'unknown';

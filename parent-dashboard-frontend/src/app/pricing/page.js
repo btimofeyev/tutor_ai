@@ -89,20 +89,18 @@ export default function PricingPage() {
       id: 'free',
       price: '$0',
       period: 'forever',
-      description: 'Perfect for getting started with one child',
+      description: 'Basic homeschool tracking for one child',
       icon: <UserGroupIcon className="h-8 w-8" />,
       features: [
         '1 child account',
-        'Basic curriculum tracking',
-        'File upload & organization',
-        'Progress monitoring',
+        'Curriculum tracking',
         'Grade tracking',
-        'Due date management'
+        'Progress monitoring',
+        'File organization'
       ],
       limitations: [
         'No AI tutoring',
-        'No child login accounts',
-        'Limited to 1 child'
+        'No child login accounts'
       ],
       buttonText: 'Current Plan',
       buttonAction: null,
@@ -110,17 +108,16 @@ export default function PricingPage() {
       available: true
     },
     {
-      name: 'Klio Add-On Pack',
+      name: 'Klio Add-On',
       id: 'klio_addon',
       price: '$9.99',
       period: 'per month',
       description: 'Add AI tutoring to your free account',
       icon: <SparklesIcon className="h-8 w-8" />,
       features: [
-        'Keep your Free plan',
+        'Everything in Free plan',
         '🤖 Klio AI personal tutor',
         'Interactive homework help',
-        'Adaptive learning support',
         'Instant explanations',
         'Study session tracking',
         '24/7 AI availability'
@@ -129,7 +126,7 @@ export default function PricingPage() {
         'Still limited to 1 child',
         'No child login accounts'
       ],
-      buttonText: 'Add AI Pack',
+      buttonText: 'Add AI Tutoring',
       buttonAction: () => handleUpgrade(PRICE_IDS.klio_addon, 'klio_addon'),
       highlighted: false,
       available: true,
@@ -141,17 +138,14 @@ export default function PricingPage() {
       id: 'family',
       price: '$19',
       period: 'per month',
-      description: 'Complete homeschool solution for growing families',
+      description: 'Everything in Free + Klio for up to 3 children',
       icon: <UserGroupIcon className="h-8 w-8" />,
       features: [
-        'Everything in Starter + AI',
+        'Everything in Free + Klio',
         '👨‍👩‍👧‍👦 Up to 3 children',
         '🔐 Child login accounts',
         'Individual AI tutors per child',
-        'Advanced progress analytics',
-        'Family dashboard',
-        'Priority support',
-        'Advanced grading weights'
+        'Family dashboard'
       ],
       limitations: [],
       buttonText: 'Best Value',
@@ -164,17 +158,13 @@ export default function PricingPage() {
       id: 'academy',
       price: '$39',
       period: 'per month',
-      description: 'For large families and small schools',
+      description: 'Same as Family Plan but for up to 10 children',
       icon: <AcademicCapIcon className="h-8 w-8" />,
       features: [
         'Everything in Family Plan',
         '🏫 Up to 10 children',
-        'Advanced reporting',
-        'Bulk material uploads',
-        'Custom integrations',
-        'Dedicated support',
-        'Training sessions',
-        'Custom branding options'
+        'Perfect for large families',
+        'Great for co-op homeschool groups'
       ],
       limitations: [],
       buttonText: 'Contact Sales',

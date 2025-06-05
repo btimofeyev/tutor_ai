@@ -242,7 +242,7 @@ export default function StudentSidebar({
       <div className="p-4 border-t border-border-subtle mt-auto">
         <Button
           as="link"
-          href="/api/auth/logout"
+          href="/logout"
           variant="ghost"
           size="md"
           className="w-full !text-[var(--messageTextDanger)] hover:!bg-[var(--messageTextDanger)]/10"

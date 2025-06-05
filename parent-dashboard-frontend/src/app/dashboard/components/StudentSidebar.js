@@ -7,17 +7,15 @@ import {
   ArrowLeftOnRectangleIcon, 
   UserPlusIcon, 
   Cog6ToothIcon, 
-  CheckIcon, 
-  XMarkIcon, 
   SparklesIcon, 
   ChevronDownIcon, 
   ChevronUpIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  CreditCardIcon // Added for upgrade button
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 import SubscriptionManager from '../../../components/SubscriptionManager';
 
-// Helper for input styling (consistent with dashboard page)
 const formInputStyles = "block w-full border-[var(--border-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-input-focus)] focus:border-[var(--border-input-focus)] rounded-[var(--radius-md)] bg-background-card text-text-primary placeholder-text-tertiary shadow-sm text-sm px-3 py-2";
 
 export default function StudentSidebar({
@@ -32,14 +30,35 @@ export default function StudentSidebar({
   onNewChildGradeChange,
   onAddChildSubmit,
   onOpenChildLoginSettings,
-  canAddChild = true,
-  subscription = null,
+  subscription,
+  canAddChild,
+  onUpgradeNeeded, // New prop to handle upgrade clicks from here
 }) {
   const [showSubscriptionDetails, setShowSubscriptionDetails] = useState(false);
 
   const hasActiveSubscription = subscription && subscription.status === 'active';
   const planType = subscription?.plan_type;
-  const childCount = childrenList?.length || 0;
+
+  let planDisplayName = '🆓 Free Plan';
+  if (hasActiveSubscription) {
+    if (planType === 'klio_addon') planDisplayName = '🤖 Starter + AI';
+    else if (planType === 'family') planDisplayName = '👨‍👩‍👧‍👦 Family Plan';
+    else if (planType === 'academy') planDisplayName = '🏫 Academy Plan';
+    else planDisplayName = 'Active Plan';
+  }
+
+  const handleUpgradeButtonClick = () => {
+    if (onUpgradeNeeded) {
+      // Determine which plan to suggest upgrading to
+      let targetPlan = 'family'; // Default
+      if (planType === 'free' || planType === 'klio_addon') {
+        targetPlan = 'family';
+      } else if (planType === 'family') {
+        targetPlan = 'academy';
+      }
+      onUpgradeNeeded(targetPlan);
+    }
+  };
 
   return (
     <aside className="flex flex-col h-full text-text-primary bg-background-card">
@@ -65,7 +84,7 @@ export default function StudentSidebar({
         <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">Students</h3>
       </div>
 
-      {/* Students List */}
+      {/* Students List (no changes) */}
       <div className="flex-1 overflow-y-auto px-4 space-y-1.5">
         {(childrenList || []).map(child => {
           const isSelected = selectedChild?.id === child.id;
@@ -116,26 +135,19 @@ export default function StudentSidebar({
         })}
       </div>
 
+
       {/* Subscription & Add Student Section */}
       <div className="p-4 border-t border-border-subtle">
         {/* Subscription Section */}
         <div className="mb-4">
           <button
             onClick={() => setShowSubscriptionDetails(!showSubscriptionDetails)}
-            className="w-full flex items-center justify-between text-left p-2 rounded-md hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center justify-between text-left p-2 rounded-md hover:bg-background-card-hover transition-colors"
           >
             <div className="flex items-center">
               <SparklesIcon className="h-4 w-4 mr-2 text-accent-blue" />
               <span className="text-sm font-medium text-text-primary">
-                {hasActiveSubscription ? (
-                  <>
-                    {planType === 'klio_addon' && '🤖 Starter + AI'}
-                    {planType === 'family' && '👨‍👩‍👧‍👦 Family Plan'}
-                    {planType === 'academy' && '🏫 Academy Plan'}
-                  </>
-                ) : (
-                  '🆓 Free Plan'
-                )}
+                {planDisplayName}
               </span>
             </div>
             {showSubscriptionDetails ? (
@@ -147,7 +159,11 @@ export default function StudentSidebar({
           
           {showSubscriptionDetails && (
             <div className="mt-2 px-2">
-              <SubscriptionManager children={childrenList} compact={true} />
+              <SubscriptionManager
+                children={childrenList || []} // Ensure childrenList is an array
+                compact={true}
+                initialSubscription={subscription}
+              />
             </div>
           )}
         </div>
@@ -156,14 +172,14 @@ export default function StudentSidebar({
         {!showAddChild ? (
           <div>
             <Button
-              variant="secondary"
+              variant={canAddChild ? "secondary" : "primary"} // Make upgrade more prominent
               size="md"
-              onClick={() => onToggleShowAddChild(true)}
+              onClick={canAddChild ? () => onToggleShowAddChild(true) : handleUpgradeButtonClick}
               className="w-full"
-              disabled={!canAddChild}
+              // disabled={!canAddChild && !onUpgradeNeeded} // Disable only if no upgrade path
               title={!canAddChild ? "Upgrade your plan to add more children" : "Add a new student"}
             >
-              <UserPlusIcon className="h-5 w-5 mr-2"/> 
+              {!canAddChild ? <CreditCardIcon className="h-5 w-5 mr-2"/> : <UserPlusIcon className="h-5 w-5 mr-2"/> }
               {canAddChild ? "Add Student" : "Upgrade to Add Student"}
             </Button>
             {!canAddChild && (
@@ -175,10 +191,10 @@ export default function StudentSidebar({
                     <p className="text-xs text-orange-600 mt-0.5">
                       {hasActiveSubscription ? (
                         planType === 'klio_addon' ? 
-                          'Upgrade to Family Plan for up to 3 children' :
+                          'The AI Add-on is for 1 child. Upgrade to Family Plan for up to 3 children.' :
                           planType === 'family' ?
-                            'You have 3 children. Add more for $2/month each' :
-                            'Contact support for more children'
+                            'Family plan supports up to 3 children. Upgrade to Academy for more.' :
+                            'Your current plan is at its child limit. Contact support for options.' // General message for Academy or other
                       ) : (
                         'Free plan includes 1 child. Upgrade for more!'
                       )}
@@ -189,6 +205,7 @@ export default function StudentSidebar({
             )}
           </div>
         ) : (
+          // Form for adding child (no changes)
           <form onSubmit={onAddChildSubmit} className="flex flex-col gap-2 p-3 bg-background-main rounded-lg border border-border-subtle">
             <input
               value={newChildName}
@@ -205,7 +222,7 @@ export default function StudentSidebar({
             />
             <div className="flex gap-2 mt-1.5">
               <Button type="submit" variant="primary" size="sm" className="flex-1">
-                <CheckIcon className="h-4 w-4 mr-1.5"/> Save
+                 Save {/* Removed CheckIcon for brevity to match Cancel */}
               </Button>
               <Button
                 type="button"
@@ -214,14 +231,14 @@ export default function StudentSidebar({
                 onClick={() => onToggleShowAddChild(false)}
                 className="flex-1"
               >
-                <XMarkIcon className="h-4 w-4 mr-1.5"/> Cancel
+                 Cancel {/* Removed XMarkIcon */}
               </Button>
             </div>
           </form>
         )}
       </div>
 
-      {/* Logout Section */}
+      {/* Logout Section (no changes) */}
       <div className="p-4 border-t border-border-subtle mt-auto">
         <Button
           as="link"

@@ -1,13 +1,16 @@
 // app/dashboard/page.js
 "use client";
 import { useSession } from "@supabase/auth-helpers-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation"; // Import useSearchParams
 import { useEffect, useState, useMemo } from "react";
 import api from "../../utils/api";
 
+// Import your main subscription hook
+import { useSubscription } from "../../hooks/useSubscription"; // Adjust path if needed
+
 // Extracted hooks and utilities
 import { useChildrenData } from "../../hooks/useChildrenData";
-import { useMaterialManagement } from "../../hooks/useMaterialManagement"; // UPDATED
+import { useMaterialManagement } from "../../hooks/useMaterialManagement";
 import { useFiltersAndSorting } from "../../hooks/useFiltersAndSorting";
 import { 
   APP_CONTENT_TYPES,
@@ -35,10 +38,21 @@ import {
 export default function DashboardPage() {
   const session = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams(); // For accessing URL query parameters in Next.js App Router
+
+  // Use your main subscription hook
+  const {
+    subscription,
+    loading: subscriptionLoading,
+    refetch: refetchSubscription,
+    permissions: subscriptionPermissions, // Get permissions from the hook
+    // childrenCount: subscriptionChildrenCount // if you want to use this from useSubscription
+  } = useSubscription();
 
   // Use extracted custom hooks
-  const childrenData = useChildrenData(session);
-  const materialManagement = useMaterialManagement(childrenData.refreshChildSpecificData); // UPDATED
+  // Pass subscription and permissions to useChildrenData if it needs them
+  const childrenData = useChildrenData(session, subscription, subscriptionPermissions);
+  const materialManagement = useMaterialManagement(childrenData.refreshChildSpecificData, subscriptionPermissions);
   const filtersAndSorting = useFiltersAndSorting(
     childrenData.lessonsBySubject, 
     childrenData.gradeWeights, 
@@ -67,7 +81,7 @@ export default function DashboardPage() {
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState('');
   const [upgrading, setUpgrading] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState('free');
+  // const [currentPlan, setCurrentPlan] = useState('free'); // Can get this from subscription.planType
 
   // Get computed values from custom hooks
   const { assignedSubjectsForCurrentChild } = childrenData;
@@ -75,34 +89,51 @@ export default function DashboardPage() {
 
   // Get lesson containers for selected unit
   const currentLessonContainersForUnit = useMemo(() => {
-    const selectedUnitId = materialManagement.lessonJsonForApproval?.unit_id; // UPDATED
+    const selectedUnitId = materialManagement.lessonJsonForApproval?.unit_id;
     if (!selectedUnitId) return [];
     return childrenData.lessonsByUnit[selectedUnitId] || [];
-  }, [materialManagement.lessonJsonForApproval?.unit_id, childrenData.lessonsByUnit]); // UPDATED
+  }, [materialManagement.lessonJsonForApproval?.unit_id, childrenData.lessonsByUnit]);
 
   // Redirect to login if no session
   useEffect(() => {
-    if (session === false) {
+    if (session === false) { // Check for explicit false, not just undefined
       router.replace("/login");
     }
   }, [session, router]);
 
+  // Refetch subscription if an upgrade just happened
+  useEffect(() => {
+    const upgraded = searchParams.get('upgraded');
+    const success = searchParams.get('success');
+    if (upgraded === 'true' || success === 'true') {
+      console.log("DashboardPage: Detected upgrade/success, refetching subscription...");
+      refetchSubscription();
+      // Optionally, remove the query param to prevent refetch on normal refresh
+      // Check if window is defined for client-side execution
+      if (typeof window !== 'undefined') {
+        const newUrl = window.location.pathname; // Keep existing pathname
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, [searchParams, refetchSubscription]);
+
+
   // Reset lesson container selection when lesson approval unit changes
   useEffect(() => {
-    materialManagement.setSelectedLessonContainer(""); // UPDATED
-  }, [materialManagement.lessonJsonForApproval?.unit_id, materialManagement.setSelectedLessonContainer]); // UPDATED
+    materialManagement.setSelectedLessonContainer("");
+  }, [materialManagement.lessonJsonForApproval?.unit_id, materialManagement.setSelectedLessonContainer]);
 
   const handleAddLessonFormSubmit = async (e) => {
     e.preventDefault();
     
-    if (!materialManagement.addLessonSubject || !materialManagement.addLessonFile || materialManagement.addLessonFile.length === 0 || !materialManagement.addLessonUserContentType) { // UPDATED
+    if (!materialManagement.addLessonSubject || !materialManagement.addLessonFile || materialManagement.addLessonFile.length === 0 || !materialManagement.addLessonUserContentType) {
       alert("Please select subject, at least one file, and an initial content type.");
       return;
     }
 
     const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
     const subjectInfo = currentAssignedSubjects.find(
-      (s) => s.child_subject_id === materialManagement.addLessonSubject // UPDATED
+      (s) => s.child_subject_id === materialManagement.addLessonSubject
     );
 
     if (!subjectInfo || !subjectInfo.child_subject_id) {
@@ -112,33 +143,32 @@ export default function DashboardPage() {
 
     const formData = new FormData();
     formData.append("child_subject_id", subjectInfo.child_subject_id);
-    formData.append("user_content_type", materialManagement.addLessonUserContentType); // UPDATED
+    formData.append("user_content_type", materialManagement.addLessonUserContentType);
 
-    if (materialManagement.addLessonFile instanceof FileList && materialManagement.addLessonFile.length > 0) { // UPDATED
-      for (let i = 0; i < materialManagement.addLessonFile.length; i++) { // UPDATED
-        formData.append("files", materialManagement.addLessonFile[i], materialManagement.addLessonFile[i].name); // UPDATED
+    if (materialManagement.addLessonFile instanceof FileList && materialManagement.addLessonFile.length > 0) {
+      for (let i = 0; i < materialManagement.addLessonFile.length; i++) {
+        formData.append("files", materialManagement.addLessonFile[i], materialManagement.addLessonFile[i].name);
       }
     } else {
       alert("File selection error.");
       return;
     }
 
-    const result = await materialManagement.handleLessonUpload(formData); // UPDATED
+    const result = await materialManagement.handleLessonUpload(formData);
     
     if (!result.success) {
       alert(`Upload Error: ${result.error}`);
-      materialManagement.setLessonJsonForApproval({ error: result.error, title: "Error" }); // UPDATED
-      materialManagement.setLessonTitleForApproval("Error"); // UPDATED
-      materialManagement.setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]); // UPDATED
-      materialManagement.setLessonMaxPointsForApproval(""); // UPDATED
-      materialManagement.setLessonDueDateForApproval(""); // UPDATED
-      materialManagement.setLessonCompletedForApproval(false); // UPDATED
+      materialManagement.setLessonJsonForApproval({ error: result.error, title: "Error" });
+      materialManagement.setLessonTitleForApproval("Error");
+      materialManagement.setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
+      materialManagement.setLessonMaxPointsForApproval("");
+      materialManagement.setLessonDueDateForApproval("");
+      materialManagement.setLessonCompletedForApproval(false);
     } else {
       const receivedLessonJson = result.data.lesson_json || {};
-      // materialManagement.setLessonJsonForApproval(receivedLessonJson); // Hook's handleLessonUpload does this
       
-      const firstFileName = materialManagement.addLessonFile[0]?.name?.split(".")[0]; // UPDATED
-      materialManagement.setLessonTitleForApproval( // UPDATED
+      const firstFileName = materialManagement.addLessonFile[0]?.name?.split(".")[0];
+      materialManagement.setLessonTitleForApproval(
         receivedLessonJson?.title || firstFileName || "Untitled Material"
       );
       
@@ -146,36 +176,33 @@ export default function DashboardPage() {
       const finalContentType =
         llmContentType && APP_CONTENT_TYPES.includes(llmContentType)
           ? llmContentType
-          : materialManagement.addLessonUserContentType && // UPDATED
-            APP_CONTENT_TYPES.includes(materialManagement.addLessonUserContentType) // UPDATED
-          ? materialManagement.addLessonUserContentType // UPDATED
+          : materialManagement.addLessonUserContentType &&
+            APP_CONTENT_TYPES.includes(materialManagement.addLessonUserContentType)
+          ? materialManagement.addLessonUserContentType
           : APP_CONTENT_TYPES[0];
-      materialManagement.setLessonContentTypeForApproval(finalContentType); // UPDATED
+      materialManagement.setLessonContentTypeForApproval(finalContentType);
 
       if (
         receivedLessonJson?.total_possible_points_suggestion !== null &&
         receivedLessonJson?.total_possible_points_suggestion !== undefined
       ) {
-        materialManagement.setLessonMaxPointsForApproval( // UPDATED
+        materialManagement.setLessonMaxPointsForApproval(
           String(receivedLessonJson.total_possible_points_suggestion)
         );
       } else {
-        materialManagement.setLessonMaxPointsForApproval(""); // UPDATED
+        materialManagement.setLessonMaxPointsForApproval("");
       }
 
-      materialManagement.setLessonDueDateForApproval(""); // UPDATED
-      materialManagement.setLessonCompletedForApproval(false); // UPDATED
+      materialManagement.setLessonDueDateForApproval("");
+      materialManagement.setLessonCompletedForApproval(false);
     }
   };
 
   const handleManualMaterialSubmit = async (materialDataFromForm) => {
-    // Assuming materialDataFromForm from AddMaterialTabs includes:
-    // title, content_type, child_subject_id, lesson_container_id, unit_id (if any), etc.
-    const result = await materialManagement.handleManualMaterialCreation(materialDataFromForm); // UPDATED
+    const result = await materialManagement.handleManualMaterialCreation(materialDataFromForm);
     
     if (result.success) {
       alert('Material added successfully!');
-      // AddMaterialTabs should clear its own manual form on success
       return { success: true };
     } else {
       alert(result.error || 'Failed to create material');
@@ -193,22 +220,22 @@ export default function DashboardPage() {
       grade: childrenData.newChildGrade,
     };
     
-    const result = await childrenData.handleAddChild(childData);
+    const result = await childrenData.handleAddChild(childData); // childrenData hook handles its own state updates
     
     if (result.success) {
-      childrenData.setShowAddChild(false);
+      childrenData.setShowAddChild(false); // This is part of childrenData hook
     } else {
       if (result.code === 'CHILD_LIMIT_EXCEEDED') {
-        setCurrentPlan('free'); 
+        // Use subscription from useSubscription hook
         setUpgradeFeature('children');
-        setShowUpgradePrompt(true);
+        setShowUpgradePrompt(true); // This controls the UpgradePrompt visibility
       } else {
         alert(result.error);
       }
     }
   };
 
-  const handleUpgrade = async (targetPlan) => {
+  const handleGenericUpgrade = async (targetPlanKey) => { // Renamed to avoid conflict
     setUpgrading(true);
     try {
       const priceIds = {
@@ -217,10 +244,16 @@ export default function DashboardPage() {
         academy: 'price_1RVZTrD8TZAZUMMAiUuoU72d'
       };
 
+      if (!priceIds[targetPlanKey]) {
+        alert('Invalid plan selected for upgrade.');
+        setUpgrading(false);
+        return;
+      }
+
       const response = await api.post('/stripe/create-checkout-session', {
-        price_id: priceIds[targetPlan],
+        price_id: priceIds[targetPlanKey],
         success_url: `${window.location.origin}/dashboard?upgraded=true`,
-        cancel_url: window.location.href
+        cancel_url: window.location.href // Or specific cancel page
       });
       
       window.location.href = response.data.checkout_url;
@@ -232,22 +265,21 @@ export default function DashboardPage() {
   };
 
   const handleUpdateLessonJsonForApprovalField = (fieldName, value) => {
-    materialManagement.updateLessonApprovalField(fieldName, value); // UPDATED
+    materialManagement.updateLessonApprovalField(fieldName, value);
   };
 
-  const handleToggleLessonComplete = async (lessonId, grade = null) => { // Renamed from materialId to lessonId for consistency
-    const result = await materialManagement.toggleLessonCompletion(lessonId, grade); // UPDATED
+  const handleToggleLessonComplete = async (lessonId, grade = null) => {
+    const result = await materialManagement.toggleLessonCompletion(lessonId, grade);
     if (!result.success) {
       alert(result.error || "Could not update completion status.");
     }
-    // Data refresh is handled by the hook
   };
 
 
   const handleApproveNewLesson = async () => {
     const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
-    const subjectInfo = currentAssignedSubjects.find( // This check is still useful here for early exit
-      (s) => s.child_subject_id === materialManagement.addLessonSubject // UPDATED
+    const subjectInfo = currentAssignedSubjects.find(
+      (s) => s.child_subject_id === materialManagement.addLessonSubject
     );
   
     if (!subjectInfo || !subjectInfo.child_subject_id) {
@@ -256,29 +288,24 @@ export default function DashboardPage() {
     }
   
     if (
-      !materialManagement.lessonJsonForApproval || // UPDATED
-      !materialManagement.lessonTitleForApproval || // UPDATED
-      !materialManagement.lessonContentTypeForApproval // UPDATED
+      !materialManagement.lessonJsonForApproval ||
+      !materialManagement.lessonTitleForApproval ||
+      !materialManagement.lessonContentTypeForApproval
     ) {
       alert("Missing data for approval.");
       return;
     }
 
-    if (!materialManagement.selectedLessonContainer || materialManagement.selectedLessonContainer === '__create_new__') { // UPDATED
+    if (!materialManagement.selectedLessonContainer || materialManagement.selectedLessonContainer === '__create_new__') {
       alert("Please select or create a lesson container.");
       return;
     }
     
-    // The hook's handleSaveLesson should use its internal state for payload construction
-    // (addLessonSubject, selectedLessonContainer, lessonJsonForApproval.unit_id, etc.)
-    const result = await materialManagement.handleSaveLesson(); // UPDATED
+    const result = await materialManagement.handleSaveLesson();
   
     if (result.success) {
-      // Hook's handleSaveLesson resets form fields and refreshes data.
-      // Clear the main file input if necessary (ID might change with AddMaterialTabs)
       const fileInput = document.getElementById("lesson-file-input-main"); 
       if (fileInput) fileInput.value = "";
-      // alert("Lesson approved and saved!"); // Optional: Hook handles refresh
     } else {
       alert(result.error || "Lesson save failed.");
     }
@@ -286,23 +313,15 @@ export default function DashboardPage() {
 
   const handleLessonContainerChange = (e) => {
     const value = e.target.value;
-    console.log('Dashboard: Lesson container changed to:', value);
-    materialManagement.setSelectedLessonContainer(value); // UPDATED
-    
-    // if (value === '__create_new__') { // This state is not part of materialManagement
-    //   setNewLessonContainerTitle(''); // This local state is for the "create new container" UI element
-    // }
-    // The above logic for setNewLessonContainerTitle seems fine as it's for a UI element not directly tied to the hook's core state.
+    materialManagement.setSelectedLessonContainer(value);
   };
 
   const handleCreateNewUnit = async (newUnitName, childSubjectId) => {
     if (!childSubjectId) {
-      console.error('Child subject ID is missing for new unit creation.'); 
       alert('Error: A subject must be selected before creating a new unit.');
       return { success: false }; 
     }
     if (!newUnitName || !newUnitName.trim()) {
-      console.error('New unit name is empty.'); 
       alert('Error: New unit name cannot be empty.');
       return { success: false }; 
     }
@@ -327,13 +346,11 @@ export default function DashboardPage() {
         [childSubjectId]: updatedUnitsForSubject,
       }));
       
-      // Initialize empty lesson containers for the new unit
       childrenData.setLessonsByUnit(prev => ({
         ...prev,
         [response.data.id]: []
       }));
       
-      // Update the lesson JSON for approval to use the new unit
       if (materialManagement.lessonJsonForApproval) {
         materialManagement.updateLessonApprovalField('unit_id', response.data.id);
       }
@@ -346,16 +363,14 @@ export default function DashboardPage() {
     }
   };
 
-  const handleCreateNewLessonContainer = async (newTitleFromForm, unitIdForCreation) => { // Add unitIdForCreation
-    const unitId = unitIdForCreation; // Use the passed unitId
+  const handleCreateNewLessonContainer = async (newTitleFromForm, unitIdForCreation) => {
+    const unitId = unitIdForCreation;
   
     if (!unitId) {
-      console.error('Unit ID is missing for new lesson container creation.'); 
       alert('Error: A unit must be selected before creating a new lesson group.');
       return { success: false }; 
     }
     if (!newTitleFromForm || !newTitleFromForm.trim()) {
-      console.error('New lesson container title is empty.'); 
       alert('Error: New lesson group title cannot be empty.');
       return { success: false }; 
     }
@@ -385,28 +400,27 @@ export default function DashboardPage() {
   };
 
   const handleOpenEditModal = (lesson) => {
-    materialManagement.startEditingLesson(lesson); // UPDATED
+    materialManagement.startEditingLesson(lesson);
   };
 
   const handleEditModalFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name === "completed_toggle")
-      materialManagement.setEditForm((prev) => ({ // UPDATED
+      materialManagement.setEditForm((prev) => ({
         ...prev,
         completed_at: checked ? new Date().toISOString() : null,
       }));
-    else materialManagement.setEditForm((prev) => ({ ...prev, [name]: value })); // UPDATED
+    else materialManagement.setEditForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSaveLessonEdit = async () => {
-    if (!materialManagement.editingLesson) return; // UPDATED
+    if (!materialManagement.editingLesson) return;
     
-    const result = await materialManagement.saveEditedLesson(); // UPDATED
+    const result = await materialManagement.saveEditedLesson();
     
     if (!result.success) {
       alert(result.error || "Failed to save changes.");
     }
-    // Data refresh and state reset handled by the hook.
   };
 
   const openManageUnitsModal = (subject) => {
@@ -517,6 +531,11 @@ export default function DashboardPage() {
   };
 
   const handleOpenChildLoginSettingsModal = (child) => {
+    if (!subscriptionPermissions.hasChildLogin) {
+        setUpgradeFeature('childLogin');
+        setShowUpgradePrompt(true);
+        return;
+    }
     setEditingChildCredentials(child);
     setChildUsernameInput(child.child_username || "");
     setChildPinInput("");
@@ -604,7 +623,7 @@ export default function DashboardPage() {
       setChildPinConfirmInput("");
       const updatedChildren = childrenData.children.map((c) =>
         c.id === editingChildCredentials.id
-          ? { ...c, access_pin_hash: "set" }
+          ? { ...c, access_pin_hash: "set" } // Simulate presence of hash
           : c
       ); 
       childrenData.setChildren(updatedChildren);
@@ -623,19 +642,22 @@ export default function DashboardPage() {
     }
   };
 
+  // Loading state combining session, subscription, and initial children load
+  const isLoading = session === undefined || subscriptionLoading || (childrenData.loadingInitial && childrenData.children.length === 0);
 
-  if (childrenData.loadingInitial && session === undefined) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background-main">
         <div className="text-xl text-text-secondary">Initializing Dashboard...</div>
       </div>
     );
   }
+  // After loading, if no session, redirect (already handled by useEffect, but good for clarity)
   if (!session) return null;
 
   // Get current units for add form subject
-  const currentUnitsForAddFormSubject = materialManagement.addLessonSubject && childrenData.selectedChild && childrenData.childSubjects[childrenData.selectedChild.id] // UPDATED
-    ? childrenData.unitsBySubject[materialManagement.addLessonSubject] || []  // UPDATED
+  const currentUnitsForAddFormSubject = materialManagement.addLessonSubject && childrenData.selectedChild && childrenData.childSubjects[childrenData.selectedChild.id]
+    ? childrenData.unitsBySubject[materialManagement.addLessonSubject] || [] 
     : [];
 
   return (
@@ -653,16 +675,19 @@ export default function DashboardPage() {
           onNewChildGradeChange={(e) => childrenData.setNewChildGrade(e.target.value)}
           onAddChildSubmit={handleAddChildSubmit}
           onOpenChildLoginSettings={handleOpenChildLoginSettingsModal}
+          subscription={subscription} // PASS THE SUBSCRIPTION OBJECT
+          canAddChild={subscriptionPermissions.maxChildren > childrenData.children.length} // Use permissions from useSubscription
         />
       </div>
 
       <div className="flex-1 flex flex-col overflow-y-auto p-6 sm:p-8 lg:p-10">
-        {childrenData.loadingInitial && !childrenData.selectedChild && childrenData.children.length > 0 && (
+        {/* Initial loading or no student selected states */}
+        {childrenData.loadingInitial && !childrenData.selectedChild && childrenData.children.length === 0 && !subscriptionLoading && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-xl text-text-secondary">Loading Student Data...</div>
           </div>
         )}
-        {!childrenData.selectedChild && !childrenData.loadingInitial && (
+        {!childrenData.selectedChild && !childrenData.loadingInitial && !subscriptionLoading && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-text-secondary italic text-xl text-center">
               {childrenData.children.length > 0
@@ -816,58 +841,60 @@ export default function DashboardPage() {
         {childrenData.selectedChild && !childrenData.loadingChildData ? (
           <AddMaterialTabs
             childSubjectsForSelectedChild={assignedSubjectsForCurrentChild}
-            onFormSubmit={handleAddLessonFormSubmit} // For upload tab
-            onApprove={handleApproveNewLesson}       // For upload tab approval
-            onManualSubmit={handleManualMaterialSubmit} // For manual tab
+            onFormSubmit={handleAddLessonFormSubmit}
+            onApprove={handleApproveNewLesson}
+            onManualSubmit={handleManualMaterialSubmit}
             
-            uploading={materialManagement.uploading} // UPDATED
-            savingLesson={materialManagement.savingLesson} // UPDATED
+            uploading={materialManagement.uploading}
+            savingLesson={materialManagement.savingLesson}
             
-            lessonJsonForApproval={materialManagement.lessonJsonForApproval} // UPDATED
-            onUpdateLessonJsonField={handleUpdateLessonJsonForApprovalField} // Wrapper updated
+            lessonJsonForApproval={materialManagement.lessonJsonForApproval}
+            onUpdateLessonJsonField={handleUpdateLessonJsonForApprovalField}
             
-            lessonTitleForApproval={materialManagement.lessonTitleForApproval} // UPDATED
+            lessonTitleForApproval={materialManagement.lessonTitleForApproval}
             onLessonTitleForApprovalChange={(e) =>
-              materialManagement.setLessonTitleForApproval(e.target.value) // UPDATED
+              materialManagement.setLessonTitleForApproval(e.target.value)
             }
-            lessonContentTypeForApproval={materialManagement.lessonContentTypeForApproval} // UPDATED
+            lessonContentTypeForApproval={materialManagement.lessonContentTypeForApproval}
             onLessonContentTypeForApprovalChange={(e) =>
-              materialManagement.setLessonContentTypeForApproval(e.target.value) // UPDATED
+              materialManagement.setLessonContentTypeForApproval(e.target.value)
             }
-            lessonMaxPointsForApproval={materialManagement.lessonMaxPointsForApproval} // UPDATED
+            lessonMaxPointsForApproval={materialManagement.lessonMaxPointsForApproval}
             onLessonMaxPointsForApprovalChange={(e) =>
-              materialManagement.setLessonMaxPointsForApproval(e.target.value) // UPDATED
+              materialManagement.setLessonMaxPointsForApproval(e.target.value)
             }
-            lessonDueDateForApproval={materialManagement.lessonDueDateForApproval} // UPDATED
+            lessonDueDateForApproval={materialManagement.lessonDueDateForApproval}
             onLessonDueDateForApprovalChange={(e) =>
-              materialManagement.setLessonDueDateForApproval(e.target.value) // UPDATED
+              materialManagement.setLessonDueDateForApproval(e.target.value)
             }
-            lessonCompletedForApproval={materialManagement.lessonCompletedForApproval} // UPDATED
+            lessonCompletedForApproval={materialManagement.lessonCompletedForApproval}
             onLessonCompletedForApprovalChange={(e) =>
-              materialManagement.setLessonCompletedForApproval(e.target.checked) // UPDATED
+              materialManagement.setLessonCompletedForApproval(e.target.checked)
             }
             
-            currentAddLessonSubject={materialManagement.addLessonSubject} // UPDATED
+            currentAddLessonSubject={materialManagement.addLessonSubject}
             onAddLessonSubjectChange={(e) =>
-              materialManagement.setAddLessonSubject(e.target.value) // UPDATED
+              materialManagement.setAddLessonSubject(e.target.value)
             }
-            currentAddLessonUserContentType={materialManagement.addLessonUserContentType} // UPDATED
+            currentAddLessonUserContentType={materialManagement.addLessonUserContentType}
             onAddLessonUserContentTypeChange={(e) =>
-              materialManagement.setAddLessonUserContentType(e.target.value) // UPDATED
+              materialManagement.setAddLessonUserContentType(e.target.value)
             }
-            onAddLessonFileChange={(e) => materialManagement.setAddLessonFile(e.target.files)} // UPDATED
-            currentAddLessonFile={materialManagement.addLessonFile} // UPDATED
+            onAddLessonFileChange={(e) => materialManagement.setAddLessonFile(e.target.files)}
+            currentAddLessonFile={materialManagement.addLessonFile}
             
             appContentTypes={APP_CONTENT_TYPES}
             appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
-            unitsForSelectedSubject={currentUnitsForAddFormSubject} // Uses materialManagement state
+            unitsForSelectedSubject={currentUnitsForAddFormSubject}
             onCreateNewUnit={handleCreateNewUnit}
-            lessonContainersForSelectedUnit={currentLessonContainersForUnit} // Uses materialManagement state
+            lessonContainersForSelectedUnit={currentLessonContainersForUnit}
             lessonsByUnit={childrenData.lessonsByUnit}
             setLessonsByUnit={childrenData.setLessonsByUnit}
-            selectedLessonContainer={materialManagement.selectedLessonContainer} // UPDATED
-            onLessonContainerChange={handleLessonContainerChange} // Wrapper updated
-            onCreateNewLessonContainer={handleCreateNewLessonContainer} // Wrapper updated
+            selectedLessonContainer={materialManagement.selectedLessonContainer}
+            onLessonContainerChange={handleLessonContainerChange}
+            onCreateNewLessonContainer={handleCreateNewLessonContainer}
+            // Pass permissions for AI suggestions etc. if AddMaterialTabs needs them
+            subscriptionPermissions={subscriptionPermissions}
           />
         ) : (
           <p className="text-sm text-text-tertiary italic text-center">
@@ -1043,35 +1070,27 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {materialManagement.editingLesson && ( // UPDATED
+      {materialManagement.editingLesson && (
         <EditMaterialModal
-          editingLesson={materialManagement.editingLesson} // UPDATED
-          editForm={materialManagement.editForm} // UPDATED
-          onFormChange={handleEditModalFormChange} // Wrapper updated
-          onSave={handleSaveLessonEdit} // Wrapper updated
-          onClose={() => materialManagement.cancelEditingLesson()} // UPDATED (using hook's cancel function)
-          isSaving={materialManagement.isSavingEdit} // UPDATED
-          unitsForSubject={
-            materialManagement.editingLesson && childrenData.unitsBySubject[materialManagement.editingLesson.child_subject_id] // UPDATED
-              ? childrenData.unitsBySubject[materialManagement.editingLesson.child_subject_id] // UPDATED
-              : []
-          }
-          appContentTypes={APP_CONTENT_TYPES}
+          isOpen={!!materialManagement.editingLesson}
+          onClose={materialManagement.cancelEditingLesson}
+          lesson={materialManagement.editForm} // Pass the editForm state
+          onFormChange={handleEditModalFormChange}
+          onSave={handleSaveLessonEdit}
           appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
         />
       )}
 
       {isChildLoginSettingsModalOpen && editingChildCredentials && (
         <ChildLoginSettingsModal
-          child={editingChildCredentials}
           isOpen={isChildLoginSettingsModalOpen}
           onClose={handleCloseChildLoginSettingsModal}
+          child={editingChildCredentials}
           usernameInput={childUsernameInput}
           onUsernameInputChange={(e) => {
             setChildUsernameInput(e.target.value);
             clearCredentialMessages();
           }}
-          onSetUsername={handleSetChildUsername}
           pinInput={childPinInput}
           onPinInputChange={(e) => {
             setChildPinInput(e.target.value);
@@ -1082,21 +1101,22 @@ export default function DashboardPage() {
             setChildPinConfirmInput(e.target.value);
             clearCredentialMessages();
           }}
+          onSetUsername={handleSetChildUsername}
           onSetPin={handleSetChildPin}
+          formError={credentialFormError}
+          formSuccess={credentialFormSuccess}
           isSaving={isSavingCredentials}
-          errorMsg={credentialFormError}
-          successMsg={credentialFormSuccess}
-          clearMessages={clearCredentialMessages}
         />
       )}
-
+      
       {showUpgradePrompt && (
         <UpgradePrompt
-          feature={upgradeFeature}
-          currentPlan={currentPlan}
-          onUpgrade={handleUpgrade}
+          isOpen={showUpgradePrompt}
           onClose={() => setShowUpgradePrompt(false)}
-          upgrading={upgrading}
+          feature={upgradeFeature} // e.g., 'children', 'ai', 'childLogin'
+          currentPlan={subscription?.plan_type || 'free'} // Use plan from hook
+          onUpgrade={handleGenericUpgrade} // Pass the generic upgrade handler
+          isLoading={upgrading}
         />
       )}
     </div>

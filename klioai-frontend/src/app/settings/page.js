@@ -11,7 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { child } = useAuth();
+  const { child, logout } = useAuth();
   const [autoSpeak, setAutoSpeak] = useState(true);
   const [textSize, setTextSize] = useState('medium');
 
@@ -38,6 +38,12 @@ export default function SettingsPage() {
     setTextSize(size);
     localStorage.setItem('klio_text_size', size);
     // You can implement actual text size changes in your app
+  };
+
+  const handleLogout = async () => {
+    if (window.confirm('Are you sure you want to sign out?')) {
+      await logout();
+    }
   };
 
   return (
@@ -106,12 +112,23 @@ export default function SettingsPage() {
               </div>
 
               {/* About */}
-              <div>
+              <div className="border-b pb-6">
                 <h2 className="text-xl font-semibold text-gray-700 mb-4">ℹ️ About</h2>
                 <p className="text-gray-600">
                   Hi {child?.name}! I'm Klio, your AI learning friend. I'm here to help you learn
                   and have fun! Version 1.0 🎉
                 </p>
+              </div>
+
+              {/* Account Actions */}
+              <div>
+                <h2 className="text-xl font-semibold text-gray-700 mb-4">👤 Account</h2>
+                <button
+                  onClick={handleLogout}
+                  className="w-full sm:w-auto px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  🚪 Sign Out
+                </button>
               </div>
             </div>
           </motion.div>

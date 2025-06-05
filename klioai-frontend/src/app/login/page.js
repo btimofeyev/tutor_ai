@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../../contexts/AuthContext';
 import { 
   FiUser, 
   FiArrowLeft, 
@@ -26,6 +27,7 @@ const AVATARS = [
 
 export default function KlioLoginPage() {
   const router = useRouter();
+  const { refreshAuthState, isAuthenticated } = useAuth();
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState(null);
@@ -37,6 +39,12 @@ export default function KlioLoginPage() {
   const [welcomeName, setWelcomeName] = useState('');
 
   useEffect(() => {
+    // Redirect if already authenticated
+    if (isAuthenticated) {
+      router.push('/chat');
+      return;
+    }
+
     const savedUsername = localStorage.getItem('klio_username');
     const savedAvatarData = localStorage.getItem('klio_avatar');
     
@@ -62,7 +70,7 @@ export default function KlioLoginPage() {
         localStorage.removeItem('klio_avatar');
       }
     }
-  }, []);
+  }, [isAuthenticated, router]);
 
   const handleUsernameSubmit = (e) => {
     e.preventDefault();
@@ -124,6 +132,9 @@ export default function KlioLoginPage() {
       localStorage.setItem('klio_refresh_token', data.tokens.refreshToken);
       localStorage.setItem('klio_session_id', data.sessionId);
       localStorage.setItem('klio_child', JSON.stringify(data.child));
+
+      // Refresh auth state to pick up the new tokens
+      refreshAuthState();
 
       setWelcomeName(data.child.name || username); // Use username as fallback
       setShowSuccess(true);

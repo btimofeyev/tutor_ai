@@ -17,4 +17,7 @@ router.get('/suggestions', enrichWithMCPContext, chatController.getSuggestions);
 router.get('/lesson-help/:lessonId', chatController.getLessonHelp);
 router.post('/report', chatController.reportMessage);
 
+// Debug endpoint for testing enhanced memory system
+router.get('/debug/memory', enrichWithMCPContext, chatController.debugMemory);
+
 module.exports = router;

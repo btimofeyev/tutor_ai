@@ -1,13 +1,16 @@
-// klioai-frontend/src/components/ChatHeader.js
-// (Assuming this is the header specifically for the chat content area,
-// and a separate main Sidebar handles global branding and navigation)
+// klioai-frontend/src/components/ChatHeader.js - Enhanced with Learning Features
+import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import { FiMessageSquare, FiRefreshCw, FiTrendingUp, FiAward } from 'react-icons/fi';
 
-// motion can be removed if no animations are used in this simplified header
-// import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation'; // Still might be needed if it links somewhere specific from topic
-
-export default function ChatHeader({ childName, currentTopic }) {
-  const router = useRouter(); // Keep if topic might be clickable
+export default function ChatHeader({ 
+  childName, 
+  currentTopic, 
+  onNewChat, 
+  learningStreak = 0, 
+  todaysPracticeCount = 0 
+}) {
+  const router = useRouter();
 
   return (
     <header className="bg-[var(--background-card)] border-b border-[var(--border-subtle)] sticky top-0 z-20">
@@ -44,20 +47,44 @@ export default function ChatHeader({ childName, currentTopic }) {
             )}
           </div>
 
-          {/* Right side: Placeholder for any CHAT-SPECIFIC actions if needed in the future */}
-          <div className="flex items-center space-x-1 sm:space-x-2">
-            {/* Example of a chat-specific action (e.g., "Chat Info") - currently empty */}
-            {/* 
+          {/* Right side: Learning Stats and Actions */}
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            
+            {/* Learning Streak */}
+            {learningStreak > 0 && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="flex items-center space-x-1 bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium"
+              >
+                <FiAward size={12} />
+                <span>{learningStreak} day streak!</span>
+              </motion.div>
+            )}
+
+            {/* Today's Practice Count */}
+            {todaysPracticeCount > 0 && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="flex items-center space-x-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium"
+              >
+                <FiTrendingUp size={12} />
+                <span>{todaysPracticeCount} solved today</span>
+              </motion.div>
+            )}
+
+            {/* New Chat Button */}
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              // onClick={handleShowChatInfo} 
-              className="p-2 rounded-full text-[var(--text-secondary)] hover:bg-[var(--accent-blue)]/20 hover:text-[var(--accent-blue)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-blue)]"
-              title="Chat Information"
+              onClick={onNewChat}
+              className="flex items-center space-x-1 px-3 py-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--accent-blue)]/20 hover:text-[var(--accent-blue)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-blue)] transition-colors"
+              title="Start New Chat"
             >
-              <FiInfo size={18} />
-            </motion.button> 
-            */}
+              <FiMessageSquare size={16} />
+              <span className="hidden sm:inline text-sm font-medium">New Chat</span>
+            </motion.button>
           </div>
 
         </div>

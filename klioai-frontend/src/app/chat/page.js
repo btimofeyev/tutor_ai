@@ -10,6 +10,7 @@ import ChatInput from '../../components/ChatInput';
 import SuggestionBubbles from '../../components/SuggestionBubbles'; 
 import LessonContextBar from '../../components/LessonContextBar';
 import SimpleWorkspace from '../../components/SimpleWorkspace';
+import QuickActions from '../../components/QuickActions';
 import { useAuth } from '../../contexts/AuthContext'; 
 import { chatService } from '../../utils/chatService';
 import { analyzeKlioResponse } from '../../utils/workspaceProgress';
@@ -36,6 +37,13 @@ export default function ChatPage() {
   const [currentTopic, setCurrentTopic] = useState("General Conversation");
   const [currentLessonContext, setCurrentLessonContext] = useState(null);
   
+  // Learning stats state
+  const [learningStats, setLearningStats] = useState({
+    streak: 0,
+    todaysPracticeCount: 0,
+    totalCorrectAnswers: 0
+  });
+  
   // Workspace state
   const [workspaceContent, setWorkspaceContent] = useState(null);
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(false);
@@ -43,6 +51,7 @@ export default function ChatPage() {
   
   // Add workspace action processor
   const workspaceActionProcessorRef = useRef(null);
+  const currentChildIdRef = useRef(null);
 
   // Initialize workspace action processor
   useEffect(() => {
@@ -52,9 +61,26 @@ export default function ChatPage() {
     );
   }, []);
 
-  // Load initial messages
+  // Clear session data when child changes (user switching)
   useEffect(() => {
-    const savedMessages = sessionStorage.getItem('klio_chat_history');
+    if (child?.id && currentChildIdRef.current && currentChildIdRef.current !== child.id) {
+      console.log(`🔄 Child changed from ${currentChildIdRef.current} to ${child.id} - clearing chat`);
+      // Reset chat state for new user
+      setMessages([]);
+      setWorkspaceContent(null);
+      setCurrentLessonContext(null);
+      setCurrentTopic("General Conversation");
+      setShowSuggestions(true);
+    }
+    currentChildIdRef.current = child?.id;
+  }, [child?.id]);
+
+  // Load initial messages - FIXED: child-specific storage
+  useEffect(() => {
+    if (!child?.id) return; // Wait for child data
+    
+    const childSpecificKey = `klio_chat_history_${child.id}`;
+    const savedMessages = sessionStorage.getItem(childSpecificKey);
     let initialMessages = [];
     
     if (savedMessages) {
@@ -77,28 +103,60 @@ export default function ChatPage() {
     
     setMessages(initialMessages);
     setShowSuggestions(initialMessages.length <= 1);
-  }, [child?.name]);
+  }, [child?.name, child?.id]);
 
-  // Load suggestions
+  // Load suggestions and learning stats
   useEffect(() => {
-    const fetchSuggestions = async () => {
+    const fetchInitialData = async () => {
       try {
-        const data = await chatService.getSuggestions();
-        setSuggestions(data.suggestions || INITIAL_SUGGESTIONS);
+        const [suggestionsData, statsData] = await Promise.all([
+          chatService.getSuggestions(),
+          fetchLearningStats()
+        ]);
+        
+        setSuggestions(suggestionsData.suggestions || INITIAL_SUGGESTIONS);
+        if (statsData) setLearningStats(statsData);
       } catch (error) {
-        console.error('Failed to fetch suggestions:', error);
+        console.error('Failed to fetch initial data:', error);
         setSuggestions(INITIAL_SUGGESTIONS);
       }
     };
-    fetchSuggestions();
-  }, []);
-
-  // Save messages to session storage
-  useEffect(() => {
-    if (messages.length > 0) {
-      sessionStorage.setItem('klio_chat_history', JSON.stringify(messages));
+    
+    if (child?.id) {
+      fetchInitialData();
     }
-  }, [messages]);
+  }, [child?.id]);
+
+  // Fetch learning stats
+  const fetchLearningStats = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/progress/lifetime`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('klio_child_token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          streak: data.current_streak || 0,
+          todaysPracticeCount: data.today_count || 0,
+          totalCorrectAnswers: data.lifetime_correct || 0
+        };
+      }
+    } catch (error) {
+      console.error('Failed to fetch learning stats:', error);
+    }
+    return null;
+  };
+
+  // Save messages to session storage - FIXED: child-specific storage
+  useEffect(() => {
+    if (messages.length > 0 && child?.id) {
+      const childSpecificKey = `klio_chat_history_${child.id}`;
+      sessionStorage.setItem(childSpecificKey, JSON.stringify(messages));
+    }
+  }, [messages, child?.id]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -175,8 +233,8 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      // ENHANCED: Use function calling chat service
-      const response = await chatService.sendMessage(messageText, messages.slice(-10), currentLessonContext);
+      // ENHANCED: Use function calling chat service with expanded context
+      const response = await chatService.sendMessage(messageText, messages.slice(-50), currentLessonContext);
 
       console.log('📨 Received function calling response:', {
         workspaceActionsCount: response.workspaceActions?.length || 0,
@@ -211,6 +269,16 @@ export default function ChatPage() {
             response.workspaceActions,
             response.currentWorkspace
           );
+          
+          // Update learning stats if any problems were marked correct
+          const correctActions = response.workspaceActions.filter(action => action.action === 'mark_correct') || [];
+          if (correctActions.length > 0) {
+            console.log(`🎉 ${correctActions.length} problems marked correct - updating stats`);
+            // Refresh stats to show progress
+            fetchLearningStats().then(stats => {
+              if (stats) setLearningStats(stats);
+            });
+          }
           
           console.log('✅ Workspace updated via function calls');
         }
@@ -247,6 +315,30 @@ export default function ChatPage() {
 
   const handleSuggestionClick = (suggestion) => handleSendMessage(suggestion);
 
+  // New Chat function - clears current chat and starts fresh
+  const handleNewChat = () => {
+    if (!child?.id) return;
+    
+    const welcomeMessage = {
+      id: 'welcome-new',
+      role: 'klio',
+      content: `Hi ${child.name}! 👋 Ready for a new learning session? What would you like to explore today?`,
+      timestamp: new Date().toISOString()
+    };
+    
+    setMessages([welcomeMessage]);
+    setShowSuggestions(true);
+    setCurrentTopic("General Conversation");
+    setCurrentLessonContext(null);
+    setWorkspaceContent(null);
+    
+    // Clear child-specific storage
+    const childSpecificKey = `klio_chat_history_${child.id}`;
+    sessionStorage.setItem(childSpecificKey, JSON.stringify([welcomeMessage]));
+    
+    console.log('🆕 Started new chat session');
+  };
+
   const handleClearChat = () => {
     if (window.confirm('Start a new chat? This will clear your current conversation.')) {
       setMessages([{
@@ -264,6 +356,12 @@ export default function ChatPage() {
 
   const handleLogoutConfirmed = async () => {
     if (window.confirm('Are you sure you want to sign out?')) {
+      // Clear any sensitive session data before logout
+      if (child?.id) {
+        console.log(`🧹 Logging out child ${child.id}`);
+        // Note: We keep chat history in sessionStorage so they can continue where they left off
+        // If we wanted to clear it: sessionStorage.removeItem(`klio_chat_history_${child.id}`);
+      }
       await logout();
     }
   };
@@ -288,7 +386,13 @@ export default function ChatPage() {
         />
 
         <main className={`flex-1 flex flex-col bg-[var(--background-card)] overflow-hidden transition-all duration-300 ${chatWidth}`}>
-          <ChatHeader currentTopic={currentTopic} />
+          <ChatHeader 
+            childName={child?.name}
+            currentTopic={currentTopic}
+            onNewChat={handleNewChat}
+            learningStreak={learningStats.streak}
+            todaysPracticeCount={learningStats.todaysPracticeCount}
+          />
 
           {currentLessonContext && (
             <LessonContextBar
@@ -340,6 +444,12 @@ export default function ChatPage() {
                 </div>
             </div>
           )}
+
+          {/* Quick Actions - shown when there are few messages */}
+          <QuickActions 
+            onActionClick={handleSendMessage}
+            isVisible={messages.length <= 3}
+          />
 
           <div className="bg-[var(--background-card)] p-3 sm:p-4 border-t border-[var(--border-subtle)]">
             <div className="max-w-3xl mx-auto">

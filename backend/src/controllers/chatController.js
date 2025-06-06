@@ -3,6 +3,7 @@ const { OpenAI } = require('openai');
 const supabase = require('../utils/supabaseClient');
 const mcpClient = require('../services/mcpClient');
 const memoryService = require('../services/learningMemoryService');
+const chatHistoryService = require('../services/chatHistoryService');
 const { formatLearningContextForAI, isLessonQuery } = require('../middleware/mcpContext');
 const { getCurrentDateInfo, getDueDateStatus } = require('../utils/dateUtils');
 const { KLIO_SYSTEM_PROMPT } = require('../utils/klioSystemPrompt');
@@ -515,8 +516,8 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
     // Rest of your existing chat handler code...
     // (memory context, system prompt building, OpenAI call, etc.)
     
-    const [recentMemories, learningProfile] = await Promise.all([
-      memoryService.getRelevantMemories(childId, message, mcpContext, 4).catch(e => {
+    const [recentMemories, learningProfile, databaseHistory] = await Promise.all([
+      memoryService.getRelevantMemories(childId, message, mcpContext, 12).catch(e => {
         console.error('❌ Error getting memories:', e);
         return [];
       }),
@@ -531,6 +532,10 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
           learning_pace: 'moderate',
           confidence_level: 'building'
         };
+      }),
+      chatHistoryService.buildContextForAI(childId, message, 40).catch(e => {
+        console.error('❌ Error getting chat history:', e);
+        return [];
       })
     ]);
 
@@ -596,7 +601,15 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       ${workspaceContext}`;
 
     // Prepare conversation history
-    const recentHistory = sessionHistory.slice(-8);
+    // Combine session history with database history for better context
+    const sessionMessages = sessionHistory.slice(-10).map(msg => ({
+      role: msg.role === 'klio' ? 'assistant' : 'user',
+      content: msg.content
+    }));
+    
+    // Merge database history with current session, removing duplicates
+    const allHistory = [...databaseHistory, ...sessionMessages];
+    const recentHistory = allHistory.slice(-50); // Use up to 50 messages for context
     const openaiMessages = [
       {
         role: "system",
@@ -744,6 +757,31 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
 
     // Update learning memories
     await updateLearningMemories(childId, message, finalMessage || '', mcpContext, learningProfile);
+
+    // Store chat messages in database for enhanced context
+    try {
+      await Promise.all([
+        chatHistoryService.storeMessage(childId, 'user', message, {
+          hasLessonContext: !!(mcpContext?.currentFocus || mcpContext?.allMaterials?.length > 0),
+          hasOverdueAssignments: mcpContext?.overdue?.length > 0,
+          specificQuestionRequest: !!specificQuestionRequest,
+          materialFound: foundMaterialTitle
+        }),
+        chatHistoryService.storeMessage(childId, 'assistant', finalMessage || '', {
+          functionCallsCount: toolCalls?.length || 0,
+          workspaceActions: workspaceActions.map(a => a.action),
+          hasMaterialContent: !!materialContentForAI,
+          memoryContext: recentMemories.length > 0
+        })
+      ]);
+      
+      // Schedule cleanup if needed (async, don't wait)
+      chatHistoryService.scheduleCleanup(childId).catch(e => 
+        console.error('Cleanup scheduling failed:', e)
+      );
+    } catch (historyError) {
+      console.error('Failed to store chat history:', historyError);
+    }
 
     // Log interaction with function calling info
     try {
@@ -1168,6 +1206,73 @@ exports.reportMessage = async (req, res) => {
     res.status(500).json({
       error: 'Failed to report message',
       code: 'REPORT_ERROR'
+    });
+  }
+};
+
+// Debug endpoint to test enhanced memory system
+exports.debugMemory = async (req, res) => {
+  const childId = req.child?.child_id;
+  const mcpContext = req.mcpContext;
+  const { message = "test message" } = req.query;
+
+  if (!childId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const [recentMemories, learningProfile, databaseHistory, conversationStats] = await Promise.all([
+      memoryService.getRelevantMemories(childId, message, mcpContext, 12),
+      memoryService.getLearningProfile(childId),
+      chatHistoryService.buildContextForAI(childId, message, 40),
+      chatHistoryService.getConversationStats(childId)
+    ]);
+
+    res.json({
+      success: true,
+      childId,
+      testMessage: message,
+      enhancedMemorySystem: {
+        recentMemories: {
+          count: recentMemories.length,
+          memories: recentMemories.map(m => ({
+            type: m.memory_type,
+            content: m.content.substring(0, 100) + '...',
+            confidence: m.confidence,
+            subject: m.subject,
+            topic: m.topic,
+            daysSinceReinforced: Math.floor((Date.now() - new Date(m.last_reinforced)) / (1000 * 60 * 60 * 24))
+          }))
+        },
+        learningProfile: {
+          totalInteractions: learningProfile.total_interactions,
+          daysTogether: learningProfile.days_together,
+          preferredStyle: learningProfile.preferred_explanation_style,
+          commonDifficulties: learningProfile.common_difficulties,
+          confidenceLevel: learningProfile.confidence_level
+        },
+        databaseHistory: {
+          contextMessagesCount: databaseHistory.length,
+          recentMessages: databaseHistory.slice(-5).map(msg => ({
+            role: msg.role,
+            content: msg.content?.substring(0, 100) + '...',
+            timestamp: msg.created_at || 'session'
+          }))
+        },
+        conversationStats,
+        mcpContext: {
+          hasCurrentFocus: !!mcpContext?.currentFocus,
+          currentFocusTitle: mcpContext?.currentFocus?.title,
+          hasOverdueAssignments: mcpContext?.overdue?.length > 0,
+          totalMaterials: mcpContext?.allMaterials?.length || 0
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Debug memory error:', error);
+    res.status(500).json({
+      error: 'Failed to debug memory system',
+      details: error.message
     });
   }
 };

@@ -19,7 +19,7 @@ class ChatService {
       
       const response = await this.api.post('/message', {
         message,
-        sessionHistory: sessionHistory.slice(-10),
+        sessionHistory: sessionHistory.slice(-50), // Increased from 10 to 50 messages
         lessonContext
       });
 

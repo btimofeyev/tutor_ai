@@ -193,7 +193,20 @@ class MCPClientService {
       }
 
       const searchData = JSON.parse(result.content[0].text);
-      console.log(`✅ Search completed: ${searchData.summary}`);
+      console.log(`✅ Search completed: ${searchData?.summary || 'unknown'}`);
+      console.log('🔍 Search response structure:', Object.keys(searchData || {}));
+      
+      // Ensure the response has the expected structure
+      if (!searchData || typeof searchData !== 'object') {
+        console.log('❌ Invalid search response structure');
+        return { results: {}, summary: 'Invalid response structure' };
+      }
+      
+      // Ensure results field exists
+      if (!searchData.results) {
+        console.log('❌ Missing results field in search response');
+        return { results: {}, summary: searchData.summary || 'Missing results field' };
+      }
       
       return searchData;
 
@@ -219,13 +232,17 @@ class MCPClientService {
         this.search(childId, '', 'assignments').catch(() => ({ results: {} }))
       ]);
 
+      console.log('🔍 Debug - overdue response:', overdue);
+      console.log('🔍 Debug - recent response:', recent);
+      console.log('🔍 Debug - assignments response:', assignments);
+
       const context = {
         childSubjects: [],
-        currentMaterials: assignments.results.assignments || [],
-        allMaterials: assignments.results.assignments || [],
+        currentMaterials: assignments?.results?.assignments || [],
+        allMaterials: assignments?.results?.assignments || [],
         upcomingAssignments: [],
-        overdue: overdue.results.overdue || [],
-        recentWork: recent.results.recent || [],
+        overdue: overdue?.results?.overdue || [],
+        recentWork: recent?.results?.recent || [],
         currentFocus: null,
         progress: null
       };
@@ -465,24 +482,24 @@ class MCPClientService {
   
   async getCurrentMaterials(childId) {
     const result = await this.search(childId, '', 'assignments');
-    return result.results.assignments || [];
+    return result?.results?.assignments || [];
   }
 
   async getUpcomingAssignments(childId, daysAhead = 7) {
     const result = await this.search(childId, 'due upcoming', 'assignments');
-    return result.results.assignments || [];
+    return result?.results?.assignments || [];
   }
 
   async searchMaterials(query, childId) {
     const result = await this.search(childId, query, 'all');
-    return result.results.matching_assignments || result.results.assignments || [];
+    return result?.results?.matching_assignments || result?.results?.assignments || [];
   }
 
   async getChildMaterials(childId) {
     const result = await this.search(childId, '', 'all');
     return [
-      ...(result.results.assignments || []),
-      ...(result.results.matching_assignments || [])
+      ...(result?.results?.assignments || []),
+      ...(result?.results?.matching_assignments || [])
     ];
   }
 

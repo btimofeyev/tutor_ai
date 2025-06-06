@@ -210,20 +210,41 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
     if (!problem) return;
 
     try {
-      // Record the correct attempt
-      console.log('✅ Recording correct attempt for problem:', problemId);
-      
-      const attemptResponse = await progressService.recordAttempt(
-        sessionState.sessionId,
-        problem.text,
-        true, // is_correct
-        workNotes[problemId] || '',
-        problem.type || 'general'
-      );
-
-      if (attemptResponse.success) {
-        const stats = attemptResponse.session_stats;
+      // For function-controlled workspaces, don't record attempts as backend already handles progress
+      if (!isFunctionControlled) {
+        // Record the correct attempt
+        console.log('✅ Recording correct attempt for problem:', problemId);
         
+        const attemptResponse = await progressService.recordAttempt(
+          sessionState.sessionId,
+          problem.text,
+          true, // is_correct
+          workNotes[problemId] || '',
+          problem.type || 'general'
+        );
+
+        if (attemptResponse.success) {
+          const stats = attemptResponse.session_stats;
+          
+          setSessionState(prev => {
+            const newCompleted = new Set(prev.completedProblems);
+            newCompleted.add(problemId);
+            
+            return {
+              ...prev,
+              completedProblems: newCompleted,
+              totalCorrect: stats.totalCorrect,
+              totalAttempts: stats.totalAttempts,
+              streak: stats.currentStreak,
+              bestStreak: stats.bestStreak,
+              currentProblemIndex: Math.min(prev.currentProblemIndex + 1, prev.problems.length - 1)
+            };
+          });
+          
+          console.log('📊 Updated session stats:', stats);
+        }
+      } else {
+        // For function-controlled workspaces, just update local state without recording
         setSessionState(prev => {
           const newCompleted = new Set(prev.completedProblems);
           newCompleted.add(problemId);
@@ -231,19 +252,14 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
           return {
             ...prev,
             completedProblems: newCompleted,
-            totalCorrect: stats.totalCorrect,
-            totalAttempts: stats.totalAttempts,
-            streak: stats.currentStreak,
-            bestStreak: stats.bestStreak,
+            totalCorrect: prev.totalCorrect + 1,
             currentProblemIndex: Math.min(prev.currentProblemIndex + 1, prev.problems.length - 1)
           };
         });
-        
-        console.log('📊 Updated session stats:', stats);
-        
-        // Refresh lifetime stats after marking correct
-        fetchLifetimeStats();
       }
+      
+      // Always refresh lifetime stats after marking correct
+      fetchLifetimeStats();
     } catch (error) {
       console.error('Failed to record correct attempt:', error);
       // Fallback to local tracking
@@ -287,30 +303,42 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
     if (!problem) return;
 
     try {
-      // Record the incorrect attempt
-      console.log('❌ Recording incorrect attempt for problem:', problemId);
-      
-      const attemptResponse = await progressService.recordAttempt(
-        sessionState.sessionId,
-        problem.text,
-        false, // is_correct
-        workNotes[problemId] || '',
-        problem.type || 'general'
-      );
-
-      if (attemptResponse.success) {
-        const stats = attemptResponse.session_stats;
+      // For function-controlled workspaces, don't record attempts as backend already handles progress
+      if (!isFunctionControlled) {
+        // Record the incorrect attempt
+        console.log('❌ Recording incorrect attempt for problem:', problemId);
         
+        const attemptResponse = await progressService.recordAttempt(
+          sessionState.sessionId,
+          problem.text,
+          false, // is_correct
+          workNotes[problemId] || '',
+          problem.type || 'general'
+        );
+
+        if (attemptResponse.success) {
+          const stats = attemptResponse.session_stats;
+          
+          setSessionState(prev => ({
+            ...prev,
+            totalCorrect: stats.totalCorrect,
+            totalAttempts: stats.totalAttempts,
+            streak: stats.currentStreak, // This will be 0 due to incorrect answer
+            bestStreak: stats.bestStreak
+          }));
+          
+          console.log('📊 Updated session stats after incorrect:', stats);
+        }
+      } else {
+        // For function-controlled workspaces, just update local state
         setSessionState(prev => ({
           ...prev,
-          totalCorrect: stats.totalCorrect,
-          totalAttempts: stats.totalAttempts,
-          streak: stats.currentStreak, // This will be 0 due to incorrect answer
-          bestStreak: stats.bestStreak
+          totalAttempts: prev.totalAttempts + 1
         }));
-        
-        console.log('📊 Updated session stats after incorrect:', stats);
       }
+      
+      // Always refresh lifetime stats after marking incorrect
+      fetchLifetimeStats();
     } catch (error) {
       console.error('Failed to record incorrect attempt:', error);
       // Fallback to local tracking

@@ -8,6 +8,7 @@ import {
   FiCheckCircle, FiTarget, FiTrendingUp, FiAward 
 } from 'react-icons/fi';
 import { progressService } from '../utils/progressService';
+import { lifetimeProgressService } from '../utils/lifetimeProgressService';
 
 const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded, onClose, onSendToChat }, ref) => {
   const [sessionState, setSessionState] = useState({
@@ -24,6 +25,24 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
   
   const [workNotes, setWorkNotes] = useState({});
   const [problemStates, setProblemStates] = useState({});
+  const [lifetimeStats, setLifetimeStats] = useState({
+    lifetime_correct: 0,
+    current_streak: 0,
+    best_streak: 0,
+    weekly_correct: 0
+  });
+
+  // Function to fetch and update lifetime progress
+  const fetchLifetimeStats = async () => {
+    try {
+      const stats = await lifetimeProgressService.getLifetimeStats();
+      if (stats?.stats) {
+        setLifetimeStats(stats.stats);
+      }
+    } catch (error) {
+      console.error('Failed to fetch lifetime stats:', error);
+    }
+  };
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
@@ -66,6 +85,9 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
         });
         setProblemStates(initialStates);
         
+        // Fetch lifetime stats
+        fetchLifetimeStats();
+        
       } else {
         // Legacy workspace initialization
         const startNewSession = async () => {
@@ -95,6 +117,9 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
               bestStreak: 0
             });
             
+            // Fetch lifetime stats for fallback case too
+            fetchLifetimeStats();
+            
             // Reset problem states
             const initialStates = {};
             problems.forEach(problem => {
@@ -102,6 +127,9 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
             });
             setProblemStates(initialStates);
             setWorkNotes({});
+            
+            // Fetch lifetime stats for legacy workspaces too
+            fetchLifetimeStats();
             
           } catch (error) {
             console.error('Failed to start practice session:', error);
@@ -212,6 +240,9 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
         });
         
         console.log('📊 Updated session stats:', stats);
+        
+        // Refresh lifetime stats after marking correct
+        fetchLifetimeStats();
       }
     } catch (error) {
       console.error('Failed to record correct attempt:', error);
@@ -376,17 +407,21 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
         />
       </div>
       
-      <div className="grid grid-cols-3 gap-4 text-center">
+      <div className="grid grid-cols-4 gap-3 text-center">
         <div className="p-2 bg-green-50 rounded-lg">
           <div className="text-lg font-bold text-green-600">{sessionState.totalCorrect}</div>
-          <div className="text-xs text-green-600">Correct</div>
+          <div className="text-xs text-green-600">Session Correct</div>
         </div>
         <div className="p-2 bg-orange-50 rounded-lg">
-          <div className="text-lg font-bold text-orange-600">{sessionState.streak}</div>
+          <div className="text-lg font-bold text-orange-600">{lifetimeStats.current_streak}</div>
           <div className="text-xs text-orange-600">Current Streak</div>
         </div>
+        <div className="p-2 bg-blue-50 rounded-lg">
+          <div className="text-lg font-bold text-blue-600">{lifetimeStats.weekly_correct}</div>
+          <div className="text-xs text-blue-600">This Week</div>
+        </div>
         <div className="p-2 bg-purple-50 rounded-lg">
-          <div className="text-lg font-bold text-purple-600">{sessionState.bestStreak}</div>
+          <div className="text-lg font-bold text-purple-600">{lifetimeStats.best_streak}</div>
           <div className="text-xs text-purple-600">Best Streak</div>
         </div>
       </div>

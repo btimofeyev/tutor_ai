@@ -1,5 +1,5 @@
 // Enhanced Chat History Service with Summarization and Cleanup
-const { supabase } = require('../utils/supabaseClient');
+const supabase = require('../utils/supabaseClient');
 const OpenAI = require('openai');
 
 const openai = new OpenAI({

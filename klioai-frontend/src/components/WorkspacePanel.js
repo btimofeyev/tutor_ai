@@ -8,87 +8,39 @@ import {
   FiCheckCircle, FiTarget, FiTrendingUp, FiAward 
 } from 'react-icons/fi';
 import { progressService } from '../utils/progressService';
-import { lifetimeProgressService } from '../utils/lifetimeProgressService';
 
 const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded, onClose, onSendToChat }, ref) => {
-  const [sessionState, setSessionState] = useState({
-    sessionId: null,
-    problems: [],
-    completedProblems: new Set(),
-    currentProblemIndex: 0,
-    sessionStartTime: null,
-    totalCorrect: 0,
-    totalAttempts: 0,
-    streak: 0,
-    bestStreak: 0
-  });
-  
+  const [problems, setProblems] = useState([]);
   const [workNotes, setWorkNotes] = useState({});
   const [problemStates, setProblemStates] = useState({});
-  const [lifetimeStats, setLifetimeStats] = useState({
-    lifetime_correct: 0,
-    current_streak: 0,
-    best_streak: 0,
-    weekly_correct: 0
-  });
-
-  // Function to fetch and update lifetime progress
-  const fetchLifetimeStats = async () => {
-    try {
-      const stats = await lifetimeProgressService.getLifetimeStats();
-      console.log('📊 Fetched lifetime stats:', stats);
-      if (stats?.stats) {
-        console.log('📊 Setting lifetime stats:', stats.stats);
-        setLifetimeStats(stats.stats);
-      }
-    } catch (error) {
-      console.error('Failed to fetch lifetime stats:', error);
-    }
-  };
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
     markProblemCorrect: (problemId) => markProblemCorrect(problemId),
     markProblemIncorrect: (problemId) => markProblemIncorrect(problemId),
-    getProblemStates: () => problemStates,
-    getSessionState: () => sessionState
+    getProblemStates: () => problemStates
   }));
 
   // NEW: Detect function-controlled workspace
   const isFunctionControlled = workspaceContent?.type === 'function_calling_workspace';
   
-  // Initialize session when workspace content changes
+  // Initialize workspace when content changes  
   useEffect(() => {
     if (workspaceContent && workspaceContent.problems?.length > 0) {
-      if (isFunctionControlled) {
-        console.log('🎯 Initializing function-controlled workspace session...');
-        
-        // Use existing session data from function calls
-        setSessionState({
-          sessionId: workspaceContent.sessionId,
-          problems: workspaceContent.problems,
-          completedProblems: new Set(
-            workspaceContent.problems
-              .filter(p => p.status === 'correct')
-              .map(p => p.id)
-          ),
-          currentProblemIndex: workspaceContent.problems.findIndex(p => p.status === 'pending') || 0,
-          sessionStartTime: new Date(workspaceContent.createdAt).getTime(),
-          totalCorrect: workspaceContent.stats.correct,
-          totalAttempts: workspaceContent.stats.completed,
-          streak: workspaceContent.stats.streak,
-          bestStreak: workspaceContent.stats.bestStreak
-        });
-        
-        // Set problem states from function call data
-        const initialStates = {};
-        workspaceContent.problems.forEach(problem => {
-          initialStates[problem.id] = problem.status;
-        });
-        setProblemStates(initialStates);
-        
-        // Fetch lifetime stats
-        fetchLifetimeStats();
+      console.log('🎯 Initializing workspace with', workspaceContent.problems.length, 'problems');
+      
+      // Set problems from workspace content
+      setProblems(workspaceContent.problems);
+      
+      // Set initial problem states
+      const initialStates = {};
+      workspaceContent.problems.forEach(problem => {
+        initialStates[problem.id] = problem.status || 'pending';
+      });
+      setProblemStates(initialStates);
+      
+      // Clear work notes
+      setWorkNotes({});
         
       } else {
         // Legacy workspace initialization

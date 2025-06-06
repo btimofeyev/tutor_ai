@@ -178,19 +178,8 @@ class WorkspaceFunctionHandlers {
     problem.status = 'correct';
     problem.feedback = args.feedback || 'Correct! Great work! 🎉';
 
-    // Update workspace stats (only count if wasn't already correct)
-    if (!wasCorrect) {
-      this.currentWorkspace.stats.completed++;
-      this.currentWorkspace.stats.correct++;
-      this.currentWorkspace.stats.streak++;
-      this.currentWorkspace.stats.bestStreak = Math.max(
-        this.currentWorkspace.stats.bestStreak,
-        this.currentWorkspace.stats.streak
-      );
-
-      // Update lifetime progress for this child
-      await this.updateLifetimeProgress(childId, true);
-    }
+    // Simple feedback only - no progress tracking for MVP
+    console.log(`✅ Problem ${args.problem_index} marked correct - no tracking needed`);
 
     return {
       action: 'mark_correct',
@@ -217,11 +206,8 @@ class WorkspaceFunctionHandlers {
     problem.status = 'incorrect';
     problem.feedback = args.guidance || 'Not quite right. Try again! 💪';
 
-    // Reset workspace streak on incorrect answer
-    this.currentWorkspace.stats.streak = 0;
-
-    // Update lifetime progress (resets current streak)
-    await this.updateLifetimeProgress(childId, false);
+    // Simple feedback only - no progress tracking for MVP
+    console.log(`❌ Problem ${args.problem_index} marked incorrect - no tracking needed`);
 
     return {
       action: 'mark_incorrect',

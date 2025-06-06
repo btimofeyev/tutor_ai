@@ -9,7 +9,7 @@ import ChatMessage from '../../components/ChatMessage';
 import ChatInput from '../../components/ChatInput';
 import SuggestionBubbles from '../../components/SuggestionBubbles'; 
 import LessonContextBar from '../../components/LessonContextBar';
-import WorkspacePanel from '../../components/WorkspacePanel';
+import SimpleWorkspace from '../../components/SimpleWorkspace';
 import { useAuth } from '../../contexts/AuthContext'; 
 import { chatService } from '../../utils/chatService';
 import { analyzeKlioResponse } from '../../utils/workspaceProgress';
@@ -360,13 +360,12 @@ export default function ChatPage() {
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
               className={`${workspaceWidth} bg-[var(--background-card)] border-l border-[var(--border-subtle)] transition-all duration-300`}
             >
-              <WorkspacePanel 
+              <SimpleWorkspace 
                 workspaceContent={workspaceContent}
-                onToggleSize={handleToggleWorkspaceSize}
                 isExpanded={isWorkspaceExpanded}
                 onClose={() => setWorkspaceContent(null)}
                 onSendToChat={handleWorkspaceToChat}
-                ref={workspaceRef} // NEW: Reference to workspace for progress tracking
+                ref={workspaceRef}
               />
             </motion.div>
           )}

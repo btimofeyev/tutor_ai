@@ -80,9 +80,30 @@ export class WorkspaceActionProcessor {
   handleAddProblems(action, currentWorkspace) {
     console.log(`➕ Adding ${action.newProblems.length} problems to workspace`);
     
-    // Update the existing workspace content
+    // Update the existing workspace content, or create from currentWorkspace if none exists
     this.setWorkspaceContent(prevContent => {
-      if (!prevContent) return prevContent;
+      // If no existing workspace content but we have currentWorkspace from backend, create it
+      if (!prevContent && currentWorkspace) {
+        console.log('🔄 Creating workspace from backend currentWorkspace data');
+        return {
+          type: 'function_calling_workspace',
+          title: currentWorkspace.title,
+          explanation: currentWorkspace.explanation,
+          sessionId: currentWorkspace.sessionId,
+          problems: currentWorkspace.problems.map(problem => ({
+            ...problem,
+            isFunctionControlled: true
+          })),
+          stats: currentWorkspace.stats,
+          createdAt: currentWorkspace.createdAt
+        };
+      }
+      
+      // If no workspace content and no currentWorkspace, can't add problems
+      if (!prevContent) {
+        console.warn('Cannot add problems: no existing workspace');
+        return prevContent;
+      }
       
       const newProblems = action.newProblems.map(problem => ({
         id: problem.id,

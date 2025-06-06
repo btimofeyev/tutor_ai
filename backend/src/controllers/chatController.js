@@ -537,6 +537,9 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
     // Enhanced context for function calling
     let workspaceContext = '';
     if (currentWorkspace) {
+      const workspaceProblems = currentWorkspace.problems || [];
+      const problemsList = workspaceProblems.map((p, i) => `${i + 1}. ${p.text} (${p.status})`).join('\n');
+      
       workspaceContext = `\n\n**CURRENT WORKSPACE CONTEXT:**
       - Active workspace: "${currentWorkspace.title}"
       - Total problems: ${currentWorkspace.stats.totalProblems}
@@ -544,12 +547,18 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       - Current streak: ${currentWorkspace.stats.streak}
       - Best streak: ${currentWorkspace.stats.bestStreak}
       
+      **WORKSPACE PROBLEMS:**
+      ${problemsList}
+      
       **IMPORTANT WORKSPACE RULES:**
+      - When student asks to check work on "Problem X" and shows their work, use mark_problem_correct or mark_problem_incorrect
       - Use "add_problems_to_workspace" to add more problems to existing workspace
-      - Use "mark_problem_correct" when student shows correct work
-      - Use "mark_problem_incorrect" when student makes mistakes  
+      - Use "mark_problem_correct" when student shows correct work with problem index (X-1)
+      - Use "mark_problem_incorrect" when student makes mistakes with problem index (X-1)
       - Only use "create_math_workspace" when starting completely new topic
-      - Only use "clear_workspace" when student explicitly wants to start over`;
+      - Only use "clear_workspace" when student explicitly wants to start over
+      
+      **CHECKING STUDENT WORK:** If student says "check my work on Problem X" and shows their answer, evaluate it and use mark_problem_correct/incorrect with problem_index = X-1`;
     }
 
     // Build the enhanced system prompt
@@ -588,10 +597,12 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
         role: "system",
         content: systemPrompt
       },
-      ...recentHistory.map(msg => ({
-        role: msg.role === 'klio' ? 'assistant' : 'user',
-        content: msg.content
-      })),
+      ...recentHistory
+        .filter(msg => msg.content && typeof msg.content === 'string' && msg.content.trim().length > 0)
+        .map(msg => ({
+          role: msg.role === 'klio' ? 'assistant' : 'user',
+          content: msg.content
+        })),
       {
         role: "user",
         content: message
@@ -664,7 +675,7 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
     }
 
     // Update learning memories
-    await updateLearningMemories(childId, message, responseMessage.content, mcpContext, learningProfile);
+    await updateLearningMemories(childId, message, responseMessage.content || '', mcpContext, learningProfile);
 
     // Log interaction with function calling info
     try {
@@ -701,7 +712,7 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
     // Return enhanced response with workspace actions
     res.json({
       success: true,
-      message: responseMessage.content,
+      message: responseMessage.content || '',
       timestamp: new Date().toISOString(),
       provider: 'openai',
       workspaceActions: workspaceActions, // New: Function call results

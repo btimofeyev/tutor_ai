@@ -1,6 +1,7 @@
 // klioai-frontend/src/components/Sidebar.js
 import Image from 'next/image'; // Import Next.js Image component
-import { FiLogOut, FiSettings, FiRefreshCw } from 'react-icons/fi';
+import { useState } from 'react';
+import { FiLogOut, FiSettings, FiRefreshCw, FiChevronDown, FiChevronRight, FiBookOpen, FiHash, FiHelpCircle, FiTarget, FiEdit3, FiGlobe } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link'; // For the logo link
 
@@ -8,8 +9,48 @@ import Link from 'next/link'; // For the logo link
 // If not, you can style these buttons directly as shown below.
 // import Button from './ui/Button'; // Path to your global Button component
 
-export default function Sidebar({ childName, onLogout, onClearChat }) {
+const QUICK_ACTIONS = [
+  {
+    id: 'homework',
+    icon: FiBookOpen,
+    label: 'Homework Help',
+    message: "I need help with my homework"
+  },
+  {
+    id: 'math',
+    icon: FiHash,
+    label: 'Math Practice',
+    message: "Let's practice some math problems!"
+  },
+  {
+    id: 'explain',
+    icon: FiHelpCircle,
+    label: 'Explain This',
+    message: "Can you explain this concept to me?"
+  },
+  {
+    id: 'quiz',
+    icon: FiTarget,
+    label: 'Quick Quiz',
+    message: "Give me a quick quiz to test my knowledge"
+  },
+  {
+    id: 'writing',
+    icon: FiEdit3,
+    label: 'Writing Help',
+    message: "I need help with writing"
+  },
+  {
+    id: 'science',
+    icon: FiGlobe,
+    label: 'Science Facts',
+    message: "Tell me something cool about science!"
+  }
+];
+
+export default function Sidebar({ childName, onLogout, onClearChat, onQuickAction }) {
   const router = useRouter();
+  const [quickActionsExpanded, setQuickActionsExpanded] = useState(false);
 
   // Common styles for sidebar action buttons if not using the global Button component
   const sidebarButtonBaseStyles = "w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-[var(--radius-md)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-1";
@@ -37,16 +78,38 @@ export default function Sidebar({ childName, onLogout, onClearChat }) {
       </div>
       
       <div className="flex-1">
-         {/* Future: Placeholder for Projects/Topics List */}
-         {/* <h3 className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5 px-1">Topics</h3>
-         <nav className="space-y-0.5">
-           <a href="#" className="block px-2.5 py-1.5 rounded-[var(--radius-md)] text-sm text-[var(--text-primary)] bg-[var(--accent-blue)]/30 font-medium">
-             General Chat
-           </a>
-           <a href="#" className="block px-2.5 py-1.5 rounded-[var(--radius-md)] text-sm text-[var(--text-secondary)] hover:bg-[var(--accent-blue)]/10 hover:text-[var(--text-primary)]">
-             Space Exploration
-           </a>
-         </nav> */}
+        {/* Quick Actions Section */}
+        <div className="mb-4">
+          <button
+            onClick={() => setQuickActionsExpanded(!quickActionsExpanded)}
+            className={`${sidebarButtonDefaultStyles} justify-between`}
+          >
+            <div className="flex items-center space-x-2.5">
+              <FiTarget size={16} className="text-[var(--text-tertiary)]" />
+              <span>Quick Actions</span>
+            </div>
+            {quickActionsExpanded ? (
+              <FiChevronDown size={16} className="text-[var(--text-tertiary)]" />
+            ) : (
+              <FiChevronRight size={16} className="text-[var(--text-tertiary)]" />
+            )}
+          </button>
+          
+          {quickActionsExpanded && (
+            <div className="mt-2 ml-4 space-y-1">
+              {QUICK_ACTIONS.map((action) => (
+                <button
+                  key={action.id}
+                  onClick={() => onQuickAction && onQuickAction(action.message)}
+                  className="w-full flex items-center space-x-2 px-2 py-1.5 rounded-[var(--radius-md)] text-sm text-[var(--text-secondary)] hover:bg-[var(--accent-blue)]/10 hover:text-[var(--text-primary)] transition-colors"
+                >
+                  <action.icon size={14} className="text-[var(--text-tertiary)]" />
+                  <span>{action.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* User Info & Actions */}

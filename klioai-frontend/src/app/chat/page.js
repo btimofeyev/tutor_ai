@@ -10,7 +10,6 @@ import ChatInput from '../../components/ChatInput';
 import SuggestionBubbles from '../../components/SuggestionBubbles'; 
 import LessonContextBar from '../../components/LessonContextBar';
 import SimpleWorkspace from '../../components/SimpleWorkspace';
-import QuickActions from '../../components/QuickActions';
 import { useAuth } from '../../contexts/AuthContext'; 
 import { chatService } from '../../utils/chatService';
 import { analyzeKlioResponse } from '../../utils/workspaceProgress';
@@ -383,13 +382,11 @@ export default function ChatPage() {
           childName={child?.name}
           onLogout={handleLogoutConfirmed}
           onClearChat={handleClearChat}
+          onQuickAction={handleSendMessage}
         />
 
         <main className={`flex-1 flex flex-col bg-[var(--background-card)] overflow-hidden transition-all duration-300 ${chatWidth}`}>
           <ChatHeader 
-            childName={child?.name}
-            currentTopic={currentTopic}
-            onNewChat={handleNewChat}
             learningStreak={learningStats.streak}
             todaysPracticeCount={learningStats.todaysPracticeCount}
           />
@@ -445,11 +442,6 @@ export default function ChatPage() {
             </div>
           )}
 
-          {/* Quick Actions - shown when there are few messages */}
-          <QuickActions 
-            onActionClick={handleSendMessage}
-            isVisible={messages.length <= 3}
-          />
 
           <div className="bg-[var(--background-card)] p-3 sm:p-4 border-t border-[var(--border-subtle)]">
             <div className="max-w-3xl mx-auto">

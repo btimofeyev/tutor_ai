@@ -558,7 +558,12 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       - Only use "create_math_workspace" when starting completely new topic
       - Only use "clear_workspace" when student explicitly wants to start over
       
-      **CHECKING STUDENT WORK:** If student says "check my work on Problem X" and shows their answer, evaluate it and use mark_problem_correct/incorrect with problem_index = X-1`;
+      **CHECKING STUDENT WORK:** If student says "check my work on Problem X" and shows their answer, evaluate it and use mark_problem_correct/incorrect with problem_index = X-1
+      
+      **CRITICAL - CONVERSATIONAL RESPONSES:** Always provide conversational text alongside function calls:
+      - When marking correct: "Perfect! You got that right! Great work on 2 + 3 = 5!"
+      - When marking incorrect: "Not quite right, but let's work through this together!"
+      - NEVER use function calls without conversational text - this creates empty chat bubbles!`;
     }
 
     // Build the enhanced system prompt

@@ -697,7 +697,36 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
           // Extract student's answer from the original message if possible
           const answerMatch = message.match(/My work:\s*([^\n\[]+)/i);
           const studentAnswer = answerMatch ? answerMatch[1].trim() : 'your answer';
-          finalMessage = `Perfect! You got that exactly right! ${correctProblem.text} = ${studentAnswer}. Great work! 🎉 Ready for the next one?`;
+          
+          // Get lifetime progress to include in response
+          let progressMessage = '';
+          try {
+            const { data: child } = await supabase
+              .from('children')
+              .select('lifetime_correct, current_streak, best_streak')
+              .eq('id', childId)
+              .single();
+            
+            if (child) {
+              const lifetimeCorrect = child.lifetime_correct || 0;
+              const currentStreak = child.current_streak || 0;
+              const bestStreak = child.best_streak || 0;
+              
+              if (currentStreak > 1) {
+                if (currentStreak === bestStreak) {
+                  progressMessage = ` You're on fire with a ${currentStreak}-problem streak - that's your best yet! 🔥`;
+                } else {
+                  progressMessage = ` You're on a ${currentStreak}-problem streak! 🔥`;
+                }
+              } else if (lifetimeCorrect % 10 === 0 && lifetimeCorrect > 0) {
+                progressMessage = ` That's ${lifetimeCorrect} problems correct lifetime! 🎯`;
+              }
+            }
+          } catch (error) {
+            console.warn('Could not fetch progress for response:', error);
+          }
+          
+          finalMessage = `Perfect! You got that exactly right! ${correctProblem.text} = ${studentAnswer}. Great work!${progressMessage} 🎉 Ready for the next one?`;
           break;
         case 'mark_incorrect':
           const incorrectProblem = action.problem;

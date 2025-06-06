@@ -44,6 +44,40 @@ exports.startPracticeSession = async (req, res) => {
   }
 };
 
+// Get child's lifetime progress stats
+exports.getLifetimeProgress = async (req, res) => {
+  const child_id = req.child?.child_id;
+  
+  if (!child_id) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const { data: child, error } = await supabase
+      .from('children')
+      .select('name, lifetime_correct, current_streak, best_streak')
+      .eq('id', child_id)
+      .single();
+
+    if (error) throw error;
+
+    const stats = {
+      name: child.name,
+      lifetime_correct: child.lifetime_correct || 0,
+      current_streak: child.current_streak || 0,
+      best_streak: child.best_streak || 0
+    };
+
+    res.json({
+      success: true,
+      stats
+    });
+  } catch (error) {
+    console.error('Error fetching lifetime progress:', error);
+    res.status(500).json({ error: 'Failed to fetch progress stats' });
+  }
+};
+
 // Record a problem attempt
 exports.recordProblemAttempt = async (req, res) => {
   const child_id = req.child?.child_id;

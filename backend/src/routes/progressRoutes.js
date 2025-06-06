@@ -18,4 +18,7 @@ router.post('/attempts', progressController.recordProblemAttempt);
 // Overall progress
 router.get('/child/:child_id?', progressController.getChildProgress);
 
+// Lifetime progress stats
+router.get('/lifetime', progressController.getLifetimeProgress);
+
 module.exports = router;

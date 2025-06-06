@@ -87,6 +87,66 @@ class WorkspaceFunctionHandlers {
     };
   }
 
+  async updateLifetimeProgress(childId, isCorrect) {
+    try {
+      // Get current child progress stats
+      const { data: child, error: fetchError } = await supabase
+        .from('children')
+        .select('lifetime_correct, current_streak, best_streak')
+        .eq('id', childId)
+        .single();
+
+      if (fetchError) {
+        console.warn('Failed to fetch child progress:', fetchError);
+        return;
+      }
+
+      const currentStats = {
+        lifetime_correct: child?.lifetime_correct || 0,
+        current_streak: child?.current_streak || 0,
+        best_streak: child?.best_streak || 0
+      };
+
+      let newStats = { ...currentStats };
+
+      if (isCorrect) {
+        // Increment lifetime correct count and current streak
+        newStats.lifetime_correct = currentStats.lifetime_correct + 1;
+        newStats.current_streak = currentStats.current_streak + 1;
+        
+        // Update best streak if current streak is better
+        if (newStats.current_streak > currentStats.best_streak) {
+          newStats.best_streak = newStats.current_streak;
+        }
+      } else {
+        // Reset current streak on incorrect answer
+        newStats.current_streak = 0;
+      }
+
+      // Update the database
+      const { error: updateError } = await supabase
+        .from('children')
+        .update({
+          lifetime_correct: newStats.lifetime_correct,
+          current_streak: newStats.current_streak,
+          best_streak: newStats.best_streak,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', childId);
+
+      if (updateError) {
+        console.warn('Failed to update child progress:', updateError);
+      } else {
+        console.log(`📊 Updated lifetime progress: correct=${newStats.lifetime_correct}, streak=${newStats.current_streak}, best=${newStats.best_streak}`);
+      }
+
+      return newStats;
+    } catch (error) {
+      console.warn('Error updating lifetime progress:', error);
+      return null;
+    }
+  }
+
   async handleMarkProblemCorrect(args, childId) {
     if (!this.currentWorkspace) {
       return { action: 'error', message: 'No active workspace' };
@@ -104,7 +164,7 @@ class WorkspaceFunctionHandlers {
     problem.status = 'correct';
     problem.feedback = args.feedback || 'Correct! Great work! 🎉';
 
-    // Update stats (only count if wasn't already correct)
+    // Update workspace stats (only count if wasn't already correct)
     if (!wasCorrect) {
       this.currentWorkspace.stats.completed++;
       this.currentWorkspace.stats.correct++;
@@ -113,24 +173,10 @@ class WorkspaceFunctionHandlers {
         this.currentWorkspace.stats.bestStreak,
         this.currentWorkspace.stats.streak
       );
-    }
 
-    // Record in database if possible (disabled for now due to session ID format issues)
-    // try {
-    //   await supabase
-    //     .from('practice_attempts')
-    //     .insert([{
-    //       child_id: childId,
-    //       session_id: this.sessionId,
-    //       problem_text: problem.text,
-    //       problem_type: problem.type,
-    //       student_work: problem.studentWork || '',
-    //       is_correct: true,
-    //       attempted_at: new Date().toISOString()
-    //     }]);
-    // } catch (error) {
-    //   console.warn('Failed to record correct attempt:', error);
-    // }
+      // Update lifetime progress for this child
+      await this.updateLifetimeProgress(childId, true);
+    }
 
     return {
       action: 'mark_correct',
@@ -157,25 +203,11 @@ class WorkspaceFunctionHandlers {
     problem.status = 'incorrect';
     problem.feedback = args.guidance || 'Not quite right. Try again! 💪';
 
-    // Reset streak on incorrect answer
+    // Reset workspace streak on incorrect answer
     this.currentWorkspace.stats.streak = 0;
 
-    // Record in database if possible (disabled for now due to session ID format issues)
-    // try {
-    //   await supabase
-    //     .from('practice_attempts')
-    //     .insert([{
-    //       child_id: childId,
-    //       session_id: this.sessionId,
-    //       problem_text: problem.text,
-    //       problem_type: problem.type,
-    //       student_work: problem.studentWork || '',
-    //       is_correct: false,
-    //       attempted_at: new Date().toISOString()
-    //     }]);
-    // } catch (error) {
-    //   console.warn('Failed to record incorrect attempt:', error);
-    // }
+    // Update lifetime progress (resets current streak)
+    await this.updateLifetimeProgress(childId, false);
 
     return {
       action: 'mark_incorrect',

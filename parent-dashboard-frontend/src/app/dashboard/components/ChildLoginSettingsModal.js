@@ -66,15 +66,15 @@ export default function ChildLoginSettingsModal({
 
           {/* PIN Section */}
           <div className="p-3 border rounded-md">
-            <label className="block text-sm font-medium text-gray-700 mb-1">{child.access_pin_hash ? "Update 4-6 Digit PIN" : "Set 4-6 Digit PIN"}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{child.access_pin_hash ? "Update 4 Digit PIN" : "Set 4 Digit PIN"}</label>
             <div className="space-y-2">
                 <input 
                 type="password" 
                 value={pinInput} 
                 onChange={onPinInputChange}
                 className="block w-full sm:text-sm border-gray-300 rounded-md p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Enter 4-6 digits"
-                maxLength="6"
+                placeholder="Enter 4 digits"
+                maxLength="4"
                 autoComplete="new-password" // Prevent browser autofill if desired
                 />
                 <input 
@@ -83,13 +83,13 @@ export default function ChildLoginSettingsModal({
                 onChange={onPinConfirmInputChange}
                 className="block w-full sm:text-sm border-gray-300 rounded-md p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Confirm PIN"
-                maxLength="6"
+                maxLength="4"
                 autoComplete="new-password"
                 />
             </div>
             <button 
               onClick={onSetPin}
-              disabled={isSaving || !pinInput || !pinConfirmInput || pinInput !== pinConfirmInput || !/^\d{4,6}$/.test(pinInput)}
+              disabled={isSaving || !pinInput || !pinConfirmInput || pinInput !== pinConfirmInput || !/^\d{4}$/.test(pinInput)}
               className="w-full mt-3 px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? "Saving PIN..." : (child.access_pin_hash ? "Update PIN" : "Set PIN")}

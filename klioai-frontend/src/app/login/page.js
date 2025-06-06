@@ -95,7 +95,7 @@ export default function KlioLoginPage() {
   };
 
   const handlePinInput = (digit) => {
-    if (pin.length < 6) {
+    if (pin.length < 4) {
       setPin(prevPin => prevPin + digit);
     }
   };
@@ -105,8 +105,8 @@ export default function KlioLoginPage() {
   };
 
   const attemptLogin = async () => {
-    if (pin.length < 4) {
-      setError('PIN must be at least 4 digits.');
+    if (pin.length !== 4) {
+      setError('PIN must be exactly 4 digits.');
       return;
     }
     await processLogin(pin);
@@ -166,13 +166,13 @@ export default function KlioLoginPage() {
 
   if (showSuccess) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 text-slate-800">
-        <div className="card-base max-w-md text-center">
-          <FiCheckCircle className="text-6xl md:text-7xl text-green-500 mx-auto mb-6 animate-pulse-soft" />
-          <h1 className="text-2xl md:text-3xl font-semibold mb-2">Welcome, {welcomeName}!</h1>
-          <p className="text-slate-600 text-lg mt-1 mb-6">Your Klio space is loading...</p>
-          <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-            <div className="bg-purple-600 h-2.5 rounded-full animate-progress-bar"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[var(--background-main)]">
+        <div className="bg-[var(--background-card)] p-8 rounded-[var(--radius-xl)] shadow-lg border border-[var(--border-subtle)] max-w-md text-center">
+          <FiCheckCircle className="text-6xl md:text-7xl text-[var(--accent-green)] mx-auto mb-6 animate-pulse" />
+          <h1 className="text-2xl md:text-3xl font-semibold mb-2 text-[var(--text-primary)]">Welcome, {welcomeName}!</h1>
+          <p className="text-[var(--text-secondary)] text-lg mt-1 mb-6">Your Klio space is loading...</p>
+          <div className="w-full bg-[var(--border-subtle)] rounded-full h-2.5 overflow-hidden">
+            <div className="bg-[var(--accent-blue)] h-2.5 rounded-full animate-progress-bar"></div>
           </div>
         </div>
       </div>
@@ -180,18 +180,18 @@ export default function KlioLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 text-slate-700">
-      <div className="card-base max-w-sm"> {/* max-w-sm for a more compact login form */}
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[var(--background-main)]">
+      <div className="bg-[var(--background-card)] p-8 rounded-[var(--radius-xl)] shadow-lg border border-[var(--border-subtle)] w-full max-w-sm"> {/* Using design system */}
         <header className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-purple-600 mb-1">Klio</h1>
-          <p className="text-slate-500 text-base">Focus. Learn. Achieve.</p>
+          <h1 className="text-4xl font-bold text-[var(--accent-blue)] mb-1" style={{color: '#3B82F6'}}>Klio</h1>
+          <p className="text-[var(--text-secondary)] text-base">Focus. Learn. Achieve.</p>
         </header>
 
         {!showPinPad ? (
           <form onSubmit={handleUsernameSubmit} className="space-y-5">
             <div>
-              <label className="label-base">
-                <FiGrid className="label-icon" /> Profile Icon
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-3 flex items-center">
+                <FiGrid className="mr-2 text-[var(--text-secondary)]" /> Profile Icon
               </label>
               <div className="grid grid-cols-4 gap-2.5">
                 {AVATARS.map((avatar) => (
@@ -203,10 +203,10 @@ export default function KlioLoginPage() {
                     className={`
                       w-full aspect-square rounded-full flex items-center justify-center text-3xl
                       transition-all duration-150 ease-in-out cursor-pointer
-                      focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-purple-500
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent-blue)]
                       ${avatar.color}
                       ${selectedAvatar?.id === avatar.id 
-                        ? 'ring-2 ring-offset-white ring-purple-600 scale-110 shadow-md' 
+                        ? 'ring-2 ring-offset-white ring-[var(--accent-blue)] scale-110 shadow-md' 
                         : 'hover:scale-105 hover:shadow-sm'
                       }
                     `}
@@ -218,15 +218,15 @@ export default function KlioLoginPage() {
             </div>
 
             <div>
-              <label htmlFor="username" className="label-base">
-                <FiUser className="label-icon" /> Username
+              <label htmlFor="username" className="block text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center">
+                <FiUser className="mr-2 text-[var(--text-secondary)]" /> Username
               </label>
               <input
                 id="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="input-base"
+                className="w-full px-3 py-2 border border-[var(--border-input)] rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)] focus:border-[var(--accent-blue)] bg-[var(--background-card)] text-[var(--text-primary)]"
                 placeholder="Your unique username"
                 autoComplete="username"
                 autoCapitalize="off"
@@ -240,24 +240,24 @@ export default function KlioLoginPage() {
                 type="checkbox"
                 checked={rememberUsername}
                 onChange={(e) => setRememberUsername(e.target.checked)}
-                className="w-4 h-4 text-purple-600 border-slate-300 rounded focus:ring-purple-500 focus:ring-offset-1"
+                className="w-4 h-4 text-[var(--accent-blue)] border-[var(--border-input)] rounded focus:ring-[var(--accent-blue)] focus:ring-offset-1"
               />
-              <label htmlFor="remember" className="ml-2 text-sm text-slate-600 select-none cursor-pointer">
+              <label htmlFor="remember" className="ml-2 text-sm text-[var(--text-secondary)] select-none cursor-pointer">
                 Remember me
               </label>
             </div>
             
             {error && (
-              <div className="error-message-box">
-                <FiXCircle className="error-message-icon" />
-                <span>{error}</span>
+              <div className="flex items-center p-3 bg-[var(--accent-red)]/20 border border-[var(--accent-red)] rounded-[var(--radius-md)] text-[var(--text-primary)]">
+                <FiXCircle className="mr-2 text-[var(--accent-red)] flex-shrink-0" />
+                <span className="text-sm">{error}</span>
               </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full"
+              className="w-full flex items-center justify-center px-4 py-3 bg-[var(--accent-blue)] hover:bg-[var(--accent-blue-hover)] disabled:opacity-50 disabled:cursor-not-allowed rounded-[var(--radius-md)] text-[var(--text-primary)] font-medium transition-colors duration-150"
             >
               {loading ? <FiLoader className="animate-spin mr-2" /> : <FiArrowRight className="mr-1.5" />}
               Next
@@ -271,25 +271,25 @@ export default function KlioLoginPage() {
                   {selectedAvatar.emoji}
                 </div>
               )}
-              <p className="text-sm text-slate-500">Signing in as</p>
-              <p className="text-lg font-semibold text-slate-800">{username}</p>
+              <p className="text-sm text-[var(--text-secondary)]">Signing in as</p>
+              <p className="text-lg font-semibold text-[var(--text-primary)]">{username}</p>
             </div>
             
             <div>
-              <label className="label-base justify-center text-center"> {/* Centered label */}
-                <FiKey className="label-icon" /> Enter PIN
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-3 text-center flex items-center justify-center">
+                <FiKey className="mr-2 text-[var(--text-secondary)]" /> Enter 4-Digit PIN
               </label>
-              <div className="flex justify-center space-x-1.5 sm:space-x-2 mb-3"> {/* Reduced mb */}
-                {[...Array(6)].map((_, i) => (
+              <div className="flex justify-center space-x-2 sm:space-x-3 mb-3"> {/* Larger spacing for 4 digits */}
+                {[...Array(4)].map((_, i) => (
                   <div
                     key={i}
-                    className={`w-9 h-11 sm:w-10 sm:h-12 border-2 rounded-md flex items-center justify-center transition-all duration-100
-                      ${pin.length > i ? 'bg-purple-500 border-purple-600' : 'bg-slate-100 border-slate-300'}
-                      ${error && pin.length === i && i < pin.length /* Only if dot is filled */ ? 'border-red-500 animate-shake-short' : ''} 
+                    className={`w-12 h-14 sm:w-14 sm:h-16 border-2 rounded-lg flex items-center justify-center transition-all duration-150
+                      ${pin.length > i ? 'bg-[var(--accent-blue)] border-[var(--accent-blue)]' : 'bg-[var(--background-card)] border-[var(--border-subtle)]'}
+                      ${error && pin.length === i && i < pin.length ? 'border-red-500 animate-shake-short' : ''} 
                     `}
                   >
                     {pin.length > i && (
-                      <span className="text-white text-2xl mt-[-4px]">•</span>
+                      <span className="text-white text-3xl mt-[-2px]">•</span>
                     )}
                   </div>
                 ))}
@@ -297,9 +297,9 @@ export default function KlioLoginPage() {
             </div>
 
             {error && (
-              <div className="error-message-box">
-                <FiXCircle className="error-message-icon" />
-                <span>{error}</span>
+              <div className="flex items-center p-3 bg-[var(--accent-red)]/20 border border-[var(--accent-red)] rounded-[var(--radius-md)] text-[var(--text-primary)]">
+                <FiXCircle className="mr-2 text-[var(--accent-red)] flex-shrink-0" />
+                <span className="text-sm">{error}</span>
               </div>
             )}
             
@@ -309,8 +309,8 @@ export default function KlioLoginPage() {
                   key={digit}
                   type="button"
                   onClick={() => handlePinInput(digit.toString())}
-                  disabled={loading || pin.length >= 6}
-                  className="btn-pinpad"
+                  disabled={loading || pin.length >= 4}
+                  className="h-12 w-full bg-[var(--background-card)] border border-[var(--border-subtle)] hover:bg-[var(--accent-blue)]/20 hover:border-[var(--accent-blue)] disabled:opacity-50 disabled:cursor-not-allowed rounded-[var(--radius-md)] text-[var(--text-primary)] font-medium text-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
                 >
                   {digit}
                 </button>
@@ -319,15 +319,15 @@ export default function KlioLoginPage() {
                 type="button"
                 onClick={handleBackToUsername}
                 disabled={loading}
-                className="btn-pinpad text-sm font-medium text-slate-600 flex items-center justify-center"
+                className="h-12 w-full bg-[var(--background-card)] border border-[var(--border-subtle)] hover:bg-[var(--accent-blue)]/20 hover:border-[var(--accent-blue)] disabled:opacity-50 disabled:cursor-not-allowed rounded-[var(--radius-md)] text-[var(--text-secondary)] font-medium text-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)] flex items-center justify-center"
               >
                 <FiArrowLeft className="mr-1 text-base" /> Back
               </button>
               <button
                 type="button"
                 onClick={() => handlePinInput('0')}
-                disabled={loading || pin.length >= 6}
-                className="btn-pinpad"
+                disabled={loading || pin.length >= 4}
+                className="h-12 w-full bg-[var(--background-card)] border border-[var(--border-subtle)] hover:bg-[var(--accent-blue)]/20 hover:border-[var(--accent-blue)] disabled:opacity-50 disabled:cursor-not-allowed rounded-[var(--radius-md)] text-[var(--text-primary)] font-medium text-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
               >
                 0
               </button>
@@ -335,7 +335,7 @@ export default function KlioLoginPage() {
                 type="button"
                 onClick={handlePinDelete}
                 disabled={loading || pin.length === 0}
-                className="btn-pinpad text-xl font-medium text-slate-600"
+                className="h-12 w-full bg-[var(--background-card)] border border-[var(--border-subtle)] hover:bg-[var(--accent-red)]/20 hover:border-[var(--accent-red)] disabled:opacity-50 disabled:cursor-not-allowed rounded-[var(--radius-md)] text-[var(--text-secondary)] font-medium text-xl transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]"
               >
                 ⌫
               </button>
@@ -344,8 +344,8 @@ export default function KlioLoginPage() {
             <button
               type="button"
               onClick={attemptLogin}
-              disabled={loading || pin.length < 4 || pin.length > 6}
-              className="btn-primary w-full mt-1" // Reduced mt
+              disabled={loading || pin.length !== 4}
+              className="w-full flex items-center justify-center px-4 py-3 bg-[var(--accent-blue)] hover:bg-[var(--accent-blue-hover)] disabled:opacity-50 disabled:cursor-not-allowed rounded-[var(--radius-md)] text-[var(--text-primary)] font-medium transition-colors duration-150 mt-1"
             >
               {loading ? <FiLoader className="animate-spin mr-2" /> : <FiLogIn className="mr-2" />}
               Sign In
@@ -353,7 +353,7 @@ export default function KlioLoginPage() {
           </div>
         )}
       </div>
-      <footer className="text-center mt-6 sm:mt-8 text-xs text-slate-500">
+      <footer className="text-center mt-6 sm:mt-8 text-xs text-[var(--text-tertiary)]">
         © {new Date().getFullYear()} Klio AI. Unlock Your Potential.
       </footer>
     </div>

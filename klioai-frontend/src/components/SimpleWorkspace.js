@@ -105,10 +105,10 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden"
+      className="h-full flex flex-col bg-white border-l border-gray-200"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-blue-50 border-b">
+      <div className="flex items-center justify-between p-4 bg-blue-50 border-b flex-shrink-0">
         <h2 className="text-lg font-semibold text-gray-800">
           📝 {workspaceContent.title || 'Practice Problems'}
         </h2>
@@ -121,7 +121,7 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
       </div>
 
       {/* Problems */}
-      <div className="p-4 max-h-96 overflow-y-auto">
+      <div className="flex-1 p-4 overflow-y-auto">
         {problems.map((problem, index) => {
           const status = problemStates[problem.id];
           

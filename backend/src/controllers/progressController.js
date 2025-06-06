@@ -1,5 +1,6 @@
 // backend/src/controllers/progressController.js
 const supabase = require('../utils/supabaseClient');
+const { getCurrentWeekStart } = require('../utils/dateUtils');
 
 // Helper to get parent_id from request header
 function getParentId(req) {
@@ -55,17 +56,35 @@ exports.getLifetimeProgress = async (req, res) => {
   try {
     const { data: child, error } = await supabase
       .from('children')
-      .select('name, lifetime_correct, current_streak, best_streak')
+      .select('name, lifetime_correct, current_streak, best_streak, weekly_correct, week_start_date')
       .eq('id', child_id)
       .single();
 
     if (error) throw error;
 
+    // Check if we need to reset weekly count (new week started)
+    const currentWeekStart = getCurrentWeekStart();
+    let weeklyCorrect = child.weekly_correct || 0;
+    
+    if (!child.week_start_date || child.week_start_date !== currentWeekStart) {
+      // New week started, reset weekly count
+      weeklyCorrect = 0;
+      // Update the database to reset the weekly count
+      await supabase
+        .from('children')
+        .update({
+          weekly_correct: 0,
+          week_start_date: currentWeekStart
+        })
+        .eq('id', child_id);
+    }
+
     const stats = {
       name: child.name,
       lifetime_correct: child.lifetime_correct || 0,
       current_streak: child.current_streak || 0,
-      best_streak: child.best_streak || 0
+      best_streak: child.best_streak || 0,
+      weekly_correct: weeklyCorrect
     };
 
     res.json({

@@ -1,4 +1,5 @@
 const supabase = require('./supabaseClient');
+const { getCurrentWeekStart } = require('./dateUtils');
 
 class WorkspaceFunctionHandlers {
   constructor() {
@@ -92,7 +93,7 @@ class WorkspaceFunctionHandlers {
       // Get current child progress stats
       const { data: child, error: fetchError } = await supabase
         .from('children')
-        .select('lifetime_correct, current_streak, best_streak')
+        .select('lifetime_correct, current_streak, best_streak, weekly_correct, week_start_date')
         .eq('id', childId)
         .single();
 
@@ -101,18 +102,29 @@ class WorkspaceFunctionHandlers {
         return;
       }
 
+      const currentWeekStart = getCurrentWeekStart();
       const currentStats = {
         lifetime_correct: child?.lifetime_correct || 0,
         current_streak: child?.current_streak || 0,
-        best_streak: child?.best_streak || 0
+        best_streak: child?.best_streak || 0,
+        weekly_correct: child?.weekly_correct || 0,
+        week_start_date: child?.week_start_date
       };
 
       let newStats = { ...currentStats };
+
+      // Check if we need to reset weekly count (new week started)
+      if (!currentStats.week_start_date || currentStats.week_start_date !== currentWeekStart) {
+        console.log(`📅 New week detected - resetting weekly count. Previous: ${currentStats.weekly_correct}`);
+        newStats.weekly_correct = 0;
+        newStats.week_start_date = currentWeekStart;
+      }
 
       if (isCorrect) {
         // Increment lifetime correct count and current streak
         newStats.lifetime_correct = currentStats.lifetime_correct + 1;
         newStats.current_streak = currentStats.current_streak + 1;
+        newStats.weekly_correct = newStats.weekly_correct + 1;
         
         // Update best streak if current streak is better
         if (newStats.current_streak > currentStats.best_streak) {
@@ -130,6 +142,8 @@ class WorkspaceFunctionHandlers {
           lifetime_correct: newStats.lifetime_correct,
           current_streak: newStats.current_streak,
           best_streak: newStats.best_streak,
+          weekly_correct: newStats.weekly_correct,
+          week_start_date: newStats.week_start_date,
           updated_at: new Date().toISOString()
         })
         .eq('id', childId);
@@ -137,7 +151,7 @@ class WorkspaceFunctionHandlers {
       if (updateError) {
         console.warn('Failed to update child progress:', updateError);
       } else {
-        console.log(`📊 Updated lifetime progress: correct=${newStats.lifetime_correct}, streak=${newStats.current_streak}, best=${newStats.best_streak}`);
+        console.log(`📊 Updated progress: lifetime=${newStats.lifetime_correct}, weekly=${newStats.weekly_correct}, streak=${newStats.current_streak}, best=${newStats.best_streak}`);
       }
 
       return newStats;

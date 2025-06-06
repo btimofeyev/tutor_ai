@@ -20,12 +20,16 @@ class LifetimeProgressService {
 
   // Format progress for display
   formatProgressMessage(stats) {
-    const { lifetime_correct, current_streak, best_streak } = stats;
+    const { lifetime_correct, current_streak, best_streak, weekly_correct } = stats;
     
     const messages = [];
     
     if (lifetime_correct > 0) {
       messages.push(`${lifetime_correct} problems solved! 🎯`);
+    }
+    
+    if (weekly_correct > 0) {
+      messages.push(`${weekly_correct} this week! 📅`);
     }
     
     if (current_streak > 0) {
@@ -45,7 +49,7 @@ class LifetimeProgressService {
 
   // Get achievement message for milestones
   getAchievementMessage(stats) {
-    const { lifetime_correct, current_streak, best_streak } = stats;
+    const { lifetime_correct, current_streak, best_streak, weekly_correct } = stats;
     
     // Milestone achievements
     if (lifetime_correct === 1) return "First problem solved! 🎉";
@@ -53,6 +57,12 @@ class LifetimeProgressService {
     if (lifetime_correct === 50) return "50 problems conquered! 🏆";
     if (lifetime_correct === 100) return "100 problems dominated! 👑";
     if (lifetime_correct % 100 === 0 && lifetime_correct > 100) return `${lifetime_correct} problems! You're unstoppable! 🚀`;
+    
+    // Weekly achievements  
+    if (weekly_correct === 5) return "5 problems this week! Keep it up! 📈";
+    if (weekly_correct === 10) return "10 problems this week! You're crushing it! 💪";
+    if (weekly_correct === 20) return "20 problems this week! Weekly champion! 🏆";
+    if (weekly_correct > 20 && weekly_correct % 10 === 0) return `${weekly_correct} problems this week! Incredible dedication! 🌟`;
     
     // Streak achievements
     if (current_streak === 5) return "5 in a row! You're on fire! 🔥";

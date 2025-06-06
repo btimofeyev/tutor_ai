@@ -96,9 +96,38 @@ const getCurrentDateInfo = () => {
     }
   };
   
+  // Get the start of the current week (Sunday)
+  const getWeekStart = (date = new Date()) => {
+    const start = new Date(date);
+    const day = start.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const diff = start.getDate() - day; // Get days to subtract to reach Sunday
+    start.setDate(diff);
+    start.setHours(0, 0, 0, 0); // Set to start of day
+    return start;
+  };
+
+  // Check if a date is in the current week
+  const isInCurrentWeek = (date, referenceDate = new Date()) => {
+    const weekStart = getWeekStart(referenceDate);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    const checkDate = new Date(date);
+    return checkDate >= weekStart && checkDate <= weekEnd;
+  };
+
+  // Get week start as ISO string for database comparison
+  const getCurrentWeekStart = () => {
+    return getWeekStart().toISOString();
+  };
+
   module.exports = {
     getCurrentDateInfo,
     calculateDaysDifference,
-    getDueDateStatus
+    getDueDateStatus,
+    getWeekStart,
+    isInCurrentWeek,
+    getCurrentWeekStart
   };
   

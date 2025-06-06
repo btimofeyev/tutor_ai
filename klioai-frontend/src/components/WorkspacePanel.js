@@ -36,7 +36,9 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
   const fetchLifetimeStats = async () => {
     try {
       const stats = await lifetimeProgressService.getLifetimeStats();
+      console.log('📊 Fetched lifetime stats:', stats);
       if (stats?.stats) {
+        console.log('📊 Setting lifetime stats:', stats.stats);
         setLifetimeStats(stats.stats);
       }
     } catch (error) {
@@ -297,6 +299,35 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
     }, 100);
   };
 
+  // Reset problem state to allow retry
+  const resetProblemState = (problemId) => {
+    console.log('🔄 Resetting problem state for:', problemId);
+    
+    // Reset the problem state to pending
+    setProblemStates(prev => ({
+      ...prev,
+      [problemId]: 'pending'
+    }));
+    
+    // Clear the work notes for this problem
+    setWorkNotes(prev => ({
+      ...prev,
+      [problemId]: ''
+    }));
+    
+    // Remove from completed problems if it's there
+    setSessionState(prev => {
+      const newCompleted = new Set(prev.completedProblems);
+      newCompleted.delete(problemId);
+      return {
+        ...prev,
+        completedProblems: newCompleted
+      };
+    });
+    
+    console.log('✅ Problem reset - ready for retry');
+  };
+
   // Mark problem as incorrect
   const markProblemIncorrect = async (problemId) => {
     const problem = sessionState.problems.find(p => p.id === problemId);
@@ -553,8 +584,8 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
           </div>
         </div>
 
-        {/* Work Area - only show if not completed */}
-        {!isCompleted && (
+        {/* Work Area - show if not correctly completed (allow retry for incorrect) */}
+        {status !== 'correct' && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-medium text-gray-600 flex items-center">
@@ -610,20 +641,44 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
         
         {status === 'incorrect' && problem.feedback && (
           <div className="p-4 bg-red-100 border border-red-300 rounded-lg text-red-800">
-            <FiX className="inline-block mr-2" />
-            <strong>{problem.feedback}</strong>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <FiX className="inline-block mr-2" />
+                <strong>{problem.feedback}</strong>
+              </div>
+              <button
+                onClick={() => resetProblemState(problem.id)}
+                className="ml-3 text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center space-x-1 border border-blue-300"
+                title="Clear and try again"
+              >
+                <FiRotateCcw size={12} />
+                <span>Try Again</span>
+              </button>
+            </div>
           </div>
         )}
         
         {status === 'incorrect' && !problem.feedback && (
           <div className="p-4 bg-red-100 border border-red-300 rounded-lg text-red-800">
-            <FiX className="inline-block mr-2" />
-            <strong>Not quite right. Try again or ask for help! 💪</strong>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <FiX className="inline-block mr-2" />
+                <strong>Not quite right. Try again or ask for help! 💪</strong>
+              </div>
+              <button
+                onClick={() => resetProblemState(problem.id)}
+                className="ml-3 text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center space-x-1 border border-blue-300"
+                title="Clear and try again"
+              >
+                <FiRotateCcw size={12} />
+                <span>Try Again</span>
+              </button>
+            </div>
           </div>
         )}
 
         {/* Hint */}
-        {problem.hint && !isCompleted && (
+        {problem.hint && status !== 'correct' && (
           <div className="text-sm p-4 bg-blue-50 border-l-4 border-blue-400 rounded-lg mt-4">
             <strong className="text-blue-600">💡 Hint:</strong> {problem.hint}
           </div>

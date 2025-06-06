@@ -13,6 +13,7 @@ import WorkspacePanel from '../../components/WorkspacePanel';
 import { useAuth } from '../../contexts/AuthContext'; 
 import { chatService } from '../../utils/chatService';
 import { analyzeKlioResponse } from '../../utils/workspaceProgress';
+import { WorkspaceActionProcessor } from '../../utils/workspaceActionProcessor';
 
 const INITIAL_SUGGESTIONS = [
   "Can you help me with my homework? 📚", 
@@ -39,6 +40,17 @@ export default function ChatPage() {
   const [workspaceContent, setWorkspaceContent] = useState(null);
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(false);
   const workspaceRef = useRef(null); // Reference to workspace component
+  
+  // Add workspace action processor
+  const workspaceActionProcessorRef = useRef(null);
+
+  // Initialize workspace action processor
+  useEffect(() => {
+    workspaceActionProcessorRef.current = new WorkspaceActionProcessor(
+      setWorkspaceContent,
+      workspaceRef
+    );
+  }, []);
 
   // Load initial messages
   useEffect(() => {
@@ -104,94 +116,13 @@ export default function ChatPage() {
     }
   }, [messages, isKlioTyping]);
 
-  // ENHANCED: Handle structured workspace content from LLM response
-  const handleStructuredWorkspaceContent = (workspaceData) => {
-    if (!workspaceData || workspaceData.type === 'none') {
-      console.log('❌ No workspace content in structured response');
-      return;
-    }
+  // REMOVED: handleStructuredWorkspaceContent - now handled by function calling
 
-    console.log('✅ Processing structured workspace content:', workspaceData);
-
-    // Convert structured data to workspace format
-    let processedContent = null;
-
-    switch (workspaceData.type) {
-      case 'math_problems':
-        processedContent = {
-          type: 'math_problems',
-          problems: workspaceData.problems.map((problem, index) => ({
-            id: `structured-problem-${index}`,
-            text: problem.display_text || problem.text,
-            type: problem.type,
-            hint: problem.hint,
-            difficulty: problem.difficulty,
-            isStructured: true
-          }))
-        };
-        break;
-
-      case 'mixed':
-        processedContent = {
-          type: 'mixed',
-          content: [
-            ...(workspaceData.explanation ? [{
-              type: 'explanation',
-              title: workspaceData.explanation.title,
-              content: workspaceData.explanation.content
-            }] : []),
-            ...workspaceData.problems.map((problem, index) => ({
-              type: 'math_problem',
-              id: `structured-problem-${index}`,
-              text: problem.display_text || problem.text,
-              problemType: problem.type,
-              hint: problem.hint,
-              difficulty: problem.difficulty,
-              isStructured: true
-            }))
-          ]
-        };
-        break;
-
-      case 'assignment':
-        processedContent = {
-          type: 'assignment',
-          data: workspaceData.assignment_data || workspaceData
-        };
-        break;
-
-      default:
-        console.log('Unknown workspace content type:', workspaceData.type);
-        return;
-    }
-
-    if (processedContent) {
-      console.log('🎯 Setting structured workspace content:', processedContent);
-      setWorkspaceContent(processedContent);
-    }
-  };
-
-  // ENHANCED: Handle structured workspace content from LLM response OR message
+  // LEGACY: Handle workspace content for backward compatibility
   const handleSendToWorkspace = (message, structuredContent = null) => {
-    console.log('🔄 Processing workspace request');
+    console.log('🔄 Processing legacy workspace request');
     
-    // PRIORITY 1: Use structured content if provided
-    if (structuredContent) {
-      console.log('✅ Using provided structured content:', structuredContent);
-      handleStructuredWorkspaceContent(structuredContent);
-      return;
-    }
-    
-    // PRIORITY 2: Use message's structured content if available
-    if (message.workspaceContent) {
-      console.log('✅ Using message structured content:', message.workspaceContent);
-      handleStructuredWorkspaceContent(message.workspaceContent);
-      return;
-    }
-    
-    // PRIORITY 3: Legacy parsing fallback
-    console.log('📝 Falling back to legacy parsing for message:', message.content.substring(0, 100));
-    
+    // For function calling, this is mostly used for manual workspace creation
     const problems = [];
     
     // Look for simple patterns like "7 + 5" or "What is 7 + 5?"
@@ -244,13 +175,12 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      // ENHANCED: Use structured chat service
+      // ENHANCED: Use function calling chat service
       const response = await chatService.sendMessage(messageText, messages.slice(-10), currentLessonContext);
 
-      console.log('📨 Received structured response:', {
-        hasWorkspaceContent: !!response.workspaceContent,
-        workspaceType: response.workspaceContent?.type,
-        problemsCount: response.workspaceContent?.problems?.length
+      console.log('📨 Received function calling response:', {
+        workspaceActionsCount: response.workspaceActions?.length || 0,
+        hasCurrentWorkspace: !!response.currentWorkspace
       });
 
       const klioMessage = {
@@ -259,7 +189,9 @@ export default function ChatPage() {
         content: response.message,
         timestamp: response.timestamp || new Date().toISOString(),
         lessonContext: response.lessonContext || null,
-        workspaceContent: response.workspaceContent || null, // NEW: Store structured content
+        // NEW: Store function calling results
+        workspaceActions: response.workspaceActions || [],
+        currentWorkspace: response.currentWorkspace || null,
       };
       
       setMessages(prev => [...prev, klioMessage]);
@@ -269,38 +201,25 @@ export default function ChatPage() {
         setCurrentLessonContext(response.lessonContext);
       }
 
-      // ENHANCED: Handle structured workspace content
-      if (response.workspaceContent) {
-        console.log('🎯 Processing structured workspace content from response');
-        handleStructuredWorkspaceContent(response.workspaceContent);
+      // ENHANCED: Process function calling workspace actions
+      if (response.workspaceActions && response.workspaceActions.length > 0) {
+        console.log('🎯 Processing workspace actions from function calls');
+        
+        const processor = workspaceActionProcessorRef.current;
+        if (processor) {
+          const updatedWorkspace = processor.processWorkspaceActions(
+            response.workspaceActions,
+            response.currentWorkspace
+          );
+          
+          console.log('✅ Workspace updated via function calls');
+        }
       } else {
-        console.log('📝 No structured workspace content in response');
-        // Don't do fallback parsing here - let the user click the button if they want workspace
+        console.log('📝 No workspace actions in response');
       }
 
-      // 🆕 AUTO-DETECT PROGRESS UPDATES
-      if (workspaceContent && workspaceRef?.current) {
-        console.log('🔍 Analyzing Klio response for progress updates...');
-        
-        const progressUpdate = analyzeKlioResponse(response.message, {
-          problems: workspaceContent.problems,
-          problemStates: workspaceRef.current.getProblemStates?.()
-        });
-        
-        if (progressUpdate && progressUpdate.problemContext) {
-          console.log('📊 Detected progress update:', progressUpdate);
-          
-          if (progressUpdate.isCorrect && progressUpdate.problemContext.problemId) {
-            console.log('✅ Auto-marking problem correct:', progressUpdate.problemContext.problemId);
-            workspaceRef.current.markProblemCorrect?.(progressUpdate.problemContext.problemId);
-          } else if (!progressUpdate.isCorrect && progressUpdate.problemContext.problemId) {
-            console.log('❌ Auto-marking problem incorrect:', progressUpdate.problemContext.problemId);
-            workspaceRef.current.markProblemIncorrect?.(progressUpdate.problemContext.problemId);
-          }
-        } else {
-          console.log('ℹ️ No progress update detected in Klio response');
-        }
-      }
+      // REMOVED: Auto-progress detection (now handled by function calls)
+      // The LLM now explicitly calls mark_problem_correct/incorrect functions
 
     } catch (error) {
       console.error('Chat error:', error);

@@ -33,78 +33,110 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
     getSessionState: () => sessionState
   }));
 
-  // Initialize new session when workspace content changes
+  // NEW: Detect function-controlled workspace
+  const isFunctionControlled = workspaceContent?.type === 'function_calling_workspace';
+  
+  // Initialize session when workspace content changes
   useEffect(() => {
     if (workspaceContent && workspaceContent.problems?.length > 0) {
-      const startNewSession = async () => {
-        try {
-          console.log('🎯 Starting new practice session...');
-          
-          const response = await progressService.startSession('practice', workspaceContent.problems.length);
-          const newSessionId = response.session.id;
-          
-          const problems = workspaceContent.problems.map((problem, index) => ({
-            ...problem,
-            id: problem.id || `problem-${index}`,
-            sessionIndex: index
-          }));
+      if (isFunctionControlled) {
+        console.log('🎯 Initializing function-controlled workspace session...');
+        
+        // Use existing session data from function calls
+        setSessionState({
+          sessionId: workspaceContent.sessionId,
+          problems: workspaceContent.problems,
+          completedProblems: new Set(
+            workspaceContent.problems
+              .filter(p => p.status === 'correct')
+              .map(p => p.id)
+          ),
+          currentProblemIndex: workspaceContent.problems.findIndex(p => p.status === 'pending') || 0,
+          sessionStartTime: new Date(workspaceContent.createdAt).getTime(),
+          totalCorrect: workspaceContent.stats.correct,
+          totalAttempts: workspaceContent.stats.completed,
+          streak: workspaceContent.stats.streak,
+          bestStreak: workspaceContent.stats.bestStreak
+        });
+        
+        // Set problem states from function call data
+        const initialStates = {};
+        workspaceContent.problems.forEach(problem => {
+          initialStates[problem.id] = problem.status;
+        });
+        setProblemStates(initialStates);
+        
+      } else {
+        // Legacy workspace initialization
+        const startNewSession = async () => {
+          try {
+            console.log('🎯 Starting new practice session...');
+            
+            const response = await progressService.startSession('practice', workspaceContent.problems.length);
+            const newSessionId = response.session.id;
+            
+            const problems = workspaceContent.problems.map((problem, index) => ({
+              ...problem,
+              id: problem.id || `problem-${index}`,
+              sessionIndex: index
+            }));
 
-          console.log('✅ Practice session started:', newSessionId);
-          
-          setSessionState({
-            sessionId: newSessionId,
-            problems: problems,
-            completedProblems: new Set(),
-            currentProblemIndex: 0,
-            sessionStartTime: Date.now(),
-            totalCorrect: 0,
-            totalAttempts: 0,
-            streak: 0,
-            bestStreak: 0
-          });
-          
-          // Reset problem states
-          const initialStates = {};
-          problems.forEach(problem => {
-            initialStates[problem.id] = 'pending';
-          });
-          setProblemStates(initialStates);
-          setWorkNotes({});
-          
-        } catch (error) {
-          console.error('Failed to start practice session:', error);
-          // Fallback to local-only tracking
-          const fallbackSessionId = `local-session-${Date.now()}`;
-          const problems = workspaceContent.problems.map((problem, index) => ({
-            ...problem,
-            id: problem.id || `problem-${index}`,
-            sessionIndex: index
-          }));
+            console.log('✅ Practice session started:', newSessionId);
+            
+            setSessionState({
+              sessionId: newSessionId,
+              problems: problems,
+              completedProblems: new Set(),
+              currentProblemIndex: 0,
+              sessionStartTime: Date.now(),
+              totalCorrect: 0,
+              totalAttempts: 0,
+              streak: 0,
+              bestStreak: 0
+            });
+            
+            // Reset problem states
+            const initialStates = {};
+            problems.forEach(problem => {
+              initialStates[problem.id] = 'pending';
+            });
+            setProblemStates(initialStates);
+            setWorkNotes({});
+            
+          } catch (error) {
+            console.error('Failed to start practice session:', error);
+            // Fallback to local-only tracking
+            const fallbackSessionId = `local-session-${Date.now()}`;
+            const problems = workspaceContent.problems.map((problem, index) => ({
+              ...problem,
+              id: problem.id || `problem-${index}`,
+              sessionIndex: index
+            }));
 
-          setSessionState({
-            sessionId: fallbackSessionId,
-            problems: problems,
-            completedProblems: new Set(),
-            currentProblemIndex: 0,
-            sessionStartTime: Date.now(),
-            totalCorrect: 0,
-            totalAttempts: 0,
-            streak: 0,
-            bestStreak: 0
-          });
-          
-          const initialStates = {};
-          problems.forEach(problem => {
-            initialStates[problem.id] = 'pending';
-          });
-          setProblemStates(initialStates);
-          setWorkNotes({});
-        }
-      };
-
-      startNewSession();
+            setSessionState({
+              sessionId: fallbackSessionId,
+              problems: problems,
+              completedProblems: new Set(),
+              currentProblemIndex: 0,
+              sessionStartTime: Date.now(),
+              totalCorrect: 0,
+              totalAttempts: 0,
+              streak: 0,
+              bestStreak: 0
+            });
+            
+            const initialStates = {};
+            problems.forEach(problem => {
+              initialStates[problem.id] = 'pending';
+            });
+            setProblemStates(initialStates);
+            setWorkNotes({});
+          }
+        };
+        startNewSession();
+      }
     }
-  }, [workspaceContent]);
+  }, [workspaceContent, isFunctionControlled]);
 
   // Check if all problems are completed
   const isSessionComplete = sessionState.completedProblems.size === sessionState.problems.length && sessionState.problems.length > 0;
@@ -114,12 +146,16 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
     ? (sessionState.completedProblems.size / sessionState.problems.length) * 100 
     : 0;
 
-  // Send work to chat with session context
+  // Enhanced send work to chat for function calling
   const sendWorkToChat = (problemIndex, problemText, workNote) => {
     if (!workNote.trim()) return;
     
     const problem = sessionState.problems[problemIndex];
-    const message = `Can you check my work on Problem ${problemIndex + 1} from this session?\n\nProblem: ${problemText}\nMy work: ${workNote}`;
+    
+    // Enhanced message for function calling system
+    const message = isFunctionControlled 
+      ? `Can you check my work on Problem ${problemIndex + 1}?\n\nProblem: ${problemText}\nMy work: ${workNote}\n\n[Problem Index: ${problemIndex}]`
+      : `Can you check my work on Problem ${problemIndex + 1} from this session?\n\nProblem: ${problemText}\nMy work: ${workNote}`;
     
     // Update state to show we're checking
     setProblemStates(prev => ({
@@ -134,7 +170,8 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
         problemId: problem.id,
         problemIndex: problemIndex,
         studentWork: workNote,
-        problemText: problemText
+        problemText: problemText,
+        isFunctionControlled: isFunctionControlled
       });
     }
   };
@@ -403,7 +440,7 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
           isCompleted ? 'border-green-400 bg-green-50' : 'border-gray-200'
         }`}
       >
-        {/* Enhanced Problem Header with Status */}
+        {/* Problem Header with Function Call Status */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-2">
@@ -411,6 +448,11 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
               <span className={`text-lg font-bold ${isCompleted ? 'text-green-600' : 'text-gray-800'}`}>
                 Problem {index + 1}
               </span>
+              {isFunctionControlled && (
+                <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
+                  AI Managed
+                </span>
+              )}
             </div>
             {isCurrent && !isCompleted && (
               <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
@@ -472,7 +514,13 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
 
             <textarea
               value={workNotes[problem.id] || ''}
-              onChange={(e) => setWorkNotes(prev => ({ ...prev, [problem.id]: e.target.value }))}
+              onChange={(e) => {
+                setWorkNotes(prev => ({ ...prev, [problem.id]: e.target.value }));
+                // Update student work in function calling system
+                if (isFunctionControlled) {
+                  // This could trigger a backend update if needed
+                }
+              }}
               placeholder="Show your work here..."
               disabled={status === 'checking'}
               className={`w-full h-32 p-4 border-2 rounded-lg bg-white font-mono text-gray-800 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
@@ -482,15 +530,29 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
           </div>
         )}
 
-        {/* Feedback Area */}
-        {status === 'correct' && (
+        {/* Enhanced Feedback Area with Function Call Results */}
+        {status === 'correct' && problem.feedback && (
+          <div className="p-4 bg-green-100 border border-green-300 rounded-lg text-green-800">
+            <FiCheckCircle className="inline-block mr-2" />
+            <strong>{problem.feedback}</strong>
+          </div>
+        )}
+        
+        {status === 'correct' && !problem.feedback && (
           <div className="p-4 bg-green-100 border border-green-300 rounded-lg text-green-800">
             <FiCheckCircle className="inline-block mr-2" />
             <strong>Correct! Great job! 🎉</strong>
           </div>
         )}
         
-        {status === 'incorrect' && (
+        {status === 'incorrect' && problem.feedback && (
+          <div className="p-4 bg-red-100 border border-red-300 rounded-lg text-red-800">
+            <FiX className="inline-block mr-2" />
+            <strong>{problem.feedback}</strong>
+          </div>
+        )}
+        
+        {status === 'incorrect' && !problem.feedback && (
           <div className="p-4 bg-red-100 border border-red-300 rounded-lg text-red-800">
             <FiX className="inline-block mr-2" />
             <strong>Not quite right. Try again or ask for help! 💪</strong>

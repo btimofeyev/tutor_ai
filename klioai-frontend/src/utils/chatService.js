@@ -15,7 +15,7 @@ class ChatService {
 
   async sendMessage(message, sessionHistory = [], lessonContext = null) {
     try {
-      console.log('📤 Sending message to structured chat endpoint...');
+      console.log('📤 Sending message to function calling endpoint...');
       
       const response = await this.api.post('/message', {
         message,
@@ -23,27 +23,25 @@ class ChatService {
         lessonContext
       });
 
-      console.log('📥 Received structured response:', {
+      console.log('📥 Received function calling response:', {
         hasMessage: !!response.data.message,
-        hasWorkspaceContent: !!response.data.workspaceContent,
-        workspaceType: response.data.workspaceContent?.type,
-        problemsCount: response.data.workspaceContent?.problems?.length
+        workspaceActionsCount: response.data.workspaceActions?.length || 0,
+        currentWorkspace: !!response.data.currentWorkspace
       });
 
-      // Enhanced response structure
+      // Enhanced response structure for function calling
       return {
         message: response.data.message,
         timestamp: response.data.timestamp,
         lessonContext: response.data.lessonContext,
-        // NEW: Structured workspace content
-        workspaceContent: response.data.workspaceContent,
+        // NEW: Function calling results
+        workspaceActions: response.data.workspaceActions || [],
+        currentWorkspace: response.data.currentWorkspace || null,
         // Debug info
         debugInfo: response.data.debugInfo,
-        // Legacy compatibility
-        workspaceHint: response.data.workspaceHint // Keep for backward compatibility
       };
     } catch (error) {
-      console.error('❌ Structured chat service error:', error);
+      console.error('❌ Function calling chat service error:', error);
       
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);

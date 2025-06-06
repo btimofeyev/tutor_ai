@@ -1,4 +1,4 @@
-// backend/src/controllers/chatController.js - FIXED with MCP Integration
+// backend/src/controllers/chatController.js - FUNCTION CALLING VERSION
 const { OpenAI } = require('openai');
 const supabase = require('../utils/supabaseClient');
 const mcpClient = require('../services/mcpClient');
@@ -6,131 +6,89 @@ const memoryService = require('../services/learningMemoryService');
 const { formatLearningContextForAI, isLessonQuery } = require('../middleware/mcpContext');
 const { getCurrentDateInfo, getDueDateStatus } = require('../utils/dateUtils');
 const { KLIO_SYSTEM_PROMPT } = require('../utils/klioSystemPrompt');
+const { WORKSPACE_TOOLS } = require('../utils/workspaceTools');
+const { getWorkspaceHandler } = require('../utils/workspaceFunctionHandlers');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-const STRUCTURED_RESPONSE_SCHEMA = {
-  type: "object",
-  properties: {
-    message: {
-      type: "string",
-      description: "The main response message to show to the student"
-    },
-    workspace_content: {
-      type: "object",
-      properties: {
-        type: {
-          type: "string",
-          enum: ["math_problems", "mixed", "assignment", "none"],
-          description: "Type of workspace content"
-        },
-        problems: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              text: {
-                type: "string",
-                description: "The exact problem text (e.g., '7 + 5' or '4 × 2/3')"
-              },
-              display_text: {
-                type: "string",  
-                description: "Human-readable version for display (e.g., '4 × 2/3')"
-              },
-              type: {
-                type: "string",
-                enum: ["addition", "subtraction", "multiplication", "division", "fractions", "decimals", "mixed"],
-                description: "Type of math problem"
-              },
-              hint: {
-                type: "string",
-                description: "Helpful hint for solving this problem"
-              },
-              difficulty: {
-                type: "string",
-                enum: ["easy", "medium", "hard"],
-                description: "Difficulty level"
-              }
-            },
-            required: ["text", "type", "hint"]
-          }
-        },
-        explanation: {
-          type: "object",
-          properties: {
-            title: {
-              type: "string",
-              description: "Title for the explanation"
-            },
-            content: {
-              type: "string", 
-              description: "The explanation content"
-            }
-          }
-        }
-      },
-      required: ["type"]
-    },
-    has_workspace_content: {
-      type: "boolean",
-      description: "Whether this response should show workspace content"
-    }
-  },
-  required: ["message", "has_workspace_content"]
-};
 
-// Enhanced system prompt for structured responses
+// Enhanced system prompt for function calling
 const ENHANCED_SYSTEM_PROMPT = `${KLIO_SYSTEM_PROMPT}
 
-**CRITICAL: STRUCTURED OUTPUT REQUIREMENTS**
+# 🔧 FUNCTION CALLING FOR WORKSPACE MANAGEMENT
 
-You MUST respond with a JSON object that follows this exact schema:
+You have access to powerful workspace tools that create interactive learning experiences. Use them strategically:
 
-{
-  "message": "Your conversational response to the student",
-  "workspace_content": {
-    "type": "math_problems|mixed|assignment|none",
-    "problems": [
-      {
-        "text": "7 + 5",
-        "display_text": "7 + 5", 
-        "type": "addition|subtraction|multiplication|division|fractions|decimals|mixed",
-        "hint": "Add the numbers together...",
-        "difficulty": "easy|medium|hard"
-      }
-    ],
-    "explanation": {
-      "title": "Addition Practice",
-      "content": "Let's work on addition problems..."
-    }
-  },
-  "has_workspace_content": true
-}
+## When to CREATE NEW workspace (create_math_workspace):
+- Student asks for practice problems: "Can you give me some fraction problems?"
+- Starting a new topic: "Let's practice multiplication"
+- Student says "I want to work on [topic]"
+- You want to provide structured practice
 
-**WHEN TO INCLUDE WORKSPACE CONTENT:**
-- When giving practice problems
-- When showing step-by-step solutions  
-- When student asks for help with specific problems
-- When presenting numbered lists of problems
-- When doing math explanations with examples
+**Example:** Student says "Help me practice adding fractions"
+→ Use create_math_workspace with 3-5 addition problems
 
-**WORKSPACE CONTENT RULES:**
-1. **Always extract the clean math expression** (e.g., "4 × 2/3" not "\\( 4 \\times \\frac{2}{3} \\)")
-2. **Convert LaTeX to readable format** (\\frac{2}{3} becomes "2/3", \\times becomes "×")
-3. **Each problem gets its own object** in the problems array
-4. **Set has_workspace_content: true** whenever you provide practice problems
-5. **Set has_workspace_content: false** for pure conversation
+## When to ADD to existing workspace (add_problems_to_workspace):
+- Student wants more: "Give me another one" or "More problems please"
+- Student is doing well: "That was easy, can I have harder ones?"
+- Continuing same topic: Student solving fractions, wants more fractions
 
-**MESSAGE FORMATTING RULES:**
-1. **Keep messages conversational and clean** - don't list all the problems in the message
-2. **Reference the workspace** - tell students to look at the workspace for the actual problems
-3. **Use encouraging language** - "I've set up some problems for you", "Check out your workspace"
-4. **Provide context** - mention what type of problems they'll find
+**Example:** Student completes 3 problems and says "These are fun, more please!"
+→ Use add_problems_to_workspace with 2-3 more similar problems
 
-Remember: Your message should be natural and conversational, the workspace_content should contain clean, workable math problems, always set has_workspace_content appropriately, and convert all LaTeX notation to simple readable format`;
+## When to MARK problems (mark_problem_correct/incorrect):
+- Student shows their work and asks you to check it
+- Student gives an answer: "I got 8/12, is that right?"
+- You can clearly see if their work is correct or incorrect
+- Student asks "How did I do?" after showing work
+
+**CRITICAL:** Only mark problems when you can verify the student's work!
+
+## Function Calling Examples:
+
+**Creating workspace:**
+Student: "I need to practice multiplying fractions"
+→ create_math_workspace({
+title: "Fraction Multiplication Practice",
+problems: [
+{text: "2/3 × 1/4", type: "fractions", hint: "Multiply numerators, then denominators"},
+{text: "3/5 × 2/7", type: "fractions", hint: "Remember to simplify if possible"}
+]
+})
+
+**Adding problems:**
+Student: "Give me more fraction problems!"
+→ add_problems_to_workspace({
+problems: [
+{text: "4/9 × 3/8", type: "fractions", hint: "Take your time with the multiplication"}
+]
+})
+
+**Marking correct:**
+Student: "For 2/3 × 1/4, I multiplied 2×1=2 and 3×4=12, so I got 2/12 = 1/6"
+→ mark_problem_correct({
+problem_index: 0,
+feedback: "Perfect! You multiplied correctly and simplified beautifully! 🎉"
+})
+
+**Marking incorrect:**
+Student: "I got 5/12 for the first problem"
+→ mark_problem_incorrect({
+problem_index: 0,
+guidance: "Close, but let me help you check your multiplication. What's 2×1? And what's 3×4?"
+})
+
+## Function Calling Rules:
+1. **Always use functions when appropriate** - they create better experiences
+2. **Be specific with feedback** - make marking meaningful
+3. **Don't overuse clear_workspace** - only when completely changing topics
+4. **Add incrementally** - don't create huge workspaces at once
+5. **Match difficulty to student** - observe their performance
+
+Remember: Functions are tools to enhance learning, not replace good teaching!`;
 
 // 🔧 FIXED: Parse specific question requests
 function parseSpecificQuestionRequest(message) {
@@ -436,13 +394,13 @@ async function updateLearningMemories(childId, userMessage, aiResponse, mcpConte
   }
 }
 
-// 🚀 MAIN CHAT HANDLER - FIXED WITH MCP INTEGRATION
+// 🚀 MAIN CHAT HANDLER - FUNCTION CALLING VERSION
 exports.chat = async (req, res) => {
   const childId = req.child?.child_id;
   const { message, sessionHistory = [], lessonContext = null } = req.body;
   const mcpContext = req.mcpContext;
 
-  console.log('\n🤖 === KLIO STRUCTURED CHAT SESSION START ===');
+  console.log('\n🤖 === FUNCTION CALLING CHAT SESSION START ===');
   console.log(`Child ID: ${childId}`);
   console.log(`Message: "${message}"`);
 
@@ -457,12 +415,16 @@ exports.chat = async (req, res) => {
   try {
     const { currentDate, currentTime, today } = getCurrentDateInfo();
 
-    // Get child info
+    // Get child info and workspace handler
     const { data: child } = await supabase
       .from('children')
       .select('name, grade')
       .eq('id', childId)
       .single();
+
+    // Get workspace handler for this child
+    const workspaceHandler = getWorkspaceHandler(childId);
+    const currentWorkspace = workspaceHandler.getCurrentWorkspace();
 
     // 🔧 ENHANCED: Better specific question detection
     const specificQuestionRequest = parseSpecificQuestionRequest(message);
@@ -572,6 +534,24 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       })
     ]);
 
+    // Enhanced context for function calling
+    let workspaceContext = '';
+    if (currentWorkspace) {
+      workspaceContext = `\n\n**CURRENT WORKSPACE CONTEXT:**
+      - Active workspace: "${currentWorkspace.title}"
+      - Total problems: ${currentWorkspace.stats.totalProblems}
+      - Completed: ${currentWorkspace.stats.completed}
+      - Current streak: ${currentWorkspace.stats.streak}
+      - Best streak: ${currentWorkspace.stats.bestStreak}
+      
+      **IMPORTANT WORKSPACE RULES:**
+      - Use "add_problems_to_workspace" to add more problems to existing workspace
+      - Use "mark_problem_correct" when student shows correct work
+      - Use "mark_problem_incorrect" when student makes mistakes  
+      - Only use "create_math_workspace" when starting completely new topic
+      - Only use "clear_workspace" when student explicitly wants to start over`;
+    }
+
     // Build the enhanced system prompt
     const formattedLearningContext = formatLearningContextForAI(mcpContext, currentDate);
     const memoryContext = buildMemoryContext(recentMemories, learningProfile);
@@ -598,7 +578,8 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       **RELEVANT LEARNING MEMORIES:**
       ${memoryContext}
       
-      ${materialContentForAI}`;
+      ${materialContentForAI}
+      ${workspaceContext}`;
 
     // Prepare conversation history
     const recentHistory = sessionHistory.slice(-8);
@@ -617,24 +598,19 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       }
     ];
 
-    // Call OpenAI with structured output
-    console.log('🎯 Requesting structured response from OpenAI...');
+    // Call OpenAI with function calling
+    console.log('🎯 Requesting response with function calling...');
     console.log(`📊 Context includes: ${materialContentForAI ? `Material Content ✅ (${foundMaterialTitle})` : 'No Material Content ❌'}`);
     
     let response;
     try {
       response = await openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4o", // Function calling works better on gpt-4o
         messages: openaiMessages,
         temperature: 0.7,
         max_tokens: 1024,
-        response_format: { 
-          type: "json_schema",
-          json_schema: {
-            name: "klio_response",
-            schema: STRUCTURED_RESPONSE_SCHEMA
-          }
-        }
+        tools: WORKSPACE_TOOLS,
+        tool_choice: "auto" // Let LLM decide when to use tools
       });
     } catch (openaiError) {
       console.error('OpenAI API error:', openaiError);
@@ -644,28 +620,53 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       });
     }
 
-    // Parse structured response
-    let structuredResponse;
-    try {
-      const rawResponse = response.choices[0].message.content;
-      structuredResponse = JSON.parse(rawResponse);
-      console.log('✅ Successfully parsed structured response');
-    } catch (parseError) {
-      console.error('❌ Failed to parse structured response:', parseError);
+    const responseMessage = response.choices[0].message;
+    const toolCalls = responseMessage.tool_calls;
+    
+    console.log(`📨 Received response with ${toolCalls?.length || 0} function calls`);
+
+    // Process function calls
+    let workspaceActions = [];
+    if (toolCalls && toolCalls.length > 0) {
+      console.log('🔧 Processing function calls...');
       
-      const fallbackMessage = response.choices[0].message.content || 
-        "Sorry, I couldn't generate a response right now. Please try again!";
-      
-      structuredResponse = {
-        message: fallbackMessage,
-        has_workspace_content: false
-      };
+      for (const toolCall of toolCalls) {
+        const functionName = toolCall.function.name;
+        const functionArgs = JSON.parse(toolCall.function.arguments);
+        
+        console.log(`📞 Calling function: ${functionName}`, functionArgs);
+        
+        let result;
+        switch (functionName) {
+          case 'create_math_workspace':
+            result = await workspaceHandler.handleCreateMathWorkspace(functionArgs, childId);
+            break;
+          case 'add_problems_to_workspace':
+            result = await workspaceHandler.handleAddProblemsToWorkspace(functionArgs, childId);
+            break;
+          case 'mark_problem_correct':
+            result = await workspaceHandler.handleMarkProblemCorrect(functionArgs, childId);
+            break;
+          case 'mark_problem_incorrect':
+            result = await workspaceHandler.handleMarkProblemIncorrect(functionArgs, childId);
+            break;
+          case 'clear_workspace':
+            result = await workspaceHandler.handleClearWorkspace(functionArgs, childId);
+            break;
+          default:
+            console.warn(`Unknown function: ${functionName}`);
+            result = { action: 'error', message: `Unknown function: ${functionName}` };
+        }
+        
+        workspaceActions.push(result);
+        console.log(`✅ Function result:`, result.action);
+      }
     }
 
-    // Update memory
-    await updateLearningMemories(childId, message, structuredResponse.message, mcpContext, learningProfile);
+    // Update learning memories
+    await updateLearningMemories(childId, message, responseMessage.content, mcpContext, learningProfile);
 
-    // Log interaction with enhanced tracking
+    // Log interaction with function calling info
     try {
       await supabase
         .from('chat_interactions')
@@ -677,8 +678,10 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
           has_lesson_context: !!(mcpContext?.currentFocus || mcpContext?.allMaterials?.length > 0),
           has_overdue_assignments: mcpContext?.overdue?.length > 0,
           has_memory_context: recentMemories.length > 0,
-          has_workspace_content: structuredResponse.has_workspace_content,
-          response_type: 'structured',
+          has_workspace_content: workspaceActions.length > 0,
+          response_type: 'function_calling',
+          function_calls_count: toolCalls?.length || 0,
+          workspace_actions: workspaceActions.length > 0 ? workspaceActions.map(a => a.action) : null,
           has_material_content: !!materialContentForAI,
           specific_question_request: !!specificQuestionRequest,
           material_found: !!foundMaterialTitle,
@@ -688,27 +691,29 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       console.error('Failed to log interaction:', logError);
     }
 
-    console.log('\n✅ === STRUCTURED CHAT SESSION COMPLETE ===');
-    console.log(`Response Length: ${structuredResponse.message.length} characters`);
-    console.log(`Has Workspace Content: ${structuredResponse.has_workspace_content}`);
-    console.log(`Problems Count: ${structuredResponse.workspace_content?.problems?.length || 0}`);
+    console.log('\n✅ === FUNCTION CALLING CHAT SESSION COMPLETE ===');
+    console.log(`Response Length: ${responseMessage.content?.length || 0} characters`);
+    console.log(`Function Calls: ${toolCalls?.length || 0}`);
+    console.log(`Workspace Actions: ${workspaceActions.length}`);
     console.log(`Material Content Used: ${!!materialContentForAI}`);
     console.log(`Found Material: ${foundMaterialTitle || 'None'}`);
 
-    // Return structured response
+    // Return enhanced response with workspace actions
     res.json({
       success: true,
-      message: structuredResponse.message,
+      message: responseMessage.content,
       timestamp: new Date().toISOString(),
       provider: 'openai',
-      workspaceContent: structuredResponse.has_workspace_content ? structuredResponse.workspace_content : null,
+      workspaceActions: workspaceActions, // New: Function call results
+      currentWorkspace: workspaceHandler.getCurrentWorkspace(), // New: Current workspace state
       debugInfo: {
         currentDate,
         hasOverdueAssignments: mcpContext?.overdue?.length > 0,
         totalMaterials: mcpContext?.allMaterials?.length || 0,
         contextLength: formattedLearningContext.length,
-        hasWorkspaceContent: structuredResponse.has_workspace_content,
-        problemsCount: structuredResponse.workspace_content?.problems?.length || 0,
+        functionCallsCount: toolCalls?.length || 0,
+        workspaceActionsCount: workspaceActions.length,
+        hadExistingWorkspace: !!currentWorkspace,
         hasMaterialContent: !!materialContentForAI,
         specificQuestionDetected: !!specificQuestionRequest,
         foundMaterial: foundMaterialTitle,
@@ -717,7 +722,7 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
     });
 
   } catch (error) {
-    console.error('💥 === STRUCTURED CHAT SESSION ERROR ===');
+    console.error('💥 === FUNCTION CALLING CHAT SESSION ERROR ===');
     console.error('Error:', error);
     res.status(500).json({
       error: "Sorry! Klio got a bit confused. Can you try asking again? 🤔",

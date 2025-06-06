@@ -1,11 +1,16 @@
 // Lifetime Progress Service for fetching child progress stats
+import axios from 'axios';
 import { authService } from './auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 class LifetimeProgressService {
   constructor() {
-    this.api = authService.createAxiosInstance(`${API_URL}/api/progress`);
+    this.api = axios.create({
+      baseURL: `${API_URL}/api/progress`,
+    });
+
+    authService.setupAxiosInterceptors(this.api);
   }
 
   async getLifetimeStats() {

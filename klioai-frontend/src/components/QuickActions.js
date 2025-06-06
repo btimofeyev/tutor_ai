@@ -1,6 +1,6 @@
 // klioai-frontend/src/components/QuickActions.js - Quick Tutoring Action Buttons
 import { motion } from 'framer-motion';
-import { FiBookOpen, FiCalculator, FiHelpCircle, FiTarget, FiPenTool, FiGlobe } from 'react-icons/fi';
+import { FiBookOpen, FiHash, FiHelpCircle, FiTarget, FiEdit3, FiGlobe } from 'react-icons/fi';
 
 const QUICK_ACTIONS = [
   {
@@ -13,7 +13,7 @@ const QUICK_ACTIONS = [
   },
   {
     id: 'math',
-    icon: FiCalculator,
+    icon: FiHash,
     label: 'Math Practice',
     message: "Let's practice some math problems!",
     color: 'bg-green-500',
@@ -37,7 +37,7 @@ const QUICK_ACTIONS = [
   },
   {
     id: 'writing',
-    icon: FiPenTool,
+    icon: FiEdit3,
     label: 'Writing Help',
     message: "I need help with writing",
     color: 'bg-pink-500',

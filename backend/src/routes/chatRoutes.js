@@ -10,7 +10,7 @@ router.use(verifyChildToken);
 router.use(enforceAIAccess);
 
 // Chat endpoint with MCP context
-router.post('/chat', enrichWithMCPContext, chatController.chat);
+router.post('/message', enrichWithMCPContext, chatController.chat);
 
 // Other endpoints
 router.get('/suggestions', enrichWithMCPContext, chatController.getSuggestions);

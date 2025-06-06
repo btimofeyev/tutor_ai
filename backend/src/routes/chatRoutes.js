@@ -3,8 +3,10 @@ const router = express.Router();
 const chatController = require('../controllers/chatController');
 const { enrichWithMCPContext } = require('../middleware/mcpContext');
 const { enforceAIAccess } = require('../middleware/subscriptionEnforcement');
+const { verifyChildToken } = require('../middleware/childAuth');
 
-// All chat routes require AI access
+// All chat routes require child authentication first, then AI access
+router.use(verifyChildToken);
 router.use(enforceAIAccess);
 
 // Chat endpoint with MCP context

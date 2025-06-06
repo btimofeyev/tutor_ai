@@ -679,8 +679,42 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       }
     }
 
+    // Auto-generate conversational response if LLM only used function calls
+    let finalMessage = responseMessage.content;
+    if ((!finalMessage || finalMessage.trim() === '') && workspaceActions.length > 0) {
+      console.log('🎯 Auto-generating conversational response for function calls');
+      
+      const action = workspaceActions[0]; // Use first action for response
+      switch (action.action) {
+        case 'create_workspace':
+          finalMessage = `Great! I've set up "${action.workspace.title}" with ${action.workspace.problems.length} problems for you in the workspace. Let's start practicing! 🎯`;
+          break;
+        case 'add_problems':
+          finalMessage = `Awesome! I've added ${action.newProblems.length} more problems to keep you practicing. You're doing great! 💪`;
+          break;
+        case 'mark_correct':
+          const correctProblem = action.problem;
+          // Extract student's answer from the original message if possible
+          const answerMatch = message.match(/My work:\s*([^\n\[]+)/i);
+          const studentAnswer = answerMatch ? answerMatch[1].trim() : 'your answer';
+          finalMessage = `Perfect! You got that exactly right! ${correctProblem.text} = ${studentAnswer}. Great work! 🎉 Ready for the next one?`;
+          break;
+        case 'mark_incorrect':
+          const incorrectProblem = action.problem;
+          finalMessage = `Not quite right, but you're on the right track! Let's think through ${incorrectProblem.text} step by step. ${action.problem.feedback || "I'm here to help!"} 💪`;
+          break;
+        case 'clear_workspace':
+          finalMessage = `Workspace cleared! Ready to start something new? What would you like to practice? 🚀`;
+          break;
+        default:
+          finalMessage = `I've updated the workspace for you! 👍`;
+      }
+      
+      console.log(`🗣️ Generated conversational response: "${finalMessage}"`);
+    }
+
     // Update learning memories
-    await updateLearningMemories(childId, message, responseMessage.content || '', mcpContext, learningProfile);
+    await updateLearningMemories(childId, message, finalMessage || '', mcpContext, learningProfile);
 
     // Log interaction with function calling info
     try {
@@ -708,7 +742,7 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
     }
 
     console.log('\n✅ === FUNCTION CALLING CHAT SESSION COMPLETE ===');
-    console.log(`Response Length: ${responseMessage.content?.length || 0} characters`);
+    console.log(`Response Length: ${finalMessage?.length || 0} characters`);
     console.log(`Function Calls: ${toolCalls?.length || 0}`);
     console.log(`Workspace Actions: ${workspaceActions.length}`);
     console.log(`Material Content Used: ${!!materialContentForAI}`);
@@ -717,7 +751,7 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
     // Return enhanced response with workspace actions
     res.json({
       success: true,
-      message: responseMessage.content || '',
+      message: finalMessage || '',
       timestamp: new Date().toISOString(),
       provider: 'openai',
       workspaceActions: workspaceActions, // New: Function call results

@@ -1,4 +1,4 @@
-const { supabase } = require('./supabaseClient');
+const supabase = require('./supabaseClient');
 
 class WorkspaceFunctionHandlers {
   constructor() {
@@ -115,22 +115,22 @@ class WorkspaceFunctionHandlers {
       );
     }
 
-    // Record in database if possible
-    try {
-      await supabase
-        .from('practice_attempts')
-        .insert([{
-          child_id: childId,
-          session_id: this.sessionId,
-          problem_text: problem.text,
-          problem_type: problem.type,
-          student_work: problem.studentWork || '',
-          is_correct: true,
-          attempted_at: new Date().toISOString()
-        }]);
-    } catch (error) {
-      console.warn('Failed to record correct attempt:', error);
-    }
+    // Record in database if possible (disabled for now due to session ID format issues)
+    // try {
+    //   await supabase
+    //     .from('practice_attempts')
+    //     .insert([{
+    //       child_id: childId,
+    //       session_id: this.sessionId,
+    //       problem_text: problem.text,
+    //       problem_type: problem.type,
+    //       student_work: problem.studentWork || '',
+    //       is_correct: true,
+    //       attempted_at: new Date().toISOString()
+    //     }]);
+    // } catch (error) {
+    //   console.warn('Failed to record correct attempt:', error);
+    // }
 
     return {
       action: 'mark_correct',
@@ -160,22 +160,22 @@ class WorkspaceFunctionHandlers {
     // Reset streak on incorrect answer
     this.currentWorkspace.stats.streak = 0;
 
-    // Record in database if possible
-    try {
-      await supabase
-        .from('practice_attempts')
-        .insert([{
-          child_id: childId,
-          session_id: this.sessionId,
-          problem_text: problem.text,
-          problem_type: problem.type,
-          student_work: problem.studentWork || '',
-          is_correct: false,
-          attempted_at: new Date().toISOString()
-        }]);
-    } catch (error) {
-      console.warn('Failed to record incorrect attempt:', error);
-    }
+    // Record in database if possible (disabled for now due to session ID format issues)
+    // try {
+    //   await supabase
+    //     .from('practice_attempts')
+    //     .insert([{
+    //       child_id: childId,
+    //       session_id: this.sessionId,
+    //       problem_text: problem.text,
+    //       problem_type: problem.type,
+    //       student_work: problem.studentWork || '',
+    //       is_correct: false,
+    //       attempted_at: new Date().toISOString()
+    //     }]);
+    // } catch (error) {
+    //   console.warn('Failed to record incorrect attempt:', error);
+    // }
 
     return {
       action: 'mark_incorrect',

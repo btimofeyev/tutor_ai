@@ -52,6 +52,16 @@ export default function SchedulePage() {
     ? multiChildScheduleManagement 
     : singleChildScheduleManagement;
 
+  // Helper function to safely get entries count
+  const getTotalEntriesCount = () => {
+    if (selectedChildrenIds.length > 1) {
+      const allEntries = multiChildScheduleManagement.allScheduleEntries || {};
+      return Object.values(allEntries).flat().length;
+    } else {
+      return (singleChildScheduleManagement.scheduleEntries || []).length;
+    }
+  };
+
   // Initialize selected children when children data loads
   useEffect(() => {
     if (childrenData.children.length > 0 && selectedChildrenIds.length === 0) {
@@ -123,15 +133,15 @@ export default function SchedulePage() {
     if (window.confirm(confirmMessage)) {
       if (isMultiChild) {
         // Clear entries for all selected children
-        const allEntries = multiChildScheduleManagement.allScheduleEntries;
+        const allEntries = multiChildScheduleManagement.allScheduleEntries || {};
         for (const [childId, entries] of Object.entries(allEntries)) {
-          for (const entry of entries) {
+          for (const entry of (entries || [])) {
             await multiChildScheduleManagement.deleteScheduleEntry(entry.id, childId);
           }
         }
       } else {
         // Clear entries for single child
-        const entries = singleChildScheduleManagement.scheduleEntries;
+        const entries = singleChildScheduleManagement.scheduleEntries || [];
         for (const entry of entries) {
           await singleChildScheduleManagement.deleteScheduleEntry(entry.id);
         }
@@ -149,9 +159,9 @@ export default function SchedulePage() {
     if (window.confirm(confirmMessage)) {
       if (isMultiChild) {
         // Clear existing entries for all selected children first
-        const allEntries = multiChildScheduleManagement.allScheduleEntries;
+        const allEntries = multiChildScheduleManagement.allScheduleEntries || {};
         for (const [childId, entries] of Object.entries(allEntries)) {
-          for (const entry of entries) {
+          for (const entry of (entries || [])) {
             await multiChildScheduleManagement.deleteScheduleEntry(entry.id, childId);
           }
         }
@@ -159,7 +169,7 @@ export default function SchedulePage() {
         multiChildScheduleManagement.openAIModal();
       } else {
         // Clear existing entries for single child
-        const entries = singleChildScheduleManagement.scheduleEntries;
+        const entries = singleChildScheduleManagement.scheduleEntries || [];
         for (const entry of entries) {
           await singleChildScheduleManagement.deleteScheduleEntry(entry.id);
         }
@@ -240,7 +250,7 @@ export default function SchedulePage() {
                       Settings
                     </button>
                     
-                    {scheduleManagement.scheduleEntries.length > 0 && (
+                    {getTotalEntriesCount() > 0 && (
                       <>
                         <button 
                           onClick={handleClearSchedule}

@@ -17,6 +17,7 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showAIModal, setShowAIModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
 
   // Fetch schedule entries for a child
@@ -324,6 +325,15 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     setShowSettingsModal(false);
   };
 
+  const openAIModal = () => {
+    setShowAIModal(true);
+  };
+
+  const closeAIModal = () => {
+    setShowAIModal(false);
+    setAiScheduleResults(null); // Clear any existing results
+  };
+
   // Load data when childId changes
   useEffect(() => {
     if (childId) {
@@ -348,6 +358,7 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     showCreateModal,
     showEditModal,
     showSettingsModal,
+    showAIModal,
     editingEntry,
     
     // CRUD operations
@@ -371,6 +382,8 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     closeEditModal,
     openSettingsModal,
     closeSettingsModal,
+    openAIModal,
+    closeAIModal,
     
     // Refresh - only if we have API connectivity, otherwise keep local state
     refresh: () => {

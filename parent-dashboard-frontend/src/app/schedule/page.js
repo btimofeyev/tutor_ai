@@ -15,6 +15,7 @@ import ScheduleCalendar from "./components/ScheduleCalendar";
 import ScheduleSettingsModal from "./components/ScheduleSettingsModal";
 import CreateScheduleEntryModal from "./components/CreateScheduleEntryModal";
 import EditScheduleEntryModal from "./components/EditScheduleEntryModal";
+import AIScheduleModal from "./components/AIScheduleModal";
 import { useScheduleManagement } from "../../hooks/useScheduleManagement";
 
 export default function SchedulePage() {
@@ -145,7 +146,10 @@ export default function SchedulePage() {
                   >
                     Settings
                   </button>
-                  <button className="btn-primary">
+                  <button 
+                    onClick={scheduleManagement.openAIModal}
+                    className="btn-primary"
+                  >
                     🤖 AI Schedule
                   </button>
                 </div>
@@ -195,6 +199,20 @@ export default function SchedulePage() {
         schedulePreferences={scheduleManagement.schedulePreferences}
         childName={childrenData.selectedChild?.name}
         isSaving={scheduleManagement.loading}
+      />
+
+      {/* AI Schedule Modal */}
+      <AIScheduleModal
+        isOpen={scheduleManagement.showAIModal}
+        onClose={scheduleManagement.closeAIModal}
+        onGenerateSchedule={scheduleManagement.generateAISchedule}
+        onApplySchedule={scheduleManagement.applyAISchedule}
+        childId={childrenData.selectedChild?.id}
+        childName={childrenData.selectedChild?.name}
+        childSubjects={assignedSubjectsForCurrentChild}
+        aiScheduleResults={scheduleManagement.aiScheduleResults}
+        isGenerating={scheduleManagement.aiScheduling}
+        isApplying={scheduleManagement.loading}
       />
     </div>
   );

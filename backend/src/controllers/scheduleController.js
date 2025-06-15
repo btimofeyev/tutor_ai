@@ -374,11 +374,19 @@ const updateSchedulePreferences = async (req, res) => {
   }
 };
 
-// Generate AI schedule (placeholder - will implement AI logic later)
+// Generate AI schedule with intelligent scheduling logic
 const generateAISchedule = async (req, res) => {
   try {
     const parentId = getParentId(req);
-    const { child_id, start_date, end_date, focus_subjects } = req.body;
+    const { 
+      child_id, 
+      start_date, 
+      end_date, 
+      focus_subjects = [], 
+      weekly_hours = 15,
+      session_duration = 'mixed',
+      priority_mode = 'balanced'
+    } = req.body;
 
     if (!parentId) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -389,39 +397,184 @@ const generateAISchedule = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // For now, return a placeholder response
-    // TODO: Implement actual AI scheduling logic
-    const aiScheduleSuggestions = [
-      {
-        material_id: null,
-        subject_name: 'Math',
-        scheduled_date: '2025-06-16',
-        start_time: '09:00',
-        duration_minutes: 60,
-        created_by: 'ai_suggestion',
-        notes: 'AI suggested optimal time for math based on difficulty level'
-      },
-      {
-        material_id: null,
-        subject_name: 'Science',
-        scheduled_date: '2025-06-16',
-        start_time: '10:30',
-        duration_minutes: 45,
-        created_by: 'ai_suggestion',
-        notes: 'Science lab activity - good follow-up to math'
-      }
-    ];
+    // Get child's schedule preferences
+    const { data: preferences } = await supabase
+      .from('child_schedule_preferences')
+      .select('*')
+      .eq('child_id', child_id)
+      .single();
 
-    res.json({
-      suggestions: aiScheduleSuggestions,
-      reasoning: 'Schedule optimized for morning focus on challenging subjects, with appropriate break times.',
-      confidence: 0.85
-    });
+    // Use default preferences if none exist
+    const schedulePrefs = preferences || {
+      preferred_start_time: '09:00',
+      preferred_end_time: '15:00',
+      max_daily_study_minutes: 240,
+      break_duration_minutes: 15,
+      difficult_subjects_morning: true,
+      study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+    };
+
+    // Get existing schedule entries to avoid conflicts
+    const { data: existingEntries } = await supabase
+      .from('schedule_entries')
+      .select('scheduled_date, start_time, duration_minutes')
+      .eq('child_id', child_id)
+      .gte('scheduled_date', start_date)
+      .lte('scheduled_date', end_date)
+      .neq('status', 'skipped');
+
+    // AI scheduling logic
+    const aiSchedulePrompt = `
+    You are an expert education scheduler. Create an optimal study schedule with the following constraints:
+
+    Schedule Period: ${start_date} to ${end_date}
+    Target Weekly Hours: ${weekly_hours}
+    Preferred Study Time: ${schedulePrefs.preferred_start_time} - ${schedulePrefs.preferred_end_time}
+    Study Days: ${schedulePrefs.study_days.join(', ')}
+    Break Duration: ${schedulePrefs.break_duration_minutes} minutes
+    Difficult Subjects Morning: ${schedulePrefs.difficult_subjects_morning}
+    Session Duration Preference: ${session_duration}
+    Priority Mode: ${priority_mode}
+    Focus Subjects: ${focus_subjects.length > 0 ? focus_subjects.join(', ') : 'All subjects equally'}
+
+    Rules:
+    1. Respect the preferred study time window
+    2. Only schedule on specified study days
+    3. Include appropriate breaks between sessions
+    4. If difficult_subjects_morning is true, schedule challenging subjects (Math, Science) earlier
+    5. Vary session durations based on subject and preference
+    6. Avoid scheduling conflicts with existing entries
+    7. Distribute subjects evenly across the time period
+    8. Consider cognitive load - don't overload any single day
+
+    Default subjects to include: Math, Science, English, History, Reading
+    Use focus_subjects if specified, otherwise include all default subjects.
+
+    Return ONLY a JSON response with this exact structure:
+    {
+      "suggestions": [
+        {
+          "subject_name": "Math",
+          "scheduled_date": "2025-06-16",
+          "start_time": "09:00",
+          "duration_minutes": 60,
+          "notes": "Explanation of why this time/duration was chosen"
+        }
+      ],
+      "reasoning": "Brief explanation of the overall scheduling strategy",
+      "confidence": 0.85
+    }
+    `;
+
+    try {
+      const openaiResponse = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert educational scheduler. Respond only with valid JSON."
+          },
+          {
+            role: "user", 
+            content: aiSchedulePrompt
+          }
+        ],
+        max_tokens: 2000,
+        temperature: 0.7
+      });
+
+      const aiResponse = JSON.parse(openaiResponse.choices[0].message.content);
+      
+      // Validate the AI response structure
+      if (!aiResponse.suggestions || !Array.isArray(aiResponse.suggestions)) {
+        throw new Error('Invalid AI response structure');
+      }
+
+      // Add created_by field to each suggestion
+      const processedSuggestions = aiResponse.suggestions.map(suggestion => ({
+        ...suggestion,
+        material_id: null,
+        created_by: 'ai_suggestion'
+      }));
+
+      res.json({
+        suggestions: processedSuggestions,
+        reasoning: aiResponse.reasoning || 'AI-generated schedule optimized for learning effectiveness.',
+        confidence: aiResponse.confidence || 0.8
+      });
+
+    } catch (aiError) {
+      console.error('OpenAI API error:', aiError);
+      
+      // Fallback to rule-based scheduling if AI fails
+      const fallbackSuggestions = generateFallbackSchedule({
+        start_date,
+        end_date,
+        weekly_hours,
+        schedulePrefs,
+        focus_subjects,
+        session_duration,
+        priority_mode
+      });
+
+      res.json({
+        suggestions: fallbackSuggestions,
+        reasoning: 'Schedule generated using rule-based algorithm (AI temporarily unavailable).',
+        confidence: 0.7
+      });
+    }
+
   } catch (error) {
     console.error('Error in generateAISchedule:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+// Fallback rule-based scheduling function
+function generateFallbackSchedule({ start_date, end_date, weekly_hours, schedulePrefs, focus_subjects, session_duration, priority_mode }) {
+  const suggestions = [];
+  const subjects = focus_subjects.length > 0 ? focus_subjects : ['Math', 'Science', 'English', 'History'];
+  const difficultyOrder = schedulePrefs.difficult_subjects_morning ? 
+    ['Math', 'Science', 'English', 'History'] : 
+    ['History', 'English', 'Science', 'Math'];
+
+  // Simple rule-based generation
+  const startDate = new Date(start_date);
+  const endDate = new Date(end_date);
+  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  
+  let currentDate = new Date(startDate);
+  let subjectIndex = 0;
+  
+  while (currentDate <= endDate) {
+    const dayName = dayNames[currentDate.getDay()];
+    
+    if (schedulePrefs.study_days.includes(dayName)) {
+      const subject = priority_mode === 'difficult_first' ? 
+        difficultyOrder[subjectIndex % difficultyOrder.length] :
+        subjects[subjectIndex % subjects.length];
+      
+      const duration = session_duration === 'short' ? 30 : 
+                      session_duration === 'long' ? 90 : 60;
+      
+      suggestions.push({
+        material_id: null,
+        subject_name: subject,
+        scheduled_date: currentDate.toISOString().split('T')[0],
+        start_time: schedulePrefs.preferred_start_time,
+        duration_minutes: duration,
+        created_by: 'ai_suggestion',
+        notes: `Scheduled using rule-based algorithm for ${subject.toLowerCase()} study`
+      });
+      
+      subjectIndex++;
+    }
+    
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  return suggestions.slice(0, Math.floor(weekly_hours / 1.5)); // Limit based on weekly hours
+}
 
 module.exports = {
   getScheduleEntries,

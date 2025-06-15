@@ -283,12 +283,7 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
         }));
         
         // Add to local state
-        console.log('Adding AI entries to local state:', localEntries);
-        setScheduleEntries(prev => {
-          const newState = [...prev, ...localEntries];
-          console.log('New schedule entries state after AI application:', newState);
-          return newState;
-        });
+        setScheduleEntries(prev => [...prev, ...localEntries]);
         setAiScheduleResults(null); // Clear AI results
         setError(null);
         
@@ -306,14 +301,14 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
 
   // Convert schedule entries to calendar events
   const getCalendarEvents = () => {
-    console.log('Converting schedule entries to calendar events:', scheduleEntries);
-    const events = scheduleEntries.map(entry => ({
+    return scheduleEntries.map(entry => ({
       id: entry.id,
       title: entry.material?.title || entry.subject_name || 'Study Time',
       subject: entry.subject_name,
       date: entry.scheduled_date,
       startTime: entry.start_time,
       duration: entry.duration_minutes,
+      duration_minutes: entry.duration_minutes, // Keep both for compatibility
       status: entry.status,
       notes: entry.notes,
       // Also keep the original calendar format for compatibility
@@ -326,8 +321,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
         status: entry.status
       }
     }));
-    console.log('Generated calendar events:', events);
-    return events;
   };
 
   // Mark schedule entry as completed

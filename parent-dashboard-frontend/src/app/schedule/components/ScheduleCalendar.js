@@ -40,9 +40,8 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
   const getEventsForDay = (day) => {
     const dayString = format(day, 'yyyy-MM-dd');
     const events = calendarEvents || [];
-    console.log(`Getting events for ${dayString}, available events:`, events);
     
-    const dayEvents = events.filter(event => {
+    return events.filter(event => {
       if (event.date) {
         return event.date === dayString;
       }
@@ -52,12 +51,10 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
       }
       return false;
     });
-    console.log(`Filtered events for ${dayString}:`, dayEvents);
-    return dayEvents;
   };
 
-  // Check if a time slot is blocked by an existing event
-  const isTimeSlotBlocked = (day, timeSlot) => {
+  // Check if a time slot is occupied by an event (for click handling)
+  const isTimeSlotOccupied = (day, timeSlot) => {
     const dayEvents = getEventsForDay(day);
     const slotTime = new Date(`2000-01-01T${timeSlot}`);
     
@@ -72,25 +69,51 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
       // Check if this time slot falls within an existing event's duration
       const slotEndTime = new Date(slotTime.getTime() + (30 * 60000)); // 30-minute slot
       
-      // Slot is blocked if it overlaps with an existing event
+      // Slot is occupied if it overlaps with an existing event
       return (slotTime < eventEndTime && slotEndTime > eventStartTime);
     });
+  };
+
+  // Get the event that starts at a specific time slot
+  const getEventStartingAt = (day, timeSlot) => {
+    const dayEvents = getEventsForDay(day);
+    return dayEvents.find(event => {
+      let eventTime = event.startTime || format(new Date(event.start), 'HH:mm');
+      eventTime = eventTime.length === 8 ? eventTime.substring(0, 5) : eventTime;
+      return eventTime === timeSlot;
+    });
+  };
+
+  // Calculate how many 30-minute slots an event spans
+  const getEventHeight = (duration) => {
+    return Math.ceil(duration / 30);
+  };
+
+  // Calculate the position and height for spanning events
+  const getEventDisplayInfo = (event, timeSlot) => {
+    let eventTime = event.startTime || format(new Date(event.start), 'HH:mm');
+    eventTime = eventTime.length === 8 ? eventTime.substring(0, 5) : eventTime;
+    
+    if (eventTime !== timeSlot) return null;
+    
+    const duration = event.duration || event.duration_minutes || 30;
+    const height = getEventHeight(duration);
+    
+    return {
+      height,
+      duration
+    };
   };
 
   // Check if a time slot has an event starting at that exact time
   const hasEventAtTime = (day, timeSlot) => {
     const dayEvents = getEventsForDay(day);
-    const dayString = format(day, 'yyyy-MM-dd');
-    console.log(`Checking hasEventAtTime for ${dayString} ${timeSlot}:`, dayEvents);
-    const result = dayEvents.some(event => {
+    return dayEvents.some(event => {
       let eventTime = event.startTime || format(new Date(event.start), 'HH:mm');
       // Normalize time format - remove seconds if present
       eventTime = eventTime.length === 8 ? eventTime.substring(0, 5) : eventTime;
-      console.log(`Event time: ${eventTime}, checking against: ${timeSlot}`);
       return eventTime === timeSlot;
     });
-    console.log(`hasEventAtTime result: ${result}`);
-    return result;
   };
 
   // Get subject color
@@ -225,28 +248,19 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
               
               {/* Day Columns */}
               {weekDays.map((day, dayIndex) => {
-                const dayEvents = getEventsForDay(day);
-                const timeEvents = dayEvents.filter(event => {
-                  let eventTime = event.startTime || format(new Date(event.start), 'HH:mm');
-                  // Normalize time format - remove seconds if present
-                  eventTime = eventTime.length === 8 ? eventTime.substring(0, 5) : eventTime;
-                  return eventTime === timeSlot;
-                });
-
-                const isBlocked = isTimeSlotBlocked(day, timeSlot);
-                const hasEvent = hasEventAtTime(day, timeSlot);
-                const isClickable = !isBlocked || hasEvent; // Can click if not blocked, or if there's an event to edit
+                const isOccupied = isTimeSlotOccupied(day, timeSlot);
+                const eventStartingHere = getEventStartingAt(day, timeSlot);
+                const isClickable = !isOccupied || eventStartingHere; // Can click if not occupied, or if there's an event to edit
 
                 return (
                   <div
                     key={dayIndex}
-                    className={`p-2 min-h-[60px] border-r border-border-subtle last:border-r-0 transition-colors ${
-                      isBlocked && !hasEvent
-                        ? 'bg-gray-100 cursor-not-allowed opacity-60' // Blocked slots
-                        : 'hover:bg-gray-50 cursor-pointer' // Normal slots
+                    className={`relative border-r border-border-subtle last:border-r-0 transition-colors ${
+                      !isOccupied ? 'hover:bg-gray-50 cursor-pointer' : ''
                     }`}
+                    style={{ minHeight: '60px' }}
                     onClick={() => {
-                      if (isClickable) {
+                      if (!isOccupied) {
                         openCreateModal({
                           date: format(day, 'yyyy-MM-dd'),
                           time: timeSlot
@@ -254,30 +268,31 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
                       }
                     }}
                   >
-                    {timeEvents.map((event) => (
+                    {eventStartingHere && (
                       <div
-                        key={event.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          openEditModal(event);
+                          openEditModal(eventStartingHere);
                         }}
                         className={`
-                          ${getSubjectColor(event.subject)} 
-                          ${event.status === 'completed' ? 'opacity-60' : ''}
-                          text-white text-xs p-2 rounded mb-1 cursor-pointer hover:opacity-80 transition-opacity
+                          absolute inset-x-0 top-0 mx-1 rounded cursor-pointer hover:opacity-80 transition-opacity
+                          ${getSubjectColor(eventStartingHere.subject)} 
+                          ${eventStartingHere.status === 'completed' ? 'opacity-60' : ''}
+                          text-white text-xs p-2 z-10
                         `}
+                        style={{
+                          height: `${getEventHeight(eventStartingHere.duration || eventStartingHere.duration_minutes || 30) * 60 - 4}px`, // Account for margin
+                        }}
                       >
-                        <div className="font-medium truncate">{event.title}</div>
-                        <div className="opacity-75">
-                          {event.duration || 30}min
+                        <div className="font-medium truncate">{eventStartingHere.title}</div>
+                        <div className="opacity-75 text-xs">
+                          {eventStartingHere.duration || eventStartingHere.duration_minutes || 30}min
                         </div>
-                      </div>
-                    ))}
-                    
-                    {/* Show blocked indicator if slot is blocked but has no event */}
-                    {isBlocked && !hasEvent && (
-                      <div className="text-xs text-gray-400 italic text-center py-2">
-                        In use
+                        {eventStartingHere.notes && (
+                          <div className="opacity-75 text-xs mt-1 truncate">
+                            {eventStartingHere.notes}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

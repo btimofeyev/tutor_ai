@@ -16,10 +16,13 @@ export default function CreateScheduleEntryModal({
   materials = [],
   lessonsBySubject = {},
   unitsBySubject = {},
-  isSaving = false 
+  isSaving = false,
+  selectedChildrenIds = [],
+  allChildren = []
 }) {
   // Form state
   const [formData, setFormData] = useState({
+    child_id: '',
     subject_name: '',
     material_id: '',
     scheduled_date: '',
@@ -40,7 +43,11 @@ export default function CreateScheduleEntryModal({
   // Initialize form when modal opens or slot changes
   useEffect(() => {
     if (isOpen && selectedSlot) {
+      // Auto-select child if only one child is selected, otherwise require selection
+      const defaultChildId = selectedChildrenIds.length === 1 ? selectedChildrenIds[0] : '';
+      
       setFormData({
+        child_id: defaultChildId,
         subject_name: '',
         material_id: '',
         scheduled_date: selectedSlot.date || format(new Date(), 'yyyy-MM-dd'),
@@ -51,7 +58,7 @@ export default function CreateScheduleEntryModal({
       });
       setErrors({});
     }
-  }, [isOpen, selectedSlot]);
+  }, [isOpen, selectedSlot, selectedChildrenIds]);
 
   // Handle input changes
   const handleInputChange = (e) => {
@@ -136,6 +143,11 @@ export default function CreateScheduleEntryModal({
   const validateForm = () => {
     const newErrors = {};
 
+    // Validate child selection in multi-child mode
+    if (selectedChildrenIds.length > 1 && !formData.child_id) {
+      newErrors.child_id = 'Please select a child';
+    }
+
     if (!formData.scheduled_date) {
       newErrors.scheduled_date = 'Date is required';
     }
@@ -171,7 +183,9 @@ export default function CreateScheduleEntryModal({
     }
 
     try {
-      await onSave(formData);
+      // Determine target child ID - use form selection or default to first selected child
+      const targetChildId = formData.child_id || selectedChildrenIds[0];
+      await onSave(formData, targetChildId);
       onClose();
     } catch (error) {
       console.error('Error saving schedule entry:', error);
@@ -212,6 +226,35 @@ export default function CreateScheduleEntryModal({
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 bg-white">
           <div className="space-y-4">
+            {/* Child Selection (only in multi-child mode) */}
+            {selectedChildrenIds.length > 1 && (
+              <div>
+                <label htmlFor="child_id" className={formLabelStyles}>
+                  Select Child
+                </label>
+                <select
+                  id="child_id"
+                  name="child_id"
+                  value={formData.child_id}
+                  onChange={handleInputChange}
+                  className={formInputStyles}
+                  required
+                >
+                  <option value="">Choose a child...</option>
+                  {allChildren
+                    .filter(child => selectedChildrenIds.includes(child.id))
+                    .map(child => (
+                      <option key={child.id} value={child.id}>
+                        {child.name} (Grade {child.grade})
+                      </option>
+                    ))}
+                </select>
+                {errors.child_id && (
+                  <p className="text-red-600 text-xs mt-1">{errors.child_id}</p>
+                )}
+              </div>
+            )}
+
             {/* Date and Time Row */}
             <div className="grid grid-cols-2 gap-3">
               <div>

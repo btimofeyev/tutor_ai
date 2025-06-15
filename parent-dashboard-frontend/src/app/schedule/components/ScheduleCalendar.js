@@ -4,9 +4,16 @@ import { useState, useMemo } from 'react';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, CalendarDaysIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
-import { getSubjectColor, getSubjectDarkBgColor, getSubjectTextColor } from '../../../utils/subjectColors';
+import { getSubjectColor, getSubjectDarkBgColor, getSubjectTextColor, getMultiChildSubjectStyle, getChildVariation } from '../../../utils/subjectColors';
 
-export default function ScheduleCalendar({ childId, subscriptionPermissions, scheduleManagement, childSubjects = [] }) {
+export default function ScheduleCalendar({ 
+  childId, 
+  selectedChildrenIds = [], 
+  allChildren = [],
+  subscriptionPermissions, 
+  scheduleManagement, 
+  childSubjects = [] 
+}) {
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 })); // Start on Monday
   
   // Use schedule management from props or create our own
@@ -118,12 +125,31 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
   };
 
   // Use centralized color utility for calendar events
-  const getSubjectEventColor = (subject) => {
+  const getSubjectEventColor = (subject, eventChildId = null) => {
+    const isMultiChild = selectedChildrenIds.length > 1;
+    if (isMultiChild && eventChildId) {
+      const style = getMultiChildSubjectStyle(subject, eventChildId, childSubjects, allChildren);
+      return `${style.bgDark} ${style.opacity}`;
+    }
     return getSubjectDarkBgColor(subject, childSubjects);
   };
 
-  const getSubjectEventTextColor = (subject) => {
+  const getSubjectEventTextColor = (subject, eventChildId = null) => {
+    const isMultiChild = selectedChildrenIds.length > 1;
+    if (isMultiChild && eventChildId) {
+      const style = getMultiChildSubjectStyle(subject, eventChildId, childSubjects, allChildren);
+      return style.text;
+    }
     return getSubjectTextColor(subject, childSubjects);
+  };
+
+  const getSubjectEventBorder = (subject, eventChildId = null) => {
+    const isMultiChild = selectedChildrenIds.length > 1;
+    if (isMultiChild && eventChildId) {
+      const style = getMultiChildSubjectStyle(subject, eventChildId, childSubjects, allChildren);
+      return style.border;
+    }
+    return '';
   };
 
   // Navigate weeks
@@ -260,10 +286,11 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
                         }}
                         className={`
                           absolute inset-x-0 top-0 mx-2 rounded-lg cursor-pointer hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow-lg
-                          ${getSubjectEventColor(eventStartingHere.subject)} 
-                          ${getSubjectEventTextColor(eventStartingHere.subject)}
+                          ${getSubjectEventColor(eventStartingHere.subject, eventStartingHere.childId)} 
+                          ${getSubjectEventTextColor(eventStartingHere.subject, eventStartingHere.childId)}
+                          ${getSubjectEventBorder(eventStartingHere.subject, eventStartingHere.childId)}
                           ${eventStartingHere.status === 'completed' ? 'opacity-70' : ''}
-                          text-xs p-3 z-10 border-0
+                          text-xs p-3 z-10
                         `}
                         style={{
                           height: `${getEventHeight(eventStartingHere.duration || eventStartingHere.duration_minutes || 30) * 60 - 4}px`, // Account for margin
@@ -274,6 +301,11 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
                             <div className={`font-semibold truncate ${eventStartingHere.status === 'completed' ? 'line-through' : ''}`}>
                               {eventStartingHere.title}
                             </div>
+                            {selectedChildrenIds.length > 1 && (
+                              <div className="text-xs font-medium opacity-90 mt-0.5">
+                                {eventStartingHere.childName || 'Unknown Child'}
+                              </div>
+                            )}
                             <div className="opacity-80 text-xs mt-1">
                               {eventStartingHere.duration || eventStartingHere.duration_minutes || 30} minutes
                             </div>
@@ -288,10 +320,18 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              const entryChildId = eventStartingHere.childId || eventStartingHere.originalEntry?.child_id;
                               if (eventStartingHere.status === 'completed') {
-                                scheduleManagement.updateScheduleEntry(eventStartingHere.id, { status: 'scheduled' });
+                                scheduleManagement.updateScheduleEntry(
+                                  eventStartingHere.originalEntry?.id || eventStartingHere.id, 
+                                  { status: 'scheduled' },
+                                  entryChildId
+                                );
                               } else {
-                                scheduleManagement.markEntryCompleted(eventStartingHere.id);
+                                scheduleManagement.markEntryCompleted(
+                                  eventStartingHere.originalEntry?.id || eventStartingHere.id,
+                                  entryChildId
+                                );
                               }
                             }}
                             className={`ml-2 p-1.5 rounded-full transition-all duration-200 hover:scale-110 shadow-sm ${
@@ -316,23 +356,69 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
 
       {/* Modern Legend */}
       <div className="mt-8 p-4 bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl">
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">Subject Colors</h4>
-        <div className="flex flex-wrap gap-4 text-sm">
-          {childSubjects.map((subject) => {
-            const colorInfo = getSubjectColor(subject.name, childSubjects);
-            return (
-              <div key={subject.child_subject_id} className="flex items-center gap-2">
-                <div className={`w-4 h-4 ${colorInfo.bg} rounded-lg shadow-sm`}></div>
-                <span className="text-gray-600 font-medium">{subject.name}</span>
+        {selectedChildrenIds.length > 1 ? (
+          // Multi-child legend
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700 mb-3">Family Schedule Legend</h4>
+            <div className="space-y-4">
+              {/* Children patterns */}
+              <div>
+                <h5 className="text-xs font-medium text-gray-600 mb-2">Children:</h5>
+                <div className="flex flex-wrap gap-3 text-sm">
+                  {allChildren
+                    .filter(child => selectedChildrenIds.includes(child.id))
+                    .map((child, index) => {
+                      const variation = getChildVariation(index);
+                      return (
+                        <div key={child.id} className="flex items-center gap-2">
+                          <div className={`w-4 h-4 bg-blue-200 rounded-lg ${variation.border} ${variation.opacity}`}></div>
+                          <span className="text-gray-600 font-medium">{child.name}</span>
+                          <span className="text-xs text-gray-500">({variation.name})</span>
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
-            );
-          })}
-          
-          {/* Always show completed status */}
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-gray-300 rounded-lg opacity-60"></div>
-            <span className="text-gray-500 font-medium">Completed</span>
+              
+              {/* Subject colors */}
+              <div>
+                <h5 className="text-xs font-medium text-gray-600 mb-2">Subject Colors:</h5>
+                <div className="flex flex-wrap gap-3 text-sm">
+                  {childSubjects.map((subject) => {
+                    const colorInfo = getSubjectColor(subject.name, childSubjects);
+                    return (
+                      <div key={subject.child_subject_id} className="flex items-center gap-2">
+                        <div className={`w-4 h-4 ${colorInfo.bg} rounded-lg shadow-sm`}></div>
+                        <span className="text-gray-600 font-medium">{subject.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
+        ) : (
+          // Single child legend  
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700 mb-3">Subject Colors</h4>
+            <div className="flex flex-wrap gap-4 text-sm">
+              {childSubjects.map((subject) => {
+                const colorInfo = getSubjectColor(subject.name, childSubjects);
+                return (
+                  <div key={subject.child_subject_id} className="flex items-center gap-2">
+                    <div className={`w-4 h-4 ${colorInfo.bg} rounded-lg shadow-sm`}></div>
+                    <span className="text-gray-600 font-medium">{subject.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        
+        {/* Always show completed status */}
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
+          <div className="w-4 h-4 bg-gray-300 rounded-lg opacity-60"></div>
+          <span className="text-gray-500 font-medium">Completed</span>
         </div>
       </div>
 
@@ -340,6 +426,9 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
       <div className="mt-4 p-4 bg-blue-50 rounded-xl border-l-4 border-blue-200">
         <p className="text-sm text-blue-800">
           <strong>Quick Guide:</strong> Click empty slots to add study time • Click events to edit • Use checkmarks to mark complete
+          {selectedChildrenIds.length > 1 && (
+            <span> • Different border patterns distinguish between children</span>
+          )}
         </p>
       </div>
     </div>

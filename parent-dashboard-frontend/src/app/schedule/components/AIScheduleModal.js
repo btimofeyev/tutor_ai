@@ -18,7 +18,9 @@ export default function AIScheduleModal({
   materials = [],
   aiScheduleResults = null,
   isGenerating = false,
-  isApplying = false 
+  isApplying = false,
+  selectedChildrenIds = [],
+  allChildren = []
 }) {
   // Form state for AI parameters
   const [formData, setFormData] = useState({
@@ -27,7 +29,8 @@ export default function AIScheduleModal({
     focus_subjects: [],
     weekly_hours: 15,
     session_duration: 'mixed', // 'short', 'medium', 'long', 'mixed'
-    priority_mode: 'balanced' // 'difficult_first', 'easy_first', 'balanced'
+    priority_mode: 'balanced', // 'difficult_first', 'easy_first', 'balanced'
+    selected_children: [] // For multi-child mode
   });
 
   const [errors, setErrors] = useState({});
@@ -46,12 +49,13 @@ export default function AIScheduleModal({
         focus_subjects: [],
         weekly_hours: 15,
         session_duration: 'mixed',
-        priority_mode: 'balanced'
+        priority_mode: 'balanced',
+        selected_children: selectedChildrenIds.length > 1 ? [...selectedChildrenIds] : [childId].filter(Boolean)
       });
       setErrors({});
       setCurrentStep('parameters');
     }
-  }, [isOpen]);
+  }, [isOpen, selectedChildrenIds, childId]);
 
   // Reset to parameters step when AI results are cleared
   useEffect(() => {
@@ -87,9 +91,24 @@ export default function AIScheduleModal({
     }));
   };
 
+  // Handle child selection changes
+  const handleChildSelectionChange = (childId) => {
+    setFormData(prev => ({
+      ...prev,
+      selected_children: prev.selected_children.includes(childId)
+        ? prev.selected_children.filter(id => id !== childId)
+        : [...prev.selected_children, childId]
+    }));
+  };
+
   // Validate form
   const validateForm = () => {
     const newErrors = {};
+
+    // Validate child selection
+    if (formData.selected_children.length === 0) {
+      newErrors.selected_children = 'Please select at least one child';
+    }
 
     if (!formData.start_date) {
       newErrors.start_date = 'Start date is required';
@@ -126,11 +145,23 @@ export default function AIScheduleModal({
     }
 
     try {
-      await onGenerateSchedule({
-        child_id: childId,
-        ...formData,
-        materials: materials // Pass materials data to backend
-      });
+      const isMultiChild = formData.selected_children.length > 1;
+      
+      if (isMultiChild) {
+        // Use multi-child AI generation
+        await onGenerateSchedule({
+          children_ids: formData.selected_children,
+          ...formData,
+          materials: materials // Pass materials data to backend
+        });
+      } else {
+        // Use single-child AI generation
+        await onGenerateSchedule({
+          child_id: formData.selected_children[0] || childId,
+          ...formData,
+          materials: materials // Pass materials data to backend
+        });
+      }
     } catch (error) {
       console.error('Error generating AI schedule:', error);
       setErrors({ submit: 'Failed to generate AI schedule. Please try again.' });
@@ -176,7 +207,7 @@ export default function AIScheduleModal({
         <div className="flex justify-between items-center p-6 border-b border-[var(--border-subtle)] bg-[var(--background-card)]">
           <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
             <SparklesIcon className="h-5 w-5 text-[var(--accent-blue)]" />
-            AI Schedule Generator for {childName}
+            {selectedChildrenIds.length > 1 ? 'AI Family Schedule Generator' : `AI Schedule Generator for ${childName}`}
           </h3>
           <button
             onClick={onClose}
@@ -191,6 +222,36 @@ export default function AIScheduleModal({
           {currentStep === 'parameters' && (
             <form onSubmit={handleGenerate} className="p-6 bg-white">
               <div className="space-y-6">
+                {/* Child Selection */}
+                {selectedChildrenIds.length > 1 && (
+                  <div className="border border-[var(--border-subtle)] rounded-lg p-4 bg-[var(--background-main)]">
+                    <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
+                      Select Children for AI Scheduling
+                    </h4>
+                    <div className="space-y-2">
+                      {allChildren
+                        .filter(child => selectedChildrenIds.includes(child.id))
+                        .map(child => (
+                          <label key={child.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formData.selected_children.includes(child.id)}
+                              onChange={() => handleChildSelectionChange(child.id)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <div>
+                              <span className="font-medium text-gray-900">{child.name}</span>
+                              <span className="text-sm text-gray-500 ml-2">Grade {child.grade}</span>
+                            </div>
+                          </label>
+                        ))}
+                    </div>
+                    {errors.selected_children && (
+                      <p className="text-red-600 text-xs mt-2">{errors.selected_children}</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Date Range */}
                 <div className="border border-[var(--border-subtle)] rounded-lg p-4 bg-[var(--background-main)]">
                   <h4 className="text-md font-medium text-[var(--text-primary)] mb-3 flex items-center gap-2">

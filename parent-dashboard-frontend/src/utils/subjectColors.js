@@ -83,3 +83,41 @@ export function assignColorsToSubjects(subjects) {
     color: SUBJECT_COLORS[index % SUBJECT_COLORS.length]
   }));
 }
+
+// Additional colors for child differentiation when multiple children are shown
+const CHILD_VARIATIONS = [
+  { opacity: 'opacity-100', border: 'border-2', name: 'Full' },
+  { opacity: 'opacity-80', border: 'border-dashed border-2', name: 'Dashed' },
+  { opacity: 'opacity-60', border: 'border-dotted border-2', name: 'Dotted' },
+  { opacity: 'opacity-90', border: 'border-double border-4', name: 'Double' }
+];
+
+/**
+ * Get unique styling for a child-subject combination in multi-child view
+ * @param {string} subjectName - Name of the subject
+ * @param {string} childId - ID of the child
+ * @param {Array} childSubjects - Array of child's subjects
+ * @param {Array} allChildren - Array of all children for consistent child ordering
+ * @returns {Object} Style object with colors and variations
+ */
+export function getMultiChildSubjectStyle(subjectName, childId, childSubjects, allChildren) {
+  const baseColor = getSubjectColor(subjectName, childSubjects);
+  const childIndex = allChildren.findIndex(child => child.id === childId);
+  const childVariation = CHILD_VARIATIONS[childIndex % CHILD_VARIATIONS.length];
+  
+  return {
+    ...baseColor,
+    opacity: childVariation.opacity,
+    border: childVariation.border,
+    childVariation: childVariation.name
+  };
+}
+
+/**
+ * Get child-specific color variation for legend display
+ * @param {number} childIndex - Index of child in the children array
+ * @returns {Object} Child variation styling
+ */
+export function getChildVariation(childIndex) {
+  return CHILD_VARIATIONS[childIndex % CHILD_VARIATIONS.length];
+}

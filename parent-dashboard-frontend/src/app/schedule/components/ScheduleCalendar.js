@@ -62,7 +62,10 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
     const slotTime = new Date(`2000-01-01T${timeSlot}`);
     
     return dayEvents.some(event => {
-      const eventStartTime = new Date(`2000-01-01T${event.startTime || format(new Date(event.start), 'HH:mm')}`);
+      let eventTimeStr = event.startTime || format(new Date(event.start), 'HH:mm');
+      // Normalize time format - remove seconds if present
+      eventTimeStr = eventTimeStr.length === 8 ? eventTimeStr.substring(0, 5) : eventTimeStr;
+      const eventStartTime = new Date(`2000-01-01T${eventTimeStr}`);
       const eventDuration = event.duration || event.duration_minutes || 30;
       const eventEndTime = new Date(eventStartTime.getTime() + (eventDuration * 60000));
       
@@ -80,7 +83,9 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
     const dayString = format(day, 'yyyy-MM-dd');
     console.log(`Checking hasEventAtTime for ${dayString} ${timeSlot}:`, dayEvents);
     const result = dayEvents.some(event => {
-      const eventTime = event.startTime || format(new Date(event.start), 'HH:mm');
+      let eventTime = event.startTime || format(new Date(event.start), 'HH:mm');
+      // Normalize time format - remove seconds if present
+      eventTime = eventTime.length === 8 ? eventTime.substring(0, 5) : eventTime;
       console.log(`Event time: ${eventTime}, checking against: ${timeSlot}`);
       return eventTime === timeSlot;
     });
@@ -222,7 +227,9 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
               {weekDays.map((day, dayIndex) => {
                 const dayEvents = getEventsForDay(day);
                 const timeEvents = dayEvents.filter(event => {
-                  const eventTime = event.startTime || format(new Date(event.start), 'HH:mm');
+                  let eventTime = event.startTime || format(new Date(event.start), 'HH:mm');
+                  // Normalize time format - remove seconds if present
+                  eventTime = eventTime.length === 8 ? eventTime.substring(0, 5) : eventTime;
                   return eventTime === timeSlot;
                 });
 

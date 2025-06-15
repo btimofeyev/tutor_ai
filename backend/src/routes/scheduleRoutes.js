@@ -17,4 +17,7 @@ router.post('/preferences/:child_id', scheduleController.updateSchedulePreferenc
 router.post('/ai-generate', scheduleController.generateAISchedule);
 router.post('/family-generate', scheduleController.generateFamilySchedule);
 
+// Simplified conflict-free family scheduling
+router.post('/conflict-free', scheduleController.generateConflictFreeSchedule);
+
 module.exports = router;

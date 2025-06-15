@@ -1,247 +1,248 @@
 // Advanced AI Scheduling Service with Multi-Stage Reasoning and Family Coordination
 const OpenAI = require('openai');
+const supabase = require('../utils/supabaseClient');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
 });
 
 class AdvancedSchedulingService {
-  constructor() {
-    // Cognitive load weights for optimal learning timing
-    this.COGNITIVE_LOAD_WEIGHTS = {
-      // High cognitive load subjects - best in morning peak hours
-      'Mathematics': 0.95,
-      'Pre-Algebra': 0.95,
-      'Algebra I': 0.95,
-      'Science': 0.90,
-      'Physical Science': 0.90,
-      'Life Science': 0.90,
-      'Chemistry': 0.90,
-      'Physics': 0.90,
-      
-      // Medium cognitive load - good for mid-day
-      'English Language Arts': 0.70,
-      'Language Arts': 0.70,
-      'English Literature': 0.70,
-      'Social Studies': 0.65,
-      'World History': 0.65,
-      'American History': 0.65,
-      
-      // Lower cognitive load - suitable for afternoon
-      'Art & Creativity': 0.40,
-      'Visual Arts': 0.40,
-      'Art': 0.40,
-      'Physical Education & Health': 0.35,
-      'Physical Education': 0.35,
-      'Health & Fitness': 0.35,
-      'Music': 0.30
-    };
+    constructor() {
+        // Cognitive load weights for optimal learning timing
+        this.COGNITIVE_LOAD_WEIGHTS = {
+            // High cognitive load subjects - best in morning peak hours
+            'Mathematics': 0.95,
+            'Pre-Algebra': 0.95,
+            'Algebra I': 0.95,
+            'Science': 0.90,
+            'Physical Science': 0.90,
+            'Life Science': 0.90,
+            'Chemistry': 0.90,
+            'Physics': 0.90,
 
-    // Optimal learning windows based on cognitive science research
-    this.LEARNING_WINDOWS = {
-      HIGH_COGNITIVE: { start: '09:00', end: '11:30', efficiency: 1.0 },
-      MEDIUM_COGNITIVE: { start: '11:30', end: '14:00', efficiency: 0.8 },
-      LOW_COGNITIVE: { start: '14:00', end: '17:00', efficiency: 0.6 },
-      REVIEW_TIME: { start: '17:00', end: '18:00', efficiency: 0.5 }
-    };
+            // Medium cognitive load - good for mid-day
+            'English Language Arts': 0.70,
+            'Language Arts': 0.70,
+            'English Literature': 0.70,
+            'Social Studies': 0.65,
+            'World History': 0.65,
+            'American History': 0.65,
 
-    // Subject interdependencies for logical scheduling progression
-    this.SUBJECT_DEPENDENCIES = {
-      'Mathematics': ['Physical Science', 'Chemistry', 'Physics'],
-      'Pre-Algebra': ['Mathematics', 'Science'],
-      'Algebra I': ['Physical Science', 'Chemistry'],
-      'English Language Arts': ['Social Studies', 'History'],
-      'Language Arts': ['World History', 'American History'],
-      'Science': ['Mathematics'],
-      'Physical Science': ['Mathematics', 'Pre-Algebra', 'Algebra I']
-    };
+            // Lower cognitive load - suitable for afternoon
+            'Art & Creativity': 0.40,
+            'Visual Arts': 0.40,
+            'Art': 0.40,
+            'Physical Education & Health': 0.35,
+            'Physical Education': 0.35,
+            'Health & Fitness': 0.35,
+            'Music': 0.30
+        };
 
-    // Session duration options using golden ratio for optimal attention spans
-    this.SESSION_DURATIONS = {
-      SHORT: 25, // Pomodoro technique
-      MEDIUM: 45, // Standard class period
-      LONG: 73, // Golden ratio extension (45 * 1.618)
-      EXTENDED: 90 // Deep work sessions
-    };
-  }
+        // Optimal learning windows based on cognitive science research
+        this.LEARNING_WINDOWS = {
+            HIGH_COGNITIVE: { start: '09:00', end: '11:30', efficiency: 1.0 },
+            MEDIUM_COGNITIVE: { start: '11:30', end: '14:00', efficiency: 0.8 },
+            LOW_COGNITIVE: { start: '14:00', end: '17:00', efficiency: 0.6 },
+            REVIEW_TIME: { start: '17:00', end: '18:00', efficiency: 0.5 }
+        };
 
-  /**
-   * Main entry point for advanced AI scheduling
-   */
-  async generateOptimalSchedule(scheduleRequest) {
-    console.log('🧠 Starting Advanced AI Scheduling Engine...');
-    
-    try {
-      // Stage 1: Comprehensive Context Analysis
-      const context = await this.analyzeSchedulingContext(scheduleRequest);
-      
-      // Stage 2: Generate Optimal Time Slots
-      const timeSlots = await this.generateOptimalTimeSlots(context);
-      
-      // Stage 3: AI-Powered Subject Assignment
-      const preliminarySchedule = await this.performAISubjectAssignment(context, timeSlots);
-      
-      // Stage 4: Cognitive Load Optimization
-      const optimizedSchedule = await this.optimizeCognitiveLoad(preliminarySchedule, context);
-      
-      // Stage 5: Final Validation and Enhancement
-      const finalSchedule = await this.validateAndEnhanceSchedule(optimizedSchedule, context);
-      
-      console.log('✅ Advanced AI Scheduling completed successfully');
-      return finalSchedule;
-      
-    } catch (error) {
-      console.error('⚠️ Advanced AI scheduling failed, falling back to enhanced rule-based:', error);
-      return await this.enhancedRuleBasedFallback(scheduleRequest);
-    }
-  }
+        // Subject interdependencies for logical scheduling progression
+        this.SUBJECT_DEPENDENCIES = {
+            'Mathematics': ['Physical Science', 'Chemistry', 'Physics'],
+            'Pre-Algebra': ['Mathematics', 'Science'],
+            'Algebra I': ['Physical Science', 'Chemistry'],
+            'English Language Arts': ['Social Studies', 'History'],
+            'Language Arts': ['World History', 'American History'],
+            'Science': ['Mathematics'],
+            'Physical Science': ['Mathematics', 'Pre-Algebra', 'Algebra I']
+        };
 
-  /**
-   * Stage 1: Comprehensive Context Analysis
-   */
-  async analyzeSchedulingContext(request) {
-    const { child_id, materials, start_date, end_date, focus_subjects, preferences } = request;
-    
-    console.log('📊 Analyzing scheduling context...');
-    
-    // Analyze materials and extract key insights
-    const materialAnalysis = this.analyzeMaterials(materials);
-    
-    // Process child preferences and constraints
-    const childProfile = await this.buildChildProfile(child_id, preferences);
-    
-    // Calculate time availability and constraints
-    const timeConstraints = this.calculateTimeConstraints(start_date, end_date, childProfile);
-    
-    // Generate AI insights about optimal scheduling approach
-    const aiInsights = await this.generateContextualInsights(materialAnalysis, childProfile, timeConstraints);
-    
-    return {
-      child_id,
-      start_date,
-      end_date,
-      materials,
-      materialAnalysis,
-      childProfile,
-      timeConstraints,
-      aiInsights,
-      focus_subjects: focus_subjects || []
-    };
-  }
-
-  /**
-   * Analyze materials to extract scheduling insights
-   */
-  analyzeMaterials(materials) {
-    const analysis = {
-      totalMaterials: materials.length,
-      byContentType: {},
-      bySubject: {},
-      urgencyLevels: [],
-      estimatedDurations: [],
-      complexity: {}
-    };
-
-    materials.forEach(material => {
-      // Content type distribution
-      analysis.byContentType[material.content_type] = 
-        (analysis.byContentType[material.content_type] || 0) + 1;
-      
-      // Subject distribution
-      const subject = material.lesson?.unit?.child_subject?.custom_subject_name_override || 'Unknown';
-      analysis.bySubject[subject] = (analysis.bySubject[subject] || 0) + 1;
-      
-      // Calculate urgency based on due date
-      const daysUntilDue = this.calculateDaysUntilDue(material.due_date);
-      analysis.urgencyLevels.push({
-        material_id: material.id,
-        title: material.title,
-        daysUntilDue,
-        urgency: daysUntilDue <= 1 ? 'high' : daysUntilDue <= 3 ? 'medium' : 'low'
-      });
-      
-      // Estimate duration based on content type and complexity
-      const estimatedDuration = this.estimateMaterialDuration(material);
-      analysis.estimatedDurations.push({
-        material_id: material.id,
-        estimatedMinutes: estimatedDuration
-      });
-    });
-
-    return analysis;
-  }
-
-  /**
-   * Build comprehensive child profile
-   */
-  async buildChildProfile(child_id, preferences) {
-    // Default preferences structure
-    const defaultPrefs = {
-      preferred_start_time: '09:00',
-      preferred_end_time: '15:00',
-      max_daily_study_minutes: 240,
-      break_duration_minutes: 15,
-      difficult_subjects_morning: true,
-      study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-    };
-
-    const profile = {
-      child_id,
-      preferences: { ...defaultPrefs, ...preferences },
-      learningStyle: await this.inferLearningStyle(child_id),
-      cognitiveProfile: this.buildCognitiveProfile(preferences),
-      timeProfile: this.buildTimeProfile(preferences || defaultPrefs)
-    };
-
-    return profile;
-  }
-
-  /**
-   * Calculate comprehensive time constraints
-   */
-  calculateTimeConstraints(start_date, end_date, childProfile) {
-    const startDate = new Date(start_date);
-    const endDate = new Date(end_date);
-    const { preferences } = childProfile;
-    
-    const availableDays = [];
-    const currentDate = new Date(startDate);
-    
-    while (currentDate <= endDate) {
-      const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-      if (preferences.study_days.includes(dayName)) {
-        availableDays.push({
-          date: new Date(currentDate),
-          dayName,
-          availableMinutes: preferences.max_daily_study_minutes,
-          startTime: preferences.preferred_start_time,
-          endTime: preferences.preferred_end_time
-        });
-      }
-      currentDate.setDate(currentDate.getDate() + 1);
+        // Session duration options using golden ratio for optimal attention spans
+        this.SESSION_DURATIONS = {
+            SHORT: 25, // Pomodoro technique
+            MEDIUM: 45, // Standard class period
+            LONG: 73, // Golden ratio extension (45 * 1.618)
+            EXTENDED: 90 // Deep work sessions
+        };
     }
 
-    return {
-      totalDays: availableDays.length,
-      totalAvailableMinutes: availableDays.reduce((sum, day) => sum + day.availableMinutes, 0),
-      availableDays,
-      dailyConstraints: {
-        maxMinutes: preferences.max_daily_study_minutes,
-        breakDuration: preferences.break_duration_minutes,
-        timeWindow: {
-          start: preferences.preferred_start_time,
-          end: preferences.preferred_end_time
+    /**
+     * Main entry point for advanced AI scheduling
+     */
+    async generateOptimalSchedule(scheduleRequest) {
+        console.log('🧠 Starting Advanced AI Scheduling Engine...');
+
+        try {
+            // Stage 1: Comprehensive Context Analysis
+            const context = await this.analyzeSchedulingContext(scheduleRequest);
+
+            // Stage 2: Generate Optimal Time Slots
+            const timeSlots = await this.generateOptimalTimeSlots(context);
+
+            // Stage 3: AI-Powered Subject Assignment
+            const preliminarySchedule = await this.performAISubjectAssignment(context, timeSlots);
+
+            // Stage 4: Cognitive Load Optimization
+            const optimizedSchedule = await this.optimizeCognitiveLoad(preliminarySchedule, context);
+
+            // Stage 5: Final Validation and Enhancement
+            const finalSchedule = await this.validateAndEnhanceSchedule(optimizedSchedule, context);
+
+            console.log('✅ Advanced AI Scheduling completed successfully');
+            return finalSchedule;
+
+        } catch (error) {
+            console.error('⚠️ Advanced AI scheduling failed, falling back to enhanced rule-based:', error);
+            return await this.enhancedRuleBasedFallback(scheduleRequest);
         }
-      }
-    };
-  }
+    }
 
-  /**
-   * Generate AI insights about optimal scheduling approach
-   */
-  async generateContextualInsights(materialAnalysis, childProfile, timeConstraints) {
-    const prompt = `As an expert educational scheduler and cognitive science specialist, analyze this student's learning context and provide strategic scheduling insights:
+    /**
+     * Stage 1: Comprehensive Context Analysis
+     */
+    async analyzeSchedulingContext(request) {
+        const { child_id, materials, start_date, end_date, focus_subjects, preferences } = request;
+
+        console.log('📊 Analyzing scheduling context...');
+
+        // Analyze materials and extract key insights
+        const materialAnalysis = this.analyzeMaterials(materials);
+
+        // Process child preferences and constraints
+        const childProfile = await this.buildChildProfile(child_id, preferences);
+
+        // Calculate time availability and constraints
+        const timeConstraints = this.calculateTimeConstraints(start_date, end_date, childProfile);
+
+        // Generate AI insights about optimal scheduling approach
+        const aiInsights = await this.generateContextualInsights(materialAnalysis, childProfile, timeConstraints);
+
+        return {
+            child_id,
+            start_date,
+            end_date,
+            materials,
+            materialAnalysis,
+            childProfile,
+            timeConstraints,
+            aiInsights,
+            focus_subjects: focus_subjects || []
+        };
+    }
+
+    /**
+     * Analyze materials to extract scheduling insights
+     */
+    analyzeMaterials(materials) {
+        const analysis = {
+            totalMaterials: materials.length,
+            byContentType: {},
+            bySubject: {},
+            urgencyLevels: [],
+            estimatedDurations: [],
+            complexity: {}
+        };
+
+        materials.forEach(material => {
+            // Content type distribution
+            analysis.byContentType[material.content_type] =
+                (analysis.byContentType[material.content_type] || 0) + 1;
+
+            // Subject distribution
+            const subject = material.lesson ? .unit ? .child_subject ? .custom_subject_name_override || 'Unknown';
+            analysis.bySubject[subject] = (analysis.bySubject[subject] || 0) + 1;
+
+            // Calculate urgency based on due date
+            const daysUntilDue = this.calculateDaysUntilDue(material.due_date);
+            analysis.urgencyLevels.push({
+                material_id: material.id,
+                title: material.title,
+                daysUntilDue,
+                urgency: daysUntilDue <= 1 ? 'high' : daysUntilDue <= 3 ? 'medium' : 'low'
+            });
+
+            // Estimate duration based on content type and complexity
+            const estimatedDuration = this.estimateMaterialDuration(material);
+            analysis.estimatedDurations.push({
+                material_id: material.id,
+                estimatedMinutes: estimatedDuration
+            });
+        });
+
+        return analysis;
+    }
+
+    /**
+     * Build comprehensive child profile
+     */
+    async buildChildProfile(child_id, preferences) {
+        // Default preferences structure
+        const defaultPrefs = {
+            preferred_start_time: '09:00',
+            preferred_end_time: '15:00',
+            max_daily_study_minutes: 240,
+            break_duration_minutes: 15,
+            difficult_subjects_morning: true,
+            study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+        };
+
+        const profile = {
+            child_id,
+            preferences: {...defaultPrefs, ...preferences },
+            learningStyle: await this.inferLearningStyle(child_id),
+            cognitiveProfile: this.buildCognitiveProfile(preferences),
+            timeProfile: this.buildTimeProfile(preferences || defaultPrefs)
+        };
+
+        return profile;
+    }
+
+    /**
+     * Calculate comprehensive time constraints
+     */
+    calculateTimeConstraints(start_date, end_date, childProfile) {
+        const startDate = new Date(start_date);
+        const endDate = new Date(end_date);
+        const { preferences } = childProfile;
+
+        const availableDays = [];
+        const currentDate = new Date(startDate);
+
+        while (currentDate <= endDate) {
+            const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            if (preferences.study_days.includes(dayName)) {
+                availableDays.push({
+                    date: new Date(currentDate),
+                    dayName,
+                    availableMinutes: preferences.max_daily_study_minutes,
+                    startTime: preferences.preferred_start_time,
+                    endTime: preferences.preferred_end_time
+                });
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        return {
+            totalDays: availableDays.length,
+            totalAvailableMinutes: availableDays.reduce((sum, day) => sum + day.availableMinutes, 0),
+            availableDays,
+            dailyConstraints: {
+                maxMinutes: preferences.max_daily_study_minutes,
+                breakDuration: preferences.break_duration_minutes,
+                timeWindow: {
+                    start: preferences.preferred_start_time,
+                    end: preferences.preferred_end_time
+                }
+            }
+        };
+    }
+
+    /**
+     * Generate AI insights about optimal scheduling approach
+     */
+    async generateContextualInsights(materialAnalysis, childProfile, timeConstraints) {
+        const prompt = `As an expert educational scheduler and cognitive science specialist, analyze this student's learning context and provide strategic scheduling insights:
 
 STUDENT PROFILE:
 - Study time: ${childProfile.preferences.preferred_start_time} - ${childProfile.preferences.preferred_end_time}
@@ -267,127 +268,127 @@ Provide strategic insights in this JSON format:
   "confidence": 0.85
 }`;
 
-    try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-        max_tokens: 800
-      });
+        try {
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.3,
+                max_tokens: 800
+            });
 
-      const insights = JSON.parse(response.choices[0].message.content);
-      console.log('🔍 AI Insights generated:', insights);
-      return insights;
-    } catch (error) {
-      console.warn('⚠️ AI insights generation failed, using defaults');
-      return {
-        schedulingStrategy: 'balanced',
-        prioritizationApproach: 'subject_balance',
-        sessionLengthRecommendation: 'mixed',
-        cognitiveLoadDistribution: 'evenly_distributed',
-        riskFactors: [],
-        opportunityAreas: [],
-        confidence: 0.5
-      };
-    }
-  }
-
-  /**
-   * Stage 2: Generate Optimal Time Slots
-   */
-  async generateOptimalTimeSlots(context) {
-    console.log('⏰ Generating optimal time slots...');
-    
-    const { timeConstraints, childProfile, aiInsights } = context;
-    const slots = [];
-
-    for (const day of timeConstraints.availableDays) {
-      const dailySlots = this.generateDailyTimeSlots(day, childProfile, aiInsights);
-      slots.push(...dailySlots);
+            const insights = JSON.parse(response.choices[0].message.content);
+            console.log('🔍 AI Insights generated:', insights);
+            return insights;
+        } catch (error) {
+            console.warn('⚠️ AI insights generation failed, using defaults');
+            return {
+                schedulingStrategy: 'balanced',
+                prioritizationApproach: 'subject_balance',
+                sessionLengthRecommendation: 'mixed',
+                cognitiveLoadDistribution: 'evenly_distributed',
+                riskFactors: [],
+                opportunityAreas: [],
+                confidence: 0.5
+            };
+        }
     }
 
-    // Optimize slot distribution using golden ratio and cognitive science
-    const optimizedSlots = this.optimizeSlotDistribution(slots, context);
-    
-    console.log(`📅 Generated ${optimizedSlots.length} optimized time slots`);
-    return optimizedSlots;
-  }
+    /**
+     * Stage 2: Generate Optimal Time Slots
+     */
+    async generateOptimalTimeSlots(context) {
+        console.log('⏰ Generating optimal time slots...');
 
-  /**
-   * Generate time slots for a single day
-   */
-  generateDailyTimeSlots(day, childProfile, aiInsights) {
-    const slots = [];
-    const { preferences } = childProfile;
-    
-    // Parse time constraints
-    const startTime = this.parseTime(preferences.preferred_start_time);
-    const endTime = this.parseTime(preferences.preferred_end_time);
-    const breakMinutes = preferences.break_duration_minutes;
-    
-    // Determine session length based on AI insights
-    const sessionLength = this.determineSessionLength(aiInsights.sessionLengthRecommendation);
-    
-    let currentTime = startTime;
-    let slotIndex = 0;
-    
-    while (currentTime + sessionLength <= endTime) {
-      // Determine cognitive window for this time slot
-      const cognitiveWindow = this.getCognitiveWindow(this.formatTime(currentTime));
-      
-      const slot = {
-        id: `${day.date.toISOString().split('T')[0]}_slot_${slotIndex}`,
-        date: day.date.toISOString().split('T')[0],
-        startTime: this.formatTime(currentTime),
-        endTime: this.formatTime(currentTime + sessionLength),
-        durationMinutes: sessionLength,
-        cognitiveWindow: cognitiveWindow.type,
-        efficiency: cognitiveWindow.efficiency,
-        isOptimal: this.isOptimalLearningTime(currentTime),
-        dayIndex: slotIndex
-      };
-      
-      slots.push(slot);
-      
-      // Move to next slot with break
-      currentTime += sessionLength + breakMinutes;
-      slotIndex++;
+        const { timeConstraints, childProfile, aiInsights } = context;
+        const slots = [];
+
+        for (const day of timeConstraints.availableDays) {
+            const dailySlots = this.generateDailyTimeSlots(day, childProfile, aiInsights);
+            slots.push(...dailySlots);
+        }
+
+        // Optimize slot distribution using golden ratio and cognitive science
+        const optimizedSlots = this.optimizeSlotDistribution(slots, context);
+
+        console.log(`📅 Generated ${optimizedSlots.length} optimized time slots`);
+        return optimizedSlots;
     }
-    
-    return slots;
-  }
 
-  /**
-   * Stage 3: AI-Powered Subject Assignment
-   */
-  async performAISubjectAssignment(context, timeSlots) {
-    console.log('🎯 Performing AI-powered subject assignment...');
-    
-    const { materials, aiInsights, childProfile } = context;
-    
-    // Group materials by subject for better assignment
-    const materialsBySubject = this.groupMaterialsBySubject(materials);
-    
-    // Use AI to create optimal material-to-slot assignments
-    const assignments = await this.generateAIAssignments(
-      materialsBySubject, 
-      timeSlots, 
-      aiInsights, 
-      childProfile
-    );
-    
-    // Create preliminary schedule from assignments
-    const schedule = this.buildPreliminarySchedule(assignments, timeSlots, materials);
-    
-    console.log(`📚 Assigned ${assignments.length} materials to time slots`);
-    return schedule;
-  }
+    /**
+     * Generate time slots for a single day
+     */
+    generateDailyTimeSlots(day, childProfile, aiInsights) {
+        const slots = [];
+        const { preferences } = childProfile;
 
-  /**
-   * Generate AI-powered material assignments
-   */
-  async generateAIAssignments(materialsBySubject, timeSlots, aiInsights, childProfile) {
-    const prompt = `As an expert educational scheduler, create optimal material assignments for time slots based on cognitive science and learning efficiency.
+        // Parse time constraints
+        const startTime = this.parseTime(preferences.preferred_start_time);
+        const endTime = this.parseTime(preferences.preferred_end_time);
+        const breakMinutes = preferences.break_duration_minutes;
+
+        // Determine session length based on AI insights
+        const sessionLength = this.determineSessionLength(aiInsights.sessionLengthRecommendation);
+
+        let currentTime = startTime;
+        let slotIndex = 0;
+
+        while (currentTime + sessionLength <= endTime) {
+            // Determine cognitive window for this time slot
+            const cognitiveWindow = this.getCognitiveWindow(this.formatTime(currentTime));
+
+            const slot = {
+                id: `${day.date.toISOString().split('T')[0]}_slot_${slotIndex}`,
+                date: day.date.toISOString().split('T')[0],
+                startTime: this.formatTime(currentTime),
+                endTime: this.formatTime(currentTime + sessionLength),
+                durationMinutes: sessionLength,
+                cognitiveWindow: cognitiveWindow.type,
+                efficiency: cognitiveWindow.efficiency,
+                isOptimal: this.isOptimalLearningTime(currentTime),
+                dayIndex: slotIndex
+            };
+
+            slots.push(slot);
+
+            // Move to next slot with break
+            currentTime += sessionLength + breakMinutes;
+            slotIndex++;
+        }
+
+        return slots;
+    }
+
+    /**
+     * Stage 3: AI-Powered Subject Assignment
+     */
+    async performAISubjectAssignment(context, timeSlots) {
+        console.log('🎯 Performing AI-powered subject assignment...');
+
+        const { materials, aiInsights, childProfile } = context;
+
+        // Group materials by subject for better assignment
+        const materialsBySubject = this.groupMaterialsBySubject(materials);
+
+        // Use AI to create optimal material-to-slot assignments
+        const assignments = await this.generateAIAssignments(
+            materialsBySubject,
+            timeSlots,
+            aiInsights,
+            childProfile
+        );
+
+        // Create preliminary schedule from assignments
+        const schedule = this.buildPreliminarySchedule(assignments, timeSlots, materials);
+
+        console.log(`📚 Assigned ${assignments.length} materials to time slots`);
+        return schedule;
+    }
+
+    /**
+     * Generate AI-powered material assignments
+     */
+    async generateAIAssignments(materialsBySubject, timeSlots, aiInsights, childProfile) {
+            const prompt = `As an expert educational scheduler, create optimal material assignments for time slots based on cognitive science and learning efficiency.
 
 TIME SLOTS AVAILABLE:
 ${timeSlots.map(slot => 
@@ -437,7 +438,7 @@ IMPORTANT:
 
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.2,
         max_tokens: 2000
@@ -883,7 +884,7 @@ IMPORTANT:
           start_time: slot.startTime,
           duration_minutes: slot.durationMinutes,
           status: 'scheduled',
-          created_by: 'ai_advanced',
+          created_by: 'ai_suggestion',
           notes: material.title,
           reasoning: assignment.reasoning,
           cognitive_match: assignment.cognitive_match,
@@ -1022,34 +1023,515 @@ IMPORTANT:
   }
 
   /**
-   * Generate individual schedules for all children
+   * Generate coordinated schedules using shared family time slots
    */
   async generateIndividualSchedules(childrenRequests) {
-    console.log(`📚 Generating schedules for ${childrenRequests.length} children...`);
+    console.log(`📚 Generating coordinated schedules for ${childrenRequests.length} children...`);
     
-    const schedules = await Promise.all(
-      childrenRequests.map(async (request, index) => {
-        try {
-          const schedule = await this.generateOptimalSchedule(request);
-          return {
-            child_id: request.child_id,
-            child_index: index,
-            schedule: schedule.sessions,
-            metadata: schedule.metadata
-          };
-        } catch (error) {
-          console.warn(`⚠️ Failed to generate schedule for child ${request.child_id}:`, error);
-          return {
-            child_id: request.child_id,
-            child_index: index,
-            schedule: [],
-            metadata: { error: 'Schedule generation failed' }
-          };
+    // Create shared family time slot pool
+    const familyTimeSlots = await this.createSharedFamilyTimeSlots(childrenRequests);
+    
+    // Get existing schedule entries to avoid conflicts
+    const existingSchedules = await this.getExistingFamilySchedules(childrenRequests);
+    
+    // Reserve slots for existing schedules
+    this.reserveSlotsForExistingSchedules(familyTimeSlots, existingSchedules);
+    
+    const coordinatedSchedules = [];
+    
+    // Generate schedules one child at a time, sharing the time slot pool
+    for (const [index, request] of childrenRequests.entries()) {
+      try {
+        console.log(`📋 Scheduling child ${index + 1}/${childrenRequests.length}: ${request.child_id}`);
+        
+        const childSchedule = await this.generateScheduleWithSharedSlots(
+          request, 
+          familyTimeSlots, 
+          coordinatedSchedules
+        );
+        
+        coordinatedSchedules.push({
+          child_id: request.child_id,
+          child_index: index,
+          schedule: childSchedule.sessions,
+          metadata: childSchedule.metadata
+        });
+        
+      } catch (error) {
+        console.warn(`⚠️ Failed to generate schedule for child ${request.child_id}:`, error);
+        coordinatedSchedules.push({
+          child_id: request.child_id,
+          child_index: index,
+          schedule: [],
+          metadata: { error: 'Schedule generation failed' }
+        });
+      }
+    }
+    
+    return coordinatedSchedules.filter(s => s.schedule.length > 0);
+  }
+
+  /**
+   * Create shared family time slot pool
+   */
+  async createSharedFamilyTimeSlots(childrenRequests) {
+    console.log('🕐 Creating shared family time slot pool...');
+    
+    // Find the broadest time constraints across all children
+    const familyTimeConstraints = this.calculateFamilyTimeConstraints(childrenRequests);
+    
+    // Generate shared time slots based on family constraints
+    const sharedSlots = [];
+    
+    for (const day of familyTimeConstraints.availableDays) {
+      const dailySlots = this.generateDailyFamilyTimeSlots(day, familyTimeConstraints);
+      sharedSlots.push(...dailySlots);
+    }
+    
+    // Add reservation tracking to each slot
+    const familySlots = sharedSlots.map(slot => ({
+      ...slot,
+      isReserved: false,
+      reservedBy: null,
+      reservedFor: null
+    }));
+    
+    // Apply blocked times (lunch, parent unavailability, etc.)
+    this.applyBlockedTimes(familySlots, childrenRequests);
+    
+    console.log(`📅 Created ${familySlots.length} shared family time slots`);
+    return familySlots;
+  }
+
+  /**
+   * Calculate family-wide time constraints
+   */
+  calculateFamilyTimeConstraints(childrenRequests) {
+    // Find earliest start time and latest end time across all children
+    let earliestStart = '23:59';
+    let latestEnd = '00:00';
+    let maxDailyMinutes = 0;
+    let minBreakDuration = 60;
+    const allStudyDays = new Set();
+    
+    // Get the date range from the first child (assuming all children have same range)
+    const firstChild = childrenRequests[0];
+    const startDate = new Date(firstChild.start_date);
+    const endDate = new Date(firstChild.end_date);
+    
+    childrenRequests.forEach(request => {
+      const prefs = request.preferences || {};
+      const defaultPrefs = {
+        preferred_start_time: '09:00',
+        preferred_end_time: '15:00',
+        max_daily_study_minutes: 240,
+        break_duration_minutes: 15,
+        study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+      };
+      
+      const childPrefs = { ...defaultPrefs, ...prefs };
+      
+      if (childPrefs.preferred_start_time < earliestStart) {
+        earliestStart = childPrefs.preferred_start_time;
+      }
+      if (childPrefs.preferred_end_time > latestEnd) {
+        latestEnd = childPrefs.preferred_end_time;
+      }
+      if (childPrefs.max_daily_study_minutes > maxDailyMinutes) {
+        maxDailyMinutes = childPrefs.max_daily_study_minutes;
+      }
+      if (childPrefs.break_duration_minutes < minBreakDuration) {
+        minBreakDuration = childPrefs.break_duration_minutes;
+      }
+      
+      childPrefs.study_days.forEach(day => allStudyDays.add(day));
+    });
+    
+    // Build available days
+    const availableDays = [];
+    const currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      if (allStudyDays.has(dayName)) {
+        availableDays.push({
+          date: new Date(currentDate),
+          dayName,
+          availableMinutes: maxDailyMinutes,
+          startTime: earliestStart,
+          endTime: latestEnd
+        });
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return {
+      totalDays: availableDays.length,
+      totalAvailableMinutes: availableDays.reduce((sum, day) => sum + day.availableMinutes, 0),
+      availableDays,
+      dailyConstraints: {
+        maxMinutes: maxDailyMinutes,
+        breakDuration: minBreakDuration,
+        timeWindow: {
+          start: earliestStart,
+          end: latestEnd
         }
-      })
+      }
+    };
+  }
+
+  /**
+   * Generate daily time slots for family use
+   */
+  generateDailyFamilyTimeSlots(day, familyConstraints) {
+    const slots = [];
+    const { dailyConstraints } = familyConstraints;
+    
+    // Parse time constraints
+    const startTime = this.parseTime(dailyConstraints.timeWindow.start);
+    const endTime = this.parseTime(dailyConstraints.timeWindow.end);
+    const breakMinutes = dailyConstraints.breakDuration;
+    
+    // Use standard 45-minute sessions for family scheduling
+    const sessionLength = 45;
+    
+    let currentTime = startTime;
+    let slotIndex = 0;
+    
+    while (currentTime + sessionLength <= endTime) {
+      // Determine cognitive window for this time slot
+      const cognitiveWindow = this.getCognitiveWindow(this.formatTime(currentTime));
+      
+      const slot = {
+        id: `family_${day.date.toISOString().split('T')[0]}_slot_${slotIndex}`,
+        date: day.date.toISOString().split('T')[0],
+        startTime: this.formatTime(currentTime),
+        endTime: this.formatTime(currentTime + sessionLength),
+        durationMinutes: sessionLength,
+        cognitiveWindow: cognitiveWindow.type,
+        efficiency: cognitiveWindow.efficiency,
+        isOptimal: this.isOptimalLearningTime(currentTime),
+        dayIndex: slotIndex,
+        slotType: 'family_shared'
+      };
+      
+      slots.push(slot);
+      
+      // Move to next slot with break
+      currentTime += sessionLength + breakMinutes;
+      slotIndex++;
+    }
+    
+    return slots;
+  }
+
+  /**
+   * Get existing family schedules to avoid conflicts
+   */
+  async getExistingFamilySchedules(childrenRequests) {
+    console.log('📋 Fetching existing family schedules...');
+    
+    // Extract child IDs and date range
+    const childIds = childrenRequests.map(req => req.child_id);
+    const startDate = childrenRequests[0]?.start_date;
+    const endDate = childrenRequests[0]?.end_date;
+    
+    if (!startDate || !endDate || childIds.length === 0) {
+      return [];
+    }
+    
+    try {
+      const { data: existingEntries, error } = await supabase
+        .from('schedule_entries')
+        .select('*')
+        .in('child_id', childIds)
+        .gte('scheduled_date', startDate)
+        .lte('scheduled_date', endDate)
+        .neq('status', 'cancelled')
+        .order('scheduled_date', { ascending: true })
+        .order('start_time', { ascending: true });
+      
+      if (error) {
+        console.warn('⚠️ Failed to fetch existing schedules:', error);
+        return [];
+      }
+      
+      console.log(`📊 Found ${existingEntries?.length || 0} existing schedule entries`);
+      return existingEntries || [];
+    } catch (error) {
+      console.warn('⚠️ Failed to fetch existing schedules:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Reserve slots for existing schedules
+   */
+  reserveSlotsForExistingSchedules(familyTimeSlots, existingSchedules) {
+    console.log(`🔒 Reserving ${existingSchedules.length} existing schedule slots...`);
+    
+    existingSchedules.forEach(schedule => {
+      // Find matching time slot
+      const matchingSlot = familyTimeSlots.find(slot => 
+        slot.date === schedule.scheduled_date &&
+        slot.startTime === schedule.start_time
+      );
+      
+      if (matchingSlot) {
+        matchingSlot.isReserved = true;
+        matchingSlot.reservedBy = schedule.child_id;
+        matchingSlot.reservedFor = 'existing_schedule';
+        console.log(`🔒 Reserved slot ${matchingSlot.id} for existing schedule`);
+      }
+    });
+  }
+
+  /**
+   * Generate schedule using shared family time slots
+   */
+  async generateScheduleWithSharedSlots(childRequest, familyTimeSlots, existingCoordinatedSchedules) {
+    console.log(`⚡ Generating schedule for child ${childRequest.child_id} using shared slots...`);
+    
+    // Get available (unreserved) slots
+    const availableSlots = familyTimeSlots.filter(slot => !slot.isReserved);
+    
+    if (availableSlots.length === 0) {
+      console.warn('⚠️ No available slots remaining for child');
+      return { sessions: [], metadata: { error: 'No available time slots' } };
+    }
+    
+    // Analyze child's materials
+    const materialAnalysis = this.analyzeMaterials(childRequest.materials || []);
+    
+    // Build child profile
+    const childProfile = await this.buildChildProfile(childRequest.child_id, childRequest.preferences);
+    
+    // Group materials by subject
+    const materialsBySubject = this.groupMaterialsBySubject(childRequest.materials || []);
+    
+    // Generate assignments using available slots only
+    const assignments = await this.generateAIAssignmentsForAvailableSlots(
+      materialsBySubject,
+      availableSlots,
+      childProfile
     );
     
-    return schedules.filter(s => s.schedule.length > 0);
+    // Build schedule and reserve used slots
+    const schedule = this.buildScheduleAndReserveSlots(assignments, availableSlots, childRequest.materials, familyTimeSlots);
+    
+    return {
+      sessions: schedule,
+      metadata: {
+        generator: 'family_coordinated',
+        confidence: 0.85,
+        total_sessions: schedule.length,
+        slots_used: assignments.length,
+        slots_available: availableSlots.length
+      }
+    };
+  }
+
+  /**
+   * Generate AI assignments for available slots only
+   */
+  async generateAIAssignmentsForAvailableSlots(materialsBySubject, availableSlots, childProfile) {
+    const prompt = `As an expert educational scheduler, assign materials to available time slots for a single child in a family context.
+
+AVAILABLE TIME SLOTS:
+${availableSlots.slice(0, 20).map(slot => 
+  `ID: ${slot.id} | ${slot.date} ${slot.startTime}-${slot.endTime} (${slot.cognitiveWindow}, efficiency: ${slot.efficiency})`
+).join('\n')}${availableSlots.length > 20 ? `\n... and ${availableSlots.length - 20} more slots` : ''}
+
+MATERIALS BY SUBJECT:
+${Object.entries(materialsBySubject).map(([subject, materials]) => 
+  `${subject}: ${materials.map(m => `ID:${m.id} "${m.title}"`).join(', ')}`
+).join('\n')}
+
+CHILD PREFERENCES:
+- Difficult subjects in morning: ${childProfile.preferences.difficult_subjects_morning}
+
+COGNITIVE LOAD WEIGHTS (higher = more difficult):
+${Object.entries(this.COGNITIVE_LOAD_WEIGHTS).map(([subject, weight]) => 
+  `${subject}: ${weight}`
+).slice(0, 10).join('\n')}
+
+Create optimal assignments following these rules:
+1. Match high cognitive load subjects to high efficiency time slots  
+2. Balance subjects across available days
+3. Only use the provided available slot IDs
+4. Each material should be assigned to exactly one slot
+
+Provide assignments in this JSON format:
+{
+  "assignments": [
+    {
+      "slot_id": "family_2025-06-17_slot_0",
+      "subject": "subject_name", 
+      "material_ids": ["mat-1"],
+      "reasoning": "why this assignment is optimal",
+      "cognitive_match": 0.85
+    }
+  ],
+  "overall_strategy": "description of overall approach",
+  "confidence": 0.90
+}
+
+IMPORTANT: 
+- Use ONLY the exact slot_id values from the AVAILABLE TIME SLOTS list above
+- Use ONLY the exact material IDs from the MATERIALS BY SUBJECT list above
+- Do not double-assign materials or slots`;
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.2,
+        max_tokens: 2000
+      });
+
+      const aiAssignments = JSON.parse(response.choices[0].message.content);
+      console.log('🤖 AI assignments generated with confidence:', aiAssignments.confidence);
+      return aiAssignments.assignments;
+    } catch (error) {
+      console.warn('⚠️ AI assignment failed, using rule-based fallback');
+      return this.generateRuleBasedAssignmentsForAvailableSlots(materialsBySubject, availableSlots, childProfile);
+    }
+  }
+
+  /**
+   * Generate rule-based assignments for available slots (fallback)
+   */
+  generateRuleBasedAssignmentsForAvailableSlots(materialsBySubject, availableSlots, childProfile) {
+    const assignments = [];
+    const { preferences } = childProfile;
+    
+    // Sort available slots by efficiency
+    const sortedSlots = availableSlots.sort((a, b) => b.efficiency - a.efficiency);
+    
+    // Sort subjects by cognitive load
+    const sortedSubjects = Object.entries(materialsBySubject).sort((a, b) => {
+      const loadA = this.COGNITIVE_LOAD_WEIGHTS[a[0]] || 0.5;
+      const loadB = this.COGNITIVE_LOAD_WEIGHTS[b[0]] || 0.5;
+      return preferences.difficult_subjects_morning ? loadB - loadA : loadA - loadB;
+    });
+    
+    let slotIndex = 0;
+    
+    for (const [subject, materials] of sortedSubjects) {
+      for (const material of materials) {
+        if (slotIndex < sortedSlots.length) {
+          assignments.push({
+            slot_id: sortedSlots[slotIndex].id,
+            subject,
+            material_ids: [material.id],
+            reasoning: `Rule-based assignment: ${subject} scheduled based on cognitive load and available slots`,
+            cognitive_match: this.calculateCognitiveMatch(subject, sortedSlots[slotIndex])
+          });
+          slotIndex++;
+        }
+      }
+    }
+    
+    return assignments;
+  }
+
+  /**
+   * Build schedule and reserve used slots
+   */
+  buildScheduleAndReserveSlots(assignments, availableSlots, materials, familyTimeSlots) {
+    const schedule = [];
+    const slotMap = new Map(availableSlots.map(slot => [slot.id, slot]));
+    const materialMap = new Map(materials.map(material => [material.id, material]));
+    
+    assignments.forEach((assignment, index) => {
+      const slot = slotMap.get(assignment.slot_id);
+      const material = materialMap.get(assignment.material_ids[0]);
+      
+      if (slot && material) {
+        // Create schedule entry
+        schedule.push({
+          id: `session_${index + 1}`,
+          child_id: material.lesson?.unit?.child_subject?.child_id,
+          material_id: material.id,
+          subject_name: assignment.subject,
+          scheduled_date: slot.date,
+          start_time: slot.startTime,
+          duration_minutes: slot.durationMinutes,
+          status: 'scheduled',
+          created_by: 'ai_suggestion',
+          notes: material.title,
+          reasoning: assignment.reasoning,
+          cognitive_match: assignment.cognitive_match,
+          efficiency_score: slot.efficiency
+        });
+        
+        // Reserve the slot in the family time slots pool
+        const familySlot = familyTimeSlots.find(fs => fs.id === slot.id);
+        if (familySlot) {
+          familySlot.isReserved = true;
+          familySlot.reservedBy = material.lesson?.unit?.child_subject?.child_id;
+          familySlot.reservedFor = `${assignment.subject} - ${material.title}`;
+          console.log(`🔒 Reserved family slot ${familySlot.id} for ${assignment.subject}`);
+        }
+      }
+    });
+    
+    return schedule;
+  }
+
+  /**
+   * Apply blocked times to family time slots
+   */
+  applyBlockedTimes(familySlots, childrenRequests) {
+    console.log('🚫 Applying blocked times to family schedule...');
+    
+    // Common blocked times (can be customized per family)
+    const defaultBlockedTimes = [
+      { start: '12:00', end: '13:00', reason: 'Lunch break' },
+      // Parents can add more blocked times in their request
+    ];
+    
+    // Get custom blocked times from any child request that has them
+    const customBlockedTimes = [];
+    childrenRequests.forEach(request => {
+      if (request.blocked_times && Array.isArray(request.blocked_times)) {
+        customBlockedTimes.push(...request.blocked_times);
+      }
+      if (request.family_blocked_times && Array.isArray(request.family_blocked_times)) {
+        customBlockedTimes.push(...request.family_blocked_times);
+      }
+    });
+    
+    const allBlockedTimes = [...defaultBlockedTimes, ...customBlockedTimes];
+    
+    let blockedCount = 0;
+    
+    // Apply blocked times to slots
+    familySlots.forEach(slot => {
+      allBlockedTimes.forEach(blockedTime => {
+        if (this.slotOverlapsWithBlockedTime(slot, blockedTime)) {
+          slot.isReserved = true;
+          slot.reservedBy = 'family';
+          slot.reservedFor = blockedTime.reason || 'Blocked time';
+          blockedCount++;
+        }
+      });
+    });
+    
+    console.log(`🚫 Blocked ${blockedCount} time slots for family unavailability`);
+  }
+
+  /**
+   * Check if a slot overlaps with a blocked time period
+   */
+  slotOverlapsWithBlockedTime(slot, blockedTime) {
+    const slotStart = this.parseTime(slot.startTime);
+    const slotEnd = this.parseTime(slot.endTime);
+    const blockedStart = this.parseTime(blockedTime.start);
+    const blockedEnd = this.parseTime(blockedTime.end);
+    
+    // Check for any overlap between slot and blocked time
+    return (slotStart < blockedEnd && slotEnd > blockedStart);
   }
 
   /**
@@ -1217,7 +1699,7 @@ Provide coordination adjustments in this JSON format:
 
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.3,
         max_tokens: 1500

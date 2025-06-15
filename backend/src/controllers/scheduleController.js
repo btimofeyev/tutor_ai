@@ -790,6 +790,95 @@ const generateFamilySchedule = async (req, res) => {
   }
 };
 
+// Simplified family scheduling with conflict prevention
+const generateConflictFreeSchedule = async (req, res) => {
+  try {
+    const parentId = getParentId(req);
+    const { 
+      week_start_date,
+      week_end_date, 
+      children_ids,
+      time_constraints = { start: '09:00', end: '15:00' },
+      blocked_times = [{ start: '12:00', end: '13:00', reason: 'Lunch break' }],
+      materials_by_child = {}
+    } = req.body;
+
+    if (!parentId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (!children_ids || !Array.isArray(children_ids) || children_ids.length === 0) {
+      return res.status(400).json({ error: 'children_ids array is required' });
+    }
+
+    if (!week_start_date || !week_end_date) {
+      return res.status(400).json({ error: 'week_start_date and week_end_date are required' });
+    }
+
+    // Verify parent owns all specified children
+    for (const childId of children_ids) {
+      if (!(await verifyChildOwnership(parentId, childId))) {
+        return res.status(403).json({ 
+          error: `Access denied to child ${childId}` 
+        });
+      }
+    }
+
+    console.log(`Generating conflict-free schedule for ${children_ids.length} children for week ${week_start_date} to ${week_end_date}`);
+
+    // Build children schedule requests
+    const childrenRequests = children_ids.map(childId => ({
+      child_id: childId,
+      start_date: week_start_date,
+      end_date: week_end_date,
+      materials: materials_by_child[childId] || [],
+      preferences: {
+        preferred_start_time: time_constraints.start,
+        preferred_end_time: time_constraints.end,
+        max_daily_study_minutes: 360, // 6 hours max
+        break_duration_minutes: 15,
+        difficult_subjects_morning: true,
+        study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+      },
+      family_blocked_times: blocked_times
+    }));
+
+    // Initialize the advanced scheduling service
+    const schedulingService = new AdvancedSchedulingService();
+
+    // Use the family coordination system
+    const familySchedule = await schedulingService.generateFamilyCoordinatedSchedule({
+      children_schedules: childrenRequests,
+      coordination_mode: 'balanced'
+    });
+
+    // Format response for simple consumption
+    const conflictFreeSchedule = {
+      week_range: { start: week_start_date, end: week_end_date },
+      children_schedules: familySchedule.coordinated_schedules.map(childSchedule => ({
+        child_id: childSchedule.child_id,
+        sessions: childSchedule.schedule?.sessions || [],
+        total_sessions: childSchedule.schedule?.sessions?.length || 0,
+        subjects_covered: [...new Set((childSchedule.schedule?.sessions || []).map(s => s.subject_name))]
+      })),
+      time_constraints,
+      blocked_times,
+      conflicts_prevented: familySchedule.conflicts_resolved || 0,
+      scheduling_confidence: familySchedule.family_metadata?.confidence || 0.8,
+      generated_at: new Date().toISOString()
+    };
+
+    res.json(conflictFreeSchedule);
+
+  } catch (error) {
+    console.error('Error in generateConflictFreeSchedule:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate conflict-free schedule',
+      details: error.message 
+    });
+  }
+};
+
 module.exports = {
   getScheduleEntries,
   createScheduleEntry,
@@ -798,5 +887,6 @@ module.exports = {
   getSchedulePreferences,
   updateSchedulePreferences,
   generateAISchedule,
-  generateFamilySchedule
+  generateFamilySchedule,
+  generateConflictFreeSchedule
 };

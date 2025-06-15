@@ -1,44 +1,44 @@
 INSERT INTO subjects (id, name, description, is_predefined) VALUES
 ('a1b2c3d4-e5f6-7890-1234-567890abcdef', 'Mathematics', 'Core mathematics curriculum', true),
-('b2c3d4e5-f6g7-8901-2345-678901bcdefg', 'English Language Arts', 'Reading, writing, and language skills', true),
-('c3d4e5f6-g7h8-9012-3456-789012cdefgh', 'Science', 'Elementary and middle school science', true),
-('d4e5f6g7-h8i9-0123-4567-890123defghi', 'Social Studies', 'History, geography, and civics', true),
-('e5f6g7h8-i9j0-1234-5678-901234efghij', 'Art & Creativity', 'Visual arts and creative expression', true),
-('f6g7h8i9-j0k1-2345-6789-012345fghijk', 'Physical Education & Health', 'Physical fitness and health education', true)
+('b2c3d4e5-f6a7-8901-2345-678901bcdefa', 'English Language Arts', 'Reading, writing, and language skills', true),
+('c3d4e5f6-a7b8-9012-3456-789012cdefab', 'Science', 'Elementary and middle school science', true),
+('d4e5f6a7-b8c9-0123-4567-890123defabc', 'Social Studies', 'History, geography, and civics', true),
+('e5f6a7b8-c9d0-1234-5678-901234efabcd', 'Art & Creativity', 'Visual arts and creative expression', true),
+('f6a7b8c9-d0e1-2345-6789-012345fabcde', 'Physical Education & Health', 'Physical fitness and health education', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Assign subjects to each child (different grade levels and combinations)
 -- Child 1 (Elementary - Grade 3)
 INSERT INTO child_subjects (id, child_id, subject_id, name) VALUES
 ('11111111-1111-1111-1111-111111111111', 'e7599701-f337-4fab-bb88-531aa01bc9f0', 'a1b2c3d4-e5f6-7890-1234-567890abcdef', 'Mathematics'),
-('11111111-1111-1111-1111-111111111112', 'e7599701-f337-4fab-bb88-531aa01bc9f0', 'b2c3d4e5-f6g7-8901-2345-678901bcdefg', 'English Language Arts'),
-('11111111-1111-1111-1111-111111111113', 'e7599701-f337-4fab-bb88-531aa01bc9f0', 'c3d4e5f6-g7h8-9012-3456-789012cdefgh', 'Science'),
-('11111111-1111-1111-1111-111111111114', 'e7599701-f337-4fab-bb88-531aa01bc9f0', 'd4e5f6g7-h8i9-0123-4567-890123defghi', 'Social Studies'),
-('11111111-1111-1111-1111-111111111115', 'e7599701-f337-4fab-bb88-531aa01bc9f0', 'e5f6g7h8-i9j0-1234-5678-901234efghij', 'Art');
+('11111111-1111-1111-1111-111111111112', 'e7599701-f337-4fab-bb88-531aa01bc9f0', 'b2c3d4e5-f6a7-8901-2345-678901bcdefa', 'English Language Arts'),
+('11111111-1111-1111-1111-111111111113', 'e7599701-f337-4fab-bb88-531aa01bc9f0', 'c3d4e5f6-a7b8-9012-3456-789012cdefab', 'Science'),
+('11111111-1111-1111-1111-111111111114', 'e7599701-f337-4fab-bb88-531aa01bc9f0', 'd4e5f6a7-b8c9-0123-4567-890123defabc', 'Social Studies'),
+('11111111-1111-1111-1111-111111111115', 'e7599701-f337-4fab-bb88-531aa01bc9f0', 'e5f6a7b8-c9d0-1234-5678-901234efabcd', 'Art');
 
 -- Child 2 (Elementary - Grade 5)  
 INSERT INTO child_subjects (id, child_id, subject_id, name) VALUES
 ('22222222-2222-2222-2222-222222222221', '2e456022-6598-4fb7-86c1-f29c36f3b963', 'a1b2c3d4-e5f6-7890-1234-567890abcdef', 'Mathematics'),
-('22222222-2222-2222-2222-222222222222', '2e456022-6598-4fb7-86c1-f29c36f3b963', 'b2c3d4e5-f6g7-8901-2345-678901bcdefg', 'English Language Arts'),
-('22222222-2222-2222-2222-222222222223', '2e456022-6598-4fb7-86c1-f29c36f3b963', 'c3d4e5f6-g7h8-9012-3456-789012cdefgh', 'Science'),
-('22222222-2222-2222-2222-222222222224', '2e456022-6598-4fb7-86c1-f29c36f3b963', 'd4e5f6g7-h8i9-0123-4567-890123defghi', 'Social Studies'),
-('22222222-2222-2222-2222-222222222225', '2e456022-6598-4fb7-86c1-f29c36f3b963', 'f6g7h8i9-j0k1-2345-6789-012345fghijk', 'Physical Education');
+('22222222-2222-2222-2222-222222222222', '2e456022-6598-4fb7-86c1-f29c36f3b963', 'b2c3d4e5-f6a7-8901-2345-678901bcdefa', 'English Language Arts'),
+('22222222-2222-2222-2222-222222222223', '2e456022-6598-4fb7-86c1-f29c36f3b963', 'c3d4e5f6-a7b8-9012-3456-789012cdefab', 'Science'),
+('22222222-2222-2222-2222-222222222224', '2e456022-6598-4fb7-86c1-f29c36f3b963', 'd4e5f6a7-b8c9-0123-4567-890123defabc', 'Social Studies'),
+('22222222-2222-2222-2222-222222222225', '2e456022-6598-4fb7-86c1-f29c36f3b963', 'f6a7b8c9-d0e1-2345-6789-012345fabcde', 'Physical Education');
 
 -- Child 3 (Middle School - Grade 7)
 INSERT INTO child_subjects (id, child_id, subject_id, name) VALUES
 ('33333333-3333-3333-3333-333333333331', '6a2bee53-ed3e-4661-a8bf-9cab5412dae0', 'a1b2c3d4-e5f6-7890-1234-567890abcdef', 'Pre-Algebra'),
-('33333333-3333-3333-3333-333333333332', '6a2bee53-ed3e-4661-a8bf-9cab5412dae0', 'b2c3d4e5-f6g7-8901-2345-678901bcdefg', 'Language Arts'),
-('33333333-3333-3333-3333-333333333333', '6a2bee53-ed3e-4661-a8bf-9cab5412dae0', 'c3d4e5f6-g7h8-9012-3456-789012cdefgh', 'Life Science'),
-('33333333-3333-3333-3333-333333333334', '6a2bee53-ed3e-4661-a8bf-9cab5412dae0', 'd4e5f6g7-h8i9-0123-4567-890123defghi', 'World History'),
-('33333333-3333-3333-3333-333333333335', '6a2bee53-ed3e-4661-a8bf-9cab5412dae0', 'e5f6g7h8-i9j0-1234-5678-901234efghij', 'Visual Arts');
+('33333333-3333-3333-3333-333333333332', '6a2bee53-ed3e-4661-a8bf-9cab5412dae0', 'b2c3d4e5-f6a7-8901-2345-678901bcdefa', 'Language Arts'),
+('33333333-3333-3333-3333-333333333333', '6a2bee53-ed3e-4661-a8bf-9cab5412dae0', 'c3d4e5f6-a7b8-9012-3456-789012cdefab', 'Life Science'),
+('33333333-3333-3333-3333-333333333334', '6a2bee53-ed3e-4661-a8bf-9cab5412dae0', 'd4e5f6a7-b8c9-0123-4567-890123defabc', 'World History'),
+('33333333-3333-3333-3333-333333333335', '6a2bee53-ed3e-4661-a8bf-9cab5412dae0', 'e5f6a7b8-c9d0-1234-5678-901234efabcd', 'Visual Arts');
 
 -- Child 4 (Middle School - Grade 8)
 INSERT INTO child_subjects (id, child_id, subject_id, name) VALUES
 ('44444444-4444-4444-4444-444444444441', 'fd3640a1-2b8f-4f8c-895c-b0cd69e16519', 'a1b2c3d4-e5f6-7890-1234-567890abcdef', 'Algebra I'),
-('44444444-4444-4444-4444-444444444442', 'fd3640a1-2b8f-4f8c-895c-b0cd69e16519', 'b2c3d4e5-f6g7-8901-2345-678901bcdefg', 'English Literature'),
-('44444444-4444-4444-4444-444444444443', 'fd3640a1-2b8f-4f8c-895c-b0cd69e16519', 'c3d4e5f6-g7h8-9012-3456-789012cdefgh', 'Physical Science'),
-('44444444-4444-4444-4444-444444444444', 'fd3640a1-2b8f-4f8c-895c-b0cd69e16519', 'd4e5f6g7-h8i9-0123-4567-890123defghi', 'American History'),
-('44444444-4444-4444-4444-444444444445', 'fd3640a1-2b8f-4f8c-895c-b0cd69e16519', 'f6g7h8i9-j0k1-2345-6789-012345fghijk', 'Health & Fitness');
+('44444444-4444-4444-4444-444444444442', 'fd3640a1-2b8f-4f8c-895c-b0cd69e16519', 'b2c3d4e5-f6a7-8901-2345-678901bcdefa', 'English Literature'),
+('44444444-4444-4444-4444-444444444443', 'fd3640a1-2b8f-4f8c-895c-b0cd69e16519', 'c3d4e5f6-a7b8-9012-3456-789012cdefab', 'Physical Science'),
+('44444444-4444-4444-4444-444444444444', 'fd3640a1-2b8f-4f8c-895c-b0cd69e16519', 'd4e5f6a7-b8c9-0123-4567-890123defabc', 'American History'),
+('44444444-4444-4444-4444-444444444445', 'fd3640a1-2b8f-4f8c-895c-b0cd69e16519', 'f6a7b8c9-d0e1-2345-6789-012345fabcde', 'Health & Fitness');
 
 -- Create Units for each subject/child combination
 -- Child 1 Units (Grade 3)

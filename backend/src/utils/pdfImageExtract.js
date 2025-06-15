@@ -1,11 +1,14 @@
 // utils/pdfImageExtract.js
-const pdfPoppler = require('pdf-poppler');
+// const pdfPoppler = require('pdf-poppler');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
 async function extractImagesFromPdf(pdfPath) {
-  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pdfimg-'));
+  // Temporarily disabled due to Linux compatibility issues with pdf-poppler
+  throw new Error('PDF image extraction is temporarily disabled on Linux systems');
+  
+  /* const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pdfimg-'));
   try {
     const options = {
       format: 'png',
@@ -27,7 +30,7 @@ async function extractImagesFromPdf(pdfPath) {
     return files;
   } catch (e) {
     throw new Error(`PDF to image extraction failed: ${e.message}`);
-  }
+  } */
 }
 
 module.exports = { extractImagesFromPdf };

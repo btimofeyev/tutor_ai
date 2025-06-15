@@ -241,25 +241,40 @@ export default function CreateScheduleEntryModal({
               </div>
 
               {formData.is_material_based ? (
-                // Material Selection
-                <div>
-                  <label htmlFor="material_id" className={formLabelStyles}>
-                    Select Material
+                // Hierarchical Material Selection
+                <div className="space-y-3">
+                  <label className={formLabelStyles}>
+                    Select Lesson/Assignment
                   </label>
-                  <select
-                    id="material_id"
-                    name="material_id"
-                    value={formData.material_id}
-                    onChange={handleMaterialChange}
-                    className={formInputStyles}
-                  >
-                    <option value="">Choose a lesson or assignment...</option>
-                    {materials.map(material => (
-                      <option key={material.id} value={material.id}>
-                        {material.title} ({material.subject_name})
-                      </option>
-                    ))}
-                  </select>
+                  
+                  {materials.length === 0 ? (
+                    <div className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded border">
+                      No lessons uploaded yet. Add lessons to your curriculum first, or uncheck the box above to schedule general study time.
+                    </div>
+                  ) : (
+                    <div>
+                      <label htmlFor="material_id" className="text-xs text-gray-600 mb-1 block">
+                        Choose from {materials.length} available lessons:
+                      </label>
+                      <select
+                        id="material_id"
+                        name="material_id"
+                        value={formData.material_id}
+                        onChange={handleMaterialChange}
+                        className={formInputStyles}
+                      >
+                        <option value="">Select a specific lesson...</option>
+                        {materials
+                          .sort((a, b) => (a.subject_name || '').localeCompare(b.subject_name || ''))
+                          .map(material => (
+                            <option key={material.id} value={material.id}>
+                              {material.subject_name ? `[${material.subject_name}] ` : ''}{material.title?.replace(/\(\)$/, '') || 'Untitled Lesson'}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+                  
                   {errors.material_id && (
                     <p className="text-red-600 text-xs mt-1">{errors.material_id}</p>
                   )}

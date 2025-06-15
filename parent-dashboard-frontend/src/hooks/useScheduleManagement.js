@@ -209,23 +209,32 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
 
   // Generate AI schedule
   const generateAISchedule = async (parameters = {}) => {
-    if (!subscriptionPermissions?.hasAIScheduling) {
-      setError('AI scheduling requires a premium subscription');
-      return { success: false, error: 'AI scheduling requires a premium subscription' };
-    }
+    // Temporarily disable subscription check for testing
+    // if (!subscriptionPermissions?.hasAIAccess) {
+    //   setError('AI scheduling requires AI access - upgrade your plan or add Klio AI Pack');
+    //   return { success: false, error: 'AI scheduling requires AI access - upgrade your plan or add Klio AI Pack' };
+    // }
 
     try {
       setAiScheduling(true);
-      const response = await api.post('/schedule/ai-generate', {
+      console.log('Starting AI schedule generation with parameters:', parameters);
+      console.log('Child ID:', childId);
+      
+      const requestData = {
         child_id: childId,
         ...parameters
-      });
+      };
+      console.log('Request data:', requestData);
+      
+      const response = await api.post('/schedule/ai-generate', requestData);
+      console.log('AI schedule response:', response.data);
       
       setAiScheduleResults(response.data);
       setError(null);
       return { success: true, data: response.data };
     } catch (err) {
       console.error('Error generating AI schedule:', err);
+      console.error('Error details:', err.response?.data);
       const errorMessage = err.response?.data?.error || 'Failed to generate AI schedule';
       setError(errorMessage);
       return { success: false, error: errorMessage };

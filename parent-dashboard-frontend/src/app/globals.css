@@ -47,6 +47,110 @@
   line-height: 1.3;
 }
 
+/* Custom Calendar Styles */
+.schedule-calendar .rbc-calendar {
+  font-family: var(--font-main);
+}
+
+.schedule-calendar .rbc-header {
+  background-color: var(--background-card);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 12px 8px;
+}
+
+.schedule-calendar .rbc-today {
+  background-color: var(--accent-blue);
+  background-color: color-mix(in srgb, var(--accent-blue) 20%, transparent);
+}
+
+.schedule-calendar .rbc-off-range-bg {
+  background-color: var(--background-main);
+}
+
+.schedule-calendar .rbc-time-view {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.schedule-calendar .rbc-time-header {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.schedule-calendar .rbc-time-content {
+  border-top: none;
+}
+
+.schedule-calendar .rbc-time-gutter {
+  background-color: var(--background-card);
+}
+
+.schedule-calendar .rbc-timeslot-group {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.schedule-calendar .rbc-day-slot .rbc-time-slot {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.schedule-calendar .rbc-event {
+  border-radius: 6px;
+  padding: 2px 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.schedule-calendar .rbc-event.rbc-selected {
+  box-shadow: 0 0 0 2px var(--accent-blue);
+}
+
+.schedule-calendar .rbc-slot-selection {
+  background-color: color-mix(in srgb, var(--accent-blue) 30%, transparent);
+  border: 2px solid var(--accent-blue);
+}
+
+.schedule-calendar .rbc-toolbar {
+  margin-bottom: 16px;
+}
+
+.schedule-calendar .rbc-toolbar button {
+  background-color: var(--background-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.schedule-calendar .rbc-toolbar button:hover {
+  background-color: var(--accent-blue);
+  border-color: var(--accent-blue-darker-for-border);
+}
+
+.schedule-calendar .rbc-toolbar button.rbc-active {
+  background-color: var(--accent-blue);
+  border-color: var(--accent-blue-darker-for-border);
+  color: var(--text-on-accent);
+}
+
+/* Modal animations */
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Accent Buttons - These are the core styles for pastel buttons */
 .btn-primary {
   background: var(--accent-blue);

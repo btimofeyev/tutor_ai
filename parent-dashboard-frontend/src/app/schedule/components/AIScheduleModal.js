@@ -15,6 +15,7 @@ export default function AIScheduleModal({
   childId,
   childName = 'Student',
   childSubjects = [],
+  materials = [],
   aiScheduleResults = null,
   isGenerating = false,
   isApplying = false 
@@ -127,7 +128,8 @@ export default function AIScheduleModal({
     try {
       await onGenerateSchedule({
         child_id: childId,
-        ...formData
+        ...formData,
+        materials: materials // Pass materials data to backend
       });
     } catch (error) {
       console.error('Error generating AI schedule:', error);

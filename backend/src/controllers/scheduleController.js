@@ -385,7 +385,8 @@ const generateAISchedule = async (req, res) => {
       focus_subjects = [], 
       weekly_hours = 15,
       session_duration = 'mixed',
-      priority_mode = 'balanced'
+      priority_mode = 'balanced',
+      materials = []
     } = req.body;
 
     if (!parentId) {
@@ -417,11 +418,49 @@ const generateAISchedule = async (req, res) => {
     // Get existing schedule entries to avoid conflicts
     const { data: existingEntries } = await supabase
       .from('schedule_entries')
-      .select('scheduled_date, start_time, duration_minutes')
+      .select('scheduled_date, start_time, duration_minutes, subject_name, material_id')
       .eq('child_id', child_id)
       .gte('scheduled_date', start_date)
       .lte('scheduled_date', end_date)
       .neq('status', 'skipped');
+
+    // Process materials data for better AI context
+    const materialsBySubject = {};
+    const priorityLessons = [];
+    
+    materials.forEach(material => {
+      const subject = material.subject_name || 'Unknown';
+      if (!materialsBySubject[subject]) {
+        materialsBySubject[subject] = [];
+      }
+      materialsBySubject[subject].push({
+        title: material.title,
+        type: material.content_type,
+        estimated_duration: material.estimated_duration_minutes || 45
+      });
+
+      // Identify priority lessons (those with due dates or marked as important)
+      if (material.due_date || material.priority === 'high') {
+        priorityLessons.push({
+          title: material.title,
+          subject: subject,
+          due_date: material.due_date,
+          estimated_duration: material.estimated_duration_minutes || 45
+        });
+      }
+    });
+
+    // Create lessons context for AI prompt
+    const lessonsContext = Object.keys(materialsBySubject).length > 0 
+      ? Object.entries(materialsBySubject)
+          .map(([subject, lessons]) => 
+            `${subject}: ${lessons.map(l => `"${l.title}" (${l.estimated_duration}min)`).join(', ')}`
+          ).join('\n')
+      : 'No specific lessons provided - schedule general study time';
+
+    const priorityContext = priorityLessons.length > 0
+      ? priorityLessons.map(l => `"${l.title}" (${l.subject}) - Due: ${l.due_date || 'ASAP'}`).join('\n')
+      : 'No urgent lessons identified';
 
     // AI scheduling logic
     const aiSchedulePrompt = `
@@ -437,18 +476,29 @@ const generateAISchedule = async (req, res) => {
     Priority Mode: ${priority_mode}
     Focus Subjects: ${focus_subjects.length > 0 ? focus_subjects.join(', ') : 'All subjects equally'}
 
-    Rules:
-    1. Respect the preferred study time window
-    2. Only schedule on specified study days
-    3. Include appropriate breaks between sessions
-    4. If difficult_subjects_morning is true, schedule challenging subjects (Math, Science) earlier
-    5. Vary session durations based on subject and preference
-    6. Avoid scheduling conflicts with existing entries
-    7. Distribute subjects evenly across the time period
-    8. Consider cognitive load - don't overload any single day
+    AVAILABLE LESSONS BY SUBJECT:
+    ${lessonsContext}
 
-    Default subjects to include: Math, Science, English, History, Reading
-    Use focus_subjects if specified, otherwise include all default subjects.
+    PRIORITY LESSONS (Schedule These First):
+    ${priorityContext}
+
+    EXISTING SCHEDULE ENTRIES TO AVOID:
+    ${existingEntries ? existingEntries.map(e => `${e.scheduled_date} ${e.start_time} - ${e.subject_name || 'Study Time'} (${e.duration_minutes}min)`).join('\n') : 'None'}
+
+    SCHEDULING PRIORITY RULES:
+    1. FIRST PRIORITY: Schedule specific lessons listed above, especially priority lessons with due dates
+    2. SECOND PRIORITY: Schedule subjects that have available lesson content 
+    3. THIRD PRIORITY: Fill remaining time with general study time for subjects without specific lessons
+    4. Respect the preferred study time window
+    5. Only schedule on specified study days
+    6. Include appropriate breaks between sessions
+    7. If difficult_subjects_morning is true, schedule challenging subjects (Math, Science) earlier
+    8. Vary session durations based on subject, lesson complexity, and preference
+    9. Avoid scheduling conflicts with existing entries
+    10. Distribute subjects evenly across the time period
+    11. Consider cognitive load - don't overload any single day
+
+    When scheduling specific lessons, use the lesson title in the notes field and set appropriate duration based on lesson complexity.
 
     Return ONLY a JSON response with this exact structure:
     {
@@ -514,7 +564,9 @@ const generateAISchedule = async (req, res) => {
         schedulePrefs,
         focus_subjects,
         session_duration,
-        priority_mode
+        priority_mode,
+        materialsBySubject,
+        priorityLessons
       });
 
       res.json({
@@ -531,49 +583,116 @@ const generateAISchedule = async (req, res) => {
 };
 
 // Fallback rule-based scheduling function
-function generateFallbackSchedule({ start_date, end_date, weekly_hours, schedulePrefs, focus_subjects, session_duration, priority_mode }) {
+function generateFallbackSchedule({ 
+  start_date, 
+  end_date, 
+  weekly_hours, 
+  schedulePrefs, 
+  focus_subjects, 
+  session_duration, 
+  priority_mode,
+  materialsBySubject = {},
+  priorityLessons = []
+}) {
   const suggestions = [];
-  const subjects = focus_subjects.length > 0 ? focus_subjects : ['Math', 'Science', 'English', 'History'];
-  const difficultyOrder = schedulePrefs.difficult_subjects_morning ? 
-    ['Math', 'Science', 'English', 'History'] : 
-    ['History', 'English', 'Science', 'Math'];
+  
+  // Create a priority queue: priority lessons first, then subjects with lessons, then general subjects
+  const schedulingQueue = [];
+  
+  // Add priority lessons first
+  priorityLessons.forEach(lesson => {
+    schedulingQueue.push({
+      type: 'lesson',
+      subject: lesson.subject,
+      title: lesson.title,
+      duration: lesson.estimated_duration,
+      priority: 1
+    });
+  });
+  
+  // Add other lessons by subject
+  Object.entries(materialsBySubject).forEach(([subject, lessons]) => {
+    lessons.forEach(lesson => {
+      // Skip if already in priority queue
+      if (!priorityLessons.some(p => p.title === lesson.title)) {
+        schedulingQueue.push({
+          type: 'lesson',
+          subject: subject,
+          title: lesson.title,
+          duration: lesson.estimated_duration,
+          priority: 2
+        });
+      }
+    });
+  });
+  
+  // Add general study time for subjects without specific lessons or as filler
+  const allSubjects = focus_subjects.length > 0 ? focus_subjects : ['Math', 'Science', 'English', 'History'];
+  const subjectsWithLessons = Object.keys(materialsBySubject);
+  const subjectsNeedingGeneral = allSubjects.filter(s => !subjectsWithLessons.includes(s));
+  
+  subjectsNeedingGeneral.forEach(subject => {
+    schedulingQueue.push({
+      type: 'general',
+      subject: subject,
+      title: `${subject} Study Time`,
+      duration: session_duration === 'short' ? 30 : session_duration === 'long' ? 90 : 60,
+      priority: 3
+    });
+  });
 
-  // Simple rule-based generation
+  // Sort by priority
+  schedulingQueue.sort((a, b) => a.priority - b.priority);
+
+  // Schedule items
   const startDate = new Date(start_date);
   const endDate = new Date(end_date);
   const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   
   let currentDate = new Date(startDate);
-  let subjectIndex = 0;
+  let itemIndex = 0;
+  let currentTime = schedulePrefs.preferred_start_time;
   
-  while (currentDate <= endDate) {
+  while (currentDate <= endDate && suggestions.length < Math.floor(weekly_hours / 0.75)) {
     const dayName = dayNames[currentDate.getDay()];
     
-    if (schedulePrefs.study_days.includes(dayName)) {
-      const subject = priority_mode === 'difficult_first' ? 
-        difficultyOrder[subjectIndex % difficultyOrder.length] :
-        subjects[subjectIndex % subjects.length];
-      
-      const duration = session_duration === 'short' ? 30 : 
-                      session_duration === 'long' ? 90 : 60;
+    if (schedulePrefs.study_days.includes(dayName) && itemIndex < schedulingQueue.length) {
+      const item = schedulingQueue[itemIndex % schedulingQueue.length];
       
       suggestions.push({
         material_id: null,
-        subject_name: subject,
+        subject_name: item.subject,
         scheduled_date: currentDate.toISOString().split('T')[0],
-        start_time: schedulePrefs.preferred_start_time,
-        duration_minutes: duration,
+        start_time: currentTime,
+        duration_minutes: item.duration,
         created_by: 'ai_suggestion',
-        notes: `Scheduled using rule-based algorithm for ${subject.toLowerCase()} study`
+        notes: item.type === 'lesson' ? 
+          `Lesson: ${item.title}` : 
+          `General study time for ${item.subject.toLowerCase()}`
       });
       
-      subjectIndex++;
+      itemIndex++;
+      
+      // Advance time for next session (add duration + break)
+      const [hours, minutes] = currentTime.split(':').map(Number);
+      const nextMinutes = minutes + item.duration + schedulePrefs.break_duration_minutes;
+      const nextHours = hours + Math.floor(nextMinutes / 60);
+      const finalMinutes = nextMinutes % 60;
+      
+      if (nextHours < 15) { // Don't schedule past 3 PM
+        currentTime = `${nextHours.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}`;
+      } else {
+        // Move to next day
+        currentDate.setDate(currentDate.getDate() + 1);
+        currentTime = schedulePrefs.preferred_start_time;
+        continue;
+      }
     }
     
     currentDate.setDate(currentDate.getDate() + 1);
   }
   
-  return suggestions.slice(0, Math.floor(weekly_hours / 1.5)); // Limit based on weekly hours
+  return suggestions;
 }
 
 module.exports = {

@@ -17,52 +17,7 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
     openEditModal
   } = scheduleManagement || useScheduleManagement(childId, subscriptionPermissions);
   
-  // Sample events (fallback for when backend isn't connected)
-  const sampleEvents = useMemo(() => {
-    const today = new Date();
-    const monday = addDays(currentWeek, 0); // Monday of current week
-    const tuesday = addDays(currentWeek, 1); // Tuesday of current week
-    const wednesday = addDays(currentWeek, 2); // Wednesday of current week
-    
-    return [
-      {
-        id: 1,
-        title: 'Math - Algebra Practice',
-        subject: 'Math',
-        date: format(monday, 'yyyy-MM-dd'),
-        startTime: '09:00',
-        duration: 60,
-        status: 'scheduled'
-      },
-      {
-        id: 2,
-        title: 'Science - Chemistry Lab',
-        subject: 'Science', 
-        date: format(monday, 'yyyy-MM-dd'),
-        startTime: '11:00',
-        duration: 45,
-        status: 'scheduled'
-      },
-      {
-        id: 3,
-        title: 'English - Reading',
-        subject: 'English',
-        date: format(tuesday, 'yyyy-MM-dd'),
-        startTime: '09:00',
-        duration: 30,
-        status: 'completed'
-      },
-      {
-        id: 4,
-        title: 'History - World War II',
-        subject: 'History',
-        date: format(wednesday, 'yyyy-MM-dd'),
-        startTime: '10:00',
-        duration: 45,
-        status: 'scheduled'
-      }
-    ];
-  }, [currentWeek]);
+  // No sample events - use real data only
 
   // Generate week days
   const weekDays = useMemo(() => {
@@ -84,7 +39,7 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
   // Get events for a specific day
   const getEventsForDay = (day) => {
     const dayString = format(day, 'yyyy-MM-dd');
-    const events = calendarEvents.length > 0 ? calendarEvents : sampleEvents;
+    const events = calendarEvents || [];
     
     return events.filter(event => {
       if (event.date) {
@@ -198,9 +153,15 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
         </div>
       )}
       
-      {error && !error.includes('Schedule database not yet set up') && (
-        <div className="text-center py-4 text-orange-600 bg-orange-50 rounded-lg border border-orange-200 p-3 mb-4">
-          <p className="text-sm">No schedule data found - showing sample schedule below</p>
+      {!loading && calendarEvents.length === 0 && (
+        <div className="text-center py-8 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+          <div className="text-blue-800 mb-2">
+            <CalendarDaysIcon className="h-12 w-12 mx-auto mb-2 text-blue-500" />
+            <h3 className="font-medium">No Schedule Entries Yet</h3>
+            <p className="text-sm text-blue-600 mt-1">
+              Click "Add Study Time" to create your first schedule entry, or use "🤖 AI Schedule" to generate an intelligent weekly plan.
+            </p>
+          </div>
         </div>
       )}
 

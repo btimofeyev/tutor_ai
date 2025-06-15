@@ -87,6 +87,11 @@ export default function SchedulePage() {
     ? childrenData.childSubjects[childrenData.selectedChild.id] || []
     : [];
 
+  // Get lessons/materials for the current child across all subjects
+  const materialsForCurrentChild = childrenData.selectedChild && childrenData.lessonsBySubject
+    ? Object.values(childrenData.lessonsBySubject).flat()
+    : [];
+
   return (
     <div className="flex h-screen bg-background-main overflow-hidden">
       {/* Sidebar */}
@@ -175,7 +180,7 @@ export default function SchedulePage() {
         onSave={handleCreateEntry}
         selectedSlot={scheduleManagement.editingEntry}
         childSubjects={assignedSubjectsForCurrentChild}
-        materials={[]} // TODO: Get materials from child data
+        materials={materialsForCurrentChild}
         isSaving={scheduleManagement.loading}
       />
 
@@ -187,7 +192,7 @@ export default function SchedulePage() {
         onDelete={handleDeleteEntry}
         scheduleEntry={scheduleManagement.editingEntry}
         childSubjects={assignedSubjectsForCurrentChild}
-        materials={[]} // TODO: Get materials from child data
+        materials={materialsForCurrentChild}
         isSaving={scheduleManagement.loading}
       />
 
@@ -210,6 +215,7 @@ export default function SchedulePage() {
         childId={childrenData.selectedChild?.id}
         childName={childrenData.selectedChild?.name}
         childSubjects={assignedSubjectsForCurrentChild}
+        materials={materialsForCurrentChild}
         aiScheduleResults={scheduleManagement.aiScheduleResults}
         isGenerating={scheduleManagement.aiScheduling}
         isApplying={scheduleManagement.loading}

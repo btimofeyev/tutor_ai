@@ -150,7 +150,7 @@ class AdvancedSchedulingService {
                 (analysis.byContentType[material.content_type] || 0) + 1;
 
             // Subject distribution
-            const subject = material.lesson ? .unit ? .child_subject ? .custom_subject_name_override || 'Unknown';
+            const subject = material.lesson?.unit?.child_subject?.custom_subject_name_override || 'Unknown';
             analysis.bySubject[subject] = (analysis.bySubject[subject] || 0) + 1;
 
             // Calculate urgency based on due date
@@ -196,6 +196,30 @@ class AdvancedSchedulingService {
         };
 
         return profile;
+    }
+
+    /**
+     * Infer learning style from child's past performance (placeholder)
+     */
+    async inferLearningStyle(child_id) {
+        // In a full implementation, this would analyze the child's learning patterns
+        // For now, return a default learning style
+        return {
+            preference: 'visual',
+            pace: 'moderate',
+            attention_span: 'normal'
+        };
+    }
+
+    /**
+     * Build cognitive profile based on preferences
+     */
+    buildCognitiveProfile(preferences) {
+        return {
+            peak_hours: preferences.difficult_subjects_morning ? 'morning' : 'afternoon',
+            focus_duration: Math.min(preferences.max_daily_study_minutes / 4, 90),
+            break_preference: preferences.break_duration_minutes || 15
+        };
     }
 
     /**

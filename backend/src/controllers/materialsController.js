@@ -381,12 +381,31 @@ exports.listMaterialsForChildSubject = async (req, res) => {
 
     const { data, error } = await supabase
       .from('materials')
-      .select('*')
+      .select(`
+        *,
+        child_subject:child_subject_id (
+          id,
+          custom_subject_name_override,
+          subject:subject_id (
+            id,
+            name
+          )
+        )
+      `)
       .eq('child_subject_id', child_subject_id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json(data || []);
+    
+    // Process materials to include subject name
+    const processedMaterials = (data || []).map(material => ({
+      ...material,
+      subject_name: material.child_subject?.custom_subject_name_override || 
+                   material.child_subject?.subject?.name || 
+                   'General Studies'
+    }));
+    
+    res.json(processedMaterials);
   } catch (error) {
     console.error('Error listing materials for child subject:', error);
     res.status(500).json({ error: 'Failed to list materials' });

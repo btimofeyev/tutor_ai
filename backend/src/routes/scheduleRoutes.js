@@ -13,7 +13,8 @@ router.delete('/:id', scheduleController.deleteScheduleEntry);
 router.get('/preferences/:child_id', scheduleController.getSchedulePreferences);
 router.post('/preferences/:child_id', scheduleController.updateSchedulePreferences);
 
-// AI scheduling route
+// AI scheduling routes
 router.post('/ai-generate', scheduleController.generateAISchedule);
+router.post('/family-generate', scheduleController.generateFamilySchedule);
 
 module.exports = router;

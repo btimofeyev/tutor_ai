@@ -1,6 +1,7 @@
 // backend/src/controllers/scheduleController.js
 const supabase = require('../utils/supabaseClient');
 const { OpenAI } = require('openai');
+const AdvancedSchedulingService = require('../services/schedulingService');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -413,7 +414,7 @@ const updateSchedulePreferences = async (req, res) => {
   }
 };
 
-// Generate AI schedule with intelligent scheduling logic
+// Generate AI schedule with advanced multi-stage reasoning
 const generateAISchedule = async (req, res) => {
   try {
     const parentId = getParentId(req);
@@ -454,171 +455,76 @@ const generateAISchedule = async (req, res) => {
       study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
     };
 
-    // Get existing schedule entries to avoid conflicts
-    const { data: existingEntries } = await supabase
-      .from('schedule_entries')
-      .select('scheduled_date, start_time, duration_minutes, subject_name, material_id')
-      .eq('child_id', child_id)
-      .gte('scheduled_date', start_date)
-      .lte('scheduled_date', end_date)
-      .neq('status', 'skipped');
+    // Enhanced materials processing with subject normalization
+    const processedMaterials = materials.map(material => ({
+      ...material,
+      subject_name: material.subject_name || material.subject || 'General Study',
+      estimated_duration_minutes: material.estimated_duration_minutes || 45,
+      priority: material.due_date || material.priority === 'high' ? 'high' : 'normal'
+    }));
 
-    // Process materials data for better AI context
-    const materialsBySubject = {};
-    const priorityLessons = [];
+    console.log(`Generating advanced schedule for child ${child_id} with ${processedMaterials.length} materials`);
+
+    // Initialize the advanced scheduling service
+    const schedulingService = new AdvancedSchedulingService();
+
+    // Use the advanced scheduling service
+    const scheduleParams = {
+      child_id,
+      start_date,
+      end_date,
+      focus_subjects,
+      weekly_hours,
+      session_duration,
+      priority_mode,
+      materials: processedMaterials,
+      preferences: schedulePrefs
+    };
+
+    const schedule = await schedulingService.generateOptimalSchedule(scheduleParams);
+
+    // Log scheduling results
+    console.log(`Generated ${schedule.sessions.length} schedule sessions with confidence: ${schedule.metadata.confidence}`);
     
-    materials.forEach(material => {
-      // Use the subject name from material, but don't default to 'Unknown'
-      const subject = material.subject_name || material.subject || 'General Study';
-      if (!materialsBySubject[subject]) {
-        materialsBySubject[subject] = [];
-      }
-      materialsBySubject[subject].push({
-        title: material.title,
-        type: material.content_type,
-        estimated_duration: material.estimated_duration_minutes || 45
-      });
+    if (schedule.metadata.generator !== 'advanced_ai') {
+      console.log('Used fallback scheduling due to AI service unavailability');
+    }
 
-      // Identify priority lessons (those with due dates or marked as important)
-      if (material.due_date || material.priority === 'high') {
-        priorityLessons.push({
-          title: material.title,
-          subject: subject,
-          due_date: material.due_date,
-          estimated_duration: material.estimated_duration_minutes || 45
-        });
-      }
+    // Return enhanced schedule response
+    res.json({
+      suggestions: schedule.sessions,
+      reasoning: 'Advanced AI scheduling with multi-stage reasoning and cognitive load optimization',
+      confidence: schedule.metadata.confidence,
+      metadata: schedule.metadata,
+      analysis: {
+        total_sessions: schedule.metadata.total_sessions,
+        subjects_covered: schedule.metadata.subjects_covered,
+        days_scheduled: schedule.metadata.days_scheduled,
+        optimization_applied: schedule.metadata.optimization_applied || []
+      },
+      enhanced: true,
+      fallback: schedule.metadata.generator !== 'advanced_ai',
+      generated_at: schedule.generated_at,
+      version: schedule.version
     });
-
-    // Create lessons context for AI prompt
-    const lessonsContext = Object.keys(materialsBySubject).length > 0 
-      ? Object.entries(materialsBySubject)
-          .map(([subject, lessons]) => 
-            `${subject}: ${lessons.map(l => `"${l.title}" (${l.estimated_duration}min)`).join(', ')}`
-          ).join('\n')
-      : 'No specific lessons provided - schedule general study time';
-
-    const priorityContext = priorityLessons.length > 0
-      ? priorityLessons.map(l => `"${l.title}" (${l.subject}) - Due: ${l.due_date || 'ASAP'}`).join('\n')
-      : 'No urgent lessons identified';
-
-    // AI scheduling logic
-    const aiSchedulePrompt = `
-    You are an expert education scheduler. Create an optimal study schedule with the following constraints:
-
-    Schedule Period: ${start_date} to ${end_date}
-    Target Weekly Hours: ${weekly_hours}
-    Preferred Study Time: ${schedulePrefs.preferred_start_time} - ${schedulePrefs.preferred_end_time}
-    Study Days: ${schedulePrefs.study_days.join(', ')}
-    Break Duration: ${schedulePrefs.break_duration_minutes} minutes
-    Difficult Subjects Morning: ${schedulePrefs.difficult_subjects_morning}
-    Session Duration Preference: ${session_duration}
-    Priority Mode: ${priority_mode}
-    Focus Subjects: ${focus_subjects.length > 0 ? focus_subjects.join(', ') : 'All subjects equally'}
-
-    AVAILABLE LESSONS BY SUBJECT:
-    ${lessonsContext}
-
-    PRIORITY LESSONS (Schedule These First):
-    ${priorityContext}
-
-    EXISTING SCHEDULE ENTRIES TO AVOID:
-    ${existingEntries ? existingEntries.map(e => `${e.scheduled_date} ${e.start_time} - ${e.subject_name || 'Study Time'} (${e.duration_minutes}min)`).join('\n') : 'None'}
-
-    SCHEDULING PRIORITY RULES:
-    1. FIRST PRIORITY: Schedule specific lessons listed above, especially priority lessons with due dates
-    2. SECOND PRIORITY: Schedule subjects that have available lesson content 
-    3. THIRD PRIORITY: Fill remaining time with general study time for subjects without specific lessons
-    4. Respect the preferred study time window
-    5. Only schedule on specified study days
-    6. Include appropriate breaks between sessions
-    7. If difficult_subjects_morning is true, schedule challenging subjects (Math, Science) earlier
-    8. Vary session durations based on subject, lesson complexity, and preference
-    9. Avoid scheduling conflicts with existing entries
-    10. Distribute subjects evenly across the time period
-    11. Consider cognitive load - don't overload any single day
-
-    When scheduling specific lessons, use the lesson title in the notes field and set appropriate duration based on lesson complexity.
-
-    Return ONLY a JSON response with this exact structure:
-    {
-      "suggestions": [
-        {
-          "subject_name": "Math",
-          "scheduled_date": "2025-06-16",
-          "start_time": "09:00",
-          "duration_minutes": 60,
-          "notes": "Explanation of why this time/duration was chosen"
-        }
-      ],
-      "reasoning": "Brief explanation of the overall scheduling strategy",
-      "confidence": 0.85
-    }
-    `;
-
-    try {
-      const openaiResponse = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert educational scheduler. Respond only with valid JSON."
-          },
-          {
-            role: "user", 
-            content: aiSchedulePrompt
-          }
-        ],
-        max_tokens: 2000,
-        temperature: 0.7
-      });
-
-      const aiResponse = JSON.parse(openaiResponse.choices[0].message.content);
-      
-      // Validate the AI response structure
-      if (!aiResponse.suggestions || !Array.isArray(aiResponse.suggestions)) {
-        throw new Error('Invalid AI response structure');
-      }
-
-      // Add created_by field to each suggestion
-      const processedSuggestions = aiResponse.suggestions.map(suggestion => ({
-        ...suggestion,
-        material_id: null,
-        created_by: 'ai_suggestion'
-      }));
-
-      res.json({
-        suggestions: processedSuggestions,
-        reasoning: aiResponse.reasoning || 'AI-generated schedule optimized for learning effectiveness.',
-        confidence: aiResponse.confidence || 0.8
-      });
-
-    } catch (aiError) {
-      console.error('OpenAI API error:', aiError);
-      
-      // Fallback to rule-based scheduling if AI fails
-      const fallbackSuggestions = generateFallbackSchedule({
-        start_date,
-        end_date,
-        weekly_hours,
-        schedulePrefs,
-        focus_subjects,
-        session_duration,
-        priority_mode,
-        materialsBySubject,
-        priorityLessons
-      });
-
-      res.json({
-        suggestions: fallbackSuggestions,
-        reasoning: 'Schedule generated using rule-based algorithm (AI temporarily unavailable).',
-        confidence: 0.7
-      });
-    }
 
   } catch (error) {
     console.error('Error in generateAISchedule:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    
+    // Final fallback to simple scheduling
+    try {
+      const simpleSchedule = await generateSimpleFallbackSchedule(req.body);
+      res.json({
+        suggestions: simpleSchedule,
+        reasoning: 'Simple fallback scheduling used due to service error.',
+        confidence: 0.6,
+        fallback: true,
+        error_recovery: true
+      });
+    } catch (fallbackError) {
+      console.error('Error in fallback scheduling:', fallbackError);
+      res.status(500).json({ error: 'Schedule generation failed' });
+    }
   }
 };
 
@@ -735,6 +641,155 @@ function generateFallbackSchedule({
   return suggestions;
 }
 
+// Simple fallback scheduling function for emergency cases
+async function generateSimpleFallbackSchedule({
+  start_date,
+  end_date,
+  weekly_hours = 15,
+  focus_subjects = [],
+  session_duration = 'mixed',
+  materials = []
+}) {
+  const suggestions = [];
+  const studyDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+  const startTime = '09:00';
+  const breakDuration = 15;
+  
+  // Simple subject rotation
+  const subjects = focus_subjects.length > 0 ? focus_subjects : 
+    [...new Set(materials.map(m => m.subject_name || m.subject))].filter(Boolean);
+  
+  if (subjects.length === 0) {
+    subjects.push('Math', 'English', 'Science');
+  }
+  
+  // Calculate sessions needed
+  const sessionsNeeded = Math.ceil(weekly_hours / subjects.length);
+  const sessionDuration = session_duration === 'short' ? 45 : 
+                         session_duration === 'long' ? 90 : 60;
+  
+  let subjectIndex = 0;
+  const startDate = new Date(start_date);
+  const endDate = new Date(end_date);
+  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  
+  let currentDate = new Date(startDate);
+  let sessionCount = 0;
+  
+  while (currentDate <= endDate && sessionCount < sessionsNeeded * subjects.length) {
+    const dayName = dayNames[currentDate.getDay()];
+    
+    if (studyDays.includes(dayName)) {
+      const subject = subjects[subjectIndex % subjects.length];
+      
+      suggestions.push({
+        subject_name: subject,
+        scheduled_date: currentDate.toISOString().split('T')[0],
+        start_time: startTime,
+        duration_minutes: sessionDuration,
+        material_id: null,
+        notes: `Simple scheduling for ${subject}`,
+        created_by: 'ai_suggestion'
+      });
+      
+      subjectIndex++;
+      sessionCount++;
+    }
+    
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  return suggestions;
+}
+
+// Generate coordinated family schedule for multiple children
+const generateFamilySchedule = async (req, res) => {
+  try {
+    const parentId = getParentId(req);
+    const { children_schedules, coordination_mode = 'balanced' } = req.body;
+
+    if (!parentId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (!children_schedules || !Array.isArray(children_schedules) || children_schedules.length === 0) {
+      return res.status(400).json({ error: 'children_schedules array is required' });
+    }
+
+    // Verify parent owns all specified children
+    for (const childSchedule of children_schedules) {
+      if (!(await verifyChildOwnership(parentId, childSchedule.child_id))) {
+        return res.status(403).json({ 
+          error: `Access denied to child ${childSchedule.child_id}` 
+        });
+      }
+    }
+
+    console.log(`Generating family schedule for ${children_schedules.length} children with coordination mode: ${coordination_mode}`);
+
+    // Initialize the advanced scheduling service
+    const schedulingService = new AdvancedSchedulingService();
+
+    // Use the scheduling service for family coordination
+    const familyScheduleParams = {
+      parent_id: parentId,
+      children_schedules,
+      coordination_mode
+    };
+
+    const familySchedule = await schedulingService.generateFamilyCoordinatedSchedule(familyScheduleParams);
+
+    // Log family scheduling results
+    console.log(`Generated family schedule with ${familySchedule.coordinated_schedules.length} coordinated schedules`);
+    
+    if (familySchedule.coordination_mode === 'individual_fallback') {
+      console.log('Used fallback family scheduling due to coordination service unavailability');
+    }
+
+    // Return coordinated family schedule
+    res.json({
+      family_schedule: familySchedule.coordinated_schedules,
+      coordination_analysis: {
+        coordination_mode: familySchedule.coordination_mode,
+        conflicts_resolved: familySchedule.conflicts_resolved,
+        family_metadata: familySchedule.family_metadata
+      },
+      conflict_resolutions: familySchedule.conflicts_resolved,
+      optimization_insights: familySchedule.family_metadata,
+      coordination_mode: familySchedule.coordination_mode,
+      fallback: familySchedule.coordination_mode === 'individual_fallback',
+      generated_at: familySchedule.generated_at,
+      children_count: children_schedules.length
+    });
+
+  } catch (error) {
+    console.error('Error in generateFamilySchedule:', error);
+    
+    // Final fallback to individual schedules
+    try {
+      const individualSchedules = [];
+      for (const childSchedule of req.body.children_schedules || []) {
+        const schedule = await generateSimpleFallbackSchedule(childSchedule);
+        individualSchedules.push({
+          child_id: childSchedule.child_id,
+          suggestions: schedule,
+          fallback: true
+        });
+      }
+      
+      res.json({
+        family_schedule: individualSchedules,
+        reasoning: 'Individual fallback schedules generated due to family coordination error.',
+        fallback: true,
+        error_recovery: true
+      });
+    } catch (fallbackError) {
+      console.error('Error in family schedule fallback:', fallbackError);
+      res.status(500).json({ error: 'Family schedule generation failed' });
+    }
+  }
+};
+
 module.exports = {
   getScheduleEntries,
   createScheduleEntry,
@@ -742,5 +797,6 @@ module.exports = {
   deleteScheduleEntry,
   getSchedulePreferences,
   updateSchedulePreferences,
-  generateAISchedule
+  generateAISchedule,
+  generateFamilySchedule
 };

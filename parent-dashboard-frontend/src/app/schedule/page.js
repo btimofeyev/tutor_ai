@@ -12,7 +12,7 @@ import StudentHeader from "../dashboard/components/StudentHeader";
 
 // Schedule-specific components
 import ScheduleCalendar from "./components/ScheduleCalendar";
-import ScheduleSettings from "./components/ScheduleSettings";
+import ScheduleSettingsModal from "./components/ScheduleSettingsModal";
 import CreateScheduleEntryModal from "./components/CreateScheduleEntryModal";
 import EditScheduleEntryModal from "./components/EditScheduleEntryModal";
 import { useScheduleManagement } from "../../hooks/useScheduleManagement";
@@ -75,6 +75,12 @@ export default function SchedulePage() {
     return result;
   };
 
+  // Handle saving schedule preferences
+  const handleSavePreferences = async (preferencesData) => {
+    const result = await scheduleManagement.updateSchedulePreferences(preferencesData);
+    return result;
+  };
+
   // Get assigned subjects for the current child
   const assignedSubjectsForCurrentChild = childrenData.selectedChild 
     ? childrenData.childSubjects[childrenData.selectedChild.id] || []
@@ -133,7 +139,10 @@ export default function SchedulePage() {
                   📅 Schedule for {childrenData.selectedChild.name}
                 </h1>
                 <div className="flex gap-2">
-                  <button className="btn-secondary">
+                  <button 
+                    onClick={scheduleManagement.openSettingsModal}
+                    className="btn-secondary"
+                  >
                     Settings
                   </button>
                   <button className="btn-primary">
@@ -175,6 +184,16 @@ export default function SchedulePage() {
         scheduleEntry={scheduleManagement.editingEntry}
         childSubjects={assignedSubjectsForCurrentChild}
         materials={[]} // TODO: Get materials from child data
+        isSaving={scheduleManagement.loading}
+      />
+
+      {/* Schedule Settings Modal */}
+      <ScheduleSettingsModal
+        isOpen={scheduleManagement.showSettingsModal}
+        onClose={scheduleManagement.closeSettingsModal}
+        onSave={handleSavePreferences}
+        schedulePreferences={scheduleManagement.schedulePreferences}
+        childName={childrenData.selectedChild?.name}
         isSaving={scheduleManagement.loading}
       />
     </div>

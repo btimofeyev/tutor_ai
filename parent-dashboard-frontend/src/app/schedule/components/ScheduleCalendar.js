@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
+import { getSubjectColor, getSubjectBgColor } from '../../../utils/subjectColors';
 
 export default function ScheduleCalendar({ childId, subscriptionPermissions, scheduleManagement, childSubjects = [] }) {
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 })); // Start on Monday
@@ -116,30 +117,9 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
     });
   };
 
-  // Get subject color
-  const getSubjectColor = (subject) => {
-    // First check if this matches a child's actual subjects
-    const childSubject = childSubjects.find(s => s.name === subject);
-    if (childSubject) {
-      // Generate consistent color based on subject name
-      const subjectColors = [
-        'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 
-        'bg-yellow-500', 'bg-indigo-500', 'bg-pink-500', 'bg-teal-500'
-      ];
-      const colorIndex = childSubject.name.length % subjectColors.length;
-      return subjectColors[colorIndex];
-    }
-    
-    // Fallback to default colors for common subjects
-    const defaultColors = {
-      'Math': 'bg-red-500',
-      'Science': 'bg-green-500', 
-      'English': 'bg-purple-500',
-      'History': 'bg-yellow-500',
-      'Unknown': 'bg-gray-400',
-      'default': 'bg-blue-500'
-    };
-    return defaultColors[subject] || defaultColors.default;
+  // Use centralized color utility
+  const getSubjectColorClass = (subject) => {
+    return getSubjectBgColor(subject, childSubjects);
   };
 
   // Navigate weeks
@@ -276,7 +256,7 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
                         }}
                         className={`
                           absolute inset-x-0 top-0 mx-1 rounded cursor-pointer hover:opacity-80 transition-opacity
-                          ${getSubjectColor(eventStartingHere.subject)} 
+                          ${getSubjectColorClass(eventStartingHere.subject)} 
                           ${eventStartingHere.status === 'completed' ? 'opacity-60' : ''}
                           text-white text-xs p-2 z-10
                         `}
@@ -303,26 +283,21 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
         </div>
       </div>
 
-      {/* Legend */}
+      {/* Dynamic Legend based on child's subjects */}
       <div className="mt-6 flex flex-wrap gap-4 text-sm">
+        {childSubjects.map((subject) => {
+          const colorInfo = getSubjectColor(subject.name, childSubjects);
+          return (
+            <div key={subject.child_subject_id} className="flex items-center gap-2">
+              <div className={`w-3 h-3 ${colorInfo.bg} rounded`}></div>
+              <span className="text-text-secondary">{subject.name}</span>
+            </div>
+          );
+        })}
+        
+        {/* Always show completed status */}
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-red-500 rounded"></div>
-          <span className="text-text-secondary">Math</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-green-500 rounded"></div>
-          <span className="text-text-secondary">Science</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-purple-500 rounded"></div>
-          <span className="text-text-secondary">English</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-          <span className="text-text-secondary">History</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-gray-400 rounded"></div>
+          <div className="w-3 h-3 bg-gray-400 rounded opacity-60"></div>
           <span className="text-text-secondary">Completed</span>
         </div>
       </div>

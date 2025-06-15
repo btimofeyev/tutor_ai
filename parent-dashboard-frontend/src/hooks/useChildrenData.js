@@ -70,7 +70,6 @@ export function useChildrenData(session) {
             // Fetch units for this subject
             const unitsRes = await api.get(`/units/subject/${subject.child_subject_id}`);
             const units = unitsRes.data || [];
-            console.log(`Units for subject ${subject.name} (${subject.child_subject_id}):`, units);
             newUnitsBySubject[subject.child_subject_id] = units;
             
             // Fetch lessons for each unit
@@ -82,7 +81,6 @@ export function useChildrenData(session) {
             // Fetch all materials/lessons for this subject
             const materialsRes = await api.get(`/materials/subject/${subject.child_subject_id}`);
             const materials = materialsRes.data || [];
-            console.log(`Materials for subject ${subject.name} (${subject.child_subject_id}):`, materials);
             
             // Process materials to ensure they have proper subject names
             const materialsWithSubject = materials.map(material => ({
@@ -107,7 +105,6 @@ export function useChildrenData(session) {
       }
       
       // Update all state at once
-      console.log('Final unitsBySubject being set:', newUnitsBySubject);
       setUnitsBySubject(newUnitsBySubject);
       setLessonsByUnit(newLessonsByUnit);
       setLessonsBySubject(newLessonsBySubject);

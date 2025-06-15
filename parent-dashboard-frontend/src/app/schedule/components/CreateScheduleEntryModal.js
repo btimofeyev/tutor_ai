@@ -98,10 +98,7 @@ export default function CreateScheduleEntryModal({
       setFormData(prev => ({ ...prev, subject_name: subject.name }));
       
       // Get units for this subject
-      console.log('Looking for units with subjectId:', subjectId);
-      console.log('Available unitsBySubject keys:', Object.keys(unitsBySubject));
       const units = unitsBySubject[subjectId] || [];
-      console.log('Found units for subject:', units);
       setAvailableUnits(units);
       
       // Get lessons for this subject

@@ -40,8 +40,9 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
   const getEventsForDay = (day) => {
     const dayString = format(day, 'yyyy-MM-dd');
     const events = calendarEvents || [];
+    console.log(`Getting events for ${dayString}, available events:`, events);
     
-    return events.filter(event => {
+    const dayEvents = events.filter(event => {
       if (event.date) {
         return event.date === dayString;
       }
@@ -51,6 +52,8 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
       }
       return false;
     });
+    console.log(`Filtered events for ${dayString}:`, dayEvents);
+    return dayEvents;
   };
 
   // Check if a time slot is blocked by an existing event
@@ -74,10 +77,15 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
   // Check if a time slot has an event starting at that exact time
   const hasEventAtTime = (day, timeSlot) => {
     const dayEvents = getEventsForDay(day);
-    return dayEvents.some(event => {
+    const dayString = format(day, 'yyyy-MM-dd');
+    console.log(`Checking hasEventAtTime for ${dayString} ${timeSlot}:`, dayEvents);
+    const result = dayEvents.some(event => {
       const eventTime = event.startTime || format(new Date(event.start), 'HH:mm');
+      console.log(`Event time: ${eventTime}, checking against: ${timeSlot}`);
       return eventTime === timeSlot;
     });
+    console.log(`hasEventAtTime result: ${result}`);
+    return result;
   };
 
   // Get subject color

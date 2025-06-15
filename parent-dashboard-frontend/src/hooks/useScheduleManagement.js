@@ -323,9 +323,16 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     }));
   };
 
-  // Mark schedule entry as completed
+  // Mark schedule entry as completed with sync notification
   const markEntryCompleted = async (entryId) => {
-    return updateScheduleEntry(entryId, { status: 'completed' });
+    const result = await updateScheduleEntry(entryId, { status: 'completed' });
+    
+    // Show success message if materials were synced
+    if (result.success && result.data?.synced_materials > 0) {
+      console.log(`Schedule entry completed and synced with ${result.data.synced_materials} material(s)`);
+    }
+    
+    return result;
   };
 
   // Mark schedule entry as skipped

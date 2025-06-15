@@ -206,16 +206,26 @@ export function useMaterialManagement(refreshChildData) {
     }
   }, [editingLesson, editForm, refreshChildData]);
 
-  // Toggle lesson completion
+  // Toggle lesson completion with sync feedback
   const toggleLessonCompletion = useCallback(async (materialId, grade = null) => {
     try {
       const payload = grade !== null ? { grade } : {};
-      await api.put(`/materials/${materialId}/toggle-complete`, payload);
+      const response = await api.put(`/materials/${materialId}/toggle-complete`, payload);
+      
+      // Show sync feedback if schedule entries were updated
+      if (response.data?.synced_schedule_entries > 0) {
+        console.log(`Material completion synced with ${response.data.synced_schedule_entries} schedule entry(s)`);
+      }
       
       if (refreshChildData) {
         await refreshChildData();
       }
-      return { success: true };
+      
+      return { 
+        success: true, 
+        syncedEntries: response.data?.synced_schedule_entries || 0,
+        message: response.data?.message 
+      };
     } catch (error) {
       console.error('Toggle completion error:', error);
       return { 

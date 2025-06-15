@@ -2,7 +2,7 @@
 "use client";
 import { useState, useMemo } from 'react';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, CalendarDaysIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
 import { getSubjectColor, getSubjectDarkBgColor, getSubjectTextColor } from '../../../utils/subjectColors';
 
@@ -269,15 +269,41 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
                           height: `${getEventHeight(eventStartingHere.duration || eventStartingHere.duration_minutes || 30) * 60 - 4}px`, // Account for margin
                         }}
                       >
-                        <div className="font-semibold truncate">{eventStartingHere.title}</div>
-                        <div className="opacity-80 text-xs mt-1">
-                          {eventStartingHere.duration || eventStartingHere.duration_minutes || 30} minutes
-                        </div>
-                        {eventStartingHere.notes && (
-                          <div className="opacity-70 text-xs mt-1 truncate">
-                            {eventStartingHere.notes}
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 min-w-0">
+                            <div className={`font-semibold truncate ${eventStartingHere.status === 'completed' ? 'line-through' : ''}`}>
+                              {eventStartingHere.title}
+                            </div>
+                            <div className="opacity-80 text-xs mt-1">
+                              {eventStartingHere.duration || eventStartingHere.duration_minutes || 30} minutes
+                            </div>
+                            {eventStartingHere.notes && (
+                              <div className="opacity-70 text-xs mt-1 truncate">
+                                {eventStartingHere.notes}
+                              </div>
+                            )}
                           </div>
-                        )}
+                          
+                          {/* Completion Toggle Button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (eventStartingHere.status === 'completed') {
+                                scheduleManagement.updateScheduleEntry(eventStartingHere.id, { status: 'scheduled' });
+                              } else {
+                                scheduleManagement.markEntryCompleted(eventStartingHere.id);
+                              }
+                            }}
+                            className={`ml-2 p-1 rounded-full transition-all duration-200 hover:scale-110 ${
+                              eventStartingHere.status === 'completed' 
+                                ? 'bg-white/30 text-white' 
+                                : 'bg-white/20 hover:bg-white/40 text-white/70 hover:text-white'
+                            }`}
+                            title={eventStartingHere.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
+                          >
+                            <CheckIcon className="h-3 w-3" />
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

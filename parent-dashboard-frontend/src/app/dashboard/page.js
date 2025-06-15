@@ -272,6 +272,9 @@ export default function DashboardPage() {
     const result = await materialManagement.toggleLessonCompletion(lessonId, grade);
     if (!result.success) {
       alert(result.error || "Could not update completion status.");
+    } else if (result.syncedEntries > 0) {
+      // Show brief success message about sync
+      console.log(`✅ Lesson completion synced with ${result.syncedEntries} schedule entry(s)`);
     }
   };
 

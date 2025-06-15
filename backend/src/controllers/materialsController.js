@@ -714,3 +714,95 @@ exports.createMaterialManually = async (req, res) => {
     res.status(500).json({ error: 'Failed to create material' });
   }
 };
+
+// Toggle material completion status with bidirectional sync
+exports.toggleMaterialCompletion = async (req, res) => {
+  const parent_id = getParentId(req);
+  const { material_id } = req.params;
+  const { grade } = req.body;
+
+  if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
+  if (!material_id) return res.status(400).json({ error: 'material_id is required' });
+
+  try {
+    // First get the material to verify ownership
+    const { data: material, error: materialError } = await supabase
+      .from('materials')
+      .select(`
+        id,
+        title,
+        completed_at,
+        lesson:lesson_id (
+          id,
+          unit:unit_id (
+            id,
+            child_subject:child_subject_id (
+              id,
+              child:child_id (
+                id,
+                parent_id
+              )
+            )
+          )
+        )
+      `)
+      .eq('id', material_id)
+      .single();
+
+    if (materialError || !material || material.lesson.unit.child_subject.child.parent_id !== parent_id) {
+      return res.status(403).json({ error: 'Access denied to this material' });
+    }
+
+    // Toggle completion status
+    const isCurrentlyCompleted = !!material.completed_at;
+    const newCompletedAt = isCurrentlyCompleted ? null : new Date().toISOString();
+
+    // Update material completion
+    const { data: updatedMaterial, error: updateError } = await supabase
+      .from('materials')
+      .update({ 
+        completed_at: newCompletedAt,
+        ...(grade && { grade_value: grade })
+      })
+      .eq('id', material_id)
+      .select('*')
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Sync with schedule entries that reference this material
+    const childId = material.lesson.unit.child_subject.child.id;
+    const newScheduleStatus = newCompletedAt ? 'completed' : 'scheduled';
+
+    // Find related schedule entries
+    const { data: relatedScheduleEntries, error: scheduleError } = await supabase
+      .from('schedule_entries')
+      .select('id, material_id, subject_name, notes')
+      .eq('child_id', childId)
+      .eq('material_id', material.lesson.id);
+
+    if (!scheduleError && relatedScheduleEntries?.length > 0) {
+      // Update all related schedule entries
+      const { error: syncError } = await supabase
+        .from('schedule_entries')
+        .update({ status: newScheduleStatus })
+        .eq('child_id', childId)
+        .eq('material_id', material.lesson.id);
+
+      if (syncError) {
+        console.warn('Failed to sync schedule entries:', syncError);
+      }
+    }
+
+    res.json({
+      success: true,
+      material: updatedMaterial,
+      synced_schedule_entries: relatedScheduleEntries?.length || 0,
+      message: `Material ${newCompletedAt ? 'completed' : 'marked as incomplete'} and synced with schedule`
+    });
+
+  } catch (error) {
+    console.error('Error toggling material completion:', error);
+    res.status(500).json({ error: 'Failed to toggle completion status' });
+  }
+};

@@ -218,7 +218,46 @@ const updateScheduleEntry = async (req, res) => {
       return res.status(500).json({ error: 'Failed to update schedule entry' });
     }
 
-    res.json(updatedEntry);
+    // Sync with materials if status changed and material_id exists
+    let syncedMaterials = 0;
+    if (allowedUpdates.status && updatedEntry.material_id) {
+      try {
+        // Find the material associated with this schedule entry
+        const { data: materials, error: materialError } = await supabase
+          .from('materials')
+          .select(`
+            id,
+            completed_at,
+            lesson:lesson_id (id)
+          `)
+          .eq('lesson_id', updatedEntry.material_id);
+
+        if (!materialError && materials?.length > 0) {
+          // Update material completion based on schedule status
+          const materialCompletedAt = updatedEntry.status === 'completed' 
+            ? new Date().toISOString() 
+            : null;
+
+          const { error: syncError } = await supabase
+            .from('materials')
+            .update({ completed_at: materialCompletedAt })
+            .eq('lesson_id', updatedEntry.material_id);
+
+          if (!syncError) {
+            syncedMaterials = materials.length;
+          } else {
+            console.warn('Failed to sync materials:', syncError);
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Error during material sync:', syncErr);
+      }
+    }
+
+    res.json({
+      ...updatedEntry,
+      synced_materials: syncedMaterials
+    });
   } catch (error) {
     console.error('Error in updateScheduleEntry:', error);
     res.status(500).json({ error: 'Internal server error' });

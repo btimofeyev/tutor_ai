@@ -165,12 +165,12 @@ export default function SchedulePage() {
               {/* Schedule Header */}
               <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold text-text-primary">
-                  📅 Schedule for {childrenData.selectedChild.name}
+                  Schedule for {childrenData.selectedChild.name}
                 </h1>
                 <div className="flex gap-2">
                   <button 
                     onClick={scheduleManagement.openSettingsModal}
-                    className="btn-secondary text-sm"
+                    className="btn-secondary text-sm px-4 py-2"
                   >
                     Settings
                   </button>
@@ -179,24 +179,24 @@ export default function SchedulePage() {
                     <>
                       <button 
                         onClick={handleClearSchedule}
-                        className="text-red-600 hover:text-red-700 text-sm px-3 py-2 rounded-lg hover:bg-red-50 transition-colors border border-red-200"
+                        className="btn-danger text-sm px-4 py-2"
                       >
                         Clear All
                       </button>
                       <button 
                         onClick={handleRebuildSchedule}
-                        className="text-blue-600 hover:text-blue-700 text-sm px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors border border-blue-200"
+                        className="btn-secondary text-sm px-4 py-2"
                       >
-                        🤖 Rebuild
+                        Rebuild Schedule
                       </button>
                     </>
                   )}
                   
                   <button 
                     onClick={scheduleManagement.openAIModal}
-                    className="btn-primary text-sm"
+                    className="btn-primary text-sm px-4 py-2"
                   >
-                    🤖 AI Schedule
+                    AI Schedule
                   </button>
                 </div>
               </div>

@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
-import { getSubjectColor, getSubjectBgColor } from '../../../utils/subjectColors';
+import { getSubjectColor, getSubjectDarkBgColor, getSubjectTextColor } from '../../../utils/subjectColors';
 
 export default function ScheduleCalendar({ childId, subscriptionPermissions, scheduleManagement, childSubjects = [] }) {
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 })); // Start on Monday
@@ -117,9 +117,13 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
     });
   };
 
-  // Use centralized color utility
-  const getSubjectColorClass = (subject) => {
-    return getSubjectBgColor(subject, childSubjects);
+  // Use centralized color utility for calendar events
+  const getSubjectEventColor = (subject) => {
+    return getSubjectDarkBgColor(subject, childSubjects);
+  };
+
+  const getSubjectEventTextColor = (subject) => {
+    return getSubjectTextColor(subject, childSubjects);
   };
 
   // Navigate weeks
@@ -162,13 +166,13 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
         <div className="flex gap-2">
           <button
             onClick={goToToday}
-            className="btn-secondary text-sm"
+            className="btn-secondary text-sm px-4 py-2"
           >
             Today
           </button>
           <button
             onClick={() => openCreateModal()}
-            className="btn-primary text-sm flex items-center gap-1"
+            className="btn-primary text-sm px-4 py-2 flex items-center gap-2"
           >
             <PlusIcon className="h-4 w-4" />
             Add Study Time
@@ -184,12 +188,12 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
       )}
       
       {!loading && calendarEvents.length === 0 && (
-        <div className="text-center py-8 bg-blue-50 rounded-lg border border-blue-200 mb-4">
-          <div className="text-blue-800 mb-2">
-            <CalendarDaysIcon className="h-12 w-12 mx-auto mb-2 text-blue-500" />
-            <h3 className="font-medium">No Schedule Entries Yet</h3>
-            <p className="text-sm text-blue-600 mt-1">
-              Click "Add Study Time" to create your first schedule entry, or use "🤖 AI Schedule" to generate an intelligent weekly plan.
+        <div className="text-center py-8 bg-slate-50 rounded-lg border border-gray-200 mb-4">
+          <div className="text-slate-700 mb-2">
+            <CalendarDaysIcon className="h-12 w-12 mx-auto mb-3 text-slate-400" />
+            <h3 className="font-semibold text-lg">No Schedule Entries Yet</h3>
+            <p className="text-sm text-slate-600 mt-2 max-w-md mx-auto">
+              Click "Add Study Time" to create your first schedule entry, or use "AI Schedule" to generate an intelligent weekly plan.
             </p>
           </div>
         </div>
@@ -218,7 +222,7 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
         </div>
 
         {/* Time Slots and Events */}
-        <div className="max-h-96 overflow-y-auto">
+        <div className="min-h-[calc(100vh-450px)] max-h-[calc(100vh-350px)] overflow-y-auto">
           {timeSlots.map((timeSlot) => (
             <div key={timeSlot} className="grid grid-cols-8 border-b border-border-subtle last:border-b-0">
               {/* Time Label */}
@@ -255,21 +259,22 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
                           openEditModal(eventStartingHere);
                         }}
                         className={`
-                          absolute inset-x-0 top-0 mx-1 rounded cursor-pointer hover:opacity-80 transition-opacity
-                          ${getSubjectColorClass(eventStartingHere.subject)} 
+                          absolute inset-x-0 top-0 mx-1 rounded-lg cursor-pointer hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow-md
+                          ${getSubjectEventColor(eventStartingHere.subject)} 
+                          ${getSubjectEventTextColor(eventStartingHere.subject)}
                           ${eventStartingHere.status === 'completed' ? 'opacity-60' : ''}
-                          text-white text-xs p-2 z-10
+                          text-xs p-3 z-10 border border-white/20
                         `}
                         style={{
                           height: `${getEventHeight(eventStartingHere.duration || eventStartingHere.duration_minutes || 30) * 60 - 4}px`, // Account for margin
                         }}
                       >
-                        <div className="font-medium truncate">{eventStartingHere.title}</div>
-                        <div className="opacity-75 text-xs">
-                          {eventStartingHere.duration || eventStartingHere.duration_minutes || 30}min
+                        <div className="font-semibold truncate">{eventStartingHere.title}</div>
+                        <div className="opacity-80 text-xs mt-1">
+                          {eventStartingHere.duration || eventStartingHere.duration_minutes || 30} minutes
                         </div>
                         {eventStartingHere.notes && (
-                          <div className="opacity-75 text-xs mt-1 truncate">
+                          <div className="opacity-70 text-xs mt-1 truncate">
                             {eventStartingHere.notes}
                           </div>
                         )}
@@ -303,10 +308,10 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
       </div>
 
       {/* Instructions */}
-      <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <p className="text-sm text-blue-800">
+      <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-gray-200">
+        <p className="text-sm text-slate-700">
           <strong>How to use:</strong> Click on any available time slot to add study time. Click on existing events to edit them. 
-          Grayed-out slots are blocked by existing activities - longer sessions automatically block overlapping time slots.
+          Events span multiple time slots based on their duration.
         </p>
       </div>
     </div>

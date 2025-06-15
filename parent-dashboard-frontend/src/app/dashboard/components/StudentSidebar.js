@@ -11,7 +11,9 @@ import {
   ChevronDownIcon, 
   ChevronUpIcon,
   ExclamationTriangleIcon,
-  CreditCardIcon // Added for upgrade button
+  CreditCardIcon, // Added for upgrade button
+  CalendarDaysIcon,
+  HomeIcon
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 import SubscriptionManager from '../../../components/SubscriptionManager';
@@ -77,6 +79,26 @@ export default function StudentSidebar({
             Klio AI
           </span>
         </Link>
+      </div>
+
+      {/* Navigation Menu */}
+      <div className="px-6 pt-2 pb-3 border-b border-border-subtle mb-2">
+        <div className="space-y-1">
+          <Link 
+            href="/dashboard" 
+            className="flex items-center px-3 py-2 text-sm font-medium text-text-primary hover:bg-[var(--accent-blue)]/20 rounded-md transition-colors"
+          >
+            <HomeIcon className="h-4 w-4 mr-2" />
+            Dashboard
+          </Link>
+          <Link 
+            href="/schedule" 
+            className="flex items-center px-3 py-2 text-sm font-medium text-text-primary hover:bg-[var(--accent-blue)]/20 rounded-md transition-colors"
+          >
+            <CalendarDaysIcon className="h-4 w-4 mr-2" />
+            Schedule
+          </Link>
+        </div>
       </div>
 
       {/* Students Section Header */}

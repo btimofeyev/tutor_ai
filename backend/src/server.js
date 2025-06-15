@@ -12,6 +12,7 @@ const unitsRoutes = require('./routes/unitsRoutes');
 const childAuthRoutes = require('./routes/childAuthRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const progressRoutes = require('./routes/progressRoutes');
+const scheduleRoutes = require('./routes/scheduleRoutes');
 
 
 // Import Stripe routes
@@ -43,6 +44,7 @@ app.use('/api/weights', weightsRoutes);
 app.use('/api/auth/child', childAuthRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/progress', progressRoutes); // Fixed: removed 'Routes' suffix
+app.use('/api/schedule', scheduleRoutes); // Add Schedule routes
 app.use('/api/stripe', stripeRoutes); // Add Stripe routes
 
 const PORT = process.env.PORT || 5000;

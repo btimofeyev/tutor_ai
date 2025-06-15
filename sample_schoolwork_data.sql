@@ -1,11 +1,3 @@
--- Realistic Week of Schoolwork for 4 Children
--- Children IDs:
--- Child 1: e7599701-f337-4fab-bb88-531aa01bc9f0
--- Child 2: 2e456022-6598-4fb7-86c1-f29c36f3b963  
--- Child 3: 6a2bee53-ed3e-4661-a8bf-9cab5412dae0
--- Child 4: fd3640a1-2b8f-4f8c-895c-b0cd69e16519
-
--- First, let's create the core subjects that will be used
 INSERT INTO subjects (id, name, description, is_predefined) VALUES
 ('a1b2c3d4-e5f6-7890-1234-567890abcdef', 'Mathematics', 'Core mathematics curriculum', true),
 ('b2c3d4e5-f6g7-8901-2345-678901bcdefg', 'English Language Arts', 'Reading, writing, and language skills', true),
@@ -180,7 +172,7 @@ INSERT INTO lessons (id, unit_id, title, description, sort_order) VALUES
 -- English - Shakespeare Studies
 ('60000004-6000-6000-6000-600000000006', '50000004-5000-5000-5000-500000000003', 'Elizabethan Context', 'Historical background of Shakespeare', 1),
 ('60000004-6000-6000-6000-600000000007', '50000004-5000-5000-5000-500000000003', 'Character Motives', 'Romeo and Juliet character analysis', 2),
-('60000004-6000-6000-6000-600000000008', '50000004-5000-5000-5000-500000000003', 'Dramatic Irony', 'Understanding Shakespeare\'s techniques', 3),
+('60000004-6000-6000-6000-600000000008', '50000004-5000-5000-5000-500000000003', 'Dramatic Irony', 'Understanding Shakespeares techniques', 3),
 ('60000004-6000-6000-6000-600000000009', '50000004-5000-5000-5000-500000000003', 'Theme Analysis', 'Love, fate, and conflict themes', 4),
 -- Science - Chemical Reactions
 ('60000004-6000-6000-6000-600000000010', '50000004-5000-5000-5000-500000000005', 'Atomic Structure', 'Protons, neutrons, and electrons', 1),
@@ -262,9 +254,9 @@ INSERT INTO materials (id, lesson_id, title, description, content_type, due_date
 ('70000004-7000-7000-7000-700000000005', '60000004-6000-6000-6000-600000000005', 'Linear Modeling Project', 'Create a real-world linear model and presentation', 'assignment', CURRENT_DATE + INTERVAL '5 days', 60, 'Research a real situation that can be modeled with a linear equation. Include graph and analysis.'),
 
 -- English Materials
-('70000004-7000-7000-7000-700000000006', '60000004-6000-6000-6000-600000000006', 'Elizabethan Research', 'Research paper on Shakespeare\'s time period', 'assignment', CURRENT_DATE + INTERVAL '2 days', 50, 'Include information about daily life, theater, and social customs. 3-4 pages, MLA format.'),
-('70000004-7000-7000-7000-700000000007', '60000004-6000-6000-6000-600000000007', 'Character Analysis Essay', 'Deep analysis of Romeo or Juliet\'s character development', 'assignment', CURRENT_DATE + INTERVAL '3 days', 60, 'Trace character growth through specific scenes. Use textual evidence.'),
-('70000004-7000-7000-7000-700000000008', '60000004-6000-6000-6000-600000000008', 'Dramatic Irony Examples', 'Find and explain 5 examples of dramatic irony in the play', 'worksheet', CURRENT_DATE + INTERVAL '4 days', 35, 'Explain what the audience knows that the characters don\'t.'),
+('70000004-7000-7000-7000-700000000006', '60000004-6000-6000-6000-600000000006', 'Elizabethan Research', 'Research paper on Shakespeares time period', 'assignment', CURRENT_DATE + INTERVAL '2 days', 50, 'Include information about daily life, theater, and social customs. 3-4 pages, MLA format.'),
+('70000004-7000-7000-7000-700000000007', '60000004-6000-6000-6000-600000000007', 'Character Analysis Essay', 'Deep analysis of Romeo or Juliets character development', 'assignment', CURRENT_DATE + INTERVAL '3 days', 60, 'Trace character growth through specific scenes. Use textual evidence.'),
+('70000004-7000-7000-7000-700000000008', '60000004-6000-6000-6000-600000000008', 'Dramatic Irony Examples', 'Find and explain 5 examples of dramatic irony in the play', 'worksheet', CURRENT_DATE + INTERVAL '4 days', 35, 'Explain what the audience knows that the characters dont.'),
 ('70000004-7000-7000-7000-700000000009', '60000004-6000-6000-6000-600000000009', 'Theme Analysis Project', 'Multi-media presentation on a major theme', 'assignment', CURRENT_DATE + INTERVAL '5 days', 75, 'Choose one theme and create a 10-minute presentation with visuals.'),
 
 -- Science Materials
@@ -316,20 +308,3 @@ ON CONFLICT (child_id) DO UPDATE SET
   break_duration_minutes = EXCLUDED.break_duration_minutes,
   difficult_subjects_morning = EXCLUDED.difficult_subjects_morning,
   study_days = EXCLUDED.study_days;
-
--- Summary of what was created:
--- 4 children with realistic grade-appropriate subjects
--- 6 core subjects (Math, English, Science, Social Studies, Art, PE)
--- 20+ units across all children with age-appropriate content
--- 60+ lessons providing a full week of instruction per unit
--- 80+ materials with realistic assignments, worksheets, quizzes, and tests
--- Due dates spread across a school week (Monday-Friday)
--- Grade weights reflecting realistic assessment strategies
--- Schedule preferences for each child for AI planning
-
--- This creates a comprehensive testing environment for the multi-child scheduler with:
--- - Different grade levels (3rd, 5th, 7th, 8th grade)
--- - Varying assignment complexity and time requirements
--- - Realistic due date conflicts for testing scheduling logic
--- - Mix of assessment types for complete academic simulation
--- - Different learning preferences and schedules per child

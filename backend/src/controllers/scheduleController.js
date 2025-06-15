@@ -458,12 +458,32 @@ const generateAISchedule = async (req, res) => {
     // Enhanced materials processing with subject normalization
     const processedMaterials = materials.map(material => ({
       ...material,
+      child_id: child_id, // Ensure child_id is set on each material
       subject_name: material.subject_name || material.subject || 'General Study',
       estimated_duration_minutes: material.estimated_duration_minutes || 45,
       priority: material.due_date || material.priority === 'high' ? 'high' : 'normal'
     }));
 
     console.log(`Generating advanced schedule for child ${child_id} with ${processedMaterials.length} materials`);
+    
+    // If no materials provided, create some default study sessions
+    if (processedMaterials.length === 0) {
+      console.log('No materials provided, creating default study sessions');
+      const defaultSubjects = focus_subjects.length > 0 ? focus_subjects : ['Mathematics', 'English Language Arts', 'Science'];
+      
+      for (const subject of defaultSubjects) {
+        processedMaterials.push({
+          id: `default_${subject.toLowerCase().replace(/\s+/g, '_')}_${child_id}`,
+          child_id: child_id,
+          title: `${subject} Study Session`,
+          subject_name: subject,
+          estimated_duration_minutes: 45,
+          priority: 'normal',
+          content_type: 'study_session'
+        });
+      }
+      console.log(`Created ${processedMaterials.length} default study sessions`);
+    }
 
     // Initialize the advanced scheduling service
     const schedulingService = new AdvancedSchedulingService();
@@ -490,9 +510,42 @@ const generateAISchedule = async (req, res) => {
       console.log('Used fallback scheduling due to AI service unavailability');
     }
 
-    // Return enhanced schedule response
+    // Auto-save schedule entries to database for immediate use
+    const savedEntries = [];
+    for (const session of schedule.sessions) {
+      try {
+        const { data: savedEntry, error } = await supabase
+          .from('schedule_entries')
+          .insert({
+            child_id: session.child_id,
+            material_id: session.material_id,
+            subject_name: session.subject_name,
+            scheduled_date: session.scheduled_date,
+            start_time: session.start_time,
+            duration_minutes: session.duration_minutes,
+            status: session.status || 'scheduled',
+            created_by: session.created_by || 'ai_suggestion',
+            notes: session.notes
+          })
+          .select('*')
+          .single();
+
+        if (!error && savedEntry) {
+          savedEntries.push(savedEntry);
+          console.log(`✅ Saved schedule entry: ${savedEntry.subject_name} on ${savedEntry.scheduled_date} at ${savedEntry.start_time}`);
+        } else {
+          console.error(`❌ Failed to save schedule entry:`, error);
+        }
+      } catch (saveError) {
+        console.error(`❌ Error saving schedule entry:`, saveError);
+      }
+    }
+
+    // Return enhanced schedule response with saved entries
     res.json({
       suggestions: schedule.sessions,
+      saved_entries: savedEntries,
+      auto_saved: savedEntries.length,
       reasoning: 'Advanced AI scheduling with multi-stage reasoning and cognitive load optimization',
       confidence: schedule.metadata.confidence,
       metadata: schedule.metadata,

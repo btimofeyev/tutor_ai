@@ -433,6 +433,15 @@ Provide strategic insights in this JSON format:
         const schedule = this.buildPreliminarySchedule(assignments, timeSlots, materials);
 
         console.log(`📚 Assigned ${assignments.length} materials to time slots`);
+        console.log(`📋 Built ${schedule.length} schedule entries from assignments`);
+        
+        if (schedule.length === 0) {
+            console.warn('⚠️ No schedule entries created - checking inputs:');
+            console.warn(`- Assignments: ${assignments.length}`);
+            console.warn(`- Time slots: ${timeSlots.length}`);
+            console.warn(`- Materials: ${materials.length}`);
+        }
+        
         return schedule;
     }
 
@@ -914,6 +923,8 @@ IMPORTANT:
     assignments.forEach((assignment, index) => {
       const slot = slotMap.get(assignment.slot_id);
       const material = materialMap.get(assignment.material_ids[0]); // Using first material for now
+      
+      console.log(`🔨 Processing assignment ${index}: slot=${!!slot}, material=${!!material}, slot_id=${assignment.slot_id}, material_id=${assignment.material_ids[0]}`);
       
       if (slot && material) {
         // Determine child_id from multiple possible sources

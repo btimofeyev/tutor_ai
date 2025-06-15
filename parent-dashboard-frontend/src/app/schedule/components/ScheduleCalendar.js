@@ -199,34 +199,34 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
         </div>
       )}
 
-      {/* Simple Weekly Grid */}
-      <div className="bg-white rounded-lg border border-border-subtle overflow-hidden">
+      {/* Modern Weekly Grid */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {/* Day Headers */}
-        <div className="grid grid-cols-8 border-b border-border-subtle">
-          <div className="p-4 bg-gray-50 font-medium text-text-secondary text-sm">
+        <div className="grid grid-cols-8 bg-gradient-to-r from-slate-50 to-gray-50">
+          <div className="p-4 font-semibold text-gray-600 text-sm">
             Time
           </div>
           {weekDays.map((day, index) => (
             <div
               key={index}
-              className={`p-4 text-center font-medium ${
+              className={`p-4 text-center font-semibold transition-colors ${
                 isSameDay(day, new Date())
-                  ? 'bg-accent-blue text-text-primary'
-                  : 'bg-gray-50 text-text-secondary'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'text-gray-600 hover:bg-white/50'
               }`}
             >
-              <div className="text-sm">{format(day, 'EEE')}</div>
+              <div className="text-sm opacity-75">{format(day, 'EEE')}</div>
               <div className="text-lg">{format(day, 'd')}</div>
             </div>
           ))}
         </div>
 
         {/* Time Slots and Events */}
-        <div className="min-h-[calc(100vh-450px)] max-h-[calc(100vh-350px)] overflow-y-auto">
-          {timeSlots.map((timeSlot) => (
-            <div key={timeSlot} className="grid grid-cols-8 border-b border-border-subtle last:border-b-0">
+        <div className="min-h-[calc(100vh-450px)] max-h-[calc(100vh-350px)] overflow-y-auto calendar-scroll">
+          {timeSlots.map((timeSlot, index) => (
+            <div key={timeSlot} className={`grid grid-cols-8 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-25'}`}>
               {/* Time Label */}
-              <div className="p-3 bg-gray-50 text-sm text-text-secondary font-medium border-r border-border-subtle">
+              <div className="p-4 bg-slate-50 text-sm text-gray-500 font-medium">
                 {format(new Date(`2000-01-01T${timeSlot}`), 'h:mm a')}
               </div>
               
@@ -239,9 +239,9 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
                 return (
                   <div
                     key={dayIndex}
-                    className={`relative border-r border-border-subtle last:border-r-0 transition-colors ${
-                      !isOccupied ? 'hover:bg-gray-50 cursor-pointer' : ''
-                    }`}
+                    className={`relative transition-colors ${
+                      !isOccupied ? 'hover:bg-blue-25 cursor-pointer' : ''
+                    } ${dayIndex !== weekDays.length - 1 ? 'border-r border-gray-100' : ''}`}
                     style={{ minHeight: '60px' }}
                     onClick={() => {
                       if (!isOccupied) {
@@ -259,11 +259,11 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
                           openEditModal(eventStartingHere);
                         }}
                         className={`
-                          absolute inset-x-0 top-0 mx-1 rounded-lg cursor-pointer hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow-md
+                          absolute inset-x-0 top-0 mx-2 rounded-lg cursor-pointer hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow-lg
                           ${getSubjectEventColor(eventStartingHere.subject)} 
                           ${getSubjectEventTextColor(eventStartingHere.subject)}
-                          ${eventStartingHere.status === 'completed' ? 'opacity-60' : ''}
-                          text-xs p-3 z-10 border border-white/20
+                          ${eventStartingHere.status === 'completed' ? 'opacity-70' : ''}
+                          text-xs p-3 z-10 border-0
                         `}
                         style={{
                           height: `${getEventHeight(eventStartingHere.duration || eventStartingHere.duration_minutes || 30) * 60 - 4}px`, // Account for margin
@@ -294,14 +294,14 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
                                 scheduleManagement.markEntryCompleted(eventStartingHere.id);
                               }
                             }}
-                            className={`ml-2 p-1 rounded-full transition-all duration-200 hover:scale-110 ${
+                            className={`ml-2 p-1.5 rounded-full transition-all duration-200 hover:scale-110 shadow-sm ${
                               eventStartingHere.status === 'completed' 
-                                ? 'bg-white/30 text-white' 
-                                : 'bg-white/20 hover:bg-white/40 text-white/70 hover:text-white'
+                                ? 'bg-white text-green-600 shadow-md' 
+                                : 'bg-white/90 hover:bg-white text-gray-500 hover:text-green-600 hover:shadow-md'
                             }`}
                             title={eventStartingHere.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
                           >
-                            <CheckIcon className="h-3 w-3" />
+                            <CheckIcon className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
@@ -314,30 +314,32 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
         </div>
       </div>
 
-      {/* Dynamic Legend based on child's subjects */}
-      <div className="mt-6 flex flex-wrap gap-4 text-sm">
-        {childSubjects.map((subject) => {
-          const colorInfo = getSubjectColor(subject.name, childSubjects);
-          return (
-            <div key={subject.child_subject_id} className="flex items-center gap-2">
-              <div className={`w-3 h-3 ${colorInfo.bg} rounded`}></div>
-              <span className="text-text-secondary">{subject.name}</span>
-            </div>
-          );
-        })}
-        
-        {/* Always show completed status */}
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-gray-400 rounded opacity-60"></div>
-          <span className="text-text-secondary">Completed</span>
+      {/* Modern Legend */}
+      <div className="mt-8 p-4 bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl">
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">Subject Colors</h4>
+        <div className="flex flex-wrap gap-4 text-sm">
+          {childSubjects.map((subject) => {
+            const colorInfo = getSubjectColor(subject.name, childSubjects);
+            return (
+              <div key={subject.child_subject_id} className="flex items-center gap-2">
+                <div className={`w-4 h-4 ${colorInfo.bg} rounded-lg shadow-sm`}></div>
+                <span className="text-gray-600 font-medium">{subject.name}</span>
+              </div>
+            );
+          })}
+          
+          {/* Always show completed status */}
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-gray-300 rounded-lg opacity-60"></div>
+            <span className="text-gray-500 font-medium">Completed</span>
+          </div>
         </div>
       </div>
 
-      {/* Instructions */}
-      <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-gray-200">
-        <p className="text-sm text-slate-700">
-          <strong>How to use:</strong> Click on any available time slot to add study time. Click on existing events to edit them. 
-          Events span multiple time slots based on their duration.
+      {/* Modern Instructions */}
+      <div className="mt-4 p-4 bg-blue-50 rounded-xl border-l-4 border-blue-200">
+        <p className="text-sm text-blue-800">
+          <strong>Quick Guide:</strong> Click empty slots to add study time • Click events to edit • Use checkmarks to mark complete
         </p>
       </div>
     </div>

@@ -201,8 +201,8 @@ export default function SchedulePage() {
                 </div>
               </div>
 
-              {/* Calendar View */}
-              <div className="bg-background-card rounded-lg shadow border border-border-subtle">
+              {/* Modern Calendar View */}
+              <div className="bg-background-card rounded-xl shadow-sm">
                 <ScheduleCalendar 
                   childId={childrenData.selectedChild.id}
                   subscriptionPermissions={subscriptionPermissions}

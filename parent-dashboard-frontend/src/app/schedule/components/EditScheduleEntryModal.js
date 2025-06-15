@@ -15,6 +15,8 @@ export default function EditScheduleEntryModal({
   scheduleEntry,
   childSubjects = [],
   materials = [],
+  lessonsBySubject = {},
+  unitsBySubject = {},
   isSaving = false 
 }) {
   // Form state

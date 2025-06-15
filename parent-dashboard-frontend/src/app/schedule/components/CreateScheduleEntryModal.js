@@ -14,6 +14,8 @@ export default function CreateScheduleEntryModal({
   selectedSlot,
   childSubjects = [],
   materials = [],
+  lessonsBySubject = {},
+  unitsBySubject = {},
   isSaving = false 
 }) {
   // Form state
@@ -28,6 +30,12 @@ export default function CreateScheduleEntryModal({
   });
 
   const [errors, setErrors] = useState({});
+
+  // Hierarchical selection state
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [availableUnits, setAvailableUnits] = useState([]);
+  const [availableLessons, setAvailableLessons] = useState([]);
 
   // Initialize form when modal opens or slot changes
   useEffect(() => {
@@ -57,6 +65,14 @@ export default function CreateScheduleEntryModal({
         material_id: checked ? prev.material_id : '',
         subject_name: checked ? '' : prev.subject_name
       }));
+      
+      // Reset hierarchical selection when switching modes
+      if (checked) {
+        setSelectedSubjectId('');
+        setSelectedUnitId('');
+        setAvailableUnits([]);
+        setAvailableLessons([]);
+      }
     } else {
       setFormData(prev => ({
         ...prev,
@@ -67,6 +83,40 @@ export default function CreateScheduleEntryModal({
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  // Handle subject selection in hierarchical mode
+  const handleSubjectSelection = (subjectId) => {
+    setSelectedSubjectId(subjectId);
+    setSelectedUnitId('');
+    setFormData(prev => ({ ...prev, material_id: '' }));
+    
+    // Find the subject
+    const subject = childSubjects.find(s => s.child_subject_id === subjectId);
+    if (subject) {
+      setFormData(prev => ({ ...prev, subject_name: subject.name }));
+      
+      // Get units for this subject
+      const units = unitsBySubject[subjectId] || [];
+      setAvailableUnits(units);
+      
+      // Get lessons for this subject
+      const lessons = lessonsBySubject[subjectId] || [];
+      setAvailableLessons(lessons);
+    }
+  };
+
+  // Handle unit selection
+  const handleUnitSelection = (unitId) => {
+    setSelectedUnitId(unitId);
+    setFormData(prev => ({ ...prev, material_id: '' }));
+    
+    // Filter lessons by unit if unit is selected
+    if (unitId && selectedSubjectId) {
+      const allLessons = lessonsBySubject[selectedSubjectId] || [];
+      const unitLessons = allLessons.filter(lesson => lesson.unit_id === unitId);
+      setAvailableLessons(unitLessons);
     }
   };
 
@@ -242,36 +292,85 @@ export default function CreateScheduleEntryModal({
 
               {formData.is_material_based ? (
                 // Hierarchical Material Selection
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <label className={formLabelStyles}>
                     Select Lesson/Assignment
                   </label>
                   
-                  {materials.length === 0 ? (
+                  {childSubjects.length === 0 ? (
                     <div className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded border">
-                      No lessons uploaded yet. Add lessons to your curriculum first, or uncheck the box above to schedule general study time.
+                      No subjects assigned yet. Add subjects to your curriculum first, or uncheck the box above to schedule general study time.
                     </div>
                   ) : (
-                    <div>
-                      <label htmlFor="material_id" className="text-xs text-gray-600 mb-1 block">
-                        Choose from {materials.length} available lessons:
-                      </label>
-                      <select
-                        id="material_id"
-                        name="material_id"
-                        value={formData.material_id}
-                        onChange={handleMaterialChange}
-                        className={formInputStyles}
-                      >
-                        <option value="">Select a specific lesson...</option>
-                        {materials
-                          .sort((a, b) => (a.subject_name || '').localeCompare(b.subject_name || ''))
-                          .map(material => (
-                            <option key={material.id} value={material.id}>
-                              {material.subject_name ? `[${material.subject_name}] ` : ''}{material.title?.replace(/\(\)$/, '') || 'Untitled Lesson'}
+                    <div className="space-y-3">
+                      {/* Step 1: Select Subject */}
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 mb-1 block">
+                          1. Choose Subject
+                        </label>
+                        <select
+                          value={selectedSubjectId}
+                          onChange={(e) => handleSubjectSelection(e.target.value)}
+                          className={formInputStyles}
+                        >
+                          <option value="">Select a subject...</option>
+                          {childSubjects.map(subject => (
+                            <option key={subject.child_subject_id} value={subject.child_subject_id}>
+                              {subject.name}
                             </option>
                           ))}
-                      </select>
+                        </select>
+                      </div>
+
+                      {/* Step 2: Select Unit (if available) */}
+                      {selectedSubjectId && availableUnits.length > 0 && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 mb-1 block">
+                            2. Choose Unit (Optional)
+                          </label>
+                          <select
+                            value={selectedUnitId}
+                            onChange={(e) => handleUnitSelection(e.target.value)}
+                            className={formInputStyles}
+                          >
+                            <option value="">All lessons from this subject</option>
+                            {availableUnits.map(unit => (
+                              <option key={unit.id} value={unit.id}>
+                                {unit.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Step 3: Select Specific Lesson */}
+                      {selectedSubjectId && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 mb-1 block">
+                            {availableUnits.length > 0 ? '3. Choose Specific Lesson' : '2. Choose Specific Lesson'}
+                          </label>
+                          {availableLessons.length === 0 ? (
+                            <div className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded border">
+                              No lessons found for this {selectedUnitId ? 'unit' : 'subject'}. Upload lessons or select a different option.
+                            </div>
+                          ) : (
+                            <select
+                              id="material_id"
+                              name="material_id"
+                              value={formData.material_id}
+                              onChange={handleMaterialChange}
+                              className={formInputStyles}
+                            >
+                              <option value="">Select a specific lesson...</option>
+                              {availableLessons.map(lesson => (
+                                <option key={lesson.id} value={lesson.id}>
+                                  {lesson.title?.replace(/\(\)$/, '') || 'Untitled Lesson'}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                   

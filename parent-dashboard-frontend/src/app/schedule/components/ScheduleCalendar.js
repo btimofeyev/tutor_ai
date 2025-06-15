@@ -5,7 +5,7 @@ import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
 
-export default function ScheduleCalendar({ childId, subscriptionPermissions, scheduleManagement }) {
+export default function ScheduleCalendar({ childId, subscriptionPermissions, scheduleManagement, childSubjects = [] }) {
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 })); // Start on Monday
   
   // Use schedule management from props or create our own
@@ -82,14 +82,28 @@ export default function ScheduleCalendar({ childId, subscriptionPermissions, sch
 
   // Get subject color
   const getSubjectColor = (subject) => {
-    const colors = {
+    // First check if this matches a child's actual subjects
+    const childSubject = childSubjects.find(s => s.name === subject);
+    if (childSubject) {
+      // Generate consistent color based on subject name
+      const subjectColors = [
+        'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 
+        'bg-yellow-500', 'bg-indigo-500', 'bg-pink-500', 'bg-teal-500'
+      ];
+      const colorIndex = childSubject.name.length % subjectColors.length;
+      return subjectColors[colorIndex];
+    }
+    
+    // Fallback to default colors for common subjects
+    const defaultColors = {
       'Math': 'bg-red-500',
       'Science': 'bg-green-500', 
       'English': 'bg-purple-500',
       'History': 'bg-yellow-500',
+      'Unknown': 'bg-gray-400',
       'default': 'bg-blue-500'
     };
-    return colors[subject] || colors.default;
+    return defaultColors[subject] || defaultColors.default;
   };
 
   // Navigate weeks

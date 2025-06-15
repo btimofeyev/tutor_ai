@@ -429,7 +429,8 @@ const generateAISchedule = async (req, res) => {
     const priorityLessons = [];
     
     materials.forEach(material => {
-      const subject = material.subject_name || 'Unknown';
+      // Use the subject name from material, but don't default to 'Unknown'
+      const subject = material.subject_name || material.subject || 'General Study';
       if (!materialsBySubject[subject]) {
         materialsBySubject[subject] = [];
       }

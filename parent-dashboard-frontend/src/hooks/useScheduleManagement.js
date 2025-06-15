@@ -209,11 +209,10 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
 
   // Generate AI schedule
   const generateAISchedule = async (parameters = {}) => {
-    // Temporarily disable subscription check for testing
-    // if (!subscriptionPermissions?.hasAIAccess) {
-    //   setError('AI scheduling requires AI access - upgrade your plan or add Klio AI Pack');
-    //   return { success: false, error: 'AI scheduling requires AI access - upgrade your plan or add Klio AI Pack' };
-    // }
+    if (!subscriptionPermissions?.hasAIAccess) {
+      setError('AI scheduling requires AI access - upgrade your plan or add Klio AI Pack');
+      return { success: false, error: 'AI scheduling requires AI access - upgrade your plan or add Klio AI Pack' };
+    }
 
     try {
       setAiScheduling(true);

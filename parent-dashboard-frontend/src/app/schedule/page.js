@@ -82,6 +82,29 @@ export default function SchedulePage() {
     return result;
   };
 
+  // Handle clearing entire schedule
+  const handleClearSchedule = async () => {
+    if (window.confirm('Are you sure you want to delete all scheduled entries? This action cannot be undone.')) {
+      const entries = scheduleManagement.scheduleEntries;
+      for (const entry of entries) {
+        await scheduleManagement.deleteScheduleEntry(entry.id);
+      }
+    }
+  };
+
+  // Handle rebuilding schedule with AI
+  const handleRebuildSchedule = async () => {
+    if (window.confirm('This will clear your current schedule and generate a new one with AI. Continue?')) {
+      // Clear existing entries first
+      const entries = scheduleManagement.scheduleEntries;
+      for (const entry of entries) {
+        await scheduleManagement.deleteScheduleEntry(entry.id);
+      }
+      // Then open AI modal
+      scheduleManagement.openAIModal();
+    }
+  };
+
   // Get assigned subjects for the current child
   const assignedSubjectsForCurrentChild = childrenData.selectedChild 
     ? childrenData.childSubjects[childrenData.selectedChild.id] || []
@@ -147,13 +170,31 @@ export default function SchedulePage() {
                 <div className="flex gap-2">
                   <button 
                     onClick={scheduleManagement.openSettingsModal}
-                    className="btn-secondary"
+                    className="btn-secondary text-sm"
                   >
                     Settings
                   </button>
+                  
+                  {scheduleManagement.scheduleEntries.length > 0 && (
+                    <>
+                      <button 
+                        onClick={handleClearSchedule}
+                        className="text-red-600 hover:text-red-700 text-sm px-3 py-2 rounded-lg hover:bg-red-50 transition-colors border border-red-200"
+                      >
+                        Clear All
+                      </button>
+                      <button 
+                        onClick={handleRebuildSchedule}
+                        className="text-blue-600 hover:text-blue-700 text-sm px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors border border-blue-200"
+                      >
+                        🤖 Rebuild
+                      </button>
+                    </>
+                  )}
+                  
                   <button 
                     onClick={scheduleManagement.openAIModal}
-                    className="btn-primary"
+                    className="btn-primary text-sm"
                   >
                     🤖 AI Schedule
                   </button>
@@ -166,6 +207,7 @@ export default function SchedulePage() {
                   childId={childrenData.selectedChild.id}
                   subscriptionPermissions={subscriptionPermissions}
                   scheduleManagement={scheduleManagement}
+                  childSubjects={assignedSubjectsForCurrentChild}
                 />
               </div>
             </div>
@@ -181,6 +223,8 @@ export default function SchedulePage() {
         selectedSlot={scheduleManagement.editingEntry}
         childSubjects={assignedSubjectsForCurrentChild}
         materials={materialsForCurrentChild}
+        lessonsBySubject={childrenData.lessonsBySubject}
+        unitsBySubject={childrenData.unitsBySubject}
         isSaving={scheduleManagement.loading}
       />
 
@@ -193,6 +237,8 @@ export default function SchedulePage() {
         scheduleEntry={scheduleManagement.editingEntry}
         childSubjects={assignedSubjectsForCurrentChild}
         materials={materialsForCurrentChild}
+        lessonsBySubject={childrenData.lessonsBySubject}
+        unitsBySubject={childrenData.unitsBySubject}
         isSaving={scheduleManagement.loading}
       />
 

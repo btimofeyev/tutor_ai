@@ -74,4 +74,4 @@ export const CurriculumSkeletonLoader = () => (
   </div>
 );
 
-export default SkeletonLoader;
+// No default export needed - using named exports

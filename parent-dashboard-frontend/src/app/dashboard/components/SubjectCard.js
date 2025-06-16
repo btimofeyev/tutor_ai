@@ -47,6 +47,24 @@ export default function SubjectCard({
   const [expandedUnits, setExpandedUnits] = useState({});
   const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
 
+  // Always call hooks at the top level
+  const upcomingDueItems = useMemo(() => {
+    if (!subject.child_subject_id) return [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return lessons
+      .filter(lesson => !lesson.completed_at && lesson.due_date)
+      .map(lesson => ({ ...lesson, dueDateObj: new Date(lesson.due_date + 'T00:00:00Z') }))
+      .filter(lesson => lesson.dueDateObj >= today)
+      .sort((a, b) => a.dueDateObj - b.dueDateObj)
+      .slice(0, 3);
+  }, [lessons, subject.child_subject_id]);
+
+  const generalMaterials = useMemo(() => {
+    if (!subject.child_subject_id) return [];
+    return lessons.filter(lesson => !lesson.lesson_id);
+  }, [lessons, subject.child_subject_id]);
+
   if (!subject.child_subject_id) {
     return (
         <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-4 shadow-sm text-yellow-800">
@@ -57,19 +75,6 @@ export default function SubjectCard({
         </div>
     );
   }
-
-  const upcomingDueItems = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return lessons
-      .filter(lesson => !lesson.completed_at && lesson.due_date)
-      .map(lesson => ({ ...lesson, dueDateObj: new Date(lesson.due_date + 'T00:00:00Z') }))
-      .filter(lesson => lesson.dueDateObj >= today)
-      .sort((a, b) => a.dueDateObj - b.dueDateObj)
-      .slice(0, 3);
-  }, [lessons]);
-
-  const generalMaterials = useMemo(() => lessons.filter(lesson => !lesson.lesson_id), [lessons]);
 
   const toggleUnitExpansion = (unitId) => setExpandedUnits(prev => ({ ...prev, [unitId]: !prev[unitId] }));
   const toggleLessonContainerExpansion = (lcId) => setExpandedLessonContainers(prev => ({ ...prev, [lcId]: !prev[lcId] }));

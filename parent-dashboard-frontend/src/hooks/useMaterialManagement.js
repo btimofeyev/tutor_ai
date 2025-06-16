@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import api from '../utils/api';
 import { APP_CONTENT_TYPES } from '../utils/dashboardConstants';
 
-export function useMaterialManagement(refreshChildData) {
+export function useMaterialManagement(refreshChildData, invalidateChildCache) {
   const [addLessonSubject, setAddLessonSubject] = useState("");
   const [addLessonFile, setAddLessonFile] = useState(null);
   const [addLessonUserContentType, setAddLessonUserContentType] = useState(APP_CONTENT_TYPES[0]);
@@ -53,7 +53,7 @@ export function useMaterialManagement(refreshChildData) {
     }
   }, [refreshChildData]);
 
-  const handleSaveLesson = useCallback(async () => {
+  const handleSaveLesson = useCallback(async (childId) => {
     if (!lessonJsonForApproval) return { success: false, error: "No lesson data to save" };
     setSavingLesson(true);
     try {
@@ -76,14 +76,15 @@ export function useMaterialManagement(refreshChildData) {
       setAddLessonFile(null);
       setAddLessonSubject("");
       setSelectedLessonContainer("");
-      if (refreshChildData) await refreshChildData();
+      if (invalidateChildCache && childId) invalidateChildCache(childId);
+      if (refreshChildData) await refreshChildData(true);
       return { success: true, message: 'Material created successfully.' };
     } catch (error) {
       return { success: false, error: error.response?.data?.error || "Failed to save lesson" };
     } finally {
       setSavingLesson(false);
     }
-  }, [lessonJsonForApproval, selectedLessonContainer, lessonTitleForApproval, lessonContentTypeForApproval, lessonMaxPointsForApproval, lessonDueDateForApproval, lessonCompletedForApproval, refreshChildData]);
+  }, [lessonJsonForApproval, selectedLessonContainer, lessonTitleForApproval, lessonContentTypeForApproval, lessonMaxPointsForApproval, lessonDueDateForApproval, lessonCompletedForApproval, refreshChildData, invalidateChildCache]);
 
   const updateLessonApprovalField = useCallback((fieldName, value) => {
     setLessonJsonForApproval((prevJson) => ({ ...(prevJson || {}), [fieldName]: value }));

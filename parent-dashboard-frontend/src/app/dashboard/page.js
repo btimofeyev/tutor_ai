@@ -28,6 +28,7 @@ import EditMaterialModal from "./components/EditMaterialModal";
 import ChildLoginSettingsModal from "./components/ChildLoginSettingsModal";
 import UpgradePrompt from "../../components/UpgradePrompt";
 import Button from "../../components/ui/Button";
+import { CurriculumSkeletonLoader } from "../../components/ui/SkeletonLoader";
 
 import {
   PlusCircleIcon,
@@ -53,7 +54,7 @@ export default function DashboardPage() {
 
   // Custom hooks
   const childrenData = useChildrenData(session, subscription, subscriptionPermissions);
-  const materialManagement = useMaterialManagement(childrenData.refreshChildSpecificData, subscriptionPermissions);
+  const materialManagement = useMaterialManagement(childrenData.refreshChildSpecificData, childrenData.invalidateChildCache);
   const filtersAndSorting = useFiltersAndSorting(
     childrenData.lessonsBySubject, 
     childrenData.gradeWeights, 
@@ -296,7 +297,7 @@ export default function DashboardPage() {
       return;
     }
     
-    const result = await materialManagement.handleSaveLesson();
+    const result = await materialManagement.handleSaveLesson(childrenData.selectedChild?.id);
   
     if (result.success) {
       const fileInput = document.getElementById("lesson-file-input-main"); 
@@ -763,8 +764,11 @@ export default function DashboardPage() {
               </div>
             </div>
             {childrenData.loadingChildData ? (
-              <div className="text-center py-10 text-text-secondary">
-                Loading {childrenData.selectedChild.name}'s curriculum...
+              <div className="space-y-4">
+                <div className="text-center py-4 text-text-secondary">
+                  Loading {childrenData.selectedChild.name}&apos;s curriculum...
+                </div>
+                <CurriculumSkeletonLoader />
               </div>
             ) : (
               <div className="mt-0">
@@ -1065,12 +1069,16 @@ export default function DashboardPage() {
 
       {materialManagement.editingLesson && (
         <EditMaterialModal
-          isOpen={!!materialManagement.editingLesson}
-          onClose={materialManagement.cancelEditingLesson}
-          lesson={materialManagement.editForm}
+          editingLesson={materialManagement.editingLesson}
+          editForm={materialManagement.editForm}
           onFormChange={handleEditModalFormChange}
           onSave={handleSaveLessonEdit}
+          onClose={materialManagement.cancelEditingLesson}
+          isSaving={materialManagement.isSavingEdit}
+          appContentTypes={APP_CONTENT_TYPES}
           appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
+          unitsForSubject={childrenData.unitsBySubject[childrenData.selectedChild?.id] || []}
+          lessonContainersForSubject={childrenData.lessonsByUnit[materialManagement.editForm?.lesson_id] || []}
         />
       )}
 

@@ -1,14 +1,16 @@
 // tailwind.config.js
 module.exports = {
   content: [
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
       colors: {
         'background-main': 'var(--background-main)',
         'background-card': 'var(--background-card)',
+        'background-card-hover': 'var(--background-card-hover)',
         'text-primary': 'var(--text-primary)',
         'text-secondary': 'var(--text-secondary)',
         'text-tertiary': 'var(--text-tertiary)',
@@ -16,25 +18,24 @@ module.exports = {
         
         'accent-blue': 'var(--accent-blue)',
         'accent-blue-hover': 'var(--accent-blue-hover)',
-        'blue-700': '#0052B2',
-        'blue-800': '#00418C', 
+        'accent-blue-darker-for-border': 'var(--accent-blue-darker-for-border)',
 
-        'gray-100': '#F3F4F6',
-        'gray-200': '#E5E7EB',
-        'gray-300': '#D1D5DB',
-        'gray-400': '#9CA3AF', 
-        'gray-500': '#6B7280', 
-
+        'accent-yellow': 'var(--accent-yellow)',
+        'accent-yellow-hover': 'var(--accent-yellow-hover)',
+        'accent-yellow-darker-for-border': 'var(--accent-yellow-darker-for-border)',
+        
+        'accent-dark': 'var(--accent-dark)',
         'accent-green': 'var(--accent-green)',
         'accent-orange': 'var(--accent-orange)',
         'accent-red': 'var(--accent-red)',
         'border-subtle': 'var(--border-subtle)',
         'border-input': 'var(--border-input)',
         'border-input-focus': 'var(--border-input-focus)',
+
+        'messageTextDanger': 'var(--messageTextDanger)',
       },
       fontFamily: {
         sans: ['var(--font-main)', 'sans-serif'],
-        mono: ['var(--font-mono)', 'monospace'],
       },
       borderRadius: {
         sm: 'var(--radius-sm)',

@@ -1,12 +1,12 @@
 // app/dashboard/page.js
 "use client";
 import { useSession } from "@supabase/auth-helpers-react";
-import { useRouter, useSearchParams } from "next/navigation"; // Import useSearchParams
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import api from "../../utils/api";
 
-// Import your main subscription hook
-import { useSubscription } from "../../hooks/useSubscription"; // Adjust path if needed
+// Main subscription hook
+import { useSubscription } from "../../hooks/useSubscription";
 
 // Extracted hooks and utilities
 import { useChildrenData } from "../../hooks/useChildrenData";
@@ -27,30 +27,31 @@ import AddMaterialTabs from "./components/AddMaterialTabs";
 import EditMaterialModal from "./components/EditMaterialModal";
 import ChildLoginSettingsModal from "./components/ChildLoginSettingsModal";
 import UpgradePrompt from "../../components/UpgradePrompt";
+import Button from "../../components/ui/Button";
 
 import {
   PlusCircleIcon,
   PencilIcon,
   TrashIcon,
+  PlusIcon,
+  XMarkIcon
 } from "@heroicons/react/24/outline";
 
 
 export default function DashboardPage() {
   const session = useSession();
   const router = useRouter();
-  const searchParams = useSearchParams(); // For accessing URL query parameters in Next.js App Router
+  const searchParams = useSearchParams();
 
-  // Use your main subscription hook
+  // Subscription hook
   const {
     subscription,
     loading: subscriptionLoading,
     refetch: refetchSubscription,
-    permissions: subscriptionPermissions, // Get permissions from the hook
-    // childrenCount: subscriptionChildrenCount // if you want to use this from useSubscription
+    permissions: subscriptionPermissions,
   } = useSubscription();
 
-  // Use extracted custom hooks
-  // Pass subscription and permissions to useChildrenData if it needs them
+  // Custom hooks
   const childrenData = useChildrenData(session, subscription, subscriptionPermissions);
   const materialManagement = useMaterialManagement(childrenData.refreshChildSpecificData, subscriptionPermissions);
   const filtersAndSorting = useFiltersAndSorting(
@@ -60,12 +61,13 @@ export default function DashboardPage() {
     childrenData.selectedChild
   );
   
-  // Unit management modal state
+  // State for modals
   const [isManageUnitsModalOpen, setIsManageUnitsModalOpen] = useState(false);
   const [managingUnitsForSubject, setManagingUnitsForSubject] = useState(null);
   const [currentSubjectUnitsInModal, setCurrentSubjectUnitsInModal] = useState([]);
   const [newUnitNameModalState, setNewUnitNameModalState] = useState("");
   const [editingUnit, setEditingUnit] = useState(null);
+  const [isAddMaterialModalOpen, setIsAddMaterialModalOpen] = useState(false);
 
   // Child credentials modal state
   const [isChildLoginSettingsModalOpen, setIsChildLoginSettingsModalOpen] = useState(false);
@@ -81,44 +83,35 @@ export default function DashboardPage() {
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState('');
   const [upgrading, setUpgrading] = useState(false);
-  // const [currentPlan, setCurrentPlan] = useState('free'); // Can get this from subscription.planType
 
-  // Get computed values from custom hooks
   const { assignedSubjectsForCurrentChild } = childrenData;
   const { totalStats } = filtersAndSorting;
 
-  // Get lesson containers for selected unit
   const currentLessonContainersForUnit = useMemo(() => {
     const selectedUnitId = materialManagement.lessonJsonForApproval?.unit_id;
     if (!selectedUnitId) return [];
     return childrenData.lessonsByUnit[selectedUnitId] || [];
   }, [materialManagement.lessonJsonForApproval?.unit_id, childrenData.lessonsByUnit]);
 
-  // Redirect to login if no session
   useEffect(() => {
-    if (session === false) { // Check for explicit false, not just undefined
+    if (session === false) {
       router.replace("/login");
     }
   }, [session, router]);
 
-  // Refetch subscription if an upgrade just happened
   useEffect(() => {
     const upgraded = searchParams.get('upgraded');
     const success = searchParams.get('success');
     if (upgraded === 'true' || success === 'true') {
-      console.log("DashboardPage: Detected upgrade/success, refetching subscription...");
       refetchSubscription();
-      // Optionally, remove the query param to prevent refetch on normal refresh
-      // Check if window is defined for client-side execution
       if (typeof window !== 'undefined') {
-        const newUrl = window.location.pathname; // Keep existing pathname
+        const newUrl = window.location.pathname;
         window.history.replaceState({}, document.title, newUrl);
       }
     }
   }, [searchParams, refetchSubscription]);
 
 
-  // Reset lesson container selection when lesson approval unit changes
   useEffect(() => {
     materialManagement.setSelectedLessonContainer("");
   }, [materialManagement.lessonJsonForApproval?.unit_id, materialManagement.setSelectedLessonContainer]);
@@ -203,6 +196,7 @@ export default function DashboardPage() {
     
     if (result.success) {
       alert('Material added successfully!');
+      setIsAddMaterialModalOpen(false);
       return { success: true };
     } else {
       alert(result.error || 'Failed to create material');
@@ -220,22 +214,21 @@ export default function DashboardPage() {
       grade: childrenData.newChildGrade,
     };
     
-    const result = await childrenData.handleAddChild(childData); // childrenData hook handles its own state updates
+    const result = await childrenData.handleAddChild(childData);
     
     if (result.success) {
-      childrenData.setShowAddChild(false); // This is part of childrenData hook
+      childrenData.setShowAddChild(false);
     } else {
       if (result.code === 'CHILD_LIMIT_EXCEEDED') {
-        // Use subscription from useSubscription hook
         setUpgradeFeature('children');
-        setShowUpgradePrompt(true); // This controls the UpgradePrompt visibility
+        setShowUpgradePrompt(true);
       } else {
         alert(result.error);
       }
     }
   };
 
-  const handleGenericUpgrade = async (targetPlanKey) => { // Renamed to avoid conflict
+  const handleGenericUpgrade = async (targetPlanKey) => {
     setUpgrading(true);
     try {
       const priceIds = {
@@ -253,7 +246,7 @@ export default function DashboardPage() {
       const response = await api.post('/stripe/create-checkout-session', {
         price_id: priceIds[targetPlanKey],
         success_url: `${window.location.origin}/dashboard?upgraded=true`,
-        cancel_url: window.location.href // Or specific cancel page
+        cancel_url: window.location.href
       });
       
       window.location.href = response.data.checkout_url;
@@ -273,7 +266,6 @@ export default function DashboardPage() {
     if (!result.success) {
       alert(result.error || "Could not update completion status.");
     } else if (result.syncedEntries > 0) {
-      // Show brief success message about sync
       console.log(`✅ Lesson completion synced with ${result.syncedEntries} schedule entry(s)`);
     }
   };
@@ -309,6 +301,7 @@ export default function DashboardPage() {
     if (result.success) {
       const fileInput = document.getElementById("lesson-file-input-main"); 
       if (fileInput) fileInput.value = "";
+      setIsAddMaterialModalOpen(false);
     } else {
       alert(result.error || "Lesson save failed.");
     }
@@ -626,7 +619,7 @@ export default function DashboardPage() {
       setChildPinConfirmInput("");
       const updatedChildren = childrenData.children.map((c) =>
         c.id === editingChildCredentials.id
-          ? { ...c, access_pin_hash: "set" } // Simulate presence of hash
+          ? { ...c, access_pin_hash: "set" }
           : c
       ); 
       childrenData.setChildren(updatedChildren);
@@ -645,7 +638,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Loading state combining session, subscription, and initial children load
   const isLoading = session === undefined || subscriptionLoading || (childrenData.loadingInitial && childrenData.children.length === 0);
 
   if (isLoading) {
@@ -655,10 +647,8 @@ export default function DashboardPage() {
       </div>
     );
   }
-  // After loading, if no session, redirect (already handled by useEffect, but good for clarity)
   if (!session) return null;
 
-  // Get current units for add form subject
   const currentUnitsForAddFormSubject = materialManagement.addLessonSubject && childrenData.selectedChild && childrenData.childSubjects[childrenData.selectedChild.id]
     ? childrenData.unitsBySubject[materialManagement.addLessonSubject] || [] 
     : [];
@@ -678,13 +668,16 @@ export default function DashboardPage() {
           onNewChildGradeChange={(e) => childrenData.setNewChildGrade(e.target.value)}
           onAddChildSubmit={handleAddChildSubmit}
           onOpenChildLoginSettings={handleOpenChildLoginSettingsModal}
-          subscription={subscription} // PASS THE SUBSCRIPTION OBJECT
-          canAddChild={subscriptionPermissions.maxChildren > childrenData.children.length} // Use permissions from useSubscription
+          subscription={subscription}
+          canAddChild={subscriptionPermissions.maxChildren > childrenData.children.length}
         />
       </div>
 
       <div className="flex-1 flex flex-col overflow-y-auto p-6 sm:p-8 lg:p-10">
-        {/* Initial loading or no student selected states */}
+        <StudentHeader
+          selectedChild={childrenData.selectedChild}
+          dashboardStats={totalStats}
+        />
         {childrenData.loadingInitial && !childrenData.selectedChild && childrenData.children.length === 0 && !subscriptionLoading && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-xl text-text-secondary">Loading Student Data...</div>
@@ -702,10 +695,6 @@ export default function DashboardPage() {
 
         {childrenData.selectedChild && (
           <>
-            <StudentHeader
-              selectedChild={childrenData.selectedChild}
-              dashboardStats={totalStats}
-            />
             <div className="my-6 card p-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div>
@@ -783,6 +772,13 @@ export default function DashboardPage() {
                   <h2 className="text-xl font-semibold text-text-primary">
                     Curriculum Overview
                   </h2>
+                   <Button
+                    onClick={() => setIsAddMaterialModalOpen(true)}
+                    variant="primary"
+                  >
+                    <PlusIcon className="h-4 w-4 mr-2" />
+                    Add Material
+                  </Button>
                 </div>
                 {assignedSubjectsForCurrentChild.length === 0 ? (
                   <div className="italic text-text-secondary p-4 bg-background-card rounded-lg shadow border border-border-subtle">
@@ -831,82 +827,76 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div
-        className={`w-full md:w-1/3 lg:w-2/5 xl:w-1/3 flex-shrink-0 border-l border-border-subtle bg-background-card shadow-lg overflow-y-auto p-6 transition-opacity duration-300 ${
-          childrenData.selectedChild && !childrenData.loadingChildData
-            ? "opacity-100"
-            : "opacity-50 pointer-events-none"
-        }`}
-      >
-        <div className="sticky top-0 bg-background-card z-10 pt-0 pb-4 -mx-6 px-6 border-b border-border-subtle mb-6">
-          <h2 className="text-lg font-semibold text-text-primary">Actions</h2>
+       {isAddMaterialModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 animate-fade-in" onClick={() => setIsAddMaterialModalOpen(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setIsAddMaterialModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+            <div className="p-6">
+               <AddMaterialTabs
+                  childSubjectsForSelectedChild={assignedSubjectsForCurrentChild}
+                  onFormSubmit={handleAddLessonFormSubmit}
+                  onApprove={handleApproveNewLesson}
+                  onManualSubmit={handleManualMaterialSubmit}
+                  
+                  uploading={materialManagement.uploading}
+                  savingLesson={materialManagement.savingLesson}
+                  
+                  lessonJsonForApproval={materialManagement.lessonJsonForApproval}
+                  onUpdateLessonJsonField={handleUpdateLessonJsonForApprovalField}
+                  
+                  lessonTitleForApproval={materialManagement.lessonTitleForApproval}
+                  onLessonTitleForApprovalChange={(e) =>
+                    materialManagement.setLessonTitleForApproval(e.target.value)
+                  }
+                  lessonContentTypeForApproval={materialManagement.lessonContentTypeForApproval}
+                  onLessonContentTypeForApprovalChange={(e) =>
+                    materialManagement.setLessonContentTypeForApproval(e.target.value)
+                  }
+                  lessonMaxPointsForApproval={materialManagement.lessonMaxPointsForApproval}
+                  onLessonMaxPointsForApprovalChange={(e) =>
+                    materialManagement.setLessonMaxPointsForApproval(e.target.value)
+                  }
+                  lessonDueDateForApproval={materialManagement.lessonDueDateForApproval}
+                  onLessonDueDateForApprovalChange={(e) =>
+                    materialManagement.setLessonDueDateForApproval(e.target.value)
+                  }
+                  lessonCompletedForApproval={materialManagement.lessonCompletedForApproval}
+                  onLessonCompletedForApprovalChange={(e) =>
+                    materialManagement.setLessonCompletedForApproval(e.target.checked)
+                  }
+                  
+                  currentAddLessonSubject={materialManagement.addLessonSubject}
+                  onAddLessonSubjectChange={(e) =>
+                    materialManagement.setAddLessonSubject(e.target.value)
+                  }
+                  currentAddLessonUserContentType={materialManagement.addLessonUserContentType}
+                  onAddLessonUserContentTypeChange={(e) =>
+                    materialManagement.setAddLessonUserContentType(e.target.value)
+                  }
+                  onAddLessonFileChange={(e) => materialManagement.setAddLessonFile(e.target.files)}
+                  currentAddLessonFile={materialManagement.addLessonFile}
+                  
+                  appContentTypes={APP_CONTENT_TYPES}
+                  appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
+                  unitsForSelectedSubject={currentUnitsForAddFormSubject}
+                  onCreateNewUnit={handleCreateNewUnit}
+                  lessonContainersForSelectedUnit={currentLessonContainersForUnit}
+                  lessonsByUnit={childrenData.lessonsByUnit}
+                  setLessonsByUnit={childrenData.setLessonsByUnit}
+                  selectedLessonContainer={materialManagement.selectedLessonContainer}
+                  onLessonContainerChange={handleLessonContainerChange}
+                  onCreateNewLessonContainer={handleCreateNewLessonContainer}
+                  subscriptionPermissions={subscriptionPermissions}
+                />
+            </div>
+          </div>
         </div>
-        {childrenData.selectedChild && !childrenData.loadingChildData ? (
-          <AddMaterialTabs
-            childSubjectsForSelectedChild={assignedSubjectsForCurrentChild}
-            onFormSubmit={handleAddLessonFormSubmit}
-            onApprove={handleApproveNewLesson}
-            onManualSubmit={handleManualMaterialSubmit}
-            
-            uploading={materialManagement.uploading}
-            savingLesson={materialManagement.savingLesson}
-            
-            lessonJsonForApproval={materialManagement.lessonJsonForApproval}
-            onUpdateLessonJsonField={handleUpdateLessonJsonForApprovalField}
-            
-            lessonTitleForApproval={materialManagement.lessonTitleForApproval}
-            onLessonTitleForApprovalChange={(e) =>
-              materialManagement.setLessonTitleForApproval(e.target.value)
-            }
-            lessonContentTypeForApproval={materialManagement.lessonContentTypeForApproval}
-            onLessonContentTypeForApprovalChange={(e) =>
-              materialManagement.setLessonContentTypeForApproval(e.target.value)
-            }
-            lessonMaxPointsForApproval={materialManagement.lessonMaxPointsForApproval}
-            onLessonMaxPointsForApprovalChange={(e) =>
-              materialManagement.setLessonMaxPointsForApproval(e.target.value)
-            }
-            lessonDueDateForApproval={materialManagement.lessonDueDateForApproval}
-            onLessonDueDateForApprovalChange={(e) =>
-              materialManagement.setLessonDueDateForApproval(e.target.value)
-            }
-            lessonCompletedForApproval={materialManagement.lessonCompletedForApproval}
-            onLessonCompletedForApprovalChange={(e) =>
-              materialManagement.setLessonCompletedForApproval(e.target.checked)
-            }
-            
-            currentAddLessonSubject={materialManagement.addLessonSubject}
-            onAddLessonSubjectChange={(e) =>
-              materialManagement.setAddLessonSubject(e.target.value)
-            }
-            currentAddLessonUserContentType={materialManagement.addLessonUserContentType}
-            onAddLessonUserContentTypeChange={(e) =>
-              materialManagement.setAddLessonUserContentType(e.target.value)
-            }
-            onAddLessonFileChange={(e) => materialManagement.setAddLessonFile(e.target.files)}
-            currentAddLessonFile={materialManagement.addLessonFile}
-            
-            appContentTypes={APP_CONTENT_TYPES}
-            appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
-            unitsForSelectedSubject={currentUnitsForAddFormSubject}
-            onCreateNewUnit={handleCreateNewUnit}
-            lessonContainersForSelectedUnit={currentLessonContainersForUnit}
-            lessonsByUnit={childrenData.lessonsByUnit}
-            setLessonsByUnit={childrenData.setLessonsByUnit}
-            selectedLessonContainer={materialManagement.selectedLessonContainer}
-            onLessonContainerChange={handleLessonContainerChange}
-            onCreateNewLessonContainer={handleCreateNewLessonContainer}
-            // Pass permissions for AI suggestions etc. if AddMaterialTabs needs them
-            subscriptionPermissions={subscriptionPermissions}
-          />
-        ) : (
-          <p className="text-sm text-text-tertiary italic text-center">
-            {childrenData.selectedChild && childrenData.loadingChildData
-              ? "Loading actions..."
-              : "Select student to enable actions."}
-          </p>
-        )}
-      </div>
+      )}
 
       {isManageUnitsModalOpen && managingUnitsForSubject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 animate-fade-in">
@@ -1077,7 +1067,7 @@ export default function DashboardPage() {
         <EditMaterialModal
           isOpen={!!materialManagement.editingLesson}
           onClose={materialManagement.cancelEditingLesson}
-          lesson={materialManagement.editForm} // Pass the editForm state
+          lesson={materialManagement.editForm}
           onFormChange={handleEditModalFormChange}
           onSave={handleSaveLessonEdit}
           appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
@@ -1116,9 +1106,9 @@ export default function DashboardPage() {
         <UpgradePrompt
           isOpen={showUpgradePrompt}
           onClose={() => setShowUpgradePrompt(false)}
-          feature={upgradeFeature} // e.g., 'children', 'ai', 'childLogin'
-          currentPlan={subscription?.plan_type || 'free'} // Use plan from hook
-          onUpgrade={handleGenericUpgrade} // Pass the generic upgrade handler
+          feature={upgradeFeature}
+          currentPlan={subscription?.plan_type || 'free'}
+          onUpgrade={handleGenericUpgrade}
           isLoading={upgrading}
         />
       )}

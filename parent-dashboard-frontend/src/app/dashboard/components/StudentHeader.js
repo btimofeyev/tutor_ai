@@ -6,7 +6,7 @@ import Link from "next/link";
 import { BookOpenIcon } from "@heroicons/react/24/outline";
 
 export default function StudentHeader({ selectedChild, dashboardStats }) {
-  if (!selectedChild) { // Basic loading state, can be improved
+  if (!selectedChild) {
     return (
       <div className="mb-6 p-6 bg-background-card rounded-lg shadow-sm border border-border-subtle animate-pulse">
         <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -24,11 +24,10 @@ export default function StudentHeader({ selectedChild, dashboardStats }) {
   }
 
   return (
-    // Use bg-background-card, border-border-subtle, shadow-sm for the card itself
     <div className="mb-6 p-6 bg-background-card rounded-lg shadow-sm border border-border-subtle">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-4">
         <div className="mb-3 sm:mb-0">
-          <h1 className="text-3xl font-bold text-text-primary mb-0.5"> {/* Adjusted margin */}
+          <h1 className="text-3xl font-bold text-text-primary mb-0.5">
             {selectedChild.name}
           </h1>
           <div className="text-sm text-text-secondary">
@@ -40,7 +39,7 @@ export default function StudentHeader({ selectedChild, dashboardStats }) {
         </div>
 
         <div className="flex flex-col items-start sm:items-end w-full sm:w-auto">
-          <div className="text-xs text-text-secondary mb-2 self-end"> {/* Smaller text for stats summary */}
+          <div className="text-xs text-text-secondary mb-2 self-end">
             {dashboardStats.totalItems > 0
               ? `${dashboardStats.completedItems} / ${dashboardStats.totalItems} items completed (${dashboardStats.overallCompletionPercent}%)`
               : "No materials yet."}
@@ -56,7 +55,6 @@ export default function StudentHeader({ selectedChild, dashboardStats }) {
         </div>
       </div>
 
-      {/* Stats cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center pt-4 border-t border-border-subtle">
         {[
           { label: "Total Items", value: dashboardStats.totalItems, color: "blue" },
@@ -64,7 +62,7 @@ export default function StudentHeader({ selectedChild, dashboardStats }) {
           { label: "Overdue", value: dashboardStats.overdue, color: "red" },
           { label: "Completion", value: `${dashboardStats.overallCompletionPercent}%`, color: "green" },
         ].map(stat => (
-          <div key={stat.label} className={`p-3 rounded-md bg-${stat.color}-50`}> {/* Using Tailwind color utility classes */}
+          <div key={stat.label} className={`p-3 rounded-md bg-${stat.color}-50`}>
             <div className={`text-xs uppercase text-${stat.color}-600 tracking-wider font-semibold`}>
               {stat.label}
             </div>

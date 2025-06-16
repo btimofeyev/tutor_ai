@@ -11,7 +11,7 @@ import {
   ChevronDownIcon, 
   ChevronUpIcon,
   ExclamationTriangleIcon,
-  CreditCardIcon, // Added for upgrade button
+  CreditCardIcon,
   CalendarDaysIcon,
   HomeIcon
 } from '@heroicons/react/24/outline';
@@ -34,7 +34,7 @@ export default function StudentSidebar({
   onOpenChildLoginSettings,
   subscription,
   canAddChild,
-  onUpgradeNeeded, // New prop to handle upgrade clicks from here
+  onUpgradeNeeded,
 }) {
   const [showSubscriptionDetails, setShowSubscriptionDetails] = useState(false);
 
@@ -51,8 +51,7 @@ export default function StudentSidebar({
 
   const handleUpgradeButtonClick = () => {
     if (onUpgradeNeeded) {
-      // Determine which plan to suggest upgrading to
-      let targetPlan = 'family'; // Default
+      let targetPlan = 'family';
       if (planType === 'free' || planType === 'klio_addon') {
         targetPlan = 'family';
       } else if (planType === 'family') {
@@ -64,7 +63,6 @@ export default function StudentSidebar({
 
   return (
     <aside className="flex flex-col h-full text-text-primary bg-background-card">
-      {/* Header */}
       <div className="px-6 pt-6 pb-4">
         <Link href="/" className="flex items-center group transition-opacity hover:opacity-80">
           <Image
@@ -81,7 +79,6 @@ export default function StudentSidebar({
         </Link>
       </div>
 
-      {/* Navigation Menu */}
       <div className="px-6 pt-2 pb-3 border-b border-border-subtle mb-2">
         <div className="space-y-1">
           <Link 
@@ -101,12 +98,10 @@ export default function StudentSidebar({
         </div>
       </div>
 
-      {/* Students Section Header */}
       <div className="px-6 pt-2 pb-3 border-b border-border-subtle mb-2">
         <h3 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">Students</h3>
       </div>
 
-      {/* Students List (no changes) */}
       <div className="flex-1 overflow-y-auto px-4 space-y-1.5">
         {(childrenList || []).map(child => {
           const isSelected = selectedChild?.id === child.id;
@@ -157,10 +152,7 @@ export default function StudentSidebar({
         })}
       </div>
 
-
-      {/* Subscription & Add Student Section */}
       <div className="p-4 border-t border-border-subtle">
-        {/* Subscription Section */}
         <div className="mb-4">
           <button
             onClick={() => setShowSubscriptionDetails(!showSubscriptionDetails)}
@@ -182,7 +174,7 @@ export default function StudentSidebar({
           {showSubscriptionDetails && (
             <div className="mt-2 px-2">
               <SubscriptionManager
-                children={childrenList || []} // Ensure childrenList is an array
+                children={childrenList || []}
                 compact={true}
                 initialSubscription={subscription}
               />
@@ -190,15 +182,13 @@ export default function StudentSidebar({
           )}
         </div>
 
-        {/* Add Student Section */}
         {!showAddChild ? (
           <div>
             <Button
-              variant={canAddChild ? "secondary" : "primary"} // Make upgrade more prominent
+              variant={canAddChild ? "secondary" : "primary"}
               size="md"
               onClick={canAddChild ? () => onToggleShowAddChild(true) : handleUpgradeButtonClick}
               className="w-full"
-              // disabled={!canAddChild && !onUpgradeNeeded} // Disable only if no upgrade path
               title={!canAddChild ? "Upgrade your plan to add more children" : "Add a new student"}
             >
               {!canAddChild ? <CreditCardIcon className="h-5 w-5 mr-2"/> : <UserPlusIcon className="h-5 w-5 mr-2"/> }
@@ -216,7 +206,7 @@ export default function StudentSidebar({
                           'The AI Add-on is for 1 child. Upgrade to Family Plan for up to 3 children.' :
                           planType === 'family' ?
                             'Family plan supports up to 3 children. Upgrade to Academy for more.' :
-                            'Your current plan is at its child limit. Contact support for options.' // General message for Academy or other
+                            'Your current plan is at its child limit. Contact support for options.'
                       ) : (
                         'Free plan includes 1 child. Upgrade for more!'
                       )}
@@ -227,7 +217,6 @@ export default function StudentSidebar({
             )}
           </div>
         ) : (
-          // Form for adding child (no changes)
           <form onSubmit={onAddChildSubmit} className="flex flex-col gap-2 p-3 bg-background-main rounded-lg border border-border-subtle">
             <input
               value={newChildName}
@@ -244,7 +233,7 @@ export default function StudentSidebar({
             />
             <div className="flex gap-2 mt-1.5">
               <Button type="submit" variant="primary" size="sm" className="flex-1">
-                 Save {/* Removed CheckIcon for brevity to match Cancel */}
+                 Save
               </Button>
               <Button
                 type="button"
@@ -253,14 +242,13 @@ export default function StudentSidebar({
                 onClick={() => onToggleShowAddChild(false)}
                 className="flex-1"
               >
-                 Cancel {/* Removed XMarkIcon */}
+                 Cancel
               </Button>
             </div>
           </form>
         )}
       </div>
 
-      {/* Logout Section (no changes) */}
       <div className="p-4 border-t border-border-subtle mt-auto">
         <Button
           as="link"

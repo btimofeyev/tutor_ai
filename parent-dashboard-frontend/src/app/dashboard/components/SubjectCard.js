@@ -88,15 +88,17 @@ export default function SubjectCard({
     return (
       <div key={lessonContainer.id} className="bg-gray-50/80 rounded-lg border border-gray-200 overflow-hidden">
         <button
-          className="w-full px-4 py-3 flex justify-between items-center hover:bg-indigo-50/60 hover:shadow-sm transition-all duration-200 text-left focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-inset group"
+          className="w-full px-4 py-3 flex items-center text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
           onClick={() => toggleLessonContainerExpansion(lessonContainer.id)}
         >
-          <h5 className="text-sm font-semibold text-gray-700 flex items-center group-hover:text-indigo-700 transition-colors duration-200">
-            <ListBulletIcon className="h-4 w-4 mr-2 text-gray-500 group-hover:text-indigo-600 transition-colors duration-200" />
-            {lessonContainer.title}
-            <span className="ml-2 text-xs text-gray-500 font-normal group-hover:text-indigo-600 transition-colors duration-200">({materials.length})</span>
-          </h5>
-          <ChevronIcon isExpanded={isExpanded} />
+          <ListBulletIcon className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-semibold text-gray-700">{lessonContainer.title}</span>
+            <span className="ml-2 text-xs text-gray-500 font-normal">({materials.length})</span>
+          </div>
+          <div className="flex-shrink-0 ml-3">
+            <ChevronIcon isExpanded={isExpanded} />
+          </div>
         </button>
         
         <div className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
@@ -127,19 +129,17 @@ export default function SubjectCard({
     return (
       <div key={unit.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
         <button
-          className="w-full p-4 flex justify-between items-center hover:bg-blue-50/50 hover:shadow-sm transition-all duration-200 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset group"
+          className="w-full p-4 flex items-center text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
           onClick={() => toggleUnitExpansion(unit.id)}
         >
-          <div className="flex items-center min-w-0 flex-1">
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-200 group-hover:scale-110 transition-all duration-200 flex-shrink-0">
-              <FolderOpenIcon className="h-4 w-4 text-blue-600 group-hover:text-blue-700" />
-            </div>
-            <div>
-              <h4 className="text-base font-semibold text-gray-900 group-hover:text-blue-700 transition-colors duration-200">{unit.name}</h4>
-              <p className="text-sm text-gray-500 group-hover:text-blue-600 transition-colors duration-200">{lessonContainersInUnit.length} groups • {allUnitMaterialsCount} items</p>
-            </div>
+          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+            <FolderOpenIcon className="h-4 w-4 text-blue-600" />
           </div>
-          <div className="flex-shrink-0 ml-2">
+          <div className="flex-1 min-w-0">
+            <h4 className="text-base font-semibold text-gray-900">{unit.name}</h4>
+            <p className="text-sm text-gray-500">{lessonContainersInUnit.length} groups • {allUnitMaterialsCount} items</p>
+          </div>
+          <div className="flex-shrink-0 ml-3">
             <ChevronIcon isExpanded={isExpanded} />
           </div>
         </button>
@@ -164,15 +164,15 @@ export default function SubjectCard({
   };
   
   const ChevronIcon = ({ isExpanded }) => (
-    <div className={`transition-transform duration-300 ease-out ${isExpanded ? 'rotate-180' : ''} group-hover:scale-110`}>
-      <ChevronDownIcon className="h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors duration-200" />
+    <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+      <ChevronDownIcon className="h-5 w-5 text-gray-400" />
     </div>
   );
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg hover:shadow-gray-200/50 hover:-translate-y-0.5 transition-all duration-300 ease-out">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Header Section */}
-      <div className="p-4 sm:p-6 bg-gradient-to-r from-gray-50/80 to-white hover:from-blue-50/40 hover:to-indigo-50/20 transition-all duration-300">
+      <div className="p-4 sm:p-6 bg-gradient-to-r from-gray-50/80 to-white">
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
           <div className="flex-1 min-w-0">
             <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 truncate">{subject.name}</h3>
@@ -208,21 +208,19 @@ export default function SubjectCard({
             <div className="flex flex-wrap gap-2">
               <button 
                 onClick={onManageUnits}
-                className="inline-flex items-center px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 hover:scale-105 transform transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 title="Manage Units & Lesson Groups"
               >
-                <PlusCircleIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 transition-transform group-hover:rotate-90 duration-200" />
-                <span className="hidden sm:inline">Units</span>
-                <span className="sm:hidden">Units</span>
+                <PlusCircleIcon className="h-4 w-4 mr-1.5 flex-shrink-0" />
+                Units
               </button>
               <Link
                 href={`/subject-settings/${subject.child_subject_id}`}
-                className="inline-flex items-center px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 hover:scale-105 transform transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 title="Subject Settings & Weights"
               >
-                <AdjustmentsHorizontalIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5 transition-transform group-hover:rotate-12 duration-200" />
-                <span className="hidden sm:inline">Weights</span>
-                <span className="sm:hidden">Weights</span>
+                <AdjustmentsHorizontalIcon className="h-4 w-4 mr-1.5 flex-shrink-0" />
+                Weights
               </Link>
             </div>
           </div>

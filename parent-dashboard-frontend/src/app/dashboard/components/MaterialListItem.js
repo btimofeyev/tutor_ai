@@ -39,9 +39,8 @@ const formatDueDate = (dateString) => {
 const CompletionToggle = React.memo(({ isCompleted, isToggling, onClick, disabled }) => (
   <button
     onClick={disabled ? undefined : onClick}
-    className={`mr-4 p-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-      ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50'}
-      ${isCompleted ? 'bg-green-50' : 'hover:bg-gray-50'}
+    className={`mr-3 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0
+      ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
     `}
     title={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
     aria-pressed={isCompleted}
@@ -52,7 +51,7 @@ const CompletionToggle = React.memo(({ isCompleted, isToggling, onClick, disable
     ) : isCompleted ? (
       <CheckSolidIcon className="h-5 w-5 text-green-600" />
     ) : (
-      <div className="h-5 w-5 border-2 border-gray-300 rounded-full transition-colors group-hover:border-blue-500" />
+      <div className="h-5 w-5 border-2 border-gray-300 rounded-full" />
     )}
   </button>
 ));
@@ -172,11 +171,11 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
     onOpenEditModal(lesson);
   }, [lesson, onOpenEditModal]);
 
-  const itemBaseClasses = "flex items-center group rounded-lg transition-all duration-200 hover:shadow-sm";
-  const itemPadding = isCompact ? "px-2 sm:px-3 py-1.5 sm:py-2" : "p-3 sm:p-4";
+  const itemBaseClasses = "flex items-center rounded-lg";
+  const itemPadding = isCompact ? "px-3 py-2" : "p-3";
   const itemStateClasses = materialInfo.isCompleted 
-    ? "bg-gradient-to-r from-green-50/80 to-emerald-50/50 border border-green-200/60 hover:from-green-50 hover:to-emerald-50" 
-    : "bg-white border border-gray-200/60 hover:border-gray-300/80 hover:bg-gray-50/50";
+    ? "bg-gradient-to-r from-green-50/80 to-emerald-50/50 border border-green-200/60" 
+    : "bg-white border border-gray-200/60";
 
   return (
     <li className={`${itemBaseClasses} ${itemPadding} ${itemStateClasses}`}>
@@ -188,7 +187,7 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
       />
       <div className="flex-grow flex items-center justify-between min-w-0 cursor-pointer" onClick={handleEditClick} role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleEditClick()}>
         <div className="flex-grow min-w-0">
-          <p className={`truncate font-semibold text-sm sm:text-base transition-colors ${materialInfo.isCompleted ? 'line-through text-gray-500' : 'text-gray-900 group-hover:text-blue-700'}`} title={lesson.title}>
+          <p className={`truncate font-semibold text-sm ${materialInfo.isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}`} title={lesson.title}>
             {lesson.title}
           </p>
           {!isCompact && (
@@ -197,11 +196,11 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
             </p>
           )}
         </div>
-        <div className="flex items-center space-x-2 sm:space-x-3 ml-2 sm:ml-3 flex-shrink-0">
+        <div className="flex items-center space-x-3 ml-3 flex-shrink-0">
           <StatusBadge lesson={lesson} materialInfo={materialInfo} />
           <button 
             onClick={handleEditClick} 
-            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 rounded-lg" 
+            className="p-1.5 text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
             title="Edit Material"
           >
             <PencilSquareIcon className="h-4 w-4" />

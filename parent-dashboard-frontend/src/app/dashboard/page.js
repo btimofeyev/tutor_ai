@@ -317,16 +317,26 @@ export default function DashboardPage() {
     
     setIsSubmittingGrade(true);
     try {
+      console.log(`🎯 Submitting grade ${gradeValue} for lesson ${gradingLesson.id}`);
+      
       // Invalidate cache before the API call to ensure fresh data
       if (childrenData.selectedChild?.id) {
         childrenData.invalidateChildCache(childrenData.selectedChild.id);
       }
       
       const result = await materialManagement.toggleLessonCompletion(gradingLesson.id, true, gradeValue);
+      console.log(`📊 Grade submission result:`, result);
+      
       if (result.success) {
+        console.log(`✅ Grade submitted successfully, refreshing data...`);
+        
+        // Small delay to ensure backend processing is complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         // Force refresh the child data to update the UI immediately
         if (childrenData.selectedChild?.id) {
           await childrenData.refreshChildSpecificData(true);
+          console.log(`🔄 Data refreshed for child ${childrenData.selectedChild.id}`);
         }
         
         setShowGradeModal(false);
@@ -335,9 +345,11 @@ export default function DashboardPage() {
           console.log(`✅ Lesson completion synced with ${result.syncedEntries} schedule entry(s)`);
         }
       } else {
+        console.error(`❌ Grade submission failed:`, result.error);
         alert(result.error || "Could not update grade and completion status.");
       }
     } catch (error) {
+      console.error(`❌ Grade submission error:`, error);
       alert("Failed to save grade. Please try again.");
     } finally {
       setIsSubmittingGrade(false);

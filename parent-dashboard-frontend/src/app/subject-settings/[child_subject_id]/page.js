@@ -33,17 +33,27 @@ export default function SubjectSettingsPage() {
             // Fetch weights
             const weightsRes = await api.get(`/weights/${childSubjectId}`);
             
-            // Fetch subject and child info for context (this is a bit more involved)
-            // You might need a dedicated endpoint or adjust your existing ones
-            // For simplicity, let's assume an endpoint that gives child_subject details
-            // including subject name and child name based on child_subject_id
-            // This is a placeholder - you'll need to implement this API call
+            // Fetch subject and child info for context
             try {
-                const csDetailsRes = await api.get(`/subjects/child_subject_details/${childSubjectId}`); // Placeholder API
-                setSubjectName(csDetailsRes.data?.subject_name || 'Subject');
-                setChildName(csDetailsRes.data?.child_name || 'Student');
+                const [childrenRes, subjectsRes] = await Promise.all([
+                    api.get('/children'),
+                    api.get('/subjects')
+                ]);
+                
+                // Find the child and subject based on the child_subject_id
+                const childSubject = weightsRes.data.find(w => w.child_subject_id == childSubjectId);
+                if (childSubject) {
+                    const child = childrenRes.data.find(c => c.id == childSubject.child_id);
+                    const subject = subjectsRes.data.find(s => s.id == childSubject.subject_id);
+                    setChildName(child?.name || 'Student');
+                    setSubjectName(subject?.name || 'Subject');
+                } else {
+                    setSubjectName('Selected Subject');
+                    setChildName('Student');
+                }
             } catch (detailsError) {
-                setSubjectName('Selected Subject'); // Fallback
+                setSubjectName('Selected Subject');
+                setChildName('Student');
             }
             
             // Initialize weights for all content types if some are missing
@@ -70,8 +80,7 @@ export default function SubjectSettingsPage() {
     const handleWeightChange = (contentType, value) => {
         const newWeight = parseFloat(value);
         if (isNaN(newWeight) || newWeight < 0 || newWeight > 1.00) {
-            // Handle invalid input, maybe show a temporary error message
-            // For now, just don't update if invalid for simplicity in this step
+            // Invalid input - weight must be between 0 and 1
             return; 
         }
         setWeights(prevWeights =>
@@ -91,18 +100,22 @@ export default function SubjectSettingsPage() {
         setError('');
 
         const totalWeight = calculateTotalWeight();
-        // Example validation: ensure sum is not wildly off, e.g. for gradable types if you want sum to be 1.0
-        // For now, we allow any sum as long as individual weights are 0-1.
-        // if (Math.abs(totalWeight - 1.0) > 0.01 && weights.some(w=>w.weight > 0)) { // Check if sum isn't 1.0 if any weight is set
-        //     if (!confirm(`Total weight is ${totalWeight.toFixed(2)}, not 1.00. Save anyway?`)) {
-        //         setSaving(false);
-        //         return;
-        //     }
-        // }
+        // Validate that weights sum to approximately 1.0 for gradable content types
+        const gradableWeights = weights.filter(w => w.weight > 0);
+        if (gradableWeights.length > 0 && Math.abs(totalWeight - 1.0) > 0.01) {
+            const confirmSave = window.confirm(
+                `Total weight is ${totalWeight.toFixed(2)}, not 1.00. This may affect grade calculations. Save anyway?`
+            );
+            if (!confirmSave) {
+                setSaving(false);
+                return;
+            }
+        }
 
         try {
             await api.post(`/weights/${childSubjectId}`, { weights });
-            alert('Weights saved successfully!');
+            // Success - could be replaced with toast notification
+            setError(''); // Clear any previous errors
             router.push('/dashboard'); // Or back to where they came from
         } catch (err) {
             setError(err.response?.data?.error || "Failed to save weights.");

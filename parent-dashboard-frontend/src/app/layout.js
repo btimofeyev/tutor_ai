@@ -1,6 +1,8 @@
 import { Inter } from 'next/font/google';
 import './globals.css';
 import SupabaseProvider from '../components/SupabaseProvider';
+import { ToastProvider } from '../hooks/useToast';
+import ToastContainer from '../components/Toast';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-main' });
 
@@ -14,7 +16,10 @@ export default function RootLayout({ children }) {
     <html lang="en" className={`${inter.variable}`}>
       <body>
         <SupabaseProvider>
-          {children}
+          <ToastProvider>
+            {children}
+            <ToastContainer />
+          </ToastProvider>
         </SupabaseProvider>
       </body>
     </html>

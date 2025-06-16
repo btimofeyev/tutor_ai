@@ -32,16 +32,6 @@ export function getSubjectColor(subjectName, childSubjects) {
 }
 
 /**
- * Get background color class for a subject
- * @param {string} subjectName - Name of the subject
- * @param {Array} childSubjects - Array of child's subjects
- * @returns {string} Background color class
- */
-export function getSubjectBgColor(subjectName, childSubjects) {
-  return getSubjectColor(subjectName, childSubjects).bg;
-}
-
-/**
  * Get text color class for a subject
  * @param {string} subjectName - Name of the subject
  * @param {Array} childSubjects - Array of child's subjects
@@ -51,15 +41,6 @@ export function getSubjectTextColor(subjectName, childSubjects) {
   return getSubjectColor(subjectName, childSubjects).text;
 }
 
-/**
- * Get border color class for a subject
- * @param {string} subjectName - Name of the subject
- * @param {Array} childSubjects - Array of child's subjects
- * @returns {string} Border color class
- */
-export function getSubjectBorderColor(subjectName, childSubjects) {
-  return getSubjectColor(subjectName, childSubjects).border;
-}
 
 /**
  * Get darker background color class for better contrast (used in calendar events)
@@ -71,18 +52,6 @@ export function getSubjectDarkBgColor(subjectName, childSubjects) {
   return getSubjectColor(subjectName, childSubjects).bgDark;
 }
 
-/**
- * Generate color assignment when subjects are first assigned to a child
- * This can be used in the subject assignment UI to show preview colors
- * @param {Array} subjects - Array of subject names to assign colors to
- * @returns {Array} Array of subjects with assigned colors
- */
-export function assignColorsToSubjects(subjects) {
-  return subjects.map((subject, index) => ({
-    ...subject,
-    color: SUBJECT_COLORS[index % SUBJECT_COLORS.length]
-  }));
-}
 
 // Additional colors for child differentiation when multiple children are shown
 const CHILD_VARIATIONS = [

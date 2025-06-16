@@ -12,6 +12,8 @@ import { useSubscription } from "../../hooks/useSubscription";
 import { useChildrenData } from "../../hooks/useChildrenData";
 import { useMaterialManagement } from "../../hooks/useMaterialManagement";
 import { useFiltersAndSorting } from "../../hooks/useFiltersAndSorting";
+import { useToast } from "../../hooks/useToast";
+import { PRICE_IDS } from "../../utils/subscriptionConstants";
 import { 
   APP_CONTENT_TYPES,
   APP_GRADABLE_CONTENT_TYPES,
@@ -63,6 +65,7 @@ export default function DashboardPage() {
     childrenData.childSubjects, 
     childrenData.selectedChild
   );
+  const { showSuccess, showError, showWarning } = useToast();
   
   // State for modals
   const [isManageUnitsModalOpen, setIsManageUnitsModalOpen] = useState(false);
@@ -128,7 +131,7 @@ export default function DashboardPage() {
     e.preventDefault();
     
     if (!materialManagement.addLessonSubject || !materialManagement.addLessonFile || materialManagement.addLessonFile.length === 0 || !materialManagement.addLessonUserContentType) {
-      alert("Please select subject, at least one file, and an initial content type.");
+      showWarning("Please select subject, at least one file, and an initial content type.");
       return;
     }
 
@@ -138,7 +141,7 @@ export default function DashboardPage() {
     );
 
     if (!subjectInfo || !subjectInfo.child_subject_id) {
-      alert("Selected subject is invalid.");
+      showError("Selected subject is invalid.");
       return;
     }
 
@@ -158,7 +161,7 @@ export default function DashboardPage() {
     const result = await materialManagement.handleLessonUpload(formData);
     
     if (!result.success) {
-      alert(`Upload Error: ${result.error}`);
+      showError(`Upload Error: ${result.error}`);
       materialManagement.setLessonJsonForApproval({ error: result.error, title: "Error" });
       materialManagement.setLessonTitleForApproval("Error");
       materialManagement.setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
@@ -203,11 +206,11 @@ export default function DashboardPage() {
     const result = await materialManagement.handleManualMaterialCreation(materialDataFromForm);
     
     if (result.success) {
-      alert('Material added successfully!');
+      showSuccess('Material added successfully!');
       setIsAddMaterialModalOpen(false);
       return { success: true };
     } else {
-      alert(result.error || 'Failed to create material');
+      showError(result.error || 'Failed to create material');
       return { 
         success: false, 
         error: result.error || 'Failed to create material' 
@@ -239,20 +242,14 @@ export default function DashboardPage() {
   const handleGenericUpgrade = async (targetPlanKey) => {
     setUpgrading(true);
     try {
-      const priceIds = {
-        klio_addon: 'price_1RVZczD8TZAZUMMAQWokffCi',
-        family: 'price_1RVZT4D8TZAZUMMA3YIJeWWE',
-        academy: 'price_1RVZTrD8TZAZUMMAiUuoU72d'
-      };
-
-      if (!priceIds[targetPlanKey]) {
+      if (!PRICE_IDS[targetPlanKey]) {
         alert('Invalid plan selected for upgrade.');
         setUpgrading(false);
         return;
       }
 
       const response = await api.post('/stripe/create-checkout-session', {
-        price_id: priceIds[targetPlanKey],
+        price_id: PRICE_IDS[targetPlanKey],
         success_url: `${window.location.origin}/dashboard?upgraded=true`,
         cancel_url: window.location.href
       });

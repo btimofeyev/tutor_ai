@@ -1,15 +1,10 @@
 // parent-dashboard-frontend/src/components/SubscriptionManager.js
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
-import { SparklesIcon, UserGroupIcon, AcademicCapIcon, ArrowRightIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+import { SparklesIcon, UserGroupIcon, AcademicCapIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import Button from './ui/Button';
 import api from '../utils/api';
-
-const PRICE_IDS = {
-  klio_addon: 'price_1RVZczD8TZAZUMMAQWokffCi',
-  family: 'price_1RVZT4D8TZAZUMMA3YIJeWWE',
-  academy: 'price_1RVZTrD8TZAZUMMAiUuoU72d'
-};
+import { PRICE_IDS } from '../utils/subscriptionConstants';
 
 export default function SubscriptionManager({
   children = [], // Represents the list of children, used for childCount

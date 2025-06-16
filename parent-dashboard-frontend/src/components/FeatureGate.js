@@ -5,6 +5,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import UpgradePrompt from './UpgradePrompt';
 import Button from './ui/Button';
 import api from '../utils/api';
+import { PRICE_IDS } from '../utils/subscriptionConstants';
 
 export default function FeatureGate({ 
   feature, 
@@ -12,7 +13,7 @@ export default function FeatureGate({
   fallback = null,
   showUpgradePrompt = true 
 }) {
-  const { permissions, planType, canAccessAI, canUseChildLogin } = useSubscription();
+  const { permissions, planType } = useSubscription();
   const [showPrompt, setShowPrompt] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
 
@@ -32,14 +33,8 @@ export default function FeatureGate({
   const handleUpgrade = async (targetPlan) => {
     setUpgrading(true);
     try {
-      const priceIds = {
-        klio_addon: 'price_1RVZczD8TZAZUMMAQWokffCi',
-        family: 'price_1RVZT4D8TZAZUMMA3YIJeWWE',
-        academy: 'price_1RVZTrD8TZAZUMMAiUuoU72d'
-      };
-
       const response = await api.post('/stripe/create-checkout-session', {
-        price_id: priceIds[targetPlan],
+        price_id: PRICE_IDS[targetPlan],
         success_url: `${window.location.origin}${window.location.pathname}?upgraded=true`,
         cancel_url: window.location.href
       });

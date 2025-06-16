@@ -1,7 +1,6 @@
 // app/dashboard/components/ChildLoginSettingsModal.js
 'use client';
 import React from 'react';
-// import { UserCircleIcon, KeyIcon, XMarkIcon } from '@heroicons/react/24/outline'; // Example icons
 
 export default function ChildLoginSettingsModal({
   child, // The child object being edited

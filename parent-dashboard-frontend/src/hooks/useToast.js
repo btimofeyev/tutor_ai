@@ -1,28 +1,47 @@
-// parent-dashboard-frontend/src/hooks/useToast.js
+// Simple toast notification system
 'use client';
-
 import { createContext, useContext, useState, useCallback } from 'react';
-import Toast from '../components/ui/Toast';
 
-const ToastContext = createContext(null);
+const ToastContext = createContext();
 
 export function ToastProvider({ children }) {
-  const [toast, setToast] = useState(null);
+  const [toasts, setToasts] = useState([]);
 
-  const showToast = useCallback((message, type = 'success', duration = 3000) => {
-    const id = Date.now();
-    setToast({ id, message, type });
-    setTimeout(() => {
-      setToast(currentToast => (currentToast?.id === id ? null : currentToast));
-    }, duration);
+  const addToast = useCallback((message, type = 'info', duration = 5000) => {
+    const id = Date.now() + Math.random();
+    const toast = { id, message, type, duration };
+    
+    setToasts(prev => [...prev, toast]);
+    
+    if (duration > 0) {
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, duration);
+    }
+    
+    return id;
   }, []);
 
-  const value = { showToast };
+  const removeToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const showSuccess = useCallback((message) => addToast(message, 'success'), [addToast]);
+  const showError = useCallback((message) => addToast(message, 'error'), [addToast]);
+  const showWarning = useCallback((message) => addToast(message, 'warning'), [addToast]);
+  const showInfo = useCallback((message) => addToast(message, 'info'), [addToast]);
 
   return (
-    <ToastContext.Provider value={value}>
+    <ToastContext.Provider value={{
+      toasts,
+      addToast,
+      removeToast,
+      showSuccess,
+      showError,
+      showWarning,
+      showInfo
+    }}>
       {children}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </ToastContext.Provider>
   );
 }

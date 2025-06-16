@@ -81,17 +81,14 @@ export function useChildrenData(session) {
       const childrenData = response.data || [];
       setChildren(childrenData);
       
-      // Auto-select first child if none selected
-      if (childrenData.length > 0 && !selectedChild) {
-        setSelectedChild(childrenData[0]);
-      }
+      // Auto-select first child if none selected (handled in separate useEffect)
     } catch (error) {
       console.error('Error fetching children:', error);
       setChildren([]);
     } finally {
       setLoadingInitial(false);
     }
-  }, [session, selectedChild]);
+  }, [session]);
 
   // Check if cached data is still fresh
   const isCacheValid = useCallback((childId) => {
@@ -244,7 +241,7 @@ export function useChildrenData(session) {
     } finally {
       setLoadingChildData(false);
     }
-  }, [selectedChild, session, isCacheValid, childDataCache, lessonsByUnit, lessonsBySubject, gradeWeights, unitsBySubject, loadFromStorage, saveToStorage]);
+  }, [selectedChild, session, isCacheValid, childDataCache, loadFromStorage, saveToStorage]);
 
   // Add new child
   const handleAddChild = useCallback(async (childData) => {
@@ -277,6 +274,13 @@ export function useChildrenData(session) {
     }
   }, [session, fetchChildren]);
 
+  // Auto-select first child if none selected
+  useEffect(() => {
+    if (children.length > 0 && !selectedChild) {
+      setSelectedChild(children[0]);
+    }
+  }, [children, selectedChild]);
+
   // Invalidate cache for a specific child (useful when data is modified)
   const invalidateChildCache = useCallback((childId) => {
     setChildDataCache(prev => ({ ...prev, [childId]: false }));
@@ -297,7 +301,7 @@ export function useChildrenData(session) {
     if (selectedChild) {
       refreshChildSpecificData();
     }
-  }, [selectedChild, refreshChildSpecificData]);
+  }, [selectedChild]); // Only depend on selectedChild, not the function
 
   return {
     // Children data

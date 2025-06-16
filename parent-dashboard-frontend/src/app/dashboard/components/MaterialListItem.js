@@ -70,12 +70,27 @@ const StatusBadge = ({ lesson, materialInfo }) => {
       </div>
     );
   }
-  // For gradable items that are completed but don't have grades, show "Needs Grade"
+  // For gradable items that are completed but don't have grades, show "Needs Grade" 
   if (materialInfo.isCompleted && materialInfo.isGradable && materialInfo.hasMaxScore) {
     return (
       <span className="inline-flex items-center text-xs font-bold text-amber-700 bg-gradient-to-r from-amber-100 to-yellow-100 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-amber-200/60 shadow-sm">
         <span className="hidden sm:inline">Needs Grade</span>
         <span className="sm:hidden">Grade?</span>
+      </span>
+    );
+  }
+  
+  // Show "Needs Attention" for overdue or upcoming items
+  if (!materialInfo.isCompleted && (materialInfo.isOverdue || materialInfo.isDueSoon)) {
+    const isOverdue = materialInfo.isOverdue;
+    return (
+      <span className={`inline-flex items-center text-xs font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border shadow-sm ${
+        isOverdue 
+          ? 'text-red-700 bg-gradient-to-r from-red-100 to-rose-100 border-red-200/60' 
+          : 'text-amber-700 bg-gradient-to-r from-amber-100 to-yellow-100 border-amber-200/60'
+      }`}>
+        <span className="hidden sm:inline">{isOverdue ? 'Needs Attention' : 'Due Soon'}</span>
+        <span className="sm:hidden">{isOverdue ? 'Overdue' : 'Soon'}</span>
       </span>
     );
   }

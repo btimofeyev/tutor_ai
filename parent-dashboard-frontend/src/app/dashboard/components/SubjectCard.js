@@ -130,8 +130,8 @@ export default function SubjectCard({
           className="w-full p-4 flex justify-between items-center hover:bg-blue-50/50 hover:shadow-sm transition-all duration-200 text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset group"
           onClick={() => toggleUnitExpansion(unit.id)}
         >
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-200 group-hover:scale-110 transition-all duration-200">
+          <div className="flex items-center min-w-0 flex-1">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-200 group-hover:scale-110 transition-all duration-200 flex-shrink-0">
               <FolderOpenIcon className="h-4 w-4 text-blue-600 group-hover:text-blue-700" />
             </div>
             <div>
@@ -139,7 +139,9 @@ export default function SubjectCard({
               <p className="text-sm text-gray-500 group-hover:text-blue-600 transition-colors duration-200">{lessonContainersInUnit.length} groups • {allUnitMaterialsCount} items</p>
             </div>
           </div>
-          <ChevronIcon isExpanded={isExpanded} />
+          <div className="flex-shrink-0 ml-2">
+            <ChevronIcon isExpanded={isExpanded} />
+          </div>
         </button>
         
         <div className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>

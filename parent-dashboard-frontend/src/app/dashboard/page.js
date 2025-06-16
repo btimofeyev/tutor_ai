@@ -300,8 +300,15 @@ export default function DashboardPage() {
     const result = await materialManagement.toggleLessonCompletion(lessonId, isCompleting);
     if (!result.success) {
       alert(result.error || "Could not update completion status.");
-    } else if (result.syncedEntries > 0) {
-      console.log(`✅ Lesson completion synced with ${result.syncedEntries} schedule entry(s)`);
+    } else {
+      // Force refresh the child data to update the UI immediately
+      if (childrenData.selectedChild?.id) {
+        await childrenData.refreshChildSpecificData(true);
+      }
+      
+      if (result.syncedEntries > 0) {
+        console.log(`✅ Lesson completion synced with ${result.syncedEntries} schedule entry(s)`);
+      }
     }
   };
 
@@ -317,6 +324,11 @@ export default function DashboardPage() {
       
       const result = await materialManagement.toggleLessonCompletion(gradingLesson.id, true, gradeValue);
       if (result.success) {
+        // Force refresh the child data to update the UI immediately
+        if (childrenData.selectedChild?.id) {
+          await childrenData.refreshChildSpecificData(true);
+        }
+        
         setShowGradeModal(false);
         setGradingLesson(null);
         if (result.syncedEntries > 0) {

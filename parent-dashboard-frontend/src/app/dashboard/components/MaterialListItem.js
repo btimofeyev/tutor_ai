@@ -39,19 +39,20 @@ const formatDueDate = (dateString) => {
 const CompletionToggle = React.memo(({ isCompleted, isToggling, onClick, disabled }) => (
   <button
     onClick={disabled ? undefined : onClick}
-    className={`mr-3 p-1 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1
-      ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-200 focus:ring-accent-blue'}
+    className={`mr-4 p-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+      ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50'}
+      ${isCompleted ? 'bg-green-50' : 'hover:bg-gray-50'}
     `}
     title={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
     aria-pressed={isCompleted}
     disabled={isToggling || disabled}
   >
     {isToggling ? (
-      <div className="h-5 w-5 border-2 border-gray-300 border-t-accent-blue rounded-full animate-spin" />
+      <div className="h-5 w-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
     ) : isCompleted ? (
-      <CheckSolidIcon className="h-5 w-5 text-accent-green" />
+      <CheckSolidIcon className="h-5 w-5 text-green-600" />
     ) : (
-      <div className="h-5 w-5 border-2 border-border-input rounded-full group-hover:border-accent-blue" />
+      <div className="h-5 w-5 border-2 border-gray-300 rounded-full transition-colors group-hover:border-blue-500" />
     )}
   </button>
 ));
@@ -62,25 +63,58 @@ const StatusBadge = ({ lesson, materialInfo }) => {
   const hasGrade = lesson.grade_value !== null && lesson.grade_value !== undefined && lesson.grade_value !== '';
   if (hasGrade || (lesson.grade_value === 0 && materialInfo.hasMaxScore)) {
     return (
-      <span className="font-semibold text-sm text-accent-blue" aria-label={`Grade: ${lesson.grade_value}${lesson.grade_max_value ? ` / ${lesson.grade_max_value}` : ''}`}>
-        {String(lesson.grade_value)}{lesson.grade_max_value ? `/${String(lesson.grade_max_value)}` : ''}
-      </span>
+      <div className="flex items-center bg-gradient-to-r from-blue-50 to-indigo-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-blue-200/60 shadow-sm">
+        <span className="font-bold text-blue-700 text-xs sm:text-sm" aria-label={`Grade: ${lesson.grade_value}${lesson.grade_max_value ? ` / ${lesson.grade_max_value}` : ''}`}>
+          {String(lesson.grade_value)}{lesson.grade_max_value ? `/${String(lesson.grade_max_value)}` : ''}
+        </span>
+      </div>
     );
   }
   // For gradable items that are completed but don't have grades, show "Needs Grade"
   if (materialInfo.isCompleted && materialInfo.isGradable && materialInfo.hasMaxScore) {
-    return <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Needs Grade</span>;
+    return (
+      <span className="inline-flex items-center text-xs font-bold text-amber-700 bg-gradient-to-r from-amber-100 to-yellow-100 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-amber-200/60 shadow-sm">
+        <span className="hidden sm:inline">Needs Grade</span>
+        <span className="sm:hidden">Grade?</span>
+      </span>
+    );
   }
   // For non-gradable completed items, show "Completed"
   if (materialInfo.isCompleted) {
-    return <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Completed</span>;
+    return (
+      <span className="inline-flex items-center text-xs font-bold text-green-700 bg-gradient-to-r from-green-100 to-emerald-100 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-green-200/60 shadow-sm">
+        <span className="hidden sm:inline">Completed</span>
+        <span className="sm:hidden">Done</span>
+      </span>
+    );
   }
   if (lesson.due_date) {
-    const badgeColor = materialInfo.isOverdue ? 'text-red-600 bg-red-100' : materialInfo.isDueSoon ? 'text-orange-600 bg-orange-100' : 'text-gray-600 bg-gray-100';
-    const prefix = materialInfo.isOverdue ? 'Overdue: ' : 'Due: ';
+    const badgeConfig = materialInfo.isOverdue 
+      ? { 
+          gradient: 'bg-gradient-to-r from-red-100 to-rose-100', 
+          text: 'text-red-700', 
+          border: 'border-red-200/60', 
+          prefix: 'Overdue' 
+        }
+      : materialInfo.isDueSoon 
+      ? { 
+          gradient: 'bg-gradient-to-r from-orange-100 to-amber-100', 
+          text: 'text-orange-700', 
+          border: 'border-orange-200/60', 
+          prefix: 'Due' 
+        }
+      : { 
+          gradient: 'bg-gradient-to-r from-gray-100 to-slate-100', 
+          text: 'text-gray-700', 
+          border: 'border-gray-200/60', 
+          prefix: 'Due' 
+        };
+    
     return (
-      <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex items-center ${badgeColor}`}>
-        <CalendarDaysIcon className="h-3.5 w-3.5 mr-1"/> {prefix}{formatDueDate(lesson.due_date)}
+      <span className={`inline-flex items-center text-xs font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border shadow-sm ${badgeConfig.gradient} ${badgeConfig.text} ${badgeConfig.border}`}>
+        <CalendarDaysIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5 flex-shrink-0" />
+        <span className="hidden sm:inline">{badgeConfig.prefix}: {formatDueDate(lesson.due_date)}</span>
+        <span className="sm:hidden">{formatDueDate(lesson.due_date)}</span>
       </span>
     );
   }
@@ -123,9 +157,11 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
     onOpenEditModal(lesson);
   }, [lesson, onOpenEditModal]);
 
-  const itemBaseClasses = "flex items-center group rounded-lg transition-all duration-150";
-  const itemPadding = isCompact ? "px-2 py-1.5" : "p-3";
-  const itemStateClasses = materialInfo.isCompleted ? "bg-green-50/50 hover:bg-green-50" : "bg-white hover:bg-gray-50";
+  const itemBaseClasses = "flex items-center group rounded-lg transition-all duration-200 hover:shadow-sm";
+  const itemPadding = isCompact ? "px-2 sm:px-3 py-1.5 sm:py-2" : "p-3 sm:p-4";
+  const itemStateClasses = materialInfo.isCompleted 
+    ? "bg-gradient-to-r from-green-50/80 to-emerald-50/50 border border-green-200/60 hover:from-green-50 hover:to-emerald-50" 
+    : "bg-white border border-gray-200/60 hover:border-gray-300/80 hover:bg-gray-50/50";
 
   return (
     <li className={`${itemBaseClasses} ${itemPadding} ${itemStateClasses}`}>
@@ -135,19 +171,29 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
         onClick={handleToggle}
         disabled={isToggling}
       />
-      <div className="flex-grow flex items-center justify-between min-w-0" onClick={handleEditClick} role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleEditClick()}>
+      <div className="flex-grow flex items-center justify-between min-w-0 cursor-pointer" onClick={handleEditClick} role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleEditClick()}>
         <div className="flex-grow min-w-0">
-          <p className={`truncate font-medium text-sm ${materialInfo.isCompleted ? 'line-through text-text-tertiary' : 'text-text-primary'}`} title={lesson.title}>{lesson.title}</p>
-          {!isCompact && <p className="text-xs text-text-secondary capitalize">{formatContentType(lesson.content_type)}</p>}
+          <p className={`truncate font-semibold text-sm sm:text-base transition-colors ${materialInfo.isCompleted ? 'line-through text-gray-500' : 'text-gray-900 group-hover:text-blue-700'}`} title={lesson.title}>
+            {lesson.title}
+          </p>
+          {!isCompact && (
+            <p className="text-xs text-gray-600 capitalize mt-0.5 font-medium truncate">
+              {formatContentType(lesson.content_type)}
+            </p>
+          )}
         </div>
-        <div className="flex items-center space-x-3 ml-2 flex-shrink-0">
+        <div className="flex items-center space-x-2 sm:space-x-3 ml-2 sm:ml-3 flex-shrink-0">
           <StatusBadge lesson={lesson} materialInfo={materialInfo} />
-          <button onClick={handleEditClick} className="p-1 text-text-tertiary hover:text-accent-blue opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-md" title="Edit Material">
+          <button 
+            onClick={handleEditClick} 
+            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-200 rounded-lg" 
+            title="Edit Material"
+          >
             <PencilSquareIcon className="h-4 w-4" />
           </button>
         </div>
       </div>
-       {error && <p className="text-xs text-red-500 text-center w-full mt-1">{error}</p>}
+      {error && <p className="text-xs text-red-500 text-center w-full mt-2 px-2">{error}</p>}
     </li>
   );
 }

@@ -40,7 +40,6 @@ export function useChildrenData(session) {
       };
       localStorage.setItem(getStorageKey(childId, 'data'), JSON.stringify(storageData));
     } catch (error) {
-      console.warn('Failed to save dashboard data to localStorage:', error);
     }
   }, []);
   
@@ -62,7 +61,6 @@ export function useChildrenData(session) {
       
       return data;
     } catch (error) {
-      console.warn('Failed to load dashboard data from localStorage:', error);
       return null;
     }
   }, [CACHE_EXPIRY_MS]);
@@ -83,7 +81,6 @@ export function useChildrenData(session) {
       
       // Auto-select first child if none selected (handled in separate useEffect)
     } catch (error) {
-      console.error('Error fetching children:', error);
       setChildren([]);
     } finally {
       setLoadingInitial(false);
@@ -105,7 +102,6 @@ export function useChildrenData(session) {
     if (!forceRefresh) {
       const storedData = loadFromStorage(selectedChild.id);
       if (storedData) {
-        console.log(`Loaded data from localStorage for child ${selectedChild.id}`);
         
         // Apply stored data
         setChildSubjects(prev => ({ ...prev, [selectedChild.id]: storedData.subjects || [] }));
@@ -124,7 +120,6 @@ export function useChildrenData(session) {
     
     // Check if we have fresh cached data and don't need to refetch
     if (!forceRefresh && isCacheValid(selectedChild.id) && childDataCache[selectedChild.id]) {
-      console.log(`Using cached data for child ${selectedChild.id}`);
       return;
     }
     
@@ -164,7 +159,6 @@ export function useChildrenData(session) {
               const lessonsRes = await api.get(`/lesson-containers/unit/${unit.id}`);
               return { unitId: unit.id, lessons: lessonsRes.data || [] };
             } catch (err) {
-              console.error(`Error fetching lessons for unit ${unit.id}:`, err);
               return { unitId: unit.id, lessons: [] };
             }
           });
@@ -187,7 +181,6 @@ export function useChildrenData(session) {
           };
           
         } catch (err) {
-          console.error(`Error fetching data for subject ${subject.name}:`, err);
           return {
             subjectId: subject.child_subject_id,
             subjectName: subject.name,
@@ -237,7 +230,6 @@ export function useChildrenData(session) {
       setLastFetchTime(prev => ({ ...prev, [selectedChild.id]: Date.now() }));
       
     } catch (error) {
-      console.error("Error refreshing child data:", error);
     } finally {
       setLoadingChildData(false);
     }
@@ -291,7 +283,6 @@ export function useChildrenData(session) {
       try {
         localStorage.removeItem(getStorageKey(childId, 'data'));
       } catch (error) {
-        console.warn('Failed to clear localStorage for child:', childId, error);
       }
     }
   }, []);

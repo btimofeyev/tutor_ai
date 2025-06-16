@@ -26,7 +26,6 @@ export default function SubscriptionManager({
       const response = await api.get('/stripe/subscription-status');
       setSubscription(response.data.subscription);
     } catch (error) {
-      console.error('SubscriptionManager: Error fetching subscription:', error);
       setSubscription(null);
     } finally {
       setLoading(false);
@@ -56,7 +55,6 @@ export default function SubscriptionManager({
       });
       window.location.href = response.data.checkout_url;
     } catch (error) {
-      console.error('Error creating checkout session:', error);
       alert('Failed to start upgrade process. Please try again.');
     } finally {
       // Set upgrading to false only if not redirecting or on error
@@ -71,7 +69,6 @@ export default function SubscriptionManager({
       const response = await api.post('/stripe/create-portal-session');
       window.location.href = response.data.portal_url;
     } catch (error) {
-      console.error('Error creating portal session:', error);
       alert('Failed to access subscription management. Please try again.');
     }
   };

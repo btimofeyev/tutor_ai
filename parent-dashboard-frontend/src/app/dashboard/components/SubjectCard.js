@@ -101,7 +101,7 @@ export default function SubjectCard({
                     className="w-full px-4 py-3 flex items-center text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
                     onClick={() => toggleLessonContainerExpansion(lessonContainer.id)}
                 >
-                    <ListBulletIcon className="h-4 w-4 mr-3 text-gray-500 flex-shrink-0" />
+                    <ListBulletIcon className="h-4 w-4 mr-3 sm:mr-4 text-gray-500 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                         <span className="text-sm font-semibold text-gray-700">{lessonContainer.title}</span>
                         <span className="ml-2 text-xs text-gray-500 font-normal">({materials.length})</span>
@@ -143,7 +143,7 @@ export default function SubjectCard({
                     onClick={() => toggleUnitExpansion(unit.id)}
                 >
                     {/* CUSTOM ICON: This uses the Next.js Image component. Added rounded-md to soften the background edges. */}
-                    <Image src="/icons/folder_icon.png" alt="Folder" width={24} height={24} className="mr-4 flex-shrink-0 rounded-md" />
+                    <Image src="/icons/folder_icon.png" alt="Folder" width={24} height={24} className="mr-4 sm:mr-5 flex-shrink-0 rounded-md" />
                     <div className="flex-1 min-w-0">
                         <h4 className="text-base font-semibold text-gray-900">{unit.name}</h4>
                         <p className="text-sm text-gray-500">{lessonContainersInUnit.length} groups • {allUnitMaterialsCount} items</p>
@@ -213,7 +213,7 @@ export default function SubjectCard({
                                 className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 title="Manage Units & Lesson Groups"
                             >
-                                <PlusCircleIcon className="h-5 w-5 mr-2" />
+                                <PlusCircleIcon className="h-5 w-5 mr-2 sm:mr-2.5" />
                                 Units
                             </button>
                             <Link
@@ -221,7 +221,7 @@ export default function SubjectCard({
                                 className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 title="Subject Settings & Weights"
                             >
-                                <AdjustmentsHorizontalIcon className="h-5 w-5 mr-2" />
+                                <AdjustmentsHorizontalIcon className="h-5 w-5 mr-2 sm:mr-2.5" />
                                 Weights
                             </Link>
                         </div>
@@ -234,7 +234,7 @@ export default function SubjectCard({
                 {upcomingDueItems.length > 0 && (
                     <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-orange-200">
                         <h4 className="text-sm font-semibold text-orange-800 mb-3 flex items-center">
-                            <ClockIcon className="h-4 w-4 mr-2" />
+                            <ClockIcon className="h-4 w-4 mr-2 sm:mr-3" />
                             Upcoming Deadlines
                         </h4>
                         <ul className="space-y-2">

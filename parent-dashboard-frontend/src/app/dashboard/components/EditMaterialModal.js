@@ -22,7 +22,7 @@ export default function EditMaterialModal({
       const currentJson = JSON.parse(editForm.lesson_json_string || '{}');
       currentJson[fieldName] = e.target.value;
       onFormChange({ target: { name: 'lesson_json_string', value: JSON.stringify(currentJson, null, 2) } });
-    } catch (error) { console.error("Error updating field in JSON string", error); }
+    } catch (error) { }
   };
 
   const handleJsonArrayFieldChangeInModal = (e, fieldName) => {
@@ -31,7 +31,7 @@ export default function EditMaterialModal({
       const currentJson = JSON.parse(editForm.lesson_json_string || '{}');
       currentJson[fieldName] = newArray;
       onFormChange({ target: { name: 'lesson_json_string', value: JSON.stringify(currentJson, null, 2) } });
-    } catch (error) { console.error("Error updating array field in JSON string", error); }
+    } catch (error) { }
   };
 
   return (

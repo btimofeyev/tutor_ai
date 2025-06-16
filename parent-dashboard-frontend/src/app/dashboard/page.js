@@ -259,7 +259,6 @@ export default function DashboardPage() {
       
       window.location.href = response.data.checkout_url;
     } catch (error) {
-      console.error('Error creating checkout session:', error);
       alert('Failed to start upgrade process. Please try again.');
       setUpgrading(false);
     }
@@ -307,7 +306,6 @@ export default function DashboardPage() {
       }
       
       if (result.syncedEntries > 0) {
-        console.log(`✅ Lesson completion synced with ${result.syncedEntries} schedule entry(s)`);
       }
     }
   };
@@ -317,7 +315,6 @@ export default function DashboardPage() {
     
     setIsSubmittingGrade(true);
     try {
-      console.log(`🎯 Submitting grade ${gradeValue} for lesson ${gradingLesson.id}`);
       
       // Invalidate cache before the API call to ensure fresh data
       if (childrenData.selectedChild?.id) {
@@ -325,10 +322,8 @@ export default function DashboardPage() {
       }
       
       const result = await materialManagement.toggleLessonCompletion(gradingLesson.id, true, gradeValue);
-      console.log(`📊 Grade submission result:`, result);
       
       if (result.success) {
-        console.log(`✅ Grade submitted successfully, refreshing data...`);
         
         // Small delay to ensure backend processing is complete
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -336,20 +331,16 @@ export default function DashboardPage() {
         // Force refresh the child data to update the UI immediately
         if (childrenData.selectedChild?.id) {
           await childrenData.refreshChildSpecificData(true);
-          console.log(`🔄 Data refreshed for child ${childrenData.selectedChild.id}`);
         }
         
         setShowGradeModal(false);
         setGradingLesson(null);
         if (result.syncedEntries > 0) {
-          console.log(`✅ Lesson completion synced with ${result.syncedEntries} schedule entry(s)`);
-        }
+          }
       } else {
-        console.error(`❌ Grade submission failed:`, result.error);
         alert(result.error || "Could not update grade and completion status.");
       }
     } catch (error) {
-      console.error(`❌ Grade submission error:`, error);
       alert("Failed to save grade. Please try again.");
     } finally {
       setIsSubmittingGrade(false);
@@ -447,7 +438,7 @@ export default function DashboardPage() {
       return { success: true, data: response.data };
   
     } catch (error) {
-      console.error('Failed to create unit:', error.response?.data || error.message); 
+ 
       return { success: false, error: error.response?.data?.error || error.message };
     }
   };
@@ -483,7 +474,7 @@ export default function DashboardPage() {
       return { success: true, data: response.data };
   
     } catch (error) {
-      console.error('Failed to create lesson container:', error.response?.data || error.message); 
+ 
       return { success: false, error: error.response?.data?.error || error.message };
     }
   };

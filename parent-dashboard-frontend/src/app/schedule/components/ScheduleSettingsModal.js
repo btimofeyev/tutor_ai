@@ -116,7 +116,6 @@ export default function ScheduleSettingsModal({
       await onSave(formData);
       onClose();
     } catch (error) {
-      console.error('Error saving schedule preferences:', error);
       setErrors({ submit: 'Failed to save preferences. Please try again.' });
     }
   };

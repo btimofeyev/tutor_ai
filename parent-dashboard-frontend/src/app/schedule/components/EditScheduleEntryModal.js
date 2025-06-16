@@ -136,7 +136,6 @@ export default function EditScheduleEntryModal({
       await onSave(scheduleEntry.id, formData);
       onClose();
     } catch (error) {
-      console.error('Error updating schedule entry:', error);
       setErrors({ submit: 'Failed to update schedule entry. Please try again.' });
     }
   };
@@ -147,7 +146,6 @@ export default function EditScheduleEntryModal({
       await onDelete(scheduleEntry.id);
       onClose();
     } catch (error) {
-      console.error('Error deleting schedule entry:', error);
       setErrors({ submit: 'Failed to delete schedule entry. Please try again.' });
     }
   };

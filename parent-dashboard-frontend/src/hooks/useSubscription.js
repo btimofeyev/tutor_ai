@@ -11,10 +11,8 @@ export function useSubscription() {
     setLoading(true);
     try {
       const response = await api.get('/stripe/subscription-status');
-      console.log('useSubscription: Fetched subscription status from API:', response.data);
       setSubscription(response.data.subscription);
     } catch (error) {
-      console.error('useSubscription: Error fetching subscription:', error);
       setSubscription(null);
     } finally {
       setLoading(false);
@@ -27,7 +25,6 @@ export function useSubscription() {
       const response = await api.get('/children');
       setChildren(response.data || []);
     } catch (error) {
-      console.error('useSubscription: Error fetching children:', error);
     }
   }, []); // Empty dependency array for useCallback
 

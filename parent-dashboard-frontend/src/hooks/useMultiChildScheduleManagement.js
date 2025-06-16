@@ -27,7 +27,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     try {
       const promises = childrenIds.map(childId => 
         api.get(`/schedule/${childId}`).catch(err => {
-          console.error(`Error fetching schedule for child ${childId}:`, err);
           return { data: [] }; // Return empty data on error
         })
       );
@@ -43,9 +42,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
       setAllScheduleEntries(entriesByChild);
       setError(null);
     } catch (err) {
-      console.error('Error fetching multiple children schedules:', err);
       // Keep existing entries if API fails
-      console.log('API unavailable, keeping existing local entries');
       setError(null);
     } finally {
       setLoading(false);
@@ -112,7 +109,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         setError(null);
         return { success: true, data: response.data };
       } catch (apiError) {
-        console.log('API not available, saving to local state:', apiError.message);
         
         // Create a local entry if API fails
         const localEntry = {
@@ -139,7 +135,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         return { success: true, data: localEntry };
       }
     } catch (err) {
-      console.error('Error creating schedule entry:', err);
       const errorMessage = 'Failed to create schedule entry';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -167,7 +162,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         setError(null);
         return { success: true, data: response.data };
       } catch (apiError) {
-        console.log('API not available, updating local state:', apiError.message);
         
         // Update local entry if API fails
         setAllScheduleEntries(prev => ({
@@ -187,7 +181,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         return { success: true };
       }
     } catch (err) {
-      console.error('Error updating schedule entry:', err);
       const errorMessage = 'Failed to update schedule entry';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -213,7 +206,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         setError(null);
         return { success: true };
       } catch (apiError) {
-        console.log('API not available, deleting from local state:', apiError.message);
         
         // Remove from local state if API fails
         setAllScheduleEntries(prev => ({
@@ -224,7 +216,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         return { success: true };
       }
     } catch (err) {
-      console.error('Error deleting schedule entry:', err);
       const errorMessage = 'Failed to delete schedule entry';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -242,7 +233,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
 
     try {
       setAiScheduling(true);
-      console.log('Starting multi-child AI schedule generation with parameters:', parameters);
       
       // Generate schedule for each child individually using existing endpoint
       const allScheduleResults = {};
@@ -250,7 +240,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
       
       for (const childId of parameters.selected_children || selectedChildrenIds) {
         try {
-          console.log(`Generating AI schedule for child ${childId}`);
           
           const requestData = {
             child_id: childId,
@@ -264,7 +253,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           };
           
           const response = await api.post('/schedule/ai-generate', requestData);
-          console.log(`AI schedule response for child ${childId}:`, response.data);
           
           allScheduleResults[childId] = response.data;
           
@@ -278,7 +266,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
             combinedSuggestions.push(...childSuggestions);
           }
         } catch (childError) {
-          console.error(`Error generating schedule for child ${childId}:`, childError);
           // Continue with other children even if one fails
         }
       }
@@ -296,8 +283,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
       setError(null);
       return { success: true, data: combinedResults };
     } catch (err) {
-      console.error('Error generating multi-child AI schedule:', err);
-      console.error('Error details:', err.response?.data);
       const errorMessage = err.response?.data?.error || 'Failed to generate AI schedule';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -355,7 +340,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         
         return { success: true, data: allNewEntries };
       } catch (apiError) {
-        console.log('API not available, saving AI schedule to local state:', apiError.message);
         
         // Create local entries if API fails
         const allLocalEntries = {};
@@ -395,7 +379,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         return { success: true, data: allLocalEntries };
       }
     } catch (err) {
-      console.error('Error applying AI schedule:', err);
       const errorMessage = 'Failed to apply AI schedule';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -410,7 +393,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     
     // Show success message if materials were synced
     if (result.success && result.data?.synced_materials > 0) {
-      console.log(`Schedule entry completed and synced with ${result.data.synced_materials} material(s)`);
     }
     
     return result;

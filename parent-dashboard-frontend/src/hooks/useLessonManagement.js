@@ -39,7 +39,6 @@ export function useLessonManagement(refreshChildData) {
       setLessonTitleForApproval(response.data?.extracted_json?.title || "");
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('Upload error:', error);
       return { 
         success: false, 
         error: error.response?.data?.error || "Upload failed" 
@@ -87,7 +86,6 @@ export function useLessonManagement(refreshChildData) {
       
       return { success: true };
     } catch (error) {
-      console.error('Save lesson error:', error);
       return { 
         success: false, 
         error: error.response?.data?.error || "Failed to save lesson" 
@@ -151,7 +149,6 @@ export function useLessonManagement(refreshChildData) {
       
       return { success: true };
     } catch (error) {
-      console.error('Edit lesson error:', error);
       return { 
         success: false, 
         error: error.response?.data?.error || "Failed to update lesson" 
@@ -170,7 +167,6 @@ export function useLessonManagement(refreshChildData) {
       }
       return { success: true };
     } catch (error) {
-      console.error('Toggle completion error:', error);
       return { 
         success: false, 
         error: error.response?.data?.error || "Failed to toggle completion" 
@@ -187,7 +183,6 @@ export function useLessonManagement(refreshChildData) {
       }
       return { success: true };
     } catch (error) {
-      console.error('Delete lesson error:', error);
       return { 
         success: false, 
         error: error.response?.data?.error || "Failed to delete lesson" 

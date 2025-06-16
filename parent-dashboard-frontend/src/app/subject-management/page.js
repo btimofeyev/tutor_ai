@@ -27,7 +27,7 @@ export default function SubjectsPage() {
     setLoadingAllSubjects(true);
     api.get('/subjects')
       .then(res => setAllSubjects(res.data || []))
-      .catch(err => console.error("Failed to fetch all subjects", err))
+      .catch(err => {})
       .finally(() => setLoadingAllSubjects(false));
   };
 
@@ -35,7 +35,7 @@ export default function SubjectsPage() {
     setLoadingChildren(true);
     api.get('/children')
       .then(res => setChildren(res.data || []))
-      .catch(err => console.error("Failed to fetch children", err))
+      .catch(err => {})
       .finally(() => setLoadingChildren(false));
     
     fetchAllSubjects(); // Initial fetch
@@ -51,7 +51,6 @@ export default function SubjectsPage() {
       api.get(`/child-subjects/child/${selectedChild}`)
         .then(res => setAssignedChildSubjects(res.data || []))
         .catch(err => {
-            console.error("Failed to fetch assigned subjects", err);
             setAssignedChildSubjects([]);
         })
         .finally(() => setLoadingAssigned(false));
@@ -75,7 +74,6 @@ export default function SubjectsPage() {
       const res = await api.get(`/child-subjects/child/${selectedChild}`);
       setAssignedChildSubjects(res.data || []);
     } catch (error) {
-      console.error("Failed to assign subject:", error);
       alert(error.response?.data?.error || "Could not assign subject.");
     } finally {
       setProcessingAction(false);
@@ -100,7 +98,6 @@ export default function SubjectsPage() {
       const res = await api.get(`/child-subjects/child/${selectedChild}`);
       setAssignedChildSubjects(res.data || []);
     } catch (error) {
-      console.error("Failed to unassign subject:", error);
       alert(error.response?.data?.error || "Could not unassign subject.");
     } finally {
       setProcessingAction(false);
@@ -128,7 +125,6 @@ export default function SubjectsPage() {
       fetchAllSubjects(); // Re-fetch all subjects to include the new one
       alert(`Subject "${newSubjectName.trim()}" created successfully!`);
     } catch (error) {
-      console.error("Failed to create subject:", error);
       alert(error.response?.data?.error || "Could not create subject.");
     } finally {
       setCreatingSubject(false);

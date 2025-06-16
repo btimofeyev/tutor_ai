@@ -27,7 +27,7 @@
   --border-input: #d1d5db;
   --border-input-focus: var(--accent-blue-darker-for-border);
 
-  --messageTextDanger: '#ef4444';
+  --messageTextDanger: #ef4444;
 
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
@@ -261,10 +261,3 @@ button {
   text-align: inherit;
 }
 
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(5px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0px) scale(1); }
-}
-.animate-fade-in {
-  animation: fade-in 0.3s ease-out;
-}

@@ -39,7 +39,7 @@ const formatDueDate = (dateString) => {
 const CompletionToggle = React.memo(({ isCompleted, isToggling, onClick, disabled }) => (
   <button
     onClick={disabled ? undefined : onClick}
-    className={`mr-3 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0
+    className={`mr-3 sm:mr-4 p-2 sm:p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0
       ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
     `}
     title={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
@@ -126,7 +126,7 @@ const StatusBadge = ({ lesson, materialInfo }) => {
     
     return (
       <span className={`inline-flex items-center text-xs font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border shadow-sm ${badgeConfig.gradient} ${badgeConfig.text} ${badgeConfig.border}`}>
-        <CalendarDaysIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5 flex-shrink-0" />
+        <CalendarDaysIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1.5 sm:mr-2 flex-shrink-0" />
         <span className="hidden sm:inline">{badgeConfig.prefix}: {formatDueDate(lesson.due_date)}</span>
         <span className="sm:hidden">{formatDueDate(lesson.due_date)}</span>
       </span>
@@ -160,7 +160,6 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
       await onToggleComplete(lesson.id, !lesson.completed_at);
     } catch (err) {
       setError('Failed to update.');
-      console.error('Toggle error:', err);
     } finally {
       setIsToggling(false);
     }
@@ -200,7 +199,7 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
           <StatusBadge lesson={lesson} materialInfo={materialInfo} />
           <button 
             onClick={handleEditClick} 
-            className="p-1.5 text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+            className="p-2 sm:p-2.5 text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
             title="Edit Material"
           >
             <PencilSquareIcon className="h-4 w-4" />

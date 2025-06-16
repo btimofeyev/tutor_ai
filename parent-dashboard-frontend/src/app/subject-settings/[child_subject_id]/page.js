@@ -43,7 +43,6 @@ export default function SubjectSettingsPage() {
                 setSubjectName(csDetailsRes.data?.subject_name || 'Subject');
                 setChildName(csDetailsRes.data?.child_name || 'Student');
             } catch (detailsError) {
-                console.warn("Could not fetch subject/child details for context", detailsError);
                 setSubjectName('Selected Subject'); // Fallback
             }
             
@@ -58,7 +57,6 @@ export default function SubjectSettingsPage() {
             setWeights(initialWeights);
 
         } catch (err) {
-            console.error("Failed to fetch weights", err);
             setError(err.response?.data?.error || "Failed to load weight settings.");
         } finally {
             setLoading(false);
@@ -107,7 +105,6 @@ export default function SubjectSettingsPage() {
             alert('Weights saved successfully!');
             router.push('/dashboard'); // Or back to where they came from
         } catch (err) {
-            console.error("Failed to save weights", err);
             setError(err.response?.data?.error || "Failed to save weights.");
         } finally {
             setSaving(false);

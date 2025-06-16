@@ -76,7 +76,6 @@ export default function AddMaterialTabs(props) {
           }));
         }
       } catch (error) {
-        console.error('Error fetching lesson containers for unit:', error);
         if (setLessonsByUnit) {
           setLessonsByUnit(prev => ({
             ...prev,

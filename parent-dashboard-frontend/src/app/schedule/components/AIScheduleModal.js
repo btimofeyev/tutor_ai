@@ -163,7 +163,6 @@ export default function AIScheduleModal({
         });
       }
     } catch (error) {
-      console.error('Error generating AI schedule:', error);
       setErrors({ submit: 'Failed to generate AI schedule. Please try again.' });
     }
   };
@@ -178,7 +177,6 @@ export default function AIScheduleModal({
       await onApplySchedule(aiScheduleResults.suggestions);
       onClose(); // Close modal after successful application
     } catch (error) {
-      console.error('Error applying AI schedule:', error);
       setErrors({ submit: 'Failed to apply AI schedule. Please try again.' });
     }
   };

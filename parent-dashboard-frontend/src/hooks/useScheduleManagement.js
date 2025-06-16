@@ -30,11 +30,9 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
       setScheduleEntries(response.data || []);
       setError(null);
     } catch (err) {
-      console.error('Error fetching schedule entries:', err);
       
       // Don't clear existing entries if API fails - keep local state
       // This prevents losing locally created entries when the API is unavailable
-      console.log('API unavailable, keeping existing local entries');
       
       // Only clear error for now, don't show scary messages
       setError(null);
@@ -51,7 +49,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
       const response = await api.get(`/schedule/preferences/${childId}`);
       setSchedulePreferences(response.data);
     } catch (err) {
-      console.error('Error fetching schedule preferences:', err);
       // Set default preferences if API fails (database not set up yet)
       setSchedulePreferences({
         preferred_start_time: '09:00',
@@ -81,7 +78,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
         setError(null);
         return { success: true, data: response.data };
       } catch (apiError) {
-        console.log('API not available, saving to local state:', apiError.message);
         
         // Create a local entry if API fails
         const localEntry = {
@@ -105,7 +101,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
         return { success: true, data: localEntry };
       }
     } catch (err) {
-      console.error('Error creating schedule entry:', err);
       const errorMessage = 'Failed to create schedule entry';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -130,7 +125,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
         setError(null);
         return { success: true, data: response.data };
       } catch (apiError) {
-        console.log('API not available, updating local state:', apiError.message);
         
         // Update local entry if API fails
         setScheduleEntries(prev => 
@@ -149,7 +143,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
         return { success: true };
       }
     } catch (err) {
-      console.error('Error updating schedule entry:', err);
       const errorMessage = 'Failed to update schedule entry';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -172,7 +165,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
         setError(null);
         return { success: true };
       } catch (apiError) {
-        console.log('API not available, deleting from local state:', apiError.message);
         
         // Remove from local state if API fails
         setScheduleEntries(prev => prev.filter(entry => entry.id !== entryId));
@@ -180,7 +172,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
         return { success: true };
       }
     } catch (err) {
-      console.error('Error deleting schedule entry:', err);
       const errorMessage = 'Failed to delete schedule entry';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -198,7 +189,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
       setError(null);
       return { success: true, data: response.data };
     } catch (err) {
-      console.error('Error updating schedule preferences:', err);
       const errorMessage = err.response?.data?.error || 'Failed to update preferences';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -216,24 +206,18 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
 
     try {
       setAiScheduling(true);
-      console.log('Starting AI schedule generation with parameters:', parameters);
-      console.log('Child ID:', childId);
       
       const requestData = {
         child_id: childId,
         ...parameters
       };
-      console.log('Request data:', requestData);
       
       const response = await api.post('/schedule/ai-generate', requestData);
-      console.log('AI schedule response:', response.data);
       
       setAiScheduleResults(response.data);
       setError(null);
       return { success: true, data: response.data };
     } catch (err) {
-      console.error('Error generating AI schedule:', err);
-      console.error('Error details:', err.response?.data);
       const errorMessage = err.response?.data?.error || 'Failed to generate AI schedule';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -264,7 +248,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
         
         return { success: true, data: newEntries };
       } catch (apiError) {
-        console.log('API not available, saving AI schedule to local state:', apiError.message);
         
         // Create local entries if API fails
         const localEntries = scheduleData.map((entry, index) => ({
@@ -290,7 +273,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
         return { success: true, data: localEntries };
       }
     } catch (err) {
-      console.error('Error applying AI schedule:', err);
       const errorMessage = 'Failed to apply AI schedule';
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -329,7 +311,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     
     // Show success message if materials were synced
     if (result.success && result.data?.synced_materials > 0) {
-      console.log(`Schedule entry completed and synced with ${result.data.synced_materials} material(s)`);
     }
     
     return result;

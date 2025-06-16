@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useSubscription } from '../hooks/useSubscription';
 import UpgradePrompt from './UpgradePrompt';
+import Button from './ui/Button';
 import api from '../utils/api';
 
 export default function FeatureGate({ 
@@ -45,7 +46,6 @@ export default function FeatureGate({
       
       window.location.href = response.data.checkout_url;
     } catch (error) {
-      console.error('Error creating checkout session:', error);
       alert('Failed to start upgrade process. Please try again.');
       setUpgrading(false);
     }
@@ -88,70 +88,3 @@ export default function FeatureGate({
 
   return null;
 }
-
-// ================================================================
-
-// Example usage in dashboard components:
-
-// In AddMaterialForm.js:
-import FeatureGate from '../../../components/FeatureGate';
-import { useSubscription } from '../../../hooks/useSubscription';
-
-export default function AddMaterialForm(props) {
-  const { permissions, enforceAIAccess } = useSubscription();
-
-  const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      // Check material limit before submitting
-      if (props.currentMaterialCount >= permissions.maxMaterialsPerChild) {
-        throw new Error(`Material limit reached: ${permissions.maxMaterialsPerChild} maximum per child`);
-      }
-
-      // Rest of form submission logic...
-      await props.onFormSubmit(e);
-    } catch (error) {
-      if (error.message.includes('Material limit reached')) {
-        // Show upgrade prompt for materials
-        alert(`${error.message}\n\nUpgrade your plan for more storage.`);
-      } else {
-        alert(error.message);
-      }
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Material limit warning */}
-      {props.currentMaterialCount >= permissions.maxMaterialsPerChild * 0.8 && (
-        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-          <p className="text-sm text-yellow-800">
-            You're approaching your material limit ({props.currentMaterialCount}/{permissions.maxMaterialsPerChild}).
-            <Button as="link" href="/pricing" variant="ghost" size="sm" className="ml-2">
-              Upgrade for more storage
-            </Button>
-          </p>
-        </div>
-      )}
-
-      {/* Rest of your form */}
-      <form onSubmit={handleFormSubmit}>
-        {/* Your existing form content */}
-      </form>
-    </div>
-  );
-}
-
-// In StudentSidebar.js - Child login settings:
-<FeatureGate feature="childLogin">
-  <Button
-    variant="ghost"
-    size="sm"
-    onClick={(e) => { e.stopPropagation(); onOpenChildLoginSettings(child);}}
-    className="..."
-    title={`Login settings for ${child.name}`}
-  >
-    <Cog6ToothIcon className="h-4 w-4" />
-  </Button>
-</FeatureGate>

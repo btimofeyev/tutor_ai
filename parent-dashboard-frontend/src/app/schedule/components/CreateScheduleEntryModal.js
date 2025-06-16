@@ -188,7 +188,6 @@ export default function CreateScheduleEntryModal({
       await onSave(formData, targetChildId);
       onClose();
     } catch (error) {
-      console.error('Error saving schedule entry:', error);
       setErrors({ submit: 'Failed to save schedule entry. Please try again.' });
     }
   };

@@ -57,7 +57,7 @@ export function useLessonManagement(refreshChildData) {
       ...lessonJsonForApproval,
       title: lessonTitleForApproval,
       content_type: lessonContentTypeForApproval,
-      max_points: lessonMaxPointsForApproval || null,
+      grade_max_value: lessonMaxPointsForApproval || null,
       due_date: lessonDueDateForApproval || null,
       completed_at: lessonCompletedForApproval ? new Date().toISOString() : null,
     };
@@ -119,9 +119,9 @@ export function useLessonManagement(refreshChildData) {
     setEditForm({
       title: lesson.title || "",
       content_type: lesson.content_type || APP_CONTENT_TYPES[0],
-      max_points: lesson.max_points || "",
+      max_points: lesson.grade_max_value || "",
       due_date: lesson.due_date || "",
-      grade: lesson.grade || "",
+      grade: lesson.grade_value || "",
     });
   }, []);
 

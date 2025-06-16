@@ -98,9 +98,9 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
       });
       
       const gradableItems = subjectLessons.filter(lesson => 
-        lesson.grade !== null && 
-        lesson.max_points !== null && 
-        lesson.max_points > 0
+        lesson.grade_value !== null && 
+        lesson.grade_max_value !== null && 
+        lesson.grade_max_value > 0
       );
       
       totalGradableItems += gradableItems.length;
@@ -108,7 +108,7 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
       gradableItems.forEach(lesson => {
         const weight = subjectWeights.find(w => w.content_type === lesson.content_type)?.weight || 0;
         if (weight > 0) {
-          const percentage = (lesson.grade / lesson.max_points) * 100;
+          const percentage = (lesson.grade_value / lesson.grade_max_value) * 100;
           totalWeightedScore += percentage * weight;
           totalWeight += weight;
         }

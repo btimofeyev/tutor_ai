@@ -148,7 +148,7 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
     try {
       const payload = { is_complete: isComplete };
       if (gradeValue !== null) {
-        payload.grade_value = gradeValue;
+        payload.grade = gradeValue;
       }
       
       const response = await api.put(`/materials/${materialId}/toggle-complete`, payload);

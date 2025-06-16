@@ -56,7 +56,7 @@ export const validateLessonData = (lessonData) => {
     errors.push("Content type is required");
   }
   
-  if (lessonData.max_points && isNaN(Number(lessonData.max_points))) {
+  if (lessonData.grade_max_value && isNaN(Number(lessonData.grade_max_value))) {
     errors.push("Max points must be a valid number");
   }
   
@@ -73,9 +73,9 @@ export const calculateGradeStats = (lessons, weights) => {
   if (!lessons || lessons.length === 0) return { avgGradePercent: 0, gradableItemsCount: 0 };
   
   const gradableItems = lessons.filter(lesson => 
-    lesson.grade !== null && 
-    lesson.max_points !== null && 
-    lesson.max_points > 0
+    lesson.grade_value !== null && 
+    lesson.grade_max_value !== null && 
+    lesson.grade_max_value > 0
   );
   
   if (gradableItems.length === 0) return { avgGradePercent: 0, gradableItemsCount: 0 };
@@ -86,7 +86,7 @@ export const calculateGradeStats = (lessons, weights) => {
   gradableItems.forEach(lesson => {
     const weight = weights.find(w => w.content_type === lesson.content_type)?.weight || 0;
     if (weight > 0) {
-      const percentage = (lesson.grade / lesson.max_points) * 100;
+      const percentage = (lesson.grade_value / lesson.grade_max_value) * 100;
       totalWeightedScore += percentage * weight;
       totalWeight += weight;
     }

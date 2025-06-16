@@ -286,7 +286,7 @@ export default function AddMaterialForm({
             
             <div className="mt-3">
                 <label htmlFor="lesson-container-approval" className={commonLabelClasses}>
-                    Lesson Group * <span className="text-highlight-yellow">(e.g., "Week 1 Algebra")</span>
+                    Lesson Group * <span className="text-highlight-yellow">(e.g., &quot;Week 1 Algebra&quot;)</span>
                 </label>
                 <select 
                     id="lesson-container-approval" 

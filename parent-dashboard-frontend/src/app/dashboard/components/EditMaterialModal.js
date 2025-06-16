@@ -228,7 +228,7 @@ export default function EditMaterialModal({
                 className="w-full border rounded px-3 py-2 font-mono text-xs bg-gray-50"
                 placeholder="Raw JSON data..."
               ></textarea>
-              <p className="text-xs text-red-500 mt-1">⚠️ Only edit if you know what you're doing. Invalid JSON will cause errors.</p>
+              <p className="text-xs text-red-500 mt-1">⚠️ Only edit if you know what you&apos;re doing. Invalid JSON will cause errors.</p>
             </div>
           </details>
         

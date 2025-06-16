@@ -24,53 +24,49 @@ export default function StudentHeader({ selectedChild, dashboardStats }) {
   }
 
   return (
-    <div className="mb-6 p-6 bg-background-card rounded-lg shadow-sm border border-border-subtle">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-4">
-        <div className="mb-3 sm:mb-0">
-          <h1 className="text-3xl font-bold text-text-primary mb-0.5">
+    <div className="mb-4 p-4 bg-background-card rounded-lg shadow-sm border border-border-subtle">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+        <div className="mb-2 sm:mb-0">
+          <h1 className="text-2xl font-bold text-text-primary">
             {selectedChild.name}
           </h1>
           <div className="text-sm text-text-secondary">
             Grade{" "}
             {selectedChild.grade || (
               <span className="italic text-text-tertiary">N/A</span>
-            )}
+            )} • {dashboardStats.totalItems > 0
+              ? `${dashboardStats.completedItems}/${dashboardStats.totalItems} completed (${dashboardStats.overallCompletionPercent}%)`
+              : "No materials yet."}
           </div>
         </div>
 
-        <div className="flex flex-col items-start sm:items-end w-full sm:w-auto">
-          <div className="text-xs text-text-secondary mb-2 self-end">
-            {dashboardStats.totalItems > 0
-              ? `${dashboardStats.completedItems} / ${dashboardStats.totalItems} items completed (${dashboardStats.overallCompletionPercent}%)`
-              : "No materials yet."}
+        <div className="flex items-center gap-4">
+          <div className="grid grid-cols-4 gap-2 text-center">
+            {[
+              { label: "Total", value: dashboardStats.totalItems, color: "blue" },
+              { label: "Due Soon", value: dashboardStats.dueSoon, color: "orange" },
+              { label: "Overdue", value: dashboardStats.overdue, color: "red" },
+              { label: "Complete", value: `${dashboardStats.overallCompletionPercent}%`, color: "green" },
+            ].map(stat => (
+              <div key={stat.label} className={`p-2 rounded bg-${stat.color}-50`}>
+                <div className={`text-xs text-${stat.color}-600 font-medium`}>
+                  {stat.label}
+                </div>
+                <div className={`text-lg font-bold text-${stat.color}-700`}>
+                  {stat.value}
+                </div>
+              </div>
+            ))}
           </div>
 
           <Link
             href="/subject-management"
-            className="flex items-center text-xs px-3 py-1.5 bg-gray-100 text-text-secondary hover:bg-gray-200 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue focus:ring-offset-2 focus:ring-offset-background-card"
+            className="flex items-center text-xs px-3 py-2 bg-gray-100 text-text-secondary hover:bg-gray-200 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue focus:ring-offset-2 focus:ring-offset-background-card"
           >
             <BookOpenIcon className="h-4 w-4 mr-1.5" />
             Manage Subjects
           </Link>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center pt-4 border-t border-border-subtle">
-        {[
-          { label: "Total Items", value: dashboardStats.totalItems, color: "blue" },
-          { label: "Due Soon (7d)", value: dashboardStats.dueSoon, color: "orange" },
-          { label: "Overdue", value: dashboardStats.overdue, color: "red" },
-          { label: "Completion", value: `${dashboardStats.overallCompletionPercent}%`, color: "green" },
-        ].map(stat => (
-          <div key={stat.label} className={`p-3 rounded-md bg-${stat.color}-50`}>
-            <div className={`text-xs uppercase text-${stat.color}-600 tracking-wider font-semibold`}>
-              {stat.label}
-            </div>
-            <div className={`text-2xl font-bold text-${stat.color}-700 mt-1`}>
-              {stat.value}
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );

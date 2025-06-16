@@ -27,6 +27,7 @@ import AddMaterialTabs from "./components/AddMaterialTabs";
 import EditMaterialModal from "./components/EditMaterialModal";
 import ChildLoginSettingsModal from "./components/ChildLoginSettingsModal";
 import GradeInputModal from "./components/GradeInputModal";
+import QuickAccessSection from "./components/QuickAccessSection";
 import UpgradePrompt from "../../components/UpgradePrompt";
 import Button from "../../components/ui/Button";
 import { CurriculumSkeletonLoader } from "../../components/ui/SkeletonLoader";
@@ -763,6 +764,13 @@ export default function DashboardPage() {
 
         {childrenData.selectedChild && (
           <>
+            <QuickAccessSection
+              lessonsBySubject={childrenData.lessonsBySubject}
+              onToggleComplete={handleToggleLessonComplete}
+              onEdit={handleOpenEditModal}
+              maxItems={5}
+            />
+            
             <div className="my-6 card p-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div>

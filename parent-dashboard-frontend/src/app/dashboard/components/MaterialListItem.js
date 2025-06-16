@@ -58,13 +58,20 @@ const CompletionToggle = React.memo(({ isCompleted, isToggling, onClick, disable
 CompletionToggle.displayName = 'CompletionToggle';
 
 const StatusBadge = ({ lesson, materialInfo }) => {
-  if (lesson.grade_value || (lesson.grade_value === 0 && materialInfo.hasMaxScore)) {
+  // Check if this item has a grade (including grade of 0) and show it
+  const hasGrade = lesson.grade_value !== null && lesson.grade_value !== undefined && lesson.grade_value !== '';
+  if (hasGrade || (lesson.grade_value === 0 && materialInfo.hasMaxScore)) {
     return (
       <span className="font-semibold text-sm text-accent-blue" aria-label={`Grade: ${lesson.grade_value}${lesson.grade_max_value ? ` / ${lesson.grade_max_value}` : ''}`}>
         {String(lesson.grade_value)}{lesson.grade_max_value ? `/${String(lesson.grade_max_value)}` : ''}
       </span>
     );
   }
+  // For gradable items that are completed but don't have grades, show "Needs Grade"
+  if (materialInfo.isCompleted && materialInfo.isGradable && materialInfo.hasMaxScore) {
+    return <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Needs Grade</span>;
+  }
+  // For non-gradable completed items, show "Completed"
   if (materialInfo.isCompleted) {
     return <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Completed</span>;
   }
@@ -89,7 +96,7 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
     return {
       isGradable: APP_GRADABLE_CONTENT_TYPES.includes(lesson.content_type),
       hasMaxScore: lesson.grade_max_value && String(lesson.grade_max_value).trim() !== '',
-      hasGrade: lesson.grade_value != null,
+      hasGrade: lesson.grade_value !== null && lesson.grade_value !== undefined && lesson.grade_value !== '',
       isCompleted,
       isOverdue: isDateOverdue(lesson.due_date, isCompleted),
       isDueSoon: isDateDueSoon(lesson.due_date, isCompleted),

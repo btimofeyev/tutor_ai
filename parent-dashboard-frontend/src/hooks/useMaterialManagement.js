@@ -144,15 +144,27 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
     }
   }, [editingLesson, editForm, refreshChildData]);
 
-  const toggleLessonCompletion = useCallback(async (materialId, isComplete) => {
+  const toggleLessonCompletion = useCallback(async (materialId, isComplete, gradeValue = null) => {
     try {
-      const response = await api.put(`/materials/${materialId}/toggle-complete`, { is_complete: isComplete });
-      if (refreshChildData) await refreshChildData();
+      const payload = { is_complete: isComplete };
+      if (gradeValue !== null) {
+        payload.grade_value = gradeValue;
+      }
+      
+      const response = await api.put(`/materials/${materialId}/toggle-complete`, payload);
+      
+      // Force refresh to get updated data
+      if (refreshChildData) await refreshChildData(true);
+      if (invalidateChildCache) {
+        // Get child ID from the response or use a workaround
+        // For now, we'll invalidate cache in the dashboard
+      }
+      
       return { success: true, message: response.data.message || 'Status updated.', syncedEntries: response.data.synced_schedule_entries || 0 };
     } catch (error) {
       return { success: false, error: error.response?.data?.error || "Failed to toggle completion" };
     }
-  }, [refreshChildData]);
+  }, [refreshChildData, invalidateChildCache]);
 
   const deleteLesson = useCallback(async (materialId) => {
     try {

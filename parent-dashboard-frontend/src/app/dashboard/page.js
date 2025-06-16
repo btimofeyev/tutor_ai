@@ -26,6 +26,7 @@ import SubjectCard from "./components/SubjectCard";
 import AddMaterialTabs from "./components/AddMaterialTabs";
 import EditMaterialModal from "./components/EditMaterialModal";
 import ChildLoginSettingsModal from "./components/ChildLoginSettingsModal";
+import GradeInputModal from "./components/GradeInputModal";
 import UpgradePrompt from "../../components/UpgradePrompt";
 import Button from "../../components/ui/Button";
 import { CurriculumSkeletonLoader } from "../../components/ui/SkeletonLoader";
@@ -84,6 +85,11 @@ export default function DashboardPage() {
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState('');
   const [upgrading, setUpgrading] = useState(false);
+
+  // Grade input modal state
+  const [showGradeModal, setShowGradeModal] = useState(false);
+  const [gradingLesson, setGradingLesson] = useState(null);
+  const [isSubmittingGrade, setIsSubmittingGrade] = useState(false);
 
   const { assignedSubjectsForCurrentChild } = childrenData;
   const { totalStats } = filtersAndSorting;
@@ -262,12 +268,73 @@ export default function DashboardPage() {
     materialManagement.updateLessonApprovalField(fieldName, value);
   };
 
-  const handleToggleLessonComplete = async (lessonId, grade = null) => {
-    const result = await materialManagement.toggleLessonCompletion(lessonId, grade);
+  const handleToggleLessonComplete = async (lessonId, isCompleting = true) => {
+    // Find the lesson to check if it's gradable
+    const lesson = Object.values(childrenData.lessonsBySubject)
+      .flat()
+      .find(l => l.id === lessonId);
+
+    if (!lesson) {
+      alert("Could not find lesson.");
+      return;
+    }
+
+    // If marking as complete and it's a gradable assignment without a grade, show grade modal
+    const isGradable = APP_GRADABLE_CONTENT_TYPES.includes(lesson.content_type);
+    const hasMaxScore = lesson.grade_max_value && String(lesson.grade_max_value).trim() !== '';
+    const hasGrade = lesson.grade_value != null && lesson.grade_value !== '';
+
+    if (isCompleting && isGradable && hasMaxScore && !hasGrade) {
+      setGradingLesson(lesson);
+      setShowGradeModal(true);
+      return;
+    }
+
+    // For non-gradable items or items that already have grades, toggle directly
+    // Invalidate cache to ensure fresh data
+    if (childrenData.selectedChild?.id) {
+      childrenData.invalidateChildCache(childrenData.selectedChild.id);
+    }
+    
+    const result = await materialManagement.toggleLessonCompletion(lessonId, isCompleting);
     if (!result.success) {
       alert(result.error || "Could not update completion status.");
     } else if (result.syncedEntries > 0) {
       console.log(`✅ Lesson completion synced with ${result.syncedEntries} schedule entry(s)`);
+    }
+  };
+
+  const handleGradeSubmit = async (gradeValue) => {
+    if (!gradingLesson) return;
+    
+    setIsSubmittingGrade(true);
+    try {
+      // Invalidate cache before the API call to ensure fresh data
+      if (childrenData.selectedChild?.id) {
+        childrenData.invalidateChildCache(childrenData.selectedChild.id);
+      }
+      
+      const result = await materialManagement.toggleLessonCompletion(gradingLesson.id, true, gradeValue);
+      if (result.success) {
+        setShowGradeModal(false);
+        setGradingLesson(null);
+        if (result.syncedEntries > 0) {
+          console.log(`✅ Lesson completion synced with ${result.syncedEntries} schedule entry(s)`);
+        }
+      } else {
+        alert(result.error || "Could not update grade and completion status.");
+      }
+    } catch (error) {
+      alert("Failed to save grade. Please try again.");
+    } finally {
+      setIsSubmittingGrade(false);
+    }
+  };
+
+  const handleGradeModalClose = () => {
+    if (!isSubmittingGrade) {
+      setShowGradeModal(false);
+      setGradingLesson(null);
     }
   };
 
@@ -1118,6 +1185,16 @@ export default function DashboardPage() {
           currentPlan={subscription?.plan_type || 'free'}
           onUpgrade={handleGenericUpgrade}
           isLoading={upgrading}
+        />
+      )}
+
+      {showGradeModal && (
+        <GradeInputModal
+          isOpen={showGradeModal}
+          onClose={handleGradeModalClose}
+          onSubmit={handleGradeSubmit}
+          lesson={gradingLesson}
+          isLoading={isSubmittingGrade}
         />
       )}
     </div>

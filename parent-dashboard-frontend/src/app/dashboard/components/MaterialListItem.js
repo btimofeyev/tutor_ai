@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { CheckCircleIcon as CheckSolidIcon } from '@heroicons/react/24/solid';
 import { PencilSquareIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
+import { APP_GRADABLE_CONTENT_TYPES } from '../../../utils/dashboardConstants';
 
 // Utility functions
 const isDateOverdue = (dateString, completed) => {
@@ -86,7 +87,7 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
   const materialInfo = useMemo(() => {
     const isCompleted = !!lesson.completed_at;
     return {
-      isGradable: ['worksheet', 'assignment', 'test', 'quiz'].includes(lesson.content_type),
+      isGradable: APP_GRADABLE_CONTENT_TYPES.includes(lesson.content_type),
       hasMaxScore: lesson.grade_max_value && String(lesson.grade_max_value).trim() !== '',
       hasGrade: lesson.grade_value != null,
       isCompleted,
@@ -100,6 +101,7 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
     setError('');
     setIsToggling(true);
     try {
+      // Pass the lesson ID and whether we're marking as complete
       await onToggleComplete(lesson.id, !lesson.completed_at);
     } catch (err) {
       setError('Failed to update.');

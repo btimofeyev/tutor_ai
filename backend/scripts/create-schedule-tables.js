@@ -1,5 +1,5 @@
 // scripts/create-schedule-tables.js
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const supabase = require('../src/utils/supabaseClient');
 
 async function createScheduleTables() {

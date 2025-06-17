@@ -1,5 +1,6 @@
 import './globals.css';
 import { AuthProvider } from '../contexts/AuthContext';
+import { SubscriptionProvider } from '../contexts/SubscriptionContext';
 
 export const metadata = {
   title: 'Klio - Your AI Learning Friend',
@@ -11,7 +12,9 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className="font-fredoka">
         <AuthProvider>
-          {children}
+          <SubscriptionProvider>
+            {children}
+          </SubscriptionProvider>
         </AuthProvider>
       </body>
     </html>

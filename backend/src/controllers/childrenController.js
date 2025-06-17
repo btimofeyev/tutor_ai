@@ -249,3 +249,48 @@ exports.setChildPin = async (req, res) => {
       res.status(500).json({ error: error.message || "Failed to set PIN." });
   }
 };
+
+// Get parent subscription status for authenticated child
+exports.getParentSubscription = async (req, res) => {
+  try {
+    const { child_id } = req.params;
+    const authenticatedChildId = req.child?.child_id;
+
+    // Ensure the authenticated child matches the requested child_id
+    if (authenticatedChildId !== parseInt(child_id)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Get the child's parent_id
+    const { data: childData, error: childError } = await supabase
+      .from('children')
+      .select('parent_id')
+      .eq('id', child_id)
+      .single();
+
+    if (childError || !childData) {
+      return res.status(404).json({ error: 'Child not found' });
+    }
+
+    // Get parent's subscription
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from('parent_subscriptions')
+      .select('*')
+      .eq('parent_id', childData.parent_id)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (subscriptionError) {
+      console.error('Error fetching subscription:', subscriptionError);
+      return res.status(500).json({ error: 'Failed to fetch subscription status' });
+    }
+
+    res.json({
+      has_subscription: !!subscription,
+      subscription: subscription || null
+    });
+  } catch (error) {
+    console.error('Error in getParentSubscription:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

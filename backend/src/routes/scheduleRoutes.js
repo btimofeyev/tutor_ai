@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const scheduleController = require('../controllers/scheduleController');
 const simpleFamilyScheduler = require('../controllers/simpleFamilyScheduler');
+const { enforceAIAccess } = require('../middleware/subscriptionEnforcement');
 
 // Schedule entry routes
 router.get('/:child_id', scheduleController.getScheduleEntries);
@@ -14,14 +15,14 @@ router.delete('/:id', scheduleController.deleteScheduleEntry);
 router.get('/preferences/:child_id', scheduleController.getSchedulePreferences);
 router.post('/preferences/:child_id', scheduleController.updateSchedulePreferences);
 
-// AI scheduling routes
-router.post('/ai-generate', scheduleController.generateAISchedule);
-router.post('/family-generate', scheduleController.generateFamilySchedule);
+// AI scheduling routes - protected by subscription
+router.post('/ai-generate', enforceAIAccess, scheduleController.generateAISchedule);
+router.post('/family-generate', enforceAIAccess, scheduleController.generateFamilySchedule);
 
-// Simplified conflict-free family scheduling
-router.post('/conflict-free', scheduleController.generateConflictFreeSchedule);
+// Simplified conflict-free family scheduling - protected by subscription
+router.post('/conflict-free', enforceAIAccess, scheduleController.generateConflictFreeSchedule);
 
-// Simple family scheduler - the easy way
-router.post('/simple-family', simpleFamilyScheduler.generateSimpleFamilySchedule);
+// Simple family scheduler - protected by subscription
+router.post('/simple-family', enforceAIAccess, simpleFamilyScheduler.generateSimpleFamilySchedule);
 
 module.exports = router;

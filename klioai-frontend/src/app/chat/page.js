@@ -11,6 +11,8 @@ import SuggestionBubbles from '../../components/SuggestionBubbles';
 import LessonContextBar from '../../components/LessonContextBar';
 import SimpleWorkspace from '../../components/SimpleWorkspace';
 import { useAuth } from '../../contexts/AuthContext'; 
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import PaywallOverlay from '../../components/PaywallOverlay';
 import { chatService } from '../../utils/chatService';
 import { analyzeKlioResponse } from '../../utils/workspaceProgress';
 import { WorkspaceActionProcessor } from '../../utils/workspaceActionProcessor';
@@ -449,7 +451,8 @@ export default function ChatPage() {
 
   return (
     <ProtectedRoute>
-      <div className="flex h-screen overflow-hidden bg-[var(--background-main)]">
+      <PaywallOverlay feature="AI Tutoring">
+        <div className="flex h-screen overflow-hidden bg-[var(--background-main)]">
         <Sidebar
           childName={child?.name}
           onLogout={handleLogoutConfirmed}
@@ -566,7 +569,8 @@ export default function ChatPage() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+        </div>
+      </PaywallOverlay>
     </ProtectedRoute>
   );
 }

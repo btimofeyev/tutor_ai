@@ -43,6 +43,17 @@ class ChatService {
     } catch (error) {
       console.error('❌ Function calling chat service error:', error);
       
+      // Handle subscription-related errors
+      if (error.response?.status === 403) {
+        const errorData = error.response.data;
+        
+        if (errorData.code === 'AI_ACCESS_REQUIRED') {
+          throw new Error('🔒 AI features require a subscription. Please ask your parent to upgrade your plan to continue using AI tutoring.');
+        }
+        
+        throw new Error(errorData.error || 'Access denied. Please check your subscription status.');
+      }
+      
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);
       }
@@ -56,6 +67,19 @@ class ChatService {
       return response.data;
     } catch (error) {
       console.error('Failed to get suggestions:', error);
+      
+      // Handle subscription errors for suggestions
+      if (error.response?.status === 403 && error.response?.data?.code === 'AI_ACCESS_REQUIRED') {
+        return {
+          success: true,
+          suggestions: [
+            "🔒 AI features require subscription",
+            "Ask your parent to upgrade",
+            "Contact support for help"
+          ]
+        };
+      }
+      
       return {
         success: true,
         suggestions: [
@@ -74,6 +98,12 @@ class ChatService {
       return response.data.help;
     } catch (error) {
       console.error('Failed to get lesson help:', error);
+      
+      // Handle subscription errors for lesson help
+      if (error.response?.status === 403 && error.response?.data?.code === 'AI_ACCESS_REQUIRED') {
+        throw new Error('🔒 AI lesson help requires a subscription. Please ask your parent to upgrade your plan.');
+      }
+      
       throw new Error('Failed to get lesson help');
     }
   }

@@ -121,8 +121,15 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
     }
   };
 
-  // Group insights by time periods
-  const groupedInsights = useMemo(() => {
+  // Group insights by time periods (client-side only to avoid hydration mismatch)
+  const [groupedInsights, setGroupedInsights] = useState({
+    today: [],
+    yesterday: [],
+    thisWeek: [],
+    older: []
+  });
+
+  useEffect(() => {
     const today = new Date();
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
     const oneWeekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -151,7 +158,7 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
       }
     });
     
-    return grouped;
+    setGroupedInsights(grouped);
   }, [chatInsights]);
 
   // Calculate total unread count

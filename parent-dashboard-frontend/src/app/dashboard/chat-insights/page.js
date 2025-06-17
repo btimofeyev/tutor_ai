@@ -1,6 +1,6 @@
 // app/dashboard/chat-insights/page.js
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import StudentSidebar from '../components/StudentSidebar';
 import ConversationSummariesView from './components/ConversationSummariesView';
@@ -20,10 +20,30 @@ export default function ChatInsightsPage() {
   
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
+  const [currentTime, setCurrentTime] = useState('');
+
+  // Set initial time and update periodically (client-side only to avoid hydration mismatch)
+  useEffect(() => {
+    const updateTime = () => {
+      setCurrentTime(new Date().toLocaleTimeString());
+    };
+    
+    // Set initial time
+    updateTime();
+    
+    // Update time every minute
+    const interval = setInterval(updateTime, 60000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Refresh insights data
   const refreshInsights = () => {
     setRefreshTrigger(prev => prev + 1);
+    // Also update the time when refreshing
+    setTimeout(() => {
+      setCurrentTime(new Date().toLocaleTimeString());
+    }, 0);
   };
 
   // Handle child login settings (placeholder - reuse existing functionality)
@@ -170,7 +190,7 @@ export default function ChatInsightsPage() {
             <div className="flex items-center gap-4">
               <span>Auto-refresh every 5 minutes</span>
               <span>•</span>
-              <span>Last updated: {new Date().toLocaleTimeString()}</span>
+              <span>Last updated: {currentTime || 'Loading...'}</span>
             </div>
           </div>
         </footer>

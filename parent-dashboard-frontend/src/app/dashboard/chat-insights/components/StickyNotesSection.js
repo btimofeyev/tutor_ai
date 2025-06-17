@@ -1,6 +1,6 @@
 // app/dashboard/chat-insights/components/StickyNotesSection.js
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import StickyNote from './StickyNote';
 
@@ -13,29 +13,37 @@ export default function StickyNotesSection({
   getChildColor,
   emptyMessage = "No conversations this day"
 }) {
+  const [formattedDate, setFormattedDate] = useState('');
   
-  const formatSectionDate = (dateString) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+  // Format date on client side to avoid hydration mismatch
+  useEffect(() => {
+    if (!date) return;
     
-    // Reset time to compare dates only
-    today.setHours(0, 0, 0, 0);
-    yesterday.setHours(0, 0, 0, 0);
-    date.setHours(0, 0, 0, 0);
+    const formatSectionDate = (dateString) => {
+      const date = new Date(dateString);
+      const today = new Date();
+      const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+      
+      // Reset time to compare dates only
+      today.setHours(0, 0, 0, 0);
+      yesterday.setHours(0, 0, 0, 0);
+      date.setHours(0, 0, 0, 0);
+      
+      if (date.getTime() === today.getTime()) {
+        return '📅 Today';
+      } else if (date.getTime() === yesterday.getTime()) {
+        return '📅 Yesterday';
+      } else {
+        return `📅 ${date.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          month: 'short', 
+          day: 'numeric' 
+        })}`;
+      }
+    };
     
-    if (date.getTime() === today.getTime()) {
-      return '📅 Today';
-    } else if (date.getTime() === yesterday.getTime()) {
-      return '📅 Yesterday';
-    } else {
-      return `📅 ${date.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        month: 'short', 
-        day: 'numeric' 
-      })}`;
-    }
-  };
+    setFormattedDate(formatSectionDate(date));
+  }, [date]);
 
   if (summaries.length === 0) {
     return (
@@ -46,7 +54,7 @@ export default function StickyNotesSection({
         className="mb-8"
       >
         <h3 className="text-lg font-semibold text-gray-800 mb-4">
-          {title || formatSectionDate(date)}
+          {title || formattedDate || 'Loading...'}
         </h3>
         <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
           <div className="text-4xl mb-2">💤</div>
@@ -66,7 +74,7 @@ export default function StickyNotesSection({
       {/* Section Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-800">
-          {title || formatSectionDate(date)}
+          {title || formattedDate || 'Loading...'}
         </h3>
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <span>{summaries.length} child{summaries.length !== 1 ? 'ren' : ''}</span>

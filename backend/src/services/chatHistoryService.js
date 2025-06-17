@@ -8,9 +8,25 @@ const openai = new OpenAI({
 
 class ChatHistoryService {
   constructor() {
-    this.RECENT_MESSAGES_LIMIT = 50; // Keep 50 recent messages in full
-    this.SUMMARIZATION_BATCH_SIZE = 20; // Summarize in batches of 20 messages
-    this.SUMMARY_RETENTION_DAYS = 90; // Keep summaries for 90 days
+    // Configurable retention policies
+    this.config = {
+      RECENT_MESSAGES_LIMIT: parseInt(process.env.RECENT_MESSAGES_LIMIT) || 50,
+      SUMMARIZATION_BATCH_SIZE: parseInt(process.env.SUMMARIZATION_BATCH_SIZE) || 20,
+      SUMMARY_RETENTION_DAYS: parseInt(process.env.SUMMARY_RETENTION_DAYS) || 90,
+      CLEANUP_TRIGGER_MULTIPLIER: parseFloat(process.env.CLEANUP_TRIGGER_MULTIPLIER) || 1.5,
+      MIN_SESSION_SIZE: parseInt(process.env.MIN_SESSION_SIZE) || 10,
+      SESSION_GAP_HOURS: parseInt(process.env.SESSION_GAP_HOURS) || 4,
+      ENABLE_DATA_EXPORT: process.env.ENABLE_DATA_EXPORT === 'true' || false,
+      GRADUATED_RETENTION_ENABLED: process.env.GRADUATED_RETENTION_ENABLED === 'true' || true
+    };
+
+    // Graduated retention timeline (in days)
+    this.retentionLevels = {
+      IMMEDIATE: 0,     // Full messages for immediate access
+      SUMMARY: 30,      // Convert to summaries after 30 days
+      ARCHIVE: 90,      // Archive summaries after 90 days
+      DELETE: 365       // Delete archives after 1 year
+    };
   }
 
   /**
@@ -119,45 +135,140 @@ class ChatHistoryService {
   }
 
   /**
-   * Summarize old conversations and clean up database
+   * Validate summary quality before cleanup
+   */
+  async validateSummaryQuality(summary, originalMessages) {
+    const validationCriteria = {
+      minLength: 50,
+      maxLength: 500,
+      mustContainKeywords: ['topic', 'learn', 'discuss', 'understand'],
+      messageCountRatio: 0.1 // Summary should be at least 10% of original content
+    };
+
+    if (!summary || summary.length < validationCriteria.minLength) {
+      return { valid: false, reason: 'Summary too short' };
+    }
+
+    if (summary.length > validationCriteria.maxLength) {
+      return { valid: false, reason: 'Summary too long' };
+    }
+
+    const originalContentLength = originalMessages.reduce((sum, msg) => sum + msg.content.length, 0);
+    if (summary.length < originalContentLength * validationCriteria.messageCountRatio) {
+      return { valid: false, reason: 'Summary too brief compared to original content' };
+    }
+
+    const hasKeyTopics = validationCriteria.mustContainKeywords.some(keyword => 
+      summary.toLowerCase().includes(keyword)
+    );
+    if (!hasKeyTopics) {
+      return { valid: false, reason: 'Summary lacks educational context' };
+    }
+
+    return { valid: true, reason: 'Summary quality validated' };
+  }
+
+  /**
+   * Export data before cleanup for backup
+   */
+  async exportDataBeforeCleanup(childId, messages) {
+    if (!this.config.ENABLE_DATA_EXPORT) return null;
+
+    try {
+      const exportData = {
+        childId,
+        exportDate: new Date().toISOString(),
+        messageCount: messages.length,
+        messages: messages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          created_at: msg.created_at,
+          metadata: msg.metadata
+        }))
+      };
+
+      // Store export in a separate table for potential recovery
+      const { data, error } = await supabase
+        .from('chat_message_exports')
+        .insert([{
+          child_id: childId,
+          export_data: exportData,
+          message_count: messages.length,
+          created_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating data export:', error);
+        return null;
+      }
+
+      console.log(`💾 Exported ${messages.length} messages before cleanup`);
+      return data;
+    } catch (error) {
+      console.error('Error in exportDataBeforeCleanup:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Enhanced summarization and cleanup with validation
    */
   async summarizeAndCleanup(childId) {
     try {
-      console.log(`🧹 Starting summarization and cleanup for child ${childId}`);
+      console.log(`🧹 Starting enhanced summarization and cleanup for child ${childId}`);
 
       // Get messages older than the recent limit
       const { data: oldMessages, error } = await supabase
         .from('chat_messages')
-        .select('id, role, content, created_at')
+        .select('id, role, content, created_at, metadata')
         .eq('child_id', childId)
         .order('created_at', { ascending: true });
 
-      if (error || !oldMessages || oldMessages.length <= this.RECENT_MESSAGES_LIMIT) {
+      if (error || !oldMessages || oldMessages.length <= this.config.RECENT_MESSAGES_LIMIT) {
         console.log('No old messages to summarize');
         return;
       }
 
       // Messages to summarize (all but the most recent)
-      const messagesToSummarize = oldMessages.slice(0, -this.RECENT_MESSAGES_LIMIT);
+      const messagesToSummarize = oldMessages.slice(0, -this.config.RECENT_MESSAGES_LIMIT);
       
-      if (messagesToSummarize.length < this.SUMMARIZATION_BATCH_SIZE) {
+      if (messagesToSummarize.length < this.config.SUMMARIZATION_BATCH_SIZE) {
         console.log('Not enough old messages to warrant summarization');
         return;
+      }
+
+      // Export data before cleanup if enabled
+      if (this.config.ENABLE_DATA_EXPORT) {
+        await this.exportDataBeforeCleanup(childId, messagesToSummarize);
       }
 
       // Group messages into conversation sessions (by time gaps)
       const conversationSessions = this.groupIntoSessions(messagesToSummarize);
       
+      let successfulSummarizations = 0;
+      let failedSummarizations = 0;
+
       for (const session of conversationSessions) {
-        if (session.messages.length >= 10) { // Only summarize substantial conversations
-          await this.summarizeSession(childId, session);
-          await this.deleteMessages(session.messages.map(m => m.id));
+        if (session.messages.length >= this.config.MIN_SESSION_SIZE) {
+          const summaryResult = await this.summarizeSession(childId, session);
+          
+          if (summaryResult.success) {
+            await this.deleteMessages(session.messages.map(m => m.id));
+            successfulSummarizations++;
+          } else {
+            console.warn(`Failed to summarize session: ${summaryResult.reason}`);
+            failedSummarizations++;
+          }
         }
       }
 
-      console.log(`✅ Summarization and cleanup completed for child ${childId}`);
+      console.log(`✅ Cleanup completed: ${successfulSummarizations} sessions summarized, ${failedSummarizations} failed`);
+      return { success: true, summarized: successfulSummarizations, failed: failedSummarizations };
     } catch (error) {
       console.error('Error in summarizeAndCleanup:', error);
+      return { success: false, error: error.message };
     }
   }
 
@@ -208,7 +319,7 @@ class ChatHistoryService {
   }
 
   /**
-   * Summarize a conversation session using AI
+   * Enhanced summarize a conversation session using AI with validation
    */
   async summarizeSession(childId, session) {
     try {
@@ -233,7 +344,7 @@ Summary:`;
         messages: [
           {
             role: "system",
-            content: "You are helping to summarize tutoring conversations. Be concise but capture key learning moments, topics, and student progress."
+            content: "You are helping to summarize tutoring conversations. Be concise but capture key learning moments, topics, and student progress. Include specific subjects and topics discussed."
           },
           {
             role: "user",
@@ -246,8 +357,16 @@ Summary:`;
 
       const summary = response.choices[0].message.content;
 
-      // Store the summary
-      await supabase
+      // Validate summary quality before storing
+      const validation = await this.validateSummaryQuality(summary, session.messages);
+      
+      if (!validation.valid) {
+        console.warn(`Summary validation failed: ${validation.reason}`);
+        return { success: false, reason: validation.reason };
+      }
+
+      // Store the summary with validation metadata
+      const { data, error } = await supabase
         .from('conversation_summaries')
         .insert([{
           child_id: childId,
@@ -255,13 +374,48 @@ Summary:`;
           message_count: session.messages.length,
           period_start: session.startTime.toISOString(),
           period_end: session.endTime.toISOString(),
+          validation_status: 'validated',
+          validation_score: this.calculateSummaryScore(summary, session.messages),
           created_at: new Date().toISOString()
-        }]);
+        }])
+        .select()
+        .single();
 
-      console.log(`📝 Summarized session with ${session.messages.length} messages`);
+      if (error) {
+        console.error('Error storing summary:', error);
+        return { success: false, reason: 'Database error' };
+      }
+
+      console.log(`📝 Summarized and validated session with ${session.messages.length} messages`);
+      return { success: true, summaryId: data.id };
     } catch (error) {
       console.error('Error summarizing session:', error);
+      return { success: false, reason: error.message };
     }
+  }
+
+  /**
+   * Calculate a quality score for the summary
+   */
+  calculateSummaryScore(summary, originalMessages) {
+    let score = 0;
+
+    // Length score (appropriate length)
+    const lengthRatio = summary.length / originalMessages.reduce((sum, msg) => sum + msg.content.length, 0);
+    if (lengthRatio >= 0.05 && lengthRatio <= 0.3) score += 25;
+
+    // Content diversity score (mentions multiple aspects)
+    const educationalKeywords = ['topic', 'learn', 'understand', 'question', 'answer', 'practice', 'homework', 'assignment'];
+    const keywordMatches = educationalKeywords.filter(keyword => 
+      summary.toLowerCase().includes(keyword)
+    ).length;
+    score += Math.min(keywordMatches * 5, 25);
+
+    // Structure score (contains specific information)
+    if (summary.includes('topic') || summary.includes('subject')) score += 25;
+    if (summary.includes('progress') || summary.includes('understand')) score += 25;
+
+    return Math.min(score, 100);
   }
 
   /**
@@ -337,15 +491,169 @@ Summary:`;
   }
 
   /**
-   * Schedule cleanup for a child (call this periodically)
+   * Implement graduated retention system
    */
-  async scheduleCleanup(childId) {
-    const stats = await this.getConversationStats(childId);
+  async applyGraduatedRetention(childId) {
+    if (!this.config.GRADUATED_RETENTION_ENABLED) return;
+
+    try {
+      console.log(`🎯 Applying graduated retention for child ${childId}`);
+      
+      const now = new Date();
+      
+      // Stage 1: Convert old messages to summaries (30+ days old)
+      const summaryDate = new Date(now.getTime() - this.retentionLevels.SUMMARY * 24 * 60 * 60 * 1000);
+      await this.convertOldMessagesToSummaries(childId, summaryDate);
+      
+      // Stage 2: Archive old summaries (90+ days old)
+      const archiveDate = new Date(now.getTime() - this.retentionLevels.ARCHIVE * 24 * 60 * 60 * 1000);
+      await this.archiveOldSummaries(childId, archiveDate);
+      
+      // Stage 3: Delete archived data (365+ days old)
+      const deleteDate = new Date(now.getTime() - this.retentionLevels.DELETE * 24 * 60 * 60 * 1000);
+      await this.deleteArchivedData(childId, deleteDate);
+      
+      console.log(`✅ Graduated retention applied for child ${childId}`);
+    } catch (error) {
+      console.error('Error applying graduated retention:', error);
+    }
+  }
+
+  /**
+   * Convert messages older than specified date to summaries
+   */
+  async convertOldMessagesToSummaries(childId, cutoffDate) {
+    const { data: oldMessages, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('child_id', childId)
+      .lt('created_at', cutoffDate.toISOString())
+      .order('created_at', { ascending: true });
+
+    if (error || !oldMessages || oldMessages.length === 0) return;
+
+    const sessions = this.groupIntoSessions(oldMessages);
+    for (const session of sessions) {
+      if (session.messages.length >= this.config.MIN_SESSION_SIZE) {
+        const result = await this.summarizeSession(childId, session);
+        if (result.success) {
+          await this.deleteMessages(session.messages.map(m => m.id));
+        }
+      }
+    }
+  }
+
+  /**
+   * Archive old summaries to separate table
+   */
+  async archiveOldSummaries(childId, cutoffDate) {
+    // Move old summaries to archive table
+    const { data: oldSummaries, error } = await supabase
+      .from('conversation_summaries')
+      .select('*')
+      .eq('child_id', childId)
+      .lt('created_at', cutoffDate.toISOString());
+
+    if (error || !oldSummaries || oldSummaries.length === 0) return;
+
+    // Insert into archive table
+    const archiveData = oldSummaries.map(summary => ({
+      ...summary,
+      archived_at: new Date().toISOString()
+    }));
+
+    await supabase.from('conversation_summaries_archive').insert(archiveData);
     
-    // Trigger cleanup if we have too many current messages
-    if (stats.currentMessages > this.RECENT_MESSAGES_LIMIT * 1.5) {
-      await this.summarizeAndCleanup(childId);
-      await this.cleanupOldSummaries(childId);
+    // Delete from main table
+    const summaryIds = oldSummaries.map(s => s.id);
+    await supabase
+      .from('conversation_summaries')
+      .delete()
+      .in('id', summaryIds);
+
+    console.log(`📦 Archived ${oldSummaries.length} summaries`);
+  }
+
+  /**
+   * Delete archived data older than retention period
+   */
+  async deleteArchivedData(childId, cutoffDate) {
+    // Delete very old exports
+    await supabase
+      .from('chat_message_exports')
+      .delete()
+      .eq('child_id', childId)
+      .lt('created_at', cutoffDate.toISOString());
+
+    // Delete very old archived summaries
+    await supabase
+      .from('conversation_summaries_archive')
+      .delete()
+      .eq('child_id', childId)
+      .lt('created_at', cutoffDate.toISOString());
+
+    console.log(`🗑️ Deleted archived data older than ${cutoffDate.toISOString()}`);
+  }
+
+  /**
+   * Enhanced schedule cleanup for a child with configurable triggers
+   */
+  async scheduleCleanup(childId, options = {}) {
+    try {
+      const stats = await this.getConversationStats(childId);
+      const triggerLimit = this.config.RECENT_MESSAGES_LIMIT * this.config.CLEANUP_TRIGGER_MULTIPLIER;
+      
+      console.log(`📊 Child ${childId} stats: ${stats.currentMessages}/${triggerLimit} messages`);
+      
+      // Trigger immediate cleanup if we have too many current messages
+      if (stats.currentMessages > triggerLimit || options.force) {
+        console.log(`🚨 Triggering cleanup for child ${childId} (${stats.currentMessages} messages)`);
+        
+        const result = await this.summarizeAndCleanup(childId);
+        
+        if (result.success) {
+          // Apply graduated retention if enabled
+          if (this.config.GRADUATED_RETENTION_ENABLED) {
+            await this.applyGraduatedRetention(childId);
+          } else {
+            // Fallback to simple cleanup
+            await this.cleanupOldSummaries(childId);
+          }
+        }
+        
+        return result;
+      }
+      
+      return { success: true, action: 'no_cleanup_needed', stats };
+    } catch (error) {
+      console.error('Error in scheduleCleanup:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get comprehensive cleanup status for a child
+   */
+  async getCleanupStatus(childId) {
+    try {
+      const [messages, summaries, exports, archived] = await Promise.all([
+        supabase.from('chat_messages').select('id', { count: 'exact' }).eq('child_id', childId),
+        supabase.from('conversation_summaries').select('id', { count: 'exact' }).eq('child_id', childId),
+        supabase.from('chat_message_exports').select('id', { count: 'exact' }).eq('child_id', childId),
+        supabase.from('conversation_summaries_archive').select('id', { count: 'exact' }).eq('child_id', childId)
+      ]);
+
+      return {
+        currentMessages: messages.count || 0,
+        summaries: summaries.count || 0,
+        exports: exports.count || 0,
+        archived: archived.count || 0,
+        triggerThreshold: this.config.RECENT_MESSAGES_LIMIT * this.config.CLEANUP_TRIGGER_MULTIPLIER,
+        needsCleanup: (messages.count || 0) > this.config.RECENT_MESSAGES_LIMIT * this.config.CLEANUP_TRIGGER_MULTIPLIER
+      };
+    } catch (error) {
+      console.error('Error getting cleanup status:', error);
+      return null;
     }
   }
 }

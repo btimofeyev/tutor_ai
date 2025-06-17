@@ -1,6 +1,6 @@
 // parent-dashboard-frontend/src/app/page.js
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRef } from 'react';
 import { ArrowDownCircleIcon, SparklesIcon, UserGroupIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
@@ -9,6 +9,12 @@ import Link from 'next/link';
 
 export default function LandingPage() {
   const featuresRef = useRef(null);
+  const [currentYear, setCurrentYear] = useState('');
+
+  // Set current year on client side to avoid hydration mismatch
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear().toString());
+  }, []);
 
   const scrollToFeatures = () => {
     featuresRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -270,7 +276,7 @@ export default function LandingPage() {
           <div className="mt-8 text-xs text-text-tertiary space-x-6">
             <Link href="/pricing" className="hover:text-text-secondary">Pricing</Link>
             <span>•</span>
-            <span>© {new Date().getFullYear()} Klio AI. All rights reserved.</span>
+            <span>© {currentYear || '2024'} Klio AI. All rights reserved.</span>
           </div>
         </div>
       </footer>

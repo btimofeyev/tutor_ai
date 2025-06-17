@@ -1,71 +1,37 @@
-// backend/src/routes/chatInsightsRoutes.js
 const express = require('express');
 const router = express.Router();
 const chatInsightsController = require('../controllers/chatInsightsController');
+// Correctly import 'authenticateParent' by destructuring it from the module's exports
+const { authenticateParent } = require('../middleware/auth');
 
-// Middleware to extract parent ID from header and attach to request
-const extractUserFromHeader = (req, res, next) => {
-  const parentId = req.headers['x-parent-id'];
-  if (parentId) {
-    req.user = { id: parentId };
-  }
-  next();
-};
+// Fetch children with conversations for the parent dashboard
+router.get('/children-with-conversations', authenticateParent, chatInsightsController.getChildrenWithConversations);
 
-// Middleware to ensure user is authenticated
-const requireAuth = (req, res, next) => {
-  if (!req.user?.id) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  next();
-};
+// Fetch conversation summaries for a specific child
+router.get('/conversation-summaries/:childId', authenticateParent, chatInsightsController.getConversationSummaries);
 
-// Apply middlewares to all routes
-router.use(extractUserFromHeader);
-router.use(requireAuth);
+// Fetch a specific conversation detail
+router.get('/conversation/:conversationId', authenticateParent, chatInsightsController.getConversationDetail);
 
-/**
- * GET /api/parent/chat-insights
- * Get conversation summaries for parent's children
- * Query params:
- * - childId: Filter by specific child (optional)
- * - days: Number of days to look back (default: 7)
- * - status: Filter by status - 'unread', 'read', 'dismissed', 'all' (default: 'unread')
- */
-router.get('/', chatInsightsController.getChatInsights);
+// Fetch unread conversation notifications
+router.get('/unread-notifications', authenticateParent, chatInsightsController.getUnreadConversationNotifications);
 
-/**
- * POST /api/parent/chat-insights/:summaryId/mark-read
- * Mark a conversation summary as read
- */
-router.post('/:summaryId/mark-read', chatInsightsController.markSummaryAsRead);
+// Mark conversation notifications as read
+router.post('/mark-notifications-read', authenticateParent, chatInsightsController.markNotificationsAsRead);
 
-/**
- * DELETE /api/parent/chat-insights/:summaryId
- * Delete a conversation summary
- */
-router.delete('/:summaryId', chatInsightsController.deleteSummary);
+// Fetch sticky notes for a specific child
+router.get('/sticky-notes/:childId', authenticateParent, chatInsightsController.getStickyNotesByChild);
 
-/**
- * POST /api/parent/chat-insights/mark-all-read
- * Bulk mark summaries as read
- * Body:
- * - childId: Filter by specific child (optional)
- * - beforeDate: Mark all summaries before this date (optional)
- */
-router.post('/mark-all-read', chatInsightsController.markAllAsRead);
+// Add a new sticky note
+router.post('/sticky-notes', authenticateParent, chatInsightsController.addStickyNote);
 
-/**
- * GET /api/parent/chat-insights/stats
- * Get summary statistics for dashboard
- */
-router.get('/stats', chatInsightsController.getSummaryStats);
+// Update an existing sticky note
+router.put('/sticky-notes/:noteId', authenticateParent, chatInsightsController.updateStickyNote);
 
-/**
- * POST /api/parent/chat-insights/cleanup
- * Clean up expired summaries (for cron job)
- * Note: This should ideally be protected by an internal API key in production
- */
-router.post('/cleanup', chatInsightsController.cleanupExpiredSummaries);
+// Delete a sticky note
+router.delete('/sticky-notes/:noteId', authenticateParent, chatInsightsController.deleteStickyNote);
+
+// Test route to ensure insights endpoint is reachable
+router.get('/test-insights', chatInsightsController.getTestInsights);
 
 module.exports = router;

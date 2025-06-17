@@ -1,169 +1,226 @@
-// backend/scripts/generate-daily-summaries.js
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
-const { createClient } = require('@supabase/supabase-js');
-const OpenAI = require('openai');
+const supabase = require('../utils/supabaseClient');
+const { getUnixTime, startOfDay } = require('date-fns');
 
-// Initialize Supabase client
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const getChildrenWithConversations = async (date) => {
-  const { data, error } = await supabase.rpc('get_children_with_conversations_on_date', { conversation_date: date });
-
-  if (error) {
-    console.error('Error getting children with conversations:', error);
-    throw error;
-  }
-  return data;
+// Placeholder for getTestInsights
+const getTestInsights = (req, res) => {
+    res.status(200).json({ message: "This is a test insight from the backend." });
 };
 
-const getConversationsForChild = async (childId, date) => {
-    const { data, error } = await supabase
-      .from('chat_history')
-      .select('message_text, role, created_at')
-      .eq('child_id', childId)
-      .gte('created_at', `${date}T00:00:00.000Z`)
-      .lte('created_at', `${date}T23:59:59.999Z`)
-      .order('created_at', { ascending: true });
-  
-    if (error) {
-      console.error(`Error fetching conversations for child ${childId}:`, error);
-      throw error;
-    }
-    return data;
-  };
-  
 
-  const generateSummaryWithOpenAI = async (childName, conversations) => {
-    const prompt = `
-  Generate a concise, parent-friendly summary of a child's learning session.
-  
-  Child's Name: ${childName}
-  
-  Conversation History:
-  ${conversations.map(msg => `${msg.role === 'user' ? 'Child' : 'Klio'}: ${msg.message_text}`).join('\n')}
-  
-  Please provide a summary in the following JSON format:
-  {
-    "childName": "${childName}",
-    "sessionCount": 1,
-    "totalMinutes": 0, // Placeholder
-    "keyHighlights": ["string"],
-    "subjectsDiscussed": ["string"],
-    "learningProgress": {
-      "problemsSolved": 0,
-      "correctAnswers": 0,
-      "newTopicsExplored": 0,
-      "struggledWith": ["string"],
-      "masteredTopics": ["string"]
-    },
-    "materialsWorkedOn": [],
-    "engagementLevel": "high|medium|low",
-    "sessionTimes": [], // Placeholder
-    "parentSuggestions": ["string"]
-  }
-  
-  Focus on identifying key learning points, areas of progress, and any topics the child found challenging. Provide actionable suggestions for the parent. The tone should be encouraging and informative.
-  `;
-  
+const getChildrenWithConversations = async (req, res) => {
+    const parentId = req.user.id;
     try {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4-turbo',
-        messages: [{ role: 'system', content: prompt }],
-        response_format: { type: "json_object" },
-      });
-  
-      const summaryJson = JSON.parse(response.choices[0].message.content);
-      
-      // Basic post-processing
-      const sessionTimes = conversations.length > 0
-        ? [`${new Date(conversations[0].created_at).toLocaleTimeString()} - ${new Date(conversations[conversations.length - 1].created_at).toLocaleTimeString()}`]
-        : [];
-      const totalMinutes = conversations.length > 0
-        ? Math.round((new Date(conversations[conversations.length - 1].created_at) - new Date(conversations[0].created_at)) / 60000)
-        : 0;
-  
-      summaryJson.sessionTimes = sessionTimes;
-      summaryJson.totalMinutes = totalMinutes;
-  
-      return summaryJson;
-  
+        const { data, error } = await supabase.rpc('get_children_with_conversations', { p_parent_id: parentId });
+        if (error) throw error;
+        res.json(data);
     } catch (error) {
-      console.error('Error generating summary with OpenAI:', error);
-      throw error;
+        console.error('Error fetching children with conversations:', error);
+        res.status(500).json({ message: "Failed to fetch children's conversation data." });
     }
-  };
-  
-const saveSummary = async (parentId, childId, date, summaryData) => {
-    const { data, error } = await supabase
-      .from('parent_conversation_notifications')
-      .upsert({
-        parent_id: parentId,
-        child_id: childId,
-        conversation_date: date,
-        summary_data: summaryData, // Corrected column name
-        status: 'unread',
-        updated_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-      }, {
-        onConflict: 'parent_id, child_id, conversation_date'
-      });
-  
-    if (error) {
-      console.error(`Error saving summary for child ${childId}:`, error);
-      throw error;
+};
+
+const getConversationSummaries = async (req, res) => {
+    const { childId } = req.params;
+     try {
+        const { data, error } = await supabase
+            .from('conversation_summaries')
+            .select('*')
+            .eq('child_id', childId)
+            .order('summary_date', { ascending: false });
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error('Error fetching conversation summaries:', error);
+        res.status(500).json({ message: "Failed to fetch conversation summaries." });
     }
-    return data;
-  };
-  
-const generateDailySummaries = async () => {
-    console.log('🚀 Starting daily conversation summary generation...');
-    console.log(`📅 Timestamp: ${new Date().toISOString()}`);
+};
+
+const getConversationDetail = async (req, res) => {
+    const { conversationId } = req.params;
+    try {
+        const { data, error } = await supabase
+            .from('chat_history')
+            .select('*')
+            .eq('conversation_id', conversationId)
+            .order('timestamp', { ascending: true });
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error('Error fetching conversation detail:', error);
+        res.status(500).json({ message: "Failed to fetch conversation details." });
+    }
+};
+
+const getUnreadConversationNotifications = async (req, res) => {
+    const parentId = req.user.id;
+    try {
+        const { data, error } = await supabase
+            .from('parent_conversation_notifications')
+            .select('*, conversation_summaries(child_id, children(name))')
+            .eq('parent_id', parentId)
+            .eq('is_read', false);
+
+        if (error) {
+            console.error("Error fetching unread notifications:", error);
+            throw error;
+        }
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch unread notifications." });
+    }
+};
+
+const markNotificationsAsRead = async (req, res) => {
+    const parentId = req.user.id;
+    const { notification_ids } = req.body;
+    try {
+        const { error } = await supabase
+            .from('parent_conversation_notifications')
+            .update({ is_read: true })
+            .eq('parent_id', parentId)
+            .in('id', notification_ids);
+
+        if (error) throw error;
+        res.status(200).send({ message: 'Notifications marked as read.' });
+    } catch (error) {
+        console.error('Error marking notifications as read:', error);
+        res.status(500).json({ message: "Failed to mark notifications as read." });
+    }
+};
+
+
+const getStickyNotesByChild = async (req, res) => {
+    const { childId } = req.params;
+    const parentId = req.user.id;
 
     try {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const date = yesterday.toISOString().split('T')[0];
+        // First, verify this parent is allowed to see this child's notes.
+        const { data: childData, error: childError } = await supabase
+            .from('children')
+            .select('id')
+            .eq('id', childId)
+            .eq('parent_id', parentId)
+            .single();
 
-        console.log(`🔄 Generating conversation summaries for ${date}`);
-
-        const childrenToProcess = await getChildrenWithConversations(date);
-        console.log(`👨‍👩‍👧‍👦 Found ${childrenToProcess.length} children with conversations`);
-
-        for (const child of childrenToProcess) {
-            try {
-                console.log(`\nProcessing child: ${child.name} (ID: ${child.id})`);
-
-                const conversations = await getConversationsForChild(child.id, date);
-                if (conversations.length < 2) { // Need at least one exchange
-                    console.log(`  - Skipping, not enough conversation history.`);
-                    continue;
-                }
-                console.log(`  - Found ${conversations.length} messages.`);
-                
-                const summaryJson = await generateSummaryWithOpenAI(child.name, conversations);
-                console.log(`  - Generated summary with OpenAI.`);
-                
-                await saveSummary(child.parent_id, child.id, date, summaryJson);
-                console.log(`  - ✅ Successfully saved summary to database.`);
-            
-            } catch (childError) {
-                console.error(`  - ❌ Error processing child ${child.id}:`, childError.message);
-            }
+        if (childError || !childData) {
+             return res.status(404).json({ message: 'Child not found or access denied.' });
         }
 
-        console.log('\n✅ Daily summary generation complete.');
+        const { data, error } = await supabase
+            .from('sticky_notes')
+            .select('*')
+            .eq('child_id', childId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        res.json(data);
     } catch (error) {
-        console.error('\n❌ Error during daily summary generation:', error);
+        console.error('Error fetching sticky notes:', error);
+        res.status(500).json({ message: 'Failed to fetch sticky notes.' });
     }
 };
 
-if (require.main === module) {
-  generateDailySummaries();
-}
+
+const addStickyNote = async (req, res) => {
+    const { child_id, note_text, created_by } = req.body;
+    const parentId = req.user.id;
+
+     try {
+        // Verify this parent is allowed to add a note for this child.
+        const { data: childData, error: childError } = await supabase
+            .from('children')
+            .select('id')
+            .eq('id', child_id)
+            .eq('parent_id', parentId)
+            .single();
+
+        if (childError || !childData) {
+             return res.status(404).json({ message: 'Child not found or access denied.' });
+        }
+
+        const { data, error } = await supabase
+            .from('sticky_notes')
+            .insert([{ child_id, note_text, created_by: parentId }])
+            .select();
+
+        if (error) throw error;
+        res.status(201).json(data[0]);
+    } catch (error) {
+        console.error('Error adding sticky note:', error);
+        res.status(500).json({ message: 'Failed to add sticky note.' });
+    }
+};
+
+
+const updateStickyNote = async (req, res) => {
+    const { noteId } = req.params;
+    const { note_text } = req.body;
+    const parentId = req.user.id;
+
+    try {
+        // Verify parent owns the note they are trying to update
+        const { data: noteData, error: noteError } = await supabase
+            .from('sticky_notes')
+            .select('created_by')
+            .eq('id', noteId)
+            .single();
+
+        if (noteError || !noteData || noteData.created_by !== parentId) {
+            return res.status(404).json({ message: 'Note not found or access denied.' });
+        }
+
+        const { data, error } = await supabase
+            .from('sticky_notes')
+            .update({ note_text })
+            .eq('id', noteId)
+            .select();
+
+        if (error) throw error;
+        res.json(data[0]);
+    } catch (error) {
+        console.error('Error updating sticky note:', error);
+        res.status(500).json({ message: 'Failed to update sticky note.' });
+    }
+};
+
+
+const deleteStickyNote = async (req, res) => {
+    const { noteId } = req.params;
+    const parentId = req.user.id;
+     try {
+        // Verify parent owns the note they are trying to delete
+        const { data: noteData, error: noteError } = await supabase
+            .from('sticky_notes')
+            .select('created_by')
+            .eq('id', noteId)
+            .single();
+
+        if (noteError || !noteData || noteData.created_by !== parentId) {
+            return res.status(404).json({ message: 'Note not found or access denied.' });
+        }
+        const { error } = await supabase
+            .from('sticky_notes')
+            .delete()
+            .eq('id', noteId);
+
+        if (error) throw error;
+        res.status(204).send();
+    } catch (error) {
+        console.error('Error deleting sticky note:', error);
+        res.status(500).json({ message: 'Failed to delete sticky note.' });
+    }
+};
+
+module.exports = {
+    getChildrenWithConversations,
+    getConversationSummaries,
+    getConversationDetail,
+    getUnreadConversationNotifications,
+    markNotificationsAsRead,
+    getStickyNotesByChild,
+    addStickyNote,
+    updateStickyNote,
+    deleteStickyNote,
+    getTestInsights
+};

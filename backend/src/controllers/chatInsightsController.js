@@ -213,10 +213,6 @@ const deleteStickyNote = async (req, res) => {
 
 // New unified chat insights endpoint
 const getChatInsights = async (req, res) => {
-    console.log('🔍 getChatInsights called with user:', req.user?.id);
-    console.log('🔍 Request headers:', req.headers);
-    console.log('🔍 Query params:', req.query);
-    
     const parentId = req.user.id;
     const { days = 14, status = 'all', childId } = req.query;
     
@@ -229,24 +225,21 @@ const getChatInsights = async (req, res) => {
             .from('parent_conversation_notifications')
             .select(`
                 *,
-                conversation_summaries!inner(
-                    *,
-                    children!inner(name, id)
-                )
+                children!child_id(name, id)
             `)
             .eq('parent_id', parentId)
             .gte('created_at', daysAgo.toISOString());
         
-        // Apply status filter
+        // Apply status filter - use 'status' column instead of 'is_read'
         if (status === 'read') {
-            query = query.eq('is_read', true);
+            query = query.eq('status', 'read');
         } else if (status === 'unread') {
-            query = query.eq('is_read', false);
+            query = query.eq('status', 'unread');
         }
         
         // Apply child filter
         if (childId) {
-            query = query.eq('conversation_summaries.child_id', childId);
+            query = query.eq('child_id', childId);
         }
         
         const { data, error } = await query.order('created_at', { ascending: false });
@@ -266,12 +259,12 @@ const getChatInsights = async (req, res) => {
             
             groupedInsights[date].summaries.push({
                 id: insight.id,
-                status: insight.is_read ? 'read' : 'unread',
+                status: insight.status, // Use 'status' instead of 'is_read'
                 summary: insight.summary_data,
-                childName: insight.conversation_summaries.children.name,
-                childId: insight.conversation_summaries.children.id,
+                childName: insight.children?.name || 'Unknown Child',
+                childId: insight.child_id,
                 createdAt: insight.created_at,
-                conversationId: insight.conversation_id
+                conversationId: insight.id // Use notification id as conversation reference
             });
         });
         
@@ -302,7 +295,7 @@ const markChatInsightAsRead = async (req, res) => {
     try {
         const { error } = await supabase
             .from('parent_conversation_notifications')
-            .update({ is_read: true })
+            .update({ status: 'read' })
             .eq('id', id)
             .eq('parent_id', parentId);
         
@@ -350,28 +343,12 @@ const markAllChatInsightsAsRead = async (req, res) => {
     try {
         let query = supabase
             .from('parent_conversation_notifications')
-            .update({ is_read: true })
+            .update({ status: 'read' })
             .eq('parent_id', parentId)
-            .eq('is_read', false);
+            .eq('status', 'unread');
         
         if (childId) {
-            // First get notification IDs for the specific child
-            const { data: childNotifications, error: childError } = await supabase
-                .from('parent_conversation_notifications')
-                .select('id')
-                .eq('parent_id', parentId)
-                .eq('is_read', false)
-                .in('conversation_id', 
-                    supabase
-                        .from('conversation_summaries')
-                        .select('conversation_id')
-                        .eq('child_id', childId)
-                );
-            
-            if (childError) throw childError;
-            
-            const notificationIds = childNotifications.map(n => n.id);
-            query = query.in('id', notificationIds);
+            query = query.eq('child_id', childId);
         }
         
         const { data, error } = await query.select('id');

@@ -766,7 +766,7 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
     const currentContext = {
       subject: currentWorkspace?.subject || mcpContext?.childSubjects?.[0]?.subject?.name?.toLowerCase() || 'general',
       time_of_day: new Date().getHours() >= 17 ? 'evening' : 'day',
-      session_length: Math.floor((Date.now() - (session.start_time || Date.now())) / (1000 * 60)), // minutes
+      session_length: 0, // Will be calculated from session data when available
       material_present: !!materialContentForAI,
       workspace_active: !!currentWorkspace
     };

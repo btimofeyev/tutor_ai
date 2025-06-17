@@ -14,7 +14,16 @@ async function analyzeStudentProfile(childId) {
 
     if (chatError) {
       console.warn('Could not fetch chat history for student analysis:', chatError);
-      return getDefaultProfile();
+      
+      // If table doesn't exist, use enhanced default profile based on child data
+      const { data: childData } = await supabase
+        .from('children')
+        .select('lifetime_correct, current_streak, created_at')
+        .eq('id', childId)
+        .single()
+        .catch(() => ({ data: null }));
+      
+      return getEnhancedDefaultProfile(childData);
     }
 
     // Analyze patterns in recent interactions
@@ -110,6 +119,42 @@ function getDefaultProfile() {
     last_session_duration: 0,
     preferred_subjects: []
   };
+}
+
+// Enhanced default profile using available child data
+function getEnhancedDefaultProfile(childData) {
+  console.log('🧠 Using enhanced default profile with child data:', childData);
+  
+  const profile = getDefaultProfile();
+  
+  if (childData) {
+    // Adjust confidence based on lifetime performance
+    const lifetimeCorrect = childData.lifetime_correct || 0;
+    const currentStreak = childData.current_streak || 0;
+    
+    if (lifetimeCorrect > 50 && currentStreak > 5) {
+      profile.confidence_level = 'high';
+      profile.recent_success_rate = 0.85;
+      profile.engagement_level = 'high';
+    } else if (lifetimeCorrect < 10 || currentStreak === 0) {
+      profile.confidence_level = 'low';
+      profile.recent_success_rate = 0.4;
+      profile.response_patterns.tends_to_give_up = true;
+      profile.response_patterns.asks_for_help = true;
+    }
+    
+    // Account for new vs experienced students
+    const accountAge = childData.created_at ? 
+      (Date.now() - new Date(childData.created_at).getTime()) / (1000 * 60 * 60 * 24) : 0;
+    
+    if (accountAge < 7) { // New student (less than a week)
+      profile.confidence_level = 'low';
+      profile.response_patterns.asks_for_help = true;
+      profile.engagement_level = 'medium';
+    }
+  }
+  
+  return profile;
 }
 
 // Generate adaptive conversation strategy based on student profile

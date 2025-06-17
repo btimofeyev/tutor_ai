@@ -160,17 +160,7 @@ const hasStructuredContent = (content) => {
   const hasNumberedMathList = /^\s*\d+\.\s*\\?\(/m.test(content) || // 1. \( or 1. (
                               /^\s*\d+\.\s*[^.]*[\+\-\*×÷\/]/m.test(content); // 1. something with math
   
-  const result = hasIndicator || hasNumberedMathList || (hasMultipleNumbers && hasMathKeywords) || hasWritingKeywords;
-  
-  if (result) {
-    console.log('✅ Structured content detected in:', content.substring(0, 100));
-    console.log('   - Has math indicators:', hasIndicator);
-    console.log('   - Has numbered math list:', hasNumberedMathList);
-    console.log('   - Has multiple numbers + math keywords:', hasMultipleNumbers && hasMathKeywords);
-    console.log('   - Has writing keywords:', hasWritingKeywords);
-  }
-  
-  return result;
+  return hasIndicator || hasNumberedMathList || (hasMultipleNumbers && hasMathKeywords) || hasWritingKeywords;
 };
 
 // Function to automatically style Klio's structured responses
@@ -336,24 +326,17 @@ export default function ChatMessage({ message, onSendToWorkspace, hasStructuredW
 
   // Handle the workspace button click
   const handleSendToWorkspace = () => {
-    console.log('🔄 Sending message to workspace:', message.content.substring(0, 100));
-    
-    // NEW: If we have structured workspace content, use it directly
+    // Use structured workspace content if available
     if (message.workspaceContent) {
-      console.log('✅ Using structured workspace content from message');
-      // For structured content, we could trigger a different handler
-      // or pass the structured content directly
       if (onSendToWorkspace) {
         onSendToWorkspace(message, message.workspaceContent);
       }
       return;
     }
     
-    // LEGACY: Fallback to parsing message content
+    // Fallback to parsing message content
     if (onSendToWorkspace) {
       onSendToWorkspace(message);
-    } else {
-      console.warn('⚠️ onSendToWorkspace not provided');
     }
   };
 

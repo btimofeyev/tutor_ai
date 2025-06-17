@@ -759,7 +759,7 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
     ];
 
     // 🧠 ADAPTIVE CONVERSATION INTELLIGENCE - Analyze student profile
-    console.log('🧠 Analyzing student profile for adaptive tutoring...');
+    // Analyze student profile for adaptive tutoring
     const studentProfile = await analyzeStudentProfile(childId);
     
     // Determine current context for strategy adaptation
@@ -775,8 +775,8 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
     const conversationStrategy = generateConversationStrategy(studentProfile, currentContext);
     const personalityContext = generatePersonalityContext(conversationStrategy, message);
     
-    console.log(`📊 Student Analysis: confidence=${studentProfile.confidence_level}, success_rate=${studentProfile.recent_success_rate}, engagement=${studentProfile.engagement_level}`);
-    console.log(`🎯 Strategy: response_style=${conversationStrategy.response_style}, guidance=${conversationStrategy.guidance_approach}, challenge=${conversationStrategy.challenge_level}`);
+    // Log adaptive strategy for debugging
+    console.log(`🧠 Adaptive: ${studentProfile.confidence_level} confidence, ${conversationStrategy.response_style} style`);
     
     // Check if we should trigger a celebration
     const celebrationCheck = shouldCelebrate(message, conversationStrategy, studentProfile);
@@ -823,9 +823,8 @@ ${contextualSuggestions.slice(0, 3).map(s => `- "${s}"`).join('\n')}`;
     // Update the openaiMessages with enhanced system prompt
     openaiMessages[0].content = adaptiveSystemPrompt;
     
-    // Call OpenAI with function calling and adaptive intelligence
-    console.log('🎯 Requesting response with adaptive intelligence and function calling...');
-    console.log(`📊 Context includes: ${materialContentForAI ? `Material Content ✅ (${foundMaterialTitle})` : 'No Material Content ❌'} | Strategy: ${conversationStrategy.response_style}`);
+    // Call OpenAI with adaptive intelligence
+    console.log(`🎯 OpenAI request: ${conversationStrategy.response_style} strategy${materialContentForAI ? ` + material (${foundMaterialTitle})` : ''}`);
     
     let response;
     try {
@@ -848,18 +847,16 @@ ${contextualSuggestions.slice(0, 3).map(s => `- "${s}"`).join('\n')}`;
     const responseMessage = response.choices[0].message;
     const toolCalls = responseMessage.tool_calls;
     
-    console.log(`📨 Received response with ${toolCalls?.length || 0} function calls`);
+    // Process function calls if any
 
     // Process function calls
     let workspaceActions = [];
     if (toolCalls && toolCalls.length > 0) {
-      console.log('🔧 Processing function calls...');
+      console.log(`🔧 Processing ${toolCalls.length} function calls`);
       
       for (const toolCall of toolCalls) {
         const functionName = toolCall.function.name;
         const functionArgs = JSON.parse(toolCall.function.arguments);
-        
-        console.log(`📞 Calling function: ${functionName}`, functionArgs);
         
         let result;
         switch (functionName) {
@@ -903,14 +900,12 @@ ${contextualSuggestions.slice(0, 3).map(s => `- "${s}"`).join('\n')}`;
         }
         
         workspaceActions.push(result);
-        console.log(`✅ Function result:`, result.action);
       }
     }
 
     // Auto-generate conversational response if LLM only used function calls
     let finalMessage = responseMessage.content;
     if ((!finalMessage || finalMessage.trim() === '') && workspaceActions.length > 0) {
-      console.log('🎯 Auto-generating conversational response for function calls');
       
       const action = workspaceActions[0]; // Use first action for response
       switch (action.action) {
@@ -982,7 +977,7 @@ ${contextualSuggestions.slice(0, 3).map(s => `- "${s}"`).join('\n')}`;
           finalMessage = `I've updated the workspace for you! 👍`;
       }
       
-      console.log(`🗣️ Generated conversational response: "${finalMessage}"`);
+      // Generated fallback response
     }
 
     // Update learning memories
@@ -1038,12 +1033,7 @@ ${contextualSuggestions.slice(0, 3).map(s => `- "${s}"`).join('\n')}`;
       console.error('Failed to log interaction:', logError);
     }
 
-    console.log('\n✅ === FUNCTION CALLING CHAT SESSION COMPLETE ===');
-    console.log(`Response Length: ${finalMessage?.length || 0} characters`);
-    console.log(`Function Calls: ${toolCalls?.length || 0}`);
-    console.log(`Workspace Actions: ${workspaceActions.length}`);
-    console.log(`Material Content Used: ${!!materialContentForAI}`);
-    console.log(`Found Material: ${foundMaterialTitle || 'None'}`);
+    console.log(`✅ Chat complete: ${toolCalls?.length || 0} functions, ${workspaceActions.length} actions${materialContentForAI ? `, material: ${foundMaterialTitle}` : ''}`);
 
     // Return enhanced response with workspace actions and adaptive intelligence
     res.json({

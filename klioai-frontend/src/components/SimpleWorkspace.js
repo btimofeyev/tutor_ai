@@ -243,7 +243,6 @@ const SimpleWorkspace = forwardRef(({
     const items = workspaceContent?.content || workspaceContent?.problems;
     
     if (workspaceContent && items?.length > 0) {
-      console.log('📝 Loading', items.length, workspaceContent.subject ? `${workspaceContent.subject} activities` : 'problems', 'to workspace');
       
       setProblems(items);
       

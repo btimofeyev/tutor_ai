@@ -237,7 +237,6 @@ export default function ChatPage() {
       const inactivityThreshold = studentProfile?.confidence_level === 'low' ? 180000 : 300000; // 3-5 minutes
       
       if (timeSinceActivity > inactivityThreshold && !isWorkspaceExpanded) {
-        console.log('🎯 Auto-collapsing workspace due to inactivity');
         setWorkspaceContent(null);
       }
     };
@@ -272,19 +271,11 @@ export default function ChatPage() {
       // ENHANCED: Use function calling chat service with expanded context
       const response = await chatService.sendMessage(messageText, messages.slice(-50), currentLessonContext);
 
-      console.log('📨 Received function calling response:', {
-        workspaceActionsCount: response.workspaceActions?.length || 0,
-        hasCurrentWorkspace: !!response.currentWorkspace,
-        hasAdaptiveIntelligence: !!response.adaptiveIntelligence
-      });
+      // Process response with adaptive intelligence
 
       // 🧠 Process Adaptive Intelligence Data - Focus on tutoring quality
       if (response.adaptiveIntelligence) {
-        console.log('🧠 Processing adaptive intelligence data:', {
-          confidence: response.adaptiveIntelligence.studentProfile?.confidence_level,
-          success_rate: response.adaptiveIntelligence.studentProfile?.recent_success_rate,
-          strategy: response.adaptiveIntelligence.conversationStrategy?.response_style
-        });
+        // Apply adaptive intelligence to UI
         
         setAdaptiveData(response.adaptiveIntelligence);
         setStudentProfile(response.adaptiveIntelligence.studentProfile);
@@ -292,7 +283,6 @@ export default function ChatPage() {
         // Update dynamic suggestions based on student profile and needs
         if (response.adaptiveIntelligence.contextualSuggestions) {
           setDynamicSuggestions(response.adaptiveIntelligence.contextualSuggestions);
-          console.log('📝 Updated contextual suggestions based on student profile');
         }
       }
 

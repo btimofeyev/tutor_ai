@@ -123,7 +123,6 @@ function getDefaultProfile() {
 
 // Enhanced default profile using available child data
 function getEnhancedDefaultProfile(childData) {
-  console.log('🧠 Using enhanced default profile with child data:', childData);
   
   const profile = getDefaultProfile();
   

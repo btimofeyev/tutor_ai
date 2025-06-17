@@ -1,5 +1,4 @@
 const supabase = require('../utils/supabaseClient');
-const { getUnixTime, startOfDay } = require('date-fns');
 
 // Placeholder for getTestInsights
 const getTestInsights = (req, res) => {
@@ -212,6 +211,182 @@ const deleteStickyNote = async (req, res) => {
     }
 };
 
+// New unified chat insights endpoint
+const getChatInsights = async (req, res) => {
+    const parentId = req.user.id;
+    const { days = 14, status = 'all', childId } = req.query;
+    
+    try {
+        // Calculate date range
+        const daysAgo = new Date();
+        daysAgo.setDate(daysAgo.getDate() - parseInt(days));
+        
+        let query = supabase
+            .from('parent_conversation_notifications')
+            .select(`
+                *,
+                conversation_summaries!inner(
+                    *,
+                    children!inner(name, id)
+                )
+            `)
+            .eq('parent_id', parentId)
+            .gte('created_at', daysAgo.toISOString());
+        
+        // Apply status filter
+        if (status === 'read') {
+            query = query.eq('is_read', true);
+        } else if (status === 'unread') {
+            query = query.eq('is_read', false);
+        }
+        
+        // Apply child filter
+        if (childId) {
+            query = query.eq('conversation_summaries.child_id', childId);
+        }
+        
+        const { data, error } = await query.order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        // Group insights by date
+        const groupedInsights = {};
+        data.forEach(insight => {
+            const date = new Date(insight.created_at).toISOString().split('T')[0];
+            if (!groupedInsights[date]) {
+                groupedInsights[date] = {
+                    date,
+                    summaries: []
+                };
+            }
+            
+            groupedInsights[date].summaries.push({
+                id: insight.id,
+                status: insight.is_read ? 'read' : 'unread',
+                summary: insight.summary_data,
+                childName: insight.conversation_summaries.children.name,
+                childId: insight.conversation_summaries.children.id,
+                createdAt: insight.created_at,
+                conversationId: insight.conversation_id
+            });
+        });
+        
+        // Convert to array format expected by frontend
+        const chatInsights = Object.values(groupedInsights).sort((a, b) => 
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        
+        res.json({
+            success: true,
+            chatInsights
+        });
+        
+    } catch (error) {
+        console.error('Error fetching chat insights:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch chat insights'
+        });
+    }
+};
+
+// Mark a specific insight as read
+const markChatInsightAsRead = async (req, res) => {
+    const { id } = req.params;
+    const parentId = req.user.id;
+    
+    try {
+        const { error } = await supabase
+            .from('parent_conversation_notifications')
+            .update({ is_read: true })
+            .eq('id', id)
+            .eq('parent_id', parentId);
+        
+        if (error) throw error;
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error marking insight as read:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to mark insight as read'
+        });
+    }
+};
+
+// Delete a specific insight
+const deleteChatInsight = async (req, res) => {
+    const { id } = req.params;
+    const parentId = req.user.id;
+    
+    try {
+        const { error } = await supabase
+            .from('parent_conversation_notifications')
+            .delete()
+            .eq('id', id)
+            .eq('parent_id', parentId);
+        
+        if (error) throw error;
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting insight:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete insight'
+        });
+    }
+};
+
+// Mark all insights as read
+const markAllChatInsightsAsRead = async (req, res) => {
+    const parentId = req.user.id;
+    const { childId } = req.body;
+    
+    try {
+        let query = supabase
+            .from('parent_conversation_notifications')
+            .update({ is_read: true })
+            .eq('parent_id', parentId)
+            .eq('is_read', false);
+        
+        if (childId) {
+            // First get notification IDs for the specific child
+            const { data: childNotifications, error: childError } = await supabase
+                .from('parent_conversation_notifications')
+                .select('id')
+                .eq('parent_id', parentId)
+                .eq('is_read', false)
+                .in('conversation_id', 
+                    supabase
+                        .from('conversation_summaries')
+                        .select('conversation_id')
+                        .eq('child_id', childId)
+                );
+            
+            if (childError) throw childError;
+            
+            const notificationIds = childNotifications.map(n => n.id);
+            query = query.in('id', notificationIds);
+        }
+        
+        const { data, error } = await query.select('id');
+        
+        if (error) throw error;
+        
+        res.json({
+            success: true,
+            updatedCount: data.length
+        });
+    } catch (error) {
+        console.error('Error marking all insights as read:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to mark all insights as read'
+        });
+    }
+};
+
 module.exports = {
     getChildrenWithConversations,
     getConversationSummaries,
@@ -222,5 +397,9 @@ module.exports = {
     addStickyNote,
     updateStickyNote,
     deleteStickyNote,
-    getTestInsights
+    getTestInsights,
+    getChatInsights,
+    markChatInsightAsRead,
+    deleteChatInsight,
+    markAllChatInsightsAsRead
 };

@@ -187,6 +187,20 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
                 </div>
               </div>
 
+              {/* Reading Passage - show for reading comprehension */}
+              {problem.reading_passage && (
+                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center mb-2">
+                    <span className="text-sm font-semibold text-amber-700 bg-amber-200 px-2 py-1 rounded-full">
+                      📖 Reading Passage
+                    </span>
+                  </div>
+                  <div className="text-gray-800 leading-relaxed">
+                    {problem.reading_passage}
+                  </div>
+                </div>
+              )}
+
               {/* Problem Text */}
               <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="text-xl font-bold text-gray-800">

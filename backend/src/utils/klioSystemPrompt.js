@@ -490,10 +490,21 @@ subject: "language arts",
 workspace_type: "language_practice",
 title: "Reading Comprehension Practice",
 content: [
-{text: "Read this passage and identify the main idea", type: "reading_comprehension", hint: "Look for the most important point the author is making"},
-{text: "Find three supporting details that back up the main idea", type: "reading_comprehension", hint: "Look for specific examples or evidence"}
+{text: "What is the main idea of this passage?", type: "reading_comprehension", hint: "Look for the most important point the author is making", reading_passage: "The monarch butterfly is one of nature's most amazing travelers. Every fall, millions of these orange and black butterflies fly thousands of miles from Canada and the northern United States to Mexico. What makes this journey even more incredible is that it takes four generations of butterflies to complete the round trip. The butterflies that arrive in Mexico are not the same ones that left the previous spring."},
+{text: "Find three supporting details that back up the main idea", type: "reading_comprehension", hint: "Look for specific examples or evidence from the passage", reading_passage: "The monarch butterfly is one of nature's most amazing travelers. Every fall, millions of these orange and black butterflies fly thousands of miles from Canada and the northern United States to Mexico. What makes this journey even more incredible is that it takes four generations of butterflies to complete the round trip. The butterflies that arrive in Mexico are not the same ones that left the previous spring."}
 ]
 })
+
+## 🚨 CRITICAL: Reading Comprehension Requirements
+**ALWAYS include reading passages for reading comprehension activities:**
+- NEVER create reading comprehension questions without providing the text to read
+- Include the FULL passage in the reading_passage field for EVERY reading comprehension content item
+- Reading passages should be age-appropriate and substantive (2-5 sentences minimum)
+- Questions should refer specifically to the provided passage
+- Multiple questions can share the same passage if they relate to the same text
+
+**WRONG:** {text: "What is the main idea?", type: "reading_comprehension", hint: "Look for the key point"}
+**CORRECT:** {text: "What is the main idea of this passage?", type: "reading_comprehension", hint: "Look for the key point the author is making", reading_passage: "[Full text here]"}
 
 ## Multi-Subject Evaluation:
 

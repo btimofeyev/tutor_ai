@@ -73,6 +73,10 @@ const WORKSPACE_TOOLS = [
                   enum: ["easy", "medium", "hard"],
                   description: "Difficulty level"
                 },
+                reading_passage: {
+                  type: "string",
+                  description: "Required for reading_comprehension type: the passage text that students read before answering questions"
+                },
                 evaluation_criteria: {
                   type: "object",
                   description: "Subject-specific evaluation criteria",
@@ -179,6 +183,10 @@ const WORKSPACE_TOOLS = [
                 difficulty: {
                   type: "string",
                   enum: ["easy", "medium", "hard"] 
+                },
+                reading_passage: {
+                  type: "string",
+                  description: "Required for reading_comprehension type: the passage text that students read before answering questions"
                 },
                 evaluation_criteria: {
                   type: "object",

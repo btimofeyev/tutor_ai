@@ -34,4 +34,10 @@ router.delete('/sticky-notes/:noteId', authenticateParent, chatInsightsControlle
 // Test route to ensure insights endpoint is reachable
 router.get('/test-insights', chatInsightsController.getTestInsights);
 
+// New unified chat insights endpoints
+router.get('/', authenticateParent, chatInsightsController.getChatInsights);
+router.post('/:id/mark-read', authenticateParent, chatInsightsController.markChatInsightAsRead);
+router.delete('/:id', authenticateParent, chatInsightsController.deleteChatInsight);
+router.post('/mark-all-read', authenticateParent, chatInsightsController.markAllChatInsightsAsRead);
+
 module.exports = router;

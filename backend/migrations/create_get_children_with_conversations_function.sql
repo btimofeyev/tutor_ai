@@ -15,8 +15,8 @@ BEGIN
         c.name,
         c.parent_id
     FROM children c
-    INNER JOIN chat_history ch ON c.id = ch.child_id
-    WHERE DATE(ch.created_at) = conversation_date
+    INNER JOIN chat_messages cm ON c.id = cm.child_id
+    WHERE DATE(cm.created_at) = conversation_date
     ORDER BY c.name;
 END;
 $$;

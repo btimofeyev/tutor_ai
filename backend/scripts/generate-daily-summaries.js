@@ -29,8 +29,8 @@ const getChildrenWithConversations = async (date) => {
 
 const getConversationsForChild = async (childId, date) => {
     const { data, error } = await supabase
-      .from('chat_history')
-      .select('message_text, role, created_at')
+      .from('chat_messages')
+      .select('content, role, created_at')
       .eq('child_id', childId)
       .gte('created_at', `${date}T00:00:00.000Z`)
       .lte('created_at', `${date}T23:59:59.999Z`)
@@ -51,7 +51,7 @@ const getConversationsForChild = async (childId, date) => {
   Child's Name: ${childName}
   
   Conversation History:
-  ${conversations.map(msg => `${msg.role === 'user' ? 'Child' : 'Klio'}: ${msg.message_text}`).join('\n')}
+  ${conversations.map(msg => `${msg.role === 'user' ? 'Child' : 'Klio'}: ${msg.content}`).join('\n')}
   
   Please provide a summary in the following JSON format:
   {

@@ -26,16 +26,22 @@ const WorkspacePanel = forwardRef(({ workspaceContent, onToggleSize, isExpanded,
   
   // Initialize workspace when content changes  
   useEffect(() => {
-    if (workspaceContent && workspaceContent.problems?.length > 0) {
-      console.log('🎯 Initializing workspace with', workspaceContent.problems.length, 'problems');
+    // Handle both new subject workspaces (content) and legacy math workspaces (problems)
+    const items = workspaceContent?.content || workspaceContent?.problems;
+    
+    if (workspaceContent && items?.length > 0) {
+      const itemType = workspaceContent.subject ? 
+        (workspaceContent.subject === 'math' ? 'problems' : 'activities') : 'problems';
       
-      // Set problems from workspace content
-      setProblems(workspaceContent.problems);
+      console.log('🎯 Initializing', workspaceContent.subject || 'math', 'workspace with', items.length, itemType);
+      
+      // Set problems/activities from workspace content
+      setProblems(items);
       
       // Set initial problem states
       const initialStates = {};
-      workspaceContent.problems.forEach(problem => {
-        initialStates[problem.id] = problem.status || 'pending';
+      items.forEach(item => {
+        initialStates[item.id] = item.status || 'pending';
       });
       setProblemStates(initialStates);
       

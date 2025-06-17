@@ -7,7 +7,7 @@ const chatHistoryService = require('../services/chatHistoryService');
 const { formatLearningContextForAI, isLessonQuery } = require('../middleware/mcpContext');
 const { getCurrentDateInfo, getDueDateStatus } = require('../utils/dateUtils');
 const { KLIO_SYSTEM_PROMPT } = require('../utils/klioSystemPrompt');
-const { WORKSPACE_TOOLS } = require('../utils/workspaceTools');
+const { WORKSPACE_TOOLS, getEvaluationTypeForSubject, generateWorkspaceFromMaterial, detectSubjectFromMaterial, findCrossSubjectConnections, suggestComplementaryActivities } = require('../utils/workspaceTools');
 const { getWorkspaceHandler } = require('../utils/workspaceFunctionHandlers');
 
 // Initialize OpenAI client
@@ -19,77 +19,166 @@ const openai = new OpenAI({
 // Enhanced system prompt for function calling
 const ENHANCED_SYSTEM_PROMPT = `${KLIO_SYSTEM_PROMPT}
 
-# 🔧 FUNCTION CALLING FOR WORKSPACE MANAGEMENT
+# 🔧 MULTI-SUBJECT WORKSPACE MANAGEMENT
 
-You have access to powerful workspace tools that create interactive learning experiences. Use them strategically:
+You have access to powerful workspace tools that create interactive learning experiences across ALL subjects. Use them strategically:
 
-## When to CREATE NEW workspace (create_math_workspace):
-- Student asks for practice problems: "Can you give me some fraction problems?"
-- Starting a new topic: "Let's practice multiplication"
+## 🎯 CREATING SUBJECT WORKSPACES (create_subject_workspace):
+
+**Math Workspaces:**
+- Student asks: "Can you give me some fraction problems?"
+→ create_subject_workspace({subject: "math", workspace_type: "math_problems", ...})
+
+**Science Workspaces:**
+- Student asks: "Help me with the density experiment"
+→ create_subject_workspace({subject: "science", workspace_type: "science_investigation", ...})
+
+**History Workspaces:**
+- Student asks: "I need to work on Civil War timeline"
+→ create_subject_workspace({subject: "history", workspace_type: "history_analysis", ...})
+
+**Language Arts Workspaces:**
+- Student asks: "Let's practice reading comprehension"
+→ create_subject_workspace({subject: "language arts", workspace_type: "language_practice", ...})
+
+**Social Studies Workspaces:**
+- Student asks: "Help me understand government structure"
+→ create_subject_workspace({subject: "social studies", workspace_type: "social_investigation", ...})
+
+## 📚 SUBJECT-SPECIFIC CONTENT TYPES:
+
+**Math:** addition, subtraction, multiplication, division, fractions, decimals, word_problem, algebra, geometry
+**Science:** hypothesis, experiment_step, observation, data_collection, conclusion, lab_safety  
+**History:** timeline_event, cause_effect, primary_source, compare_contrast, historical_thinking
+**Language Arts:** reading_comprehension, vocabulary, grammar, writing_prompt, literary_analysis
+**Social Studies:** map_analysis, civic_scenario, cultural_comparison, government_structure, economics
+
+## ⚖️ EVALUATION TYPES BY SUBJECT:
+
+**Binary (Math):** correct/incorrect for problems with clear answers
+**Rubric (Science/Language Arts):** excellent/good/needs_improvement for multi-criteria tasks  
+**Evidence-based (History/Social Studies):** assess reasoning and evidence quality
+
+## 🔧 WHEN TO USE WORKSPACE FUNCTIONS:
+
+**CREATE NEW workspace:**
+- Student asks for practice in any subject
+- Starting a new topic or skill
 - Student says "I want to work on [topic]"
-- You want to provide structured practice
+- MCP materials suggest interactive practice
 
-**Example:** Student says "Help me practice adding fractions"
-→ Use create_math_workspace with 3-5 addition problems
-
-## When to ADD to existing workspace (add_problems_to_workspace):
-- Student wants more: "Give me another one" or "More problems please"
+**ADD CONTENT (add_content_to_workspace):**
+- Student wants more: "Give me another one" or "More activities please"
 - Student is doing well: "That was easy, can I have harder ones?"
-- Continuing same topic: Student solving fractions, wants more fractions
+- Continuing same topic in any subject
 
-**Example:** Student completes 3 problems and says "These are fun, more please!"
-→ Use add_problems_to_workspace with 2-3 more similar problems
-
-## When to MARK problems (mark_problem_correct/incorrect):
+**EVALUATE CONTENT (evaluate_content_item):**
 - Student shows their work and asks you to check it
-- Student gives an answer: "I got 8/12, is that right?"
-- You can clearly see if their work is correct or incorrect
-- Student asks "How did I do?" after showing work
+- Student gives an answer and wants feedback
+- You can assess their work quality
+- Use appropriate evaluation type for the subject
 
-**CRITICAL:** Only mark problems when you can verify the student's work!
+**CRITICAL:** Always match the evaluation type to the subject and provide meaningful feedback!
 
-## Function Calling Examples:
+## 📋 MULTI-SUBJECT FUNCTION CALLING EXAMPLES:
 
-**Creating workspace:**
+**Math Workspace:**
 Student: "I need to practice multiplying fractions"
-→ create_math_workspace({
+→ create_subject_workspace({
+subject: "math",
+workspace_type: "math_problems", 
 title: "Fraction Multiplication Practice",
-problems: [
-{text: "2/3 × 1/4", type: "fractions", hint: "Multiply numerators, then denominators"},
-{text: "3/5 × 2/7", type: "fractions", hint: "Remember to simplify if possible"}
+content: [
+{text: "2/3 × 1/4", type: "multiplication", hint: "Multiply numerators, then denominators"},
+{text: "3/5 × 2/7", type: "multiplication", hint: "Remember to simplify if possible"}
 ]
 })
 
-**Adding problems:**
-Student: "Give me more fraction problems!"
-→ add_problems_to_workspace({
-problems: [
-{text: "4/9 × 3/8", type: "fractions", hint: "Take your time with the multiplication"}
+**Science Workspace:**
+Student: "Help me with this density lab"
+→ create_subject_workspace({
+subject: "science",
+workspace_type: "science_investigation",
+title: "Density Investigation Lab",
+content: [
+{text: "Form a hypothesis about which object will be denser", type: "hypothesis", hint: "Use if-then format"},
+{text: "Record the mass and volume measurements", type: "data_collection", hint: "Use the balance and graduated cylinder"}
 ]
 })
 
-**Marking correct:**
-Student: "For 2/3 × 1/4, I multiplied 2×1=2 and 3×4=12, so I got 2/12 = 1/6"
-→ mark_problem_correct({
-problem_index: 0,
-feedback: "Perfect! You multiplied correctly and simplified beautifully! 🎉"
+**History Workspace:**
+Student: "I need to work on the Civil War timeline"
+→ create_subject_workspace({
+subject: "history", 
+workspace_type: "history_analysis",
+title: "Civil War Timeline Analysis",
+content: [
+{text: "When did the Civil War begin and with what event?", type: "timeline_event", hint: "Think about Fort Sumter"},
+{text: "What were the main causes that led to the Civil War?", type: "cause_effect", hint: "Consider economic, political, and social factors"}
+]
 })
 
-**Marking incorrect:**
-Student: "I got 5/12 for the first problem"
-→ mark_problem_incorrect({
-problem_index: 0,
-guidance: "Close, but let me help you check your multiplication. What's 2×1? And what's 3×4?"
+**Language Arts Workspace:**
+Student: "Let's practice reading comprehension"
+→ create_subject_workspace({
+subject: "language arts",
+workspace_type: "language_practice", 
+title: "Reading Comprehension Practice",
+content: [
+{text: "What is the main idea of the passage?", type: "reading_comprehension", hint: "Look for the most important point the author is making"},
+{text: "What does the word 'resilient' mean in this context?", type: "vocabulary", hint: "Use context clues from surrounding sentences"}
+]
 })
 
-## Function Calling Rules:
-1. **Always use functions when appropriate** - they create better experiences
-2. **Be specific with feedback** - make marking meaningful
-3. **Don't overuse clear_workspace** - only when completely changing topics
-4. **Add incrementally** - don't create huge workspaces at once
-5. **Match difficulty to student** - observe their performance
+**Evaluating Student Work:**
+Student: "For the density lab, my hypothesis is: If I test different materials, then metal will be denser than wood because metal atoms are packed more tightly."
+→ evaluate_content_item({
+content_index: 0,
+evaluation_result: "excellent", 
+feedback: "Outstanding hypothesis! You used proper if-then format and gave a scientific explanation based on atomic structure! ⭐",
+rubric_scores: {
+criteria_scores: [
+{criterion: "Format", score: 4, max_score: 4, feedback: "Perfect if-then structure"},
+{criterion: "Scientific reasoning", score: 4, max_score: 4, feedback: "Excellent atomic explanation"}
+]
+}
+})
 
-Remember: Functions are tools to enhance learning, not replace good teaching!`;
+## 🎯 MULTI-SUBJECT FUNCTION CALLING RULES:
+
+1. **Subject Detection**: Analyze MCP materials to detect subject automatically
+2. **Appropriate Workspaces**: Match workspace type to subject (math_problems, science_investigation, etc.)
+3. **Evaluation Matching**: Use binary for math, rubric for science/language arts, evidence-based for history/social studies
+4. **Content Type Accuracy**: Use subject-specific content types (hypothesis for science, timeline_event for history)
+5. **Progressive Difficulty**: Start with student's level and adapt based on performance
+6. **Meaningful Feedback**: Provide subject-appropriate feedback and encouragement
+7. **Workspace Continuity**: Use add_content_to_workspace for same subject, create_subject_workspace for new topics
+8. **Clear Separation**: Only use clear_workspace when completely changing subjects or starting over
+
+## 🔄 LEGACY COMPATIBILITY:
+- create_math_workspace, add_problems_to_workspace, mark_problem_correct/incorrect still work
+- But prefer create_subject_workspace and evaluate_content_item for new implementations
+- All workspaces support the enhanced multi-level feedback system
+
+## 🔗 CROSS-SUBJECT LEARNING CONNECTIONS:
+
+**Make Learning Connections:**
+- When working on math fractions, mention their use in science measurements
+- When studying history timelines, connect to mathematical sequencing
+- When analyzing literature, connect to historical context
+- When doing science experiments, connect to mathematical calculations
+
+**Examples:**
+- Math fractions + Science: "Fractions help us measure precise amounts in chemistry experiments"
+- History events + Language Arts: "Primary sources from this period are great reading comprehension practice"
+- Science observations + Math: "Let's use decimals to record our measurements precisely"
+
+**Suggest Complementary Activities:**
+- After math geometry: "This connects to architecture you might study in history class"
+- After science hypothesis: "Writing clear hypotheses helps with language arts too"
+- After history analysis: "The data from this period makes great math practice"
+
+Remember: Functions are tools to enhance learning across ALL subjects, creating meaningful connections between disciplines!`;
 
 // 🔧 FIXED: Parse specific question requests
 function parseSpecificQuestionRequest(message) {
@@ -467,6 +556,15 @@ exports.chat = async (req, res) => {
         );
         console.log(`✅ Added material content to AI context: "${foundMaterialTitle}"`);
         console.log(`📝 Question ${specificQuestionRequest.questionNumber} context prepared`);
+        
+        // Check if material has interactive content suitable for workspace
+        const detectedSubject = detectSubjectFromMaterial(materialData);
+        const workspaceData = generateWorkspaceFromMaterial(materialData, 3);
+        
+        if (workspaceData && workspaceData.content.length > 0) {
+          console.log(`🎯 Material "${foundMaterialTitle}" has ${workspaceData.content.length} interactive ${detectedSubject} activities`);
+          materialContentForAI += `\n\n**WORKSPACE OPPORTUNITY:** This material contains ${workspaceData.content.length} interactive ${detectedSubject} activities that could be turned into a hands-on workspace for practice.`;
+        }
       } else {
         console.log('❌ Could not retrieve material content');
         materialContentForAI = `\n⚠️ **MATERIAL ACCESS ISSUE**: Could not find a material containing question ${specificQuestionRequest.questionNumber}. 
@@ -506,6 +604,16 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
               foundMaterialTitle = materialData.material.title;
               materialContentForAI = formatMaterialContentForAI(materialData);
               console.log(`✅ Added found material content to AI context: "${foundMaterialTitle}"`);
+              
+              // Check if material has interactive content suitable for workspace
+              const detectedSubject = detectSubjectFromMaterial(materialData);
+              const workspaceData = generateWorkspaceFromMaterial(materialData, 4);
+              
+              if (workspaceData && workspaceData.content.length > 0) {
+                console.log(`🎯 Found material "${foundMaterialTitle}" has ${workspaceData.content.length} interactive ${detectedSubject} activities`);
+                materialContentForAI += `\n\n**WORKSPACE SUGGESTION:** This ${detectedSubject} material contains ${workspaceData.content.length} activities perfect for an interactive workspace.`;
+              }
+              
               break;
             }
           }
@@ -539,36 +647,52 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       })
     ]);
 
-    // Enhanced context for function calling
+    // Enhanced context for function calling - supports multi-subject workspaces
     let workspaceContext = '';
     if (currentWorkspace) {
-      const workspaceProblems = currentWorkspace.problems || [];
-      const problemsList = workspaceProblems.map((p, i) => `${i + 1}. ${p.text} (${p.status})`).join('\n');
+      const isSubjectWorkspace = currentWorkspace.subject && currentWorkspace.content;
+      const workspaceItems = currentWorkspace.content || currentWorkspace.problems || [];
+      const subject = currentWorkspace.subject || 'math';
+      const workspaceType = currentWorkspace.type || 'math_problems';
       
-      workspaceContext = `\n\n**CURRENT WORKSPACE CONTEXT:**
-      - Active workspace: "${currentWorkspace.title}"
-      - Total problems: ${currentWorkspace.stats.totalProblems}
+      const itemsList = workspaceItems.map((item, i) => {
+        const label = subject === 'math' ? 'Problem' : 
+                     subject === 'science' ? 'Activity' :
+                     subject === 'history' ? 'Question' :
+                     subject === 'language arts' ? 'Exercise' : 'Task';
+        return `${i + 1}. ${item.text} (${item.status})`;
+      }).join('\n');
+      
+      workspaceContext = `\n\n**CURRENT ${subject.toUpperCase()} WORKSPACE CONTEXT:**
+      - Active workspace: "${currentWorkspace.title}" (${workspaceType})
+      - Subject: ${subject}
+      - Total items: ${currentWorkspace.stats.totalItems || currentWorkspace.stats.totalProblems}
       - Completed: ${currentWorkspace.stats.completed}
-      - Current streak: ${currentWorkspace.stats.streak}
-      - Best streak: ${currentWorkspace.stats.bestStreak}
+      - Evaluation type: ${getEvaluationTypeForSubject ? getEvaluationTypeForSubject(subject) : 'binary'}
       
-      **WORKSPACE PROBLEMS:**
-      ${problemsList}
+      **WORKSPACE CONTENT:**
+      ${itemsList}
       
-      **IMPORTANT WORKSPACE RULES:**
-      - When student asks to check work on "Problem X" and shows their work, use mark_problem_correct or mark_problem_incorrect
-      - Use "add_problems_to_workspace" to add more problems to existing workspace
-      - Use "mark_problem_correct" when student shows correct work with problem index (X-1)
-      - Use "mark_problem_incorrect" when student makes mistakes with problem index (X-1)
-      - Only use "create_math_workspace" when starting completely new topic
-      - Only use "clear_workspace" when student explicitly wants to start over
+      **MULTI-SUBJECT WORKSPACE RULES:**
+      - For checking work: Use evaluate_content_item with appropriate evaluation_result for this subject
+      - For adding content: Use add_content_to_workspace with subject-appropriate content types
+      - For math: Use correct/incorrect evaluation
+      - For science/language arts: Use excellent/good/needs_improvement with rubric_scores
+      - For history/social studies: Use evidence-based evaluation with evidence_quality
+      - Content index is 0-based: "Item 1" = content_index: 0, "Item 2" = content_index: 1
       
-      **CHECKING STUDENT WORK:** If student says "check my work on Problem X" and shows their answer, evaluate it and use mark_problem_correct/incorrect with problem_index = X-1
+      **CHECKING STUDENT WORK:** 
+      If student says "check my work on [Item] X" and shows their work:
+      1. Evaluate their work quality based on subject standards
+      2. Use evaluate_content_item with content_index = X-1
+      3. Choose appropriate evaluation_result for the subject
+      4. Provide meaningful, subject-specific feedback
       
       **CRITICAL - CONVERSATIONAL RESPONSES:** Always provide conversational text alongside function calls:
-      - When marking correct: "Perfect! You got that right! Great work on 2 + 3 = 5!"
-      - When marking incorrect: "Not quite right, but let's work through this together!"
-      - NEVER use function calls without conversational text - this creates empty chat bubbles!`;
+      - When excellent: "Outstanding work! You really understand this concept! ⭐"
+      - When good: "Great job! You've got the right idea! ✅"
+      - When needs improvement: "Good effort! Let's work on this together to make it even better! 💪"
+      - NEVER use function calls without conversational text!`;
     }
 
     // Build the enhanced system prompt

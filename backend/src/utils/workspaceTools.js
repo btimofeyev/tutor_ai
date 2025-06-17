@@ -518,5 +518,126 @@ module.exports = {
     };
     
     return hintMap[subject]?.[contentType] || "Take your time and think through this step by step!";
+  },
+
+  // Cross-subject learning connections
+  findCrossSubjectConnections: function(currentSubject, topic, otherSubjects = []) {
+    const connections = {
+      math: {
+        science: {
+          fractions: "Fractions are used in chemistry for ratios and proportions",
+          decimals: "Decimals appear in scientific measurements and data",
+          geometry: "Geometric shapes help understand molecular structures",
+          algebra: "Algebraic equations model scientific relationships"
+        },
+        history: {
+          fractions: "Historical timelines often use fractional periods",
+          statistics: "Population data and historical trends use statistics",
+          geometry: "Architecture and engineering in historical civilizations"
+        },
+        "language arts": {
+          word_problem: "Math word problems develop reading comprehension skills",
+          statistics: "Data analysis skills transfer to literary analysis"
+        }
+      },
+      science: {
+        math: {
+          hypothesis: "Hypotheses often involve mathematical predictions",
+          data_collection: "Data collection requires mathematical measurement",
+          observation: "Scientific observations use mathematical precision"
+        },
+        history: {
+          experiment_step: "Scientific method development through history",
+          observation: "Historical scientific discoveries and their impact"
+        }
+      },
+      history: {
+        "language arts": {
+          primary_source: "Primary sources are literary texts requiring analysis",
+          timeline_event: "Historical narratives develop reading comprehension",
+          cause_effect: "Cause and effect analysis transfers to literature"
+        },
+        math: {
+          timeline_event: "Timelines involve mathematical sequencing and intervals",
+          cause_effect: "Statistical analysis of historical patterns"
+        }
+      },
+      "language arts": {
+        history: {
+          reading_comprehension: "Historical texts develop comprehension skills",
+          vocabulary: "Historical context enriches vocabulary learning",
+          writing_prompt: "Historical topics provide rich writing material"
+        },
+        science: {
+          vocabulary: "Scientific terminology expands academic vocabulary",
+          writing_prompt: "Science topics provide factual writing opportunities"
+        }
+      }
+    };
+
+    const currentConnections = connections[currentSubject] || {};
+    const foundConnections = [];
+
+    for (const otherSubject of otherSubjects) {
+      if (currentConnections[otherSubject]) {
+        const subjectConnections = currentConnections[otherSubject];
+        for (const [contentType, connection] of Object.entries(subjectConnections)) {
+          if (topic.toLowerCase().includes(contentType)) {
+            foundConnections.push({
+              subject: otherSubject,
+              connection: connection,
+              contentType: contentType
+            });
+          }
+        }
+      }
+    }
+
+    return foundConnections;
+  },
+
+  // Suggest complementary activities from other subjects
+  suggestComplementaryActivities: function(currentSubject, topic, completedActivities = []) {
+    const suggestions = [];
+    
+    // Define cross-curricular activity suggestions
+    const activityMap = {
+      math: {
+        fractions: [
+          { subject: "science", activity: "Measure ingredients for a chemistry experiment using fractions" },
+          { subject: "language arts", activity: "Read and analyze a recipe that uses fractional measurements" }
+        ],
+        geometry: [
+          { subject: "history", activity: "Study architectural designs from ancient civilizations" },
+          { subject: "science", activity: "Explore geometric patterns in nature and crystals" }
+        ]
+      },
+      science: {
+        density: [
+          { subject: "math", activity: "Calculate density using division and measurement" },
+          { subject: "history", activity: "Learn about Archimedes' discovery of density principles" }
+        ],
+        hypothesis: [
+          { subject: "language arts", activity: "Write a hypothesis using clear, scientific language" },
+          { subject: "math", activity: "Create mathematical predictions for your hypothesis" }
+        ]
+      },
+      history: {
+        "civil war": [
+          { subject: "math", activity: "Analyze Civil War statistics and battle data" },
+          { subject: "language arts", activity: "Read primary source letters from Civil War soldiers" }
+        ]
+      }
+    };
+
+    const currentActivities = activityMap[currentSubject] || {};
+    
+    for (const [activityTopic, activities] of Object.entries(currentActivities)) {
+      if (topic.toLowerCase().includes(activityTopic)) {
+        suggestions.push(...activities);
+      }
+    }
+
+    return suggestions.slice(0, 3); // Return top 3 suggestions
   }
 };

@@ -1,300 +1,169 @@
-// backend/src/controllers/chatInsightsController.js
-const supabase = require('../utils/supabaseClient');
+// backend/scripts/generate-daily-summaries.js
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+const { createClient } = require('@supabase/supabase-js');
+const OpenAI = require('openai');
 
-/**
- * Get conversation summaries for a parent's children
- * Returns daily summaries grouped by date, filtered by selected child if specified
- */
-exports.getChatInsights = async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const { childId, days = 7, status = 'unread' } = req.query;
+// Initialize Supabase client
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-    // Build query filters
-    let query = supabase
-      .from('parent_conversation_notifications')
-      .select(`
-        *,
-        children:child_id (
-          id,
-          name,
-          grade
-        )
-      `)
-      .eq('parent_id', userId)
-      .gte('conversation_date', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-      .order('conversation_date', { ascending: false })
-      .order('created_at', { ascending: false });
+const getChildrenWithConversations = async (date) => {
+  const { data, error } = await supabase.rpc('get_children_with_conversations_on_date', { conversation_date: date });
 
-    // Filter by child if specified
-    if (childId) {
-      query = query.eq('child_id', childId);
-    }
+  if (error) {
+    console.error('Error getting children with conversations:', error);
+    throw error;
+  }
+  return data;
+};
 
-    // Filter by status if specified (default to unread)
-    if (status !== 'all') {
-      query = query.eq('status', status);
-    }
-
-    const { data: notifications, error } = await query;
-
+const getConversationsForChild = async (childId, date) => {
+    const { data, error } = await supabase
+      .from('chat_history')
+      .select('message_text, role, created_at')
+      .eq('child_id', childId)
+      .gte('created_at', `${date}T00:00:00.000Z`)
+      .lte('created_at', `${date}T23:59:59.999Z`)
+      .order('created_at', { ascending: true });
+  
     if (error) {
-      console.error('Error fetching chat insights:', error);
-      return res.status(500).json({ error: 'Failed to fetch chat insights' });
+      console.error(`Error fetching conversations for child ${childId}:`, error);
+      throw error;
     }
+    return data;
+  };
+  
 
-    // Group notifications by date
-    const groupedByDate = notifications.reduce((acc, notification) => {
-      const dateKey = notification.conversation_date;
-      if (!acc[dateKey]) {
-        acc[dateKey] = [];
-      }
-      acc[dateKey].push({
-        id: notification.id,
-        childId: notification.child_id,
-        childName: notification.children?.name || 'Unknown',
-        childGrade: notification.children?.grade,
-        date: notification.conversation_date,
-        status: notification.status,
-        createdAt: notification.created_at,
-        expiresAt: notification.expires_at,
-        ...notification.summary_data
+  const generateSummaryWithOpenAI = async (childName, conversations) => {
+    const prompt = `
+  Generate a concise, parent-friendly summary of a child's learning session.
+  
+  Child's Name: ${childName}
+  
+  Conversation History:
+  ${conversations.map(msg => `${msg.role === 'user' ? 'Child' : 'Klio'}: ${msg.message_text}`).join('\n')}
+  
+  Please provide a summary in the following JSON format:
+  {
+    "childName": "${childName}",
+    "sessionCount": 1,
+    "totalMinutes": 0, // Placeholder
+    "keyHighlights": ["string"],
+    "subjectsDiscussed": ["string"],
+    "learningProgress": {
+      "problemsSolved": 0,
+      "correctAnswers": 0,
+      "newTopicsExplored": 0,
+      "struggledWith": ["string"],
+      "masteredTopics": ["string"]
+    },
+    "materialsWorkedOn": [],
+    "engagementLevel": "high|medium|low",
+    "sessionTimes": [], // Placeholder
+    "parentSuggestions": ["string"]
+  }
+  
+  Focus on identifying key learning points, areas of progress, and any topics the child found challenging. Provide actionable suggestions for the parent. The tone should be encouraging and informative.
+  `;
+  
+    try {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4-turbo',
+        messages: [{ role: 'system', content: prompt }],
+        response_format: { type: "json_object" },
       });
-      return acc;
-    }, {});
-
-    // Convert to array and sort dates
-    const result = Object.entries(groupedByDate)
-      .map(([date, summaries]) => ({
-        date,
-        summaries: summaries.sort((a, b) => a.childName.localeCompare(b.childName))
-      }))
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    res.json({
-      success: true,
-      chatInsights: result,
-      totalCount: notifications.length
-    });
-
-  } catch (error) {
-    console.error('Error in getChatInsights:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-/**
- * Mark a conversation summary as read
- */
-exports.markSummaryAsRead = async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const { summaryId } = req.params;
-
-    if (!userId || !summaryId) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+  
+      const summaryJson = JSON.parse(response.choices[0].message.content);
+      
+      // Basic post-processing
+      const sessionTimes = conversations.length > 0
+        ? [`${new Date(conversations[0].created_at).toLocaleTimeString()} - ${new Date(conversations[conversations.length - 1].created_at).toLocaleTimeString()}`]
+        : [];
+      const totalMinutes = conversations.length > 0
+        ? Math.round((new Date(conversations[conversations.length - 1].created_at) - new Date(conversations[0].created_at)) / 60000)
+        : 0;
+  
+      summaryJson.sessionTimes = sessionTimes;
+      summaryJson.totalMinutes = totalMinutes;
+  
+      return summaryJson;
+  
+    } catch (error) {
+      console.error('Error generating summary with OpenAI:', error);
+      throw error;
     }
-
-    // Verify ownership and update status
+  };
+  
+const saveSummary = async (parentId, childId, date, summaryData) => {
     const { data, error } = await supabase
       .from('parent_conversation_notifications')
-      .update({ 
-        status: 'read',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', summaryId)
-      .eq('parent_id', userId)
-      .select()
-      .single();
-
+      .upsert({
+        parent_id: parentId,
+        child_id: childId,
+        conversation_date: date,
+        summary_data: summaryData, // Corrected column name
+        status: 'unread',
+        updated_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      }, {
+        onConflict: 'parent_id, child_id, conversation_date'
+      });
+  
     if (error) {
-      console.error('Error marking summary as read:', error);
-      return res.status(500).json({ error: 'Failed to update summary' });
+      console.error(`Error saving summary for child ${childId}:`, error);
+      throw error;
     }
+    return data;
+  };
+  
+const generateDailySummaries = async () => {
+    console.log('🚀 Starting daily conversation summary generation...');
+    console.log(`📅 Timestamp: ${new Date().toISOString()}`);
 
-    if (!data) {
-      return res.status(404).json({ error: 'Summary not found or unauthorized' });
+    try {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const date = yesterday.toISOString().split('T')[0];
+
+        console.log(`🔄 Generating conversation summaries for ${date}`);
+
+        const childrenToProcess = await getChildrenWithConversations(date);
+        console.log(`👨‍👩‍👧‍👦 Found ${childrenToProcess.length} children with conversations`);
+
+        for (const child of childrenToProcess) {
+            try {
+                console.log(`\nProcessing child: ${child.name} (ID: ${child.id})`);
+
+                const conversations = await getConversationsForChild(child.id, date);
+                if (conversations.length < 2) { // Need at least one exchange
+                    console.log(`  - Skipping, not enough conversation history.`);
+                    continue;
+                }
+                console.log(`  - Found ${conversations.length} messages.`);
+                
+                const summaryJson = await generateSummaryWithOpenAI(child.name, conversations);
+                console.log(`  - Generated summary with OpenAI.`);
+                
+                await saveSummary(child.parent_id, child.id, date, summaryJson);
+                console.log(`  - ✅ Successfully saved summary to database.`);
+            
+            } catch (childError) {
+                console.error(`  - ❌ Error processing child ${child.id}:`, childError.message);
+            }
+        }
+
+        console.log('\n✅ Daily summary generation complete.');
+    } catch (error) {
+        console.error('\n❌ Error during daily summary generation:', error);
     }
-
-    res.json({
-      success: true,
-      message: 'Summary marked as read',
-      summary: data
-    });
-
-  } catch (error) {
-    console.error('Error in markSummaryAsRead:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
 };
 
-/**
- * Delete a conversation summary
- */
-exports.deleteSummary = async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const { summaryId } = req.params;
-
-    if (!userId || !summaryId) {
-      return res.status(400).json({ error: 'Missing required parameters' });
-    }
-
-    // Verify ownership and delete
-    const { data, error } = await supabase
-      .from('parent_conversation_notifications')
-      .delete()
-      .eq('id', summaryId)
-      .eq('parent_id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error deleting summary:', error);
-      return res.status(500).json({ error: 'Failed to delete summary' });
-    }
-
-    if (!data) {
-      return res.status(404).json({ error: 'Summary not found or unauthorized' });
-    }
-
-    res.json({
-      success: true,
-      message: 'Summary deleted successfully'
-    });
-
-  } catch (error) {
-    console.error('Error in deleteSummary:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-/**
- * Bulk mark summaries as read (for "mark all as read" functionality)
- */
-exports.markAllAsRead = async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const { childId, beforeDate } = req.body;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    let query = supabase
-      .from('parent_conversation_notifications')
-      .update({ 
-        status: 'read',
-        updated_at: new Date().toISOString()
-      })
-      .eq('parent_id', userId)
-      .eq('status', 'unread');
-
-    // Optional filters
-    if (childId) {
-      query = query.eq('child_id', childId);
-    }
-
-    if (beforeDate) {
-      query = query.lte('conversation_date', beforeDate);
-    }
-
-    const { data, error } = await query.select();
-
-    if (error) {
-      console.error('Error marking all as read:', error);
-      return res.status(500).json({ error: 'Failed to update summaries' });
-    }
-
-    res.json({
-      success: true,
-      message: `Marked ${data.length} summaries as read`,
-      updatedCount: data.length
-    });
-
-  } catch (error) {
-    console.error('Error in markAllAsRead:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-/**
- * Get summary statistics for parent dashboard
- */
-exports.getSummaryStats = async (req, res) => {
-  try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    // Get counts by status and recent activity
-    const { data: stats, error } = await supabase
-      .from('parent_conversation_notifications')
-      .select('status, conversation_date, child_id')
-      .eq('parent_id', userId)
-      .gte('conversation_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-
-    if (error) {
-      console.error('Error fetching summary stats:', error);
-      return res.status(500).json({ error: 'Failed to fetch statistics' });
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    const statistics = {
-      unreadCount: stats.filter(s => s.status === 'unread').length,
-      todayCount: stats.filter(s => s.conversation_date === today).length,
-      yesterdayCount: stats.filter(s => s.conversation_date === yesterday).length,
-      totalThisMonth: stats.length,
-      activeChildren: [...new Set(stats.map(s => s.child_id))].length
-    };
-
-    res.json({
-      success: true,
-      statistics
-    });
-
-  } catch (error) {
-    console.error('Error in getSummaryStats:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-/**
- * Clean up expired summaries (called by cron job)
- */
-exports.cleanupExpiredSummaries = async (req, res) => {
-  try {
-    const now = new Date().toISOString();
-    
-    const { data, error } = await supabase
-      .from('parent_conversation_notifications')
-      .delete()
-      .lt('expires_at', now)
-      .select('id, parent_id, child_id, conversation_date');
-
-    if (error) {
-      console.error('Error cleaning up expired summaries:', error);
-      return res.status(500).json({ error: 'Failed to cleanup expired summaries' });
-    }
-
-    console.log(`Cleaned up ${data.length} expired conversation summaries`);
-
-    res.json({
-      success: true,
-      message: `Cleaned up ${data.length} expired summaries`,
-      cleanedCount: data.length
-    });
-
-  } catch (error) {
-    console.error('Error in cleanupExpiredSummaries:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
+if (require.main === module) {
+  generateDailySummaries();
+}

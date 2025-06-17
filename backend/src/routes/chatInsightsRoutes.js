@@ -3,6 +3,15 @@ const express = require('express');
 const router = express.Router();
 const chatInsightsController = require('../controllers/chatInsightsController');
 
+// Middleware to extract parent ID from header and attach to request
+const extractUserFromHeader = (req, res, next) => {
+  const parentId = req.headers['x-parent-id'];
+  if (parentId) {
+    req.user = { id: parentId };
+  }
+  next();
+};
+
 // Middleware to ensure user is authenticated
 const requireAuth = (req, res, next) => {
   if (!req.user?.id) {
@@ -11,7 +20,8 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
-// Apply auth middleware to all routes
+// Apply middlewares to all routes
+router.use(extractUserFromHeader);
 router.use(requireAuth);
 
 /**

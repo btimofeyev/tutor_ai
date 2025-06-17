@@ -110,13 +110,13 @@ const saveSummary = async (parentId, childId, date, summaryData) => {
       .upsert({
         parent_id: parentId,
         child_id: childId,
-        conversation_date: date,
-        summary_data: summaryData, // Corrected column name
+        date: date, // Try 'date' instead of 'conversation_date'
+        summary_data: summaryData,
         status: 'unread',
         updated_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       }, {
-        onConflict: 'parent_id, child_id, conversation_date'
+        onConflict: 'parent_id, child_id, date'
       });
   
     if (error) {

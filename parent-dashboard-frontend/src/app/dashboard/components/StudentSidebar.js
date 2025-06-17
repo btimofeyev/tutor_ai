@@ -13,7 +13,8 @@ import {
   ExclamationTriangleIcon,
   CreditCardIcon,
   CalendarDaysIcon,
-  HomeIcon
+  HomeIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 import SubscriptionManager from '../../../components/SubscriptionManager';
@@ -94,6 +95,13 @@ export default function StudentSidebar({
           >
             <CalendarDaysIcon className="h-4 w-4 mr-2" />
             Schedule
+          </Link>
+          <Link 
+            href="/dashboard/chat-insights" 
+            className="flex items-center px-3 py-2 text-sm font-medium text-text-primary hover:bg-[var(--accent-blue)]/20 rounded-md transition-colors"
+          >
+            <ChatBubbleLeftRightIcon className="h-4 w-4 mr-2" />
+            Chat Insights
           </Link>
         </div>
       </div>

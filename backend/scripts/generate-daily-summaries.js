@@ -131,9 +131,8 @@ const generateDailySummaries = async () => {
     console.log(`📅 Timestamp: ${new Date().toISOString()}`);
 
     try {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const date = yesterday.toISOString().split('T')[0];
+        const today = new Date();
+        const date = today.toISOString().split('T')[0];
 
         console.log(`🔄 Generating conversation summaries for ${date}`);
 

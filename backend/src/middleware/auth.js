@@ -7,9 +7,13 @@ const supabase = require('../utils/supabaseClient');
  * If the token is valid, the user object is attached to the request.
  */
 const authenticateParent = async (req, res, next) => {
+  console.log('🔐 authenticateParent called for:', req.method, req.path);
+  console.log('🔐 Headers:', req.headers);
+  
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('❌ No valid auth header found:', authHeader);
     return res.status(401).json({ message: 'Authorization token is required.' });
   }
 
@@ -20,9 +24,11 @@ const authenticateParent = async (req, res, next) => {
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
-      console.error('Authentication error:', error);
+      console.error('❌ Authentication error:', error);
       return res.status(401).json({ message: 'Invalid or expired token.' });
     }
+    
+    console.log('✅ User authenticated:', user.id);
     
     // Attach the user object to the request for use in subsequent controllers
     req.user = user;

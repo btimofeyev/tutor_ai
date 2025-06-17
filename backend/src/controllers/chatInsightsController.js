@@ -213,6 +213,10 @@ const deleteStickyNote = async (req, res) => {
 
 // New unified chat insights endpoint
 const getChatInsights = async (req, res) => {
+    console.log('🔍 getChatInsights called with user:', req.user?.id);
+    console.log('🔍 Request headers:', req.headers);
+    console.log('🔍 Query params:', req.query);
+    
     const parentId = req.user.id;
     const { days = 14, status = 'all', childId } = req.query;
     

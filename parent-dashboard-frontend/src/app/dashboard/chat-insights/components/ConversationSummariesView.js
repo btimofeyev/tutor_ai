@@ -5,8 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import StickyNotesSection from './StickyNotesSection';
 import api from '../../../../utils/api';
 import { useToast } from '../../../../hooks/useToast';
+import { useSession } from '@supabase/auth-helpers-react';
 
 export default function ConversationSummariesView({ selectedChild, refreshTrigger = 0 }) {
+  const session = useSession();
   const [chatInsights, setChatInsights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -54,8 +56,16 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
 
   // Fetch data on mount and when dependencies change
   useEffect(() => {
-    fetchChatInsights();
-  }, [selectedChild, filter, refreshTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Only fetch if we have a valid session
+    if (session?.user) {
+      fetchChatInsights();
+    } else if (session === null) {
+      // Session is explicitly null (not loading), so user is not authenticated
+      setError('You must be logged in to view chat insights');
+      setLoading(false);
+    }
+    // If session is undefined, it's still loading, so we wait
+  }, [session, selectedChild, filter, refreshTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle marking summary as read
   const handleMarkAsRead = async (summaryId) => {

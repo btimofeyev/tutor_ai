@@ -7,10 +7,17 @@ const api = axios.create({
 
 api.interceptors.request.use(async config => {
   const supabase = createClientComponentClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user?.id) {
-    config.headers['x-parent-id'] = user.id;
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (session?.access_token) {
+    config.headers['Authorization'] = `Bearer ${session.access_token}`;
   }
+  
+  // Keep the x-parent-id header for legacy compatibility if needed
+  if (session?.user?.id) {
+    config.headers['x-parent-id'] = session.user.id;
+  }
+  
   return config;
 });
 

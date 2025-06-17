@@ -5,6 +5,30 @@ import {
   FiX, FiSend, FiEdit3, FiCheckCircle, FiRotateCcw 
 } from 'react-icons/fi';
 
+// Helper function to get emoji for different subjects
+const getSubjectEmoji = (subject) => {
+  const emojiMap = {
+    'math': '🧮',
+    'science': '🔬',
+    'history': '📜',
+    'language arts': '📚',
+    'social studies': '🗺️'
+  };
+  return emojiMap[subject] || '📝';
+};
+
+// Helper function to get appropriate item label based on subject
+const getItemLabel = (subject, itemNumber) => {
+  const labelMap = {
+    'math': `Problem ${itemNumber}`,
+    'science': `Activity ${itemNumber}`,
+    'history': `Question ${itemNumber}`,
+    'language arts': `Exercise ${itemNumber}`,
+    'social studies': `Task ${itemNumber}`
+  };
+  return labelMap[subject] || `Item ${itemNumber}`;
+};
+
 const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onSendToChat }, ref) => {
   const [problems, setProblems] = useState([]);
   const [workNotes, setWorkNotes] = useState({});
@@ -18,15 +42,18 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
 
   // Initialize workspace when content changes  
   useEffect(() => {
-    if (workspaceContent && workspaceContent.problems?.length > 0) {
-      console.log('📝 Loading', workspaceContent.problems.length, 'problems to workspace');
+    // Handle both new subject workspaces (content) and legacy math workspaces (problems)
+    const items = workspaceContent?.content || workspaceContent?.problems;
+    
+    if (workspaceContent && items?.length > 0) {
+      console.log('📝 Loading', items.length, workspaceContent.subject ? `${workspaceContent.subject} activities` : 'problems', 'to workspace');
       
-      setProblems(workspaceContent.problems);
+      setProblems(items);
       
       // Set initial states
       const initialStates = {};
-      workspaceContent.problems.forEach(problem => {
-        initialStates[problem.id] = problem.status || 'pending';
+      items.forEach(item => {
+        initialStates[item.id] = item.status || 'pending';
       });
       setProblemStates(initialStates);
       
@@ -81,15 +108,23 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
     }));
   };
 
-  // Get status indicator
+  // Get status indicator for multi-subject evaluation
   const getStatusIndicator = (problemId) => {
     const state = problemStates[problemId];
     
     switch (state) {
+      case 'excellent':
+        return <div className="text-green-600 font-bold">⭐</div>;
+      case 'good':
+        return <FiCheckCircle className="text-green-500" size={20} />;
       case 'correct':
         return <FiCheckCircle className="text-green-500" size={20} />;
+      case 'needs_improvement':
+        return <div className="text-yellow-500 font-bold">⚠</div>;
       case 'incorrect':
         return <FiX className="text-red-500" size={20} />;
+      case 'incomplete':
+        return <div className="text-gray-500 font-bold">○</div>;
       case 'checking':
         return <div className="loading-dots text-blue-500"><span></span><span></span><span></span></div>;
       default:
@@ -110,7 +145,12 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
       {/* Header */}
       <div className="flex items-center justify-between p-4 bg-blue-50 border-b flex-shrink-0">
         <h2 className="text-lg font-semibold text-gray-800">
-          📝 {workspaceContent.title || 'Practice Problems'}
+          {getSubjectEmoji(workspaceContent.subject)} {workspaceContent.title || 'Practice Activities'}
+          {workspaceContent.subject && (
+            <span className="ml-2 text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+              {workspaceContent.subject}
+            </span>
+          )}
         </h2>
         <button
           onClick={onClose}
@@ -142,7 +182,7 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
                 <div className="flex items-center space-x-3">
                   {getStatusIndicator(problem.id)}
                   <span className="text-lg font-bold text-gray-800">
-                    Problem {index + 1}
+                    {getItemLabel(workspaceContent.subject, index + 1)}
                   </span>
                 </div>
               </div>
@@ -154,8 +194,8 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
                 </div>
               </div>
 
-              {/* Work Area - show if not correctly completed */}
-              {status !== 'correct' && (
+              {/* Work Area - show if not successfully completed */}
+              {status !== 'correct' && status !== 'excellent' && status !== 'good' && (
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-medium text-gray-600 flex items-center">
@@ -187,11 +227,47 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
                 </div>
               )}
 
-              {/* Feedback Areas */}
+              {/* Multi-Subject Feedback Areas */}
+              {status === 'excellent' && (
+                <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-green-800">
+                  <div className="text-green-600 inline-block mr-2 font-bold">⭐</div>
+                  <strong>Excellent work! Outstanding! 🌟</strong>
+                  {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
+                </div>
+              )}
+              
+              {status === 'good' && (
+                <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-green-800">
+                  <FiCheckCircle className="inline-block mr-2" />
+                  <strong>Good job! Well done! 👍</strong>
+                  {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
+                </div>
+              )}
+              
               {status === 'correct' && (
                 <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-green-800">
                   <FiCheckCircle className="inline-block mr-2" />
                   <strong>Correct! Great job! 🎉</strong>
+                  {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
+                </div>
+              )}
+              
+              {status === 'needs_improvement' && (
+                <div className="p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="text-yellow-500 inline-block mr-2 font-bold">⚠</div>
+                      <strong>Good effort! Let's work on this together. 💪</strong>
+                      {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
+                    </div>
+                    <button
+                      onClick={() => resetProblemState(problem.id)}
+                      className="ml-3 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center space-x-1 border border-blue-300"
+                    >
+                      <FiRotateCcw size={12} />
+                      <span>Try Again</span>
+                    </button>
+                  </div>
                 </div>
               )}
               
@@ -201,6 +277,7 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
                     <div className="flex-1">
                       <FiX className="inline-block mr-2" />
                       <strong>Not quite right. Think it through again! 💪</strong>
+                      {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
                     </div>
                     <button
                       onClick={() => resetProblemState(problem.id)}
@@ -213,8 +290,16 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
                 </div>
               )}
 
+              {status === 'incomplete' && (
+                <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-800">
+                  <div className="text-gray-500 inline-block mr-2 font-bold">○</div>
+                  <strong>Keep working on this! 📝</strong>
+                  {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
+                </div>
+              )}
+
               {/* Hint */}
-              {problem.hint && status !== 'correct' && (
+              {problem.hint && status !== 'correct' && status !== 'excellent' && status !== 'good' && (
                 <div className="text-sm p-3 bg-blue-50 border-l-4 border-blue-400 rounded-lg mt-3">
                   <strong className="text-blue-600">💡 Hint:</strong> {problem.hint}
                 </div>

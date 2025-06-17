@@ -1,5 +1,6 @@
 const supabase = require('./supabaseClient');
 const { getCurrentWeekStart } = require('./dateUtils');
+const { detectSubjectFromMaterial, getEvaluationTypeForSubject } = require('./workspaceTools');
 
 class WorkspaceFunctionHandlers {
   constructor() {
@@ -231,6 +232,170 @@ class WorkspaceFunctionHandlers {
       message: 'Workspace cleared',
       previousWorkspace: oldWorkspace
     };
+  }
+
+  // NEW: Subject-agnostic workspace creation
+  async handleCreateSubjectWorkspace(args, childId) {
+    console.log(`🎯 Creating new ${args.subject} workspace:`, args.title);
+    
+    // Start new practice session
+    try {
+      this.sessionId = `${args.subject}-${Date.now()}-${childId}`;
+    } catch (error) {
+      console.warn('Failed to create session ID, using local tracking');
+      this.sessionId = `local-${Date.now()}`;
+    }
+
+    // Create subject-agnostic workspace structure
+    const workspace = {
+      type: args.workspace_type,
+      subject: args.subject,
+      title: args.title,
+      explanation: args.explanation || null,
+      sessionId: this.sessionId,
+      learning_objectives: args.learning_objectives || [],
+      content: args.content.map((item, index) => ({
+        id: `content-${Date.now()}-${index}`,
+        index: index,
+        text: item.text,
+        type: item.type,
+        hint: item.hint,
+        difficulty: item.difficulty || 'medium',
+        evaluation_criteria: item.evaluation_criteria || { type: getEvaluationTypeForSubject(args.subject) },
+        status: 'pending', // pending, checking, excellent, good, needs_improvement, incomplete, correct, incorrect
+        studentWork: null,
+        feedback: null,
+        rubric_scores: null,
+        evidence_quality: null
+      })),
+      stats: {
+        totalItems: args.content.length,
+        completed: 0,
+        excellent: 0,
+        good: 0,
+        needsImprovement: 0,
+        currentStreak: 0,
+        bestStreak: 0
+      },
+      createdAt: new Date().toISOString()
+    };
+
+    this.currentWorkspace = workspace;
+    
+    return {
+      action: 'create_workspace',
+      workspace: workspace,
+      message: `Created "${args.title}" with ${args.content.length} ${args.subject} activities`
+    };
+  }
+
+  // NEW: Add content to any subject workspace
+  async handleAddContentToWorkspace(args, childId) {
+    if (!this.currentWorkspace) {
+      return {
+        action: 'error',
+        message: 'No active workspace to add content to'
+      };
+    }
+
+    console.log(`➕ Adding ${args.content.length} content items to workspace`);
+
+    const newContent = args.content.map((item, index) => ({
+      id: `content-${Date.now()}-${index}`,
+      index: this.currentWorkspace.content.length + index,
+      text: item.text,
+      type: item.type, 
+      hint: item.hint,
+      difficulty: item.difficulty || 'medium',
+      evaluation_criteria: item.evaluation_criteria || { type: 'binary' },
+      status: 'pending',
+      studentWork: null,
+      feedback: null
+    }));
+
+    // Update workspace content - use 'content' for subject workspaces, 'problems' for legacy math
+    if (this.currentWorkspace.content) {
+      this.currentWorkspace.content.push(...newContent);
+      this.currentWorkspace.stats.totalItems += args.content.length;
+    } else {
+      // Legacy math workspace compatibility
+      this.currentWorkspace.problems = this.currentWorkspace.problems || [];
+      this.currentWorkspace.problems.push(...newContent);
+      this.currentWorkspace.stats.totalProblems += args.content.length;
+    }
+
+    return {
+      action: 'add_content',
+      newContent: newContent,
+      workspace: this.currentWorkspace,
+      message: `Added ${args.content.length} more activities to practice`
+    };
+  }
+
+  // NEW: Subject-agnostic content evaluation
+  async handleEvaluateContentItem(args, childId) {
+    if (!this.currentWorkspace) {
+      return { action: 'error', message: 'No active workspace' };
+    }
+
+    // Support both new 'content' array and legacy 'problems' array
+    const contentArray = this.currentWorkspace.content || this.currentWorkspace.problems;
+    const item = contentArray[args.content_index];
+    
+    if (!item) {
+      return { action: 'error', message: 'Content item not found' };
+    }
+
+    console.log(`📝 Evaluating ${this.currentWorkspace.subject || 'math'} content item ${args.content_index} as: ${args.evaluation_result}`);
+
+    // Update item status and feedback
+    item.status = args.evaluation_result;
+    item.feedback = args.feedback;
+    
+    // Handle different evaluation types
+    if (args.rubric_scores) {
+      item.rubric_scores = args.rubric_scores;
+    }
+    
+    if (args.evidence_quality) {
+      item.evidence_quality = args.evidence_quality;
+    }
+
+    // Update workspace stats based on evaluation type
+    this.updateWorkspaceStats(args.evaluation_result);
+
+    return {
+      action: 'evaluate_content',
+      contentIndex: args.content_index,
+      item: item,
+      workspace: this.currentWorkspace,
+      message: `Content item ${args.content_index + 1} evaluated: ${args.evaluation_result}`
+    };
+  }
+
+  // Helper method to update workspace stats based on evaluation result
+  updateWorkspaceStats(evaluationResult) {
+    if (!this.currentWorkspace.stats) return;
+
+    // For legacy math workspaces
+    if (evaluationResult === 'correct') {
+      this.currentWorkspace.stats.correct = (this.currentWorkspace.stats.correct || 0) + 1;
+      this.currentWorkspace.stats.completed = (this.currentWorkspace.stats.completed || 0) + 1;
+    } else if (evaluationResult === 'incorrect') {
+      this.currentWorkspace.stats.completed = (this.currentWorkspace.stats.completed || 0) + 1;
+    }
+
+    // For subject workspaces with multi-level evaluation
+    if (evaluationResult === 'excellent') {
+      this.currentWorkspace.stats.excellent = (this.currentWorkspace.stats.excellent || 0) + 1;
+      this.currentWorkspace.stats.completed = (this.currentWorkspace.stats.completed || 0) + 1;
+    } else if (evaluationResult === 'good') {
+      this.currentWorkspace.stats.good = (this.currentWorkspace.stats.good || 0) + 1;
+      this.currentWorkspace.stats.completed = (this.currentWorkspace.stats.completed || 0) + 1;
+    } else if (evaluationResult === 'needs_improvement') {
+      this.currentWorkspace.stats.needsImprovement = (this.currentWorkspace.stats.needsImprovement || 0) + 1;
+      this.currentWorkspace.stats.completed = (this.currentWorkspace.stats.completed || 0) + 1;
+    }
   }
 
   getCurrentWorkspace() {

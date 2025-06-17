@@ -230,47 +230,84 @@ function getExplanationTitle(message) {
     if (message.includes('practice')) return 'Practice Problems';
     return 'Math Practice';
 }
-// Enhanced function to detect structured content in chat messages
+// Enhanced function to detect structured content in chat messages across ALL subjects
 export const hasStructuredContent = (content) => {
     if (!content || typeof content !== 'string') return false;
     
     const indicators = [
-        // LaTeX expressions (PRIORITY)
+        // Math content (LaTeX expressions, arithmetic)
         /\\?\(\s*[^)]*[\+\-\*×÷\/\\]\s*[^)]*\s*\\?\)/,
         /\\frac\{[^}]+\}\{[^}]+\}/,
         /\\times/,
-        
-        // Math problems
         /\d+\s*[\+\-\*×÷\/]\s*\d+/,
         /what\s+is\s+\d+/i,
         /\*\*[^*]*\d+[^*]*\*\*/,
-        
-        // Numbered lists with math
         /^\s*\d+\.\s*[^.]*[\+\-\*×÷\/\\]/m,
-        
-        // Fractions
         /\d+\/\d+.*×.*\d+\/\d+/,
         /multiply.*numerator/i,
         
-        // Learning content
+        // Science content
+        /hypothesis/i,
+        /experiment/i,
+        /observe|observation/i,
+        /predict/i,
+        /lab.*activity/i,
+        /scientific.*method/i,
+        /data.*collection/i,
+        /conclusion/i,
+        /variables/i,
+        /if.*then.*because/i,
+        
+        // History content
+        /timeline/i,
+        /cause.*effect/i,
+        /primary.*source/i,
+        /historical/i,
+        /when.*did.*happen/i,
+        /civil.*war|revolution|independence/i,
+        /compare.*contrast/i,
+        /evidence.*from.*history/i,
+        
+        // Language Arts content
+        /reading.*comprehension/i,
+        /main.*idea/i,
+        /supporting.*details/i,
+        /vocabulary/i,
+        /grammar/i,
+        /writing.*prompt/i,
+        /essay|paragraph/i,
+        /literary.*analysis/i,
+        /character.*motivation/i,
+        
+        // Social Studies content
+        /government/i,
+        /democracy/i,
+        /civic|citizen/i,
+        /map.*analysis/i,
+        /geography/i,
+        /culture|cultural/i,
+        /economics|economy/i,
+        
+        // General learning content
         /learning goals/i,
         /assignment/i,
         /problem.*\d+/i,
         /question.*\d+/i,
-        
-        // Step-by-step content
         /step.*\d+/i,
         /first.*second/i,
         /\d+\.\s*\*\*/,
         
-        // Educational patterns
+        // Educational patterns (any subject)
         /tackle.*together/i,
         /let's.*solve/i,
         /practice.*problem/i,
         /warm.*up/i,
         /work through/i,
         /give.*try/i,
-        /let me know what.*come up with/i
+        /let me know what.*come up with/i,
+        /let's.*practice/i,
+        /help.*me.*with/i,
+        /work.*on/i
     ];
     
     const hasIndicator = indicators.some(pattern => pattern.test(content));
@@ -280,6 +317,57 @@ export const hasStructuredContent = (content) => {
     }
     
     return hasIndicator;
+};
+
+// NEW: Detect subject from message content
+export const detectSubjectFromMessage = (content) => {
+    if (!content || typeof content !== 'string') return 'math';
+    
+    const text = content.toLowerCase();
+    
+    // Science indicators
+    if (text.includes('science') || text.includes('experiment') || text.includes('hypothesis') ||
+        text.includes('lab') || text.includes('observe') || text.includes('data') ||
+        text.includes('scientific method') || text.includes('conclusion')) {
+        return 'science';
+    }
+    
+    // History indicators
+    if (text.includes('history') || text.includes('historical') || text.includes('timeline') ||
+        text.includes('civil war') || text.includes('revolution') || text.includes('primary source') ||
+        text.includes('cause and effect') || text.includes('when did')) {
+        return 'history';
+    }
+    
+    // Language Arts indicators
+    if (text.includes('reading') || text.includes('writing') || text.includes('english') ||
+        text.includes('language arts') || text.includes('grammar') || text.includes('vocabulary') ||
+        text.includes('essay') || text.includes('paragraph') || text.includes('main idea')) {
+        return 'language arts';
+    }
+    
+    // Social Studies indicators
+    if (text.includes('social studies') || text.includes('government') || text.includes('civic') ||
+        text.includes('democracy') || text.includes('geography') || text.includes('economics') ||
+        text.includes('culture') || text.includes('society')) {
+        return 'social studies';
+    }
+    
+    // Default to math if no other subject detected
+    return 'math';
+};
+
+// NEW: Detect workspace type from subject and content
+export const getWorkspaceTypeForSubject = (subject) => {
+    const workspaceTypes = {
+        'math': 'math_problems',
+        'science': 'science_investigation', 
+        'history': 'history_analysis',
+        'language arts': 'language_practice',
+        'social studies': 'social_investigation'
+    };
+    
+    return workspaceTypes[subject] || 'math_problems';
 };
 
 

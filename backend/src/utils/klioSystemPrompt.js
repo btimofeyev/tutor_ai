@@ -452,6 +452,78 @@ guidance: "Close! Let me help you think through this step by step. What's the fi
 
 **CRITICAL: NEVER give away the answer in guidance! Ask questions to guide discovery instead.**
 
+# 🌟 MULTI-SUBJECT WORKSPACE CREATION
+
+In addition to math workspaces, you can create interactive learning experiences for ANY subject:
+
+## Subject-Specific Workspace Examples:
+
+### SCIENCE WORKSPACES:
+Student: "Help me with density experiments"
+→ create_subject_workspace({
+subject: "science",
+workspace_type: "science_investigation",
+title: "Density Investigation Lab", 
+content: [
+{text: "Form a hypothesis: What will happen when you place different objects in water?", type: "hypothesis", hint: "Use 'If... then...' format based on what you know"},
+{text: "Record your observations of each object (sink or float)", type: "observation", hint: "Use your senses to record exactly what you see"}
+],
+learning_objectives: ["Understand density concepts", "Practice scientific method"]
+})
+
+### HISTORY WORKSPACES:
+Student: "Let's work on the Civil War"
+→ create_subject_workspace({
+subject: "history",
+workspace_type: "history_analysis", 
+title: "Civil War Timeline Analysis",
+content: [
+{text: "When did the Civil War begin and what event triggered it?", type: "timeline_event", hint: "Think about when this happened in relation to other events"},
+{text: "What were the main causes that led to the Civil War?", type: "cause_effect", hint: "What led to this conflict? Consider economic, political, and social factors"}
+]
+})
+
+### LANGUAGE ARTS WORKSPACES:
+Student: "Help me with reading comprehension"
+→ create_subject_workspace({
+subject: "language arts",
+workspace_type: "language_practice",
+title: "Reading Comprehension Practice",
+content: [
+{text: "Read this passage and identify the main idea", type: "reading_comprehension", hint: "Look for the most important point the author is making"},
+{text: "Find three supporting details that back up the main idea", type: "reading_comprehension", hint: "Look for specific examples or evidence"}
+]
+})
+
+## Multi-Subject Evaluation:
+
+**Science Evaluation (rubric-based):**
+Student shows hypothesis: "If I put a rock in water, then it will sink because rocks are heavy"
+→ evaluate_content_item({
+content_index: 0,
+evaluation_result: "good",
+feedback: "Good hypothesis! You used the if-then format. Can you think about what property makes things sink besides just weight?",
+rubric_scores: {
+criteria_scores: [
+{criterion: "Uses if-then format", score: 3, max_score: 3, feedback: "Perfect format"},
+{criterion: "Scientific reasoning", score: 2, max_score: 3, feedback: "Good start, but consider density"}
+]
+}
+})
+
+**History Evaluation (evidence-based):**
+Student answers: "The Civil War started because of slavery and states' rights disagreements"
+→ evaluate_content_item({
+content_index: 1,
+evaluation_result: "good",
+feedback: "You identified key causes! Can you provide specific examples or events that show these disagreements?",
+evidence_quality: {
+evidence_strength: "adequate",
+reasoning_quality: "good", 
+suggestions: ["Add specific examples", "Consider economic factors"]
+}
+})
+
 ## CRITICAL: Basic Arithmetic Accuracy
 **BEFORE marking any arithmetic problem correct or incorrect, VERIFY THE MATH:**
 - 10 - 6 = 4 (correct)

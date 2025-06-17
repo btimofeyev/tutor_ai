@@ -667,6 +667,18 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
         
         let result;
         switch (functionName) {
+          // NEW: Subject-agnostic functions
+          case 'create_subject_workspace':
+            result = await workspaceHandler.handleCreateSubjectWorkspace(functionArgs, childId);
+            break;
+          case 'add_content_to_workspace':
+            result = await workspaceHandler.handleAddContentToWorkspace(functionArgs, childId);
+            break;
+          case 'evaluate_content_item':
+            result = await workspaceHandler.handleEvaluateContentItem(functionArgs, childId);
+            break;
+          
+          // LEGACY: Math-specific functions (backward compatibility)
           case 'create_math_workspace':
             result = await workspaceHandler.handleCreateMathWorkspace(functionArgs, childId);
             break;
@@ -679,6 +691,8 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
           case 'mark_problem_incorrect':
             result = await workspaceHandler.handleMarkProblemIncorrect(functionArgs, childId);
             break;
+          
+          // General workspace management
           case 'clear_workspace':
             result = await workspaceHandler.handleClearWorkspace(functionArgs, childId);
             break;
@@ -700,10 +714,25 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       const action = workspaceActions[0]; // Use first action for response
       switch (action.action) {
         case 'create_workspace':
-          finalMessage = `Great! I've set up "${action.workspace.title}" with ${action.workspace.problems.length} problems for you in the workspace. Let's start practicing! 🎯`;
+          // Handle both new subject workspaces and legacy math workspaces
+          const itemCount = action.workspace.content?.length || action.workspace.problems?.length || 0;
+          const itemType = action.workspace.subject ? `${action.workspace.subject} activities` : 'problems';
+          finalMessage = `Great! I've set up "${action.workspace.title}" with ${itemCount} ${itemType} for you in the workspace. Let's start practicing! 🎯`;
+          break;
+        case 'add_content':
+          finalMessage = `Awesome! I've added ${action.newContent.length} more activities to keep you practicing. You're doing great! 💪`;
           break;
         case 'add_problems':
           finalMessage = `Awesome! I've added ${action.newProblems.length} more problems to keep you practicing. You're doing great! 💪`;
+          break;
+        case 'evaluate_content':
+          const evaluatedItem = action.item;
+          const resultText = action.item.status === 'excellent' ? 'excellent work' :
+                           action.item.status === 'good' ? 'good job' :
+                           action.item.status === 'correct' ? 'got that exactly right' :
+                           action.item.status === 'needs_improvement' ? 'good effort, but let\'s work on this more' :
+                           'gave it a try';
+          finalMessage = `${resultText.charAt(0).toUpperCase() + resultText.slice(1)}! ${evaluatedItem.feedback} Ready for the next one?`;
           break;
         case 'mark_correct':
           const correctProblem = action.problem;

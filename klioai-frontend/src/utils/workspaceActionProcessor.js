@@ -22,8 +22,16 @@ export class WorkspaceActionProcessor {
           updatedWorkspace = this.handleCreateWorkspace(action);
           break;
         
+        case 'add_content':
+          updatedWorkspace = this.handleAddContent(action, updatedWorkspace);
+          break;
+          
         case 'add_problems':
           updatedWorkspace = this.handleAddProblems(action, updatedWorkspace);
+          break;
+          
+        case 'evaluate_content':
+          this.handleEvaluateContent(action);
           break;
           
         case 'mark_correct':
@@ -53,25 +61,63 @@ export class WorkspaceActionProcessor {
   handleCreateWorkspace(action) {
     console.log('✨ Creating new workspace:', action.workspace.title);
     
-    const workspaceContent = {
-      type: 'function_calling_workspace',
-      title: action.workspace.title,
-      explanation: action.workspace.explanation,
-      sessionId: action.workspace.sessionId,
-      problems: action.workspace.problems.map((problem, index) => ({
-        id: problem.id,
-        index: problem.index,
-        text: problem.text,
-        type: problem.type,
-        hint: problem.hint,
-        difficulty: problem.difficulty,
-        status: problem.status,
-        feedback: problem.feedback,
-        isFunctionControlled: true // Mark as function-controlled
-      })),
-      stats: action.workspace.stats,
-      createdAt: action.workspace.createdAt
-    };
+    // Handle both new subject workspaces and legacy math workspaces
+    const workspace = action.workspace;
+    const isSubjectWorkspace = workspace.subject && workspace.content;
+    
+    let workspaceContent;
+    
+    if (isSubjectWorkspace) {
+      // NEW: Subject-agnostic workspace
+      workspaceContent = {
+        type: 'function_calling_workspace',
+        subject: workspace.subject,
+        workspace_type: workspace.type,
+        title: workspace.title,
+        explanation: workspace.explanation,
+        sessionId: workspace.sessionId,
+        learning_objectives: workspace.learning_objectives || [],
+        content: workspace.content.map((item, index) => ({
+          id: item.id,
+          index: item.index,
+          text: item.text,
+          type: item.type,
+          hint: item.hint,
+          difficulty: item.difficulty,
+          status: item.status,
+          feedback: item.feedback,
+          evaluation_criteria: item.evaluation_criteria,
+          rubric_scores: item.rubric_scores,
+          evidence_quality: item.evidence_quality,
+          isFunctionControlled: true
+        })),
+        stats: workspace.stats,
+        createdAt: workspace.createdAt
+      };
+    } else {
+      // LEGACY: Math-only workspace (backward compatibility)
+      workspaceContent = {
+        type: 'function_calling_workspace',
+        subject: 'math',
+        workspace_type: 'math_problems',
+        title: workspace.title,
+        explanation: workspace.explanation,
+        sessionId: workspace.sessionId,
+        problems: workspace.problems.map((problem, index) => ({
+          id: problem.id,
+          index: problem.index,
+          text: problem.text,
+          type: problem.type,
+          hint: problem.hint,
+          difficulty: problem.difficulty,
+          status: problem.status,
+          feedback: problem.feedback,
+          isFunctionControlled: true
+        })),
+        stats: workspace.stats,
+        createdAt: workspace.createdAt
+      };
+    }
 
     this.setWorkspaceContent(workspaceContent);
     return action.workspace;
@@ -182,6 +228,110 @@ export class WorkspaceActionProcessor {
     // Also update via workspace ref if available
     if (this.workspaceRef?.current?.markProblemIncorrect) {
       this.workspaceRef.current.markProblemIncorrect(action.problem.id);
+    }
+  }
+
+  // NEW: Handle adding content to subject workspaces
+  handleAddContent(action, currentWorkspace) {
+    console.log(`➕ Adding ${action.newContent.length} content items to workspace`);
+    
+    // Update the existing workspace content
+    this.setWorkspaceContent(prevContent => {
+      // If no existing workspace content but we have currentWorkspace from backend, create it
+      if (!prevContent && currentWorkspace) {
+        console.log('🔄 Creating workspace from backend currentWorkspace data');
+        return {
+          type: 'function_calling_workspace',
+          subject: currentWorkspace.subject || 'math',
+          workspace_type: currentWorkspace.type,
+          title: currentWorkspace.title,
+          explanation: currentWorkspace.explanation,
+          sessionId: currentWorkspace.sessionId,
+          learning_objectives: currentWorkspace.learning_objectives || [],
+          content: currentWorkspace.content ? currentWorkspace.content.map(item => ({
+            ...item,
+            isFunctionControlled: true
+          })) : currentWorkspace.problems?.map(problem => ({
+            ...problem,
+            isFunctionControlled: true
+          })) || [],
+          stats: currentWorkspace.stats,
+          createdAt: currentWorkspace.createdAt
+        };
+      }
+      
+      if (!prevContent) {
+        console.warn('Cannot add content: no existing workspace');
+        return prevContent;
+      }
+      
+      const newContent = action.newContent.map(item => ({
+        id: item.id,
+        index: item.index,
+        text: item.text,
+        type: item.type,
+        hint: item.hint,
+        difficulty: item.difficulty,
+        status: item.status,
+        feedback: item.feedback,
+        evaluation_criteria: item.evaluation_criteria,
+        isFunctionControlled: true
+      }));
+
+      // Add to content array (or problems array for legacy workspaces)
+      const contentKey = prevContent.content ? 'content' : 'problems';
+      
+      return {
+        ...prevContent,
+        [contentKey]: [...(prevContent[contentKey] || []), ...newContent],
+        stats: action.workspace.stats
+      };
+    });
+
+    return action.workspace;
+  }
+
+  // NEW: Handle subject-agnostic content evaluation
+  handleEvaluateContent(action) {
+    console.log(`📝 Evaluating content item ${action.contentIndex} as: ${action.item.status}`);
+    
+    // Update workspace content
+    this.setWorkspaceContent(prevContent => {
+      if (!prevContent) return prevContent;
+      
+      // Handle both content and problems arrays
+      const contentKey = prevContent.content ? 'content' : 'problems';
+      const updatedItems = [...(prevContent[contentKey] || [])];
+      
+      if (updatedItems[action.contentIndex]) {
+        updatedItems[action.contentIndex] = {
+          ...updatedItems[action.contentIndex],
+          status: action.item.status,
+          feedback: action.item.feedback,
+          rubric_scores: action.item.rubric_scores,
+          evidence_quality: action.item.evidence_quality
+        };
+      }
+
+      return {
+        ...prevContent,
+        [contentKey]: updatedItems,
+        stats: action.workspace.stats
+      };
+    });
+
+    // Also update via workspace ref if available (for backward compatibility)
+    if (this.workspaceRef?.current) {
+      const item = action.item;
+      if (item.status === 'correct' || item.status === 'excellent' || item.status === 'good') {
+        if (this.workspaceRef.current.markProblemCorrect) {
+          this.workspaceRef.current.markProblemCorrect(item.id);
+        }
+      } else if (item.status === 'incorrect' || item.status === 'needs_improvement') {
+        if (this.workspaceRef.current.markProblemIncorrect) {
+          this.workspaceRef.current.markProblemIncorrect(item.id);
+        }
+      }
     }
   }
 }

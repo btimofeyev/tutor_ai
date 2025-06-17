@@ -207,7 +207,15 @@ const getItemLabel = (subject, itemNumber) => {
   return labelMap[subject] || `Item ${itemNumber}`;
 };
 
-const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onSendToChat }, ref) => {
+const SimpleWorkspace = forwardRef(({ 
+  workspaceContent, 
+  isExpanded, 
+  onClose, 
+  onSendToChat, 
+  onInteraction,
+  studentProfile,
+  adaptiveData 
+}, ref) => {
   const [problems, setProblems] = useState([]);
   const [workNotes, setWorkNotes] = useState({});
   const [problemStates, setProblemStates] = useState({}); // 'pending', 'correct', 'incorrect'
@@ -255,6 +263,9 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
   const sendWorkToChat = (problemIndex, problemText, workNote) => {
     if (!workNote.trim()) return;
     
+    // Track interaction for auto-collapse timing
+    if (onInteraction) onInteraction();
+    
     const problem = problems[problemIndex];
     const message = `Can you check my work on Problem ${problemIndex + 1}?\n\nProblem: ${problemText}\nMy work: ${workNote}\n\n[Problem Index: ${problemIndex}]`;
     
@@ -297,27 +308,102 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
     }));
   };
 
-  // Get status indicator for multi-subject evaluation
+  // Get status indicator with smooth transitions for multi-subject evaluation
   const getStatusIndicator = (problemId) => {
     const state = problemStates[problemId];
     
+    const StatusIcon = ({ children, color = "text-gray-400" }) => (
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        className={color}
+      >
+        {children}
+      </motion.div>
+    );
+    
     switch (state) {
       case 'excellent':
-        return <div className="text-green-600 font-bold">⭐</div>;
+        return (
+          <StatusIcon color="text-green-600">
+            <motion.div 
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 0.6 }}
+              className="text-2xl"
+            >
+              ⭐
+            </motion.div>
+          </StatusIcon>
+        );
       case 'good':
-        return <FiCheckCircle className="text-green-500" size={20} />;
+        return (
+          <StatusIcon color="text-green-500">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 400 }}
+            >
+              <FiCheckCircle size={20} />
+            </motion.div>
+          </StatusIcon>
+        );
       case 'correct':
-        return <FiCheckCircle className="text-green-500" size={20} />;
+        return (
+          <StatusIcon color="text-green-500">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 400 }}
+            >
+              <FiCheckCircle size={20} />
+            </motion.div>
+          </StatusIcon>
+        );
       case 'needs_improvement':
-        return <div className="text-yellow-500 font-bold">⚠</div>;
+        return (
+          <StatusIcon color="text-yellow-500">
+            <motion.div
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="text-xl font-bold"
+            >
+              ⚠
+            </motion.div>
+          </StatusIcon>
+        );
       case 'incorrect':
-        return <FiX className="text-red-500" size={20} />;
+        return (
+          <StatusIcon color="text-red-500">
+            <motion.div
+              initial={{ rotate: 0 }}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 0.5 }}
+            >
+              <FiX size={20} />
+            </motion.div>
+          </StatusIcon>
+        );
       case 'incomplete':
-        return <div className="text-gray-500 font-bold">○</div>;
+        return (
+          <StatusIcon color="text-gray-500">
+            <div className="text-xl font-bold">○</div>
+          </StatusIcon>
+        );
       case 'checking':
-        return <div className="loading-dots text-blue-500"><span></span><span></span><span></span></div>;
+        return (
+          <StatusIcon color="text-blue-500">
+            <div className="loading-dots">
+              <span></span><span></span><span></span>
+            </div>
+          </StatusIcon>
+        );
       default:
-        return <div className="w-5 h-5 border-2 border-gray-300 rounded-full"></div>;
+        return (
+          <StatusIcon>
+            <div className="w-5 h-5 border-2 border-gray-300 rounded-full"></div>
+          </StatusIcon>
+        );
     }
   };
 
@@ -414,13 +500,37 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
           return (
             <motion.div
               key={problem.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className={`bg-white border-2 rounded-xl p-4 mb-4 transition-all duration-300 ${
-                status === 'correct' ? 'border-green-400 bg-green-50' : 
-                status === 'incorrect' ? 'border-red-400 bg-red-50' : 
-                'border-gray-200'
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ 
+                opacity: 1, 
+                y: 0, 
+                scale: 1,
+                backgroundColor: status === 'correct' ? 'rgba(34, 197, 94, 0.05)' : 
+                                status === 'incorrect' ? 'rgba(239, 68, 68, 0.05)' :
+                                status === 'excellent' ? 'rgba(34, 197, 94, 0.1)' :
+                                status === 'needs_improvement' ? 'rgba(245, 158, 11, 0.05)' :
+                                'rgba(255, 255, 255, 1)'
+              }}
+              transition={{ 
+                delay: index * 0.1,
+                type: "spring",
+                stiffness: 300,
+                damping: 20
+              }}
+              whileHover={{ 
+                scale: 1.01,
+                transition: { duration: 0.2 }
+              }}
+              className={`bg-white border-2 rounded-xl p-4 mb-4 transition-all duration-500 shadow-sm ${
+                status === 'correct' || status === 'excellent' || status === 'good' ? 
+                  'border-green-400 shadow-green-100' : 
+                status === 'incorrect' ? 
+                  'border-red-400 shadow-red-100' : 
+                status === 'needs_improvement' ? 
+                  'border-yellow-400 shadow-yellow-100' :
+                status === 'checking' ? 
+                  'border-blue-400 shadow-blue-100' :
+                'border-gray-200 hover:border-gray-300'
               }`}
             >
               {/* Problem Header */}
@@ -477,6 +587,12 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
                     value={workNotes[problem.id] || ''}
                     onChange={(e) => {
                       setWorkNotes(prev => ({ ...prev, [problem.id]: e.target.value }));
+                      // Track workspace interaction on typing
+                      if (onInteraction) onInteraction();
+                    }}
+                    onFocus={() => {
+                      // Track when student focuses on workspace
+                      if (onInteraction) onInteraction();
                     }}
                     placeholder="Show your work here..."
                     disabled={status === 'checking'}
@@ -558,11 +674,41 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
                 </div>
               )}
 
-              {/* Hint */}
+              {/* Adaptive Hint System */}
               {problem.hint && status !== 'correct' && status !== 'excellent' && status !== 'good' && (
-                <div className="text-sm p-3 bg-blue-50 border-l-4 border-blue-400 rounded-lg mt-3">
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  transition={{ duration: 0.3 }}
+                  className="text-sm p-3 bg-blue-50 border-l-4 border-blue-400 rounded-lg mt-3"
+                >
                   <strong className="text-blue-600">💡 Hint:</strong> {problem.hint}
-                </div>
+                </motion.div>
+              )}
+              
+              {/* Adaptive Encouragement based on student profile */}
+              {studentProfile?.response_patterns?.tends_to_give_up && 
+               status === 'pending' && 
+               workNotes[problem.id]?.length > 10 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-sm p-3 bg-green-50 border-l-4 border-green-400 rounded-lg mt-3"
+                >
+                  <strong className="text-green-600">🌟 You're doing great!</strong> Keep working through it step by step!
+                </motion.div>
+              )}
+              
+              {/* Challenge encouragement for confident students */}
+              {studentProfile?.confidence_level === 'high' && 
+               status === 'correct' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-sm p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg mt-3"
+                >
+                  <strong className="text-yellow-600">🚀 Ready for more?</strong> Ask for a harder challenge!
+                </motion.div>
               )}
             </motion.div>
           );

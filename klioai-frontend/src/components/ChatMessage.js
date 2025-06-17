@@ -311,10 +311,7 @@ export default function ChatMessage({ message, onSendToWorkspace, hasStructuredW
       roundedClasses = 'rounded-tr-xl rounded-br-xl rounded-tl-xl';
       timestampClasses += ' text-[var(--text-secondary)] self-start';
       
-      // Add animation for celebration messages
-      if (messageAnalysis.celebratory) {
-        borderBubbleClasses += ' animate-pulse';
-      }
+      // Remove distracting animations - focus on content quality
     }
   } else {
     // Child's Message: Right and Bottom border in Accent Yellow
@@ -390,14 +387,27 @@ export default function ChatMessage({ message, onSendToWorkspace, hasStructuredW
           
           {/* ENHANCED: Send to Workspace Button - Shows for ANY structured content */}
           {isKlio && hasStructured && onSendToWorkspace && (
-            <button
+            <motion.button
               onClick={handleSendToWorkspace}
-              className="mt-3 text-xs bg-[var(--accent-blue-10-opacity)] text-[var(--accent-blue)] px-3 py-1.5 rounded-full hover:bg-[var(--accent-blue-20-opacity)] transition-all duration-200 flex items-center space-x-1 border border-[var(--accent-blue-40-opacity-for-border)] hover:border-[var(--accent-blue)] transform hover:scale-105"
+              className="mt-3 text-xs bg-[var(--accent-blue-10-opacity)] text-[var(--accent-blue)] px-3 py-1.5 rounded-full hover:bg-[var(--accent-blue-20-opacity)] transition-all duration-200 flex items-center space-x-1 border border-[var(--accent-blue-40-opacity-for-border)] hover:border-[var(--accent-blue)]"
               title="Send these problems to your workspace for practice"
+              whileHover={{ 
+                scale: 1.05,
+                boxShadow: "0 4px 12px rgba(59, 130, 246, 0.2)"
+              }}
+              whileTap={{ scale: 0.98 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
             >
-              <span>📋</span>
+              <motion.span
+                animate={{ rotate: [0, 5, -5, 0] }}
+                transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+              >
+                📋
+              </motion.span>
               <span>Send to Workspace</span>
-            </button>
+            </motion.button>
           )}
         </div>
         <time className={timestampClasses}>

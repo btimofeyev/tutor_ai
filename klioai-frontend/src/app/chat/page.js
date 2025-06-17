@@ -53,6 +53,13 @@ export default function ChatPage() {
   const [studentProfile, setStudentProfile] = useState(null);
   const [dynamicSuggestions, setDynamicSuggestions] = useState([]);
   
+  // 🎯 Enhanced Workspace State
+  const [workspaceActivity, setWorkspaceActivity] = useState(Date.now());
+  const [workspacePreferences, setWorkspacePreferences] = useState({
+    autoCollapse: true,
+    preferredSize: 'adaptive'
+  });
+  
   // Add workspace action processor
   const workspaceActionProcessorRef = useRef(null);
   const currentChildIdRef = useRef(null);
@@ -217,7 +224,31 @@ export default function ChatPage() {
   };
 
   const handleWorkspaceToChat = (message) => {
+    setWorkspaceActivity(Date.now()); // Track workspace activity
     handleSendMessage(message);
+  };
+
+  // 🎯 Auto-collapse workspace after inactivity
+  useEffect(() => {
+    if (!workspaceContent || !workspacePreferences.autoCollapse) return;
+
+    const checkInactivity = () => {
+      const timeSinceActivity = Date.now() - workspaceActivity;
+      const inactivityThreshold = studentProfile?.confidence_level === 'low' ? 180000 : 300000; // 3-5 minutes
+      
+      if (timeSinceActivity > inactivityThreshold && !isWorkspaceExpanded) {
+        console.log('🎯 Auto-collapsing workspace due to inactivity');
+        setWorkspaceContent(null);
+      }
+    };
+
+    const interval = setInterval(checkInactivity, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [workspaceContent, workspaceActivity, workspacePreferences.autoCollapse, studentProfile, isWorkspaceExpanded]);
+
+  // Track workspace interaction
+  const handleWorkspaceInteraction = () => {
+    setWorkspaceActivity(Date.now());
   };
 
 
@@ -396,11 +427,35 @@ export default function ChatPage() {
     setIsWorkspaceExpanded(!isWorkspaceExpanded);
   };
 
-  const chatWidth = workspaceContent 
-    ? (isWorkspaceExpanded ? 'w-1/2' : 'w-2/3') 
-    : 'w-full';
+  // 🧠 Adaptive workspace sizing based on student confidence and needs
+  const getAdaptiveWorkspaceSize = () => {
+    if (!workspaceContent) return { chat: 'w-full', workspace: 'w-1/3' };
+    
+    // Base size on manual expansion first
+    if (isWorkspaceExpanded) {
+      return { chat: 'w-1/2', workspace: 'w-1/2' };
+    }
+    
+    // Adapt based on student profile
+    if (studentProfile) {
+      const { confidence_level, response_patterns } = studentProfile;
+      
+      // Low confidence students get more chat guidance, smaller workspace
+      if (confidence_level === 'low' || response_patterns?.tends_to_give_up) {
+        return { chat: 'w-3/4', workspace: 'w-1/4' };
+      }
+      
+      // High confidence students get more workspace independence
+      if (confidence_level === 'high' && !response_patterns?.asks_for_help) {
+        return { chat: 'w-1/2', workspace: 'w-1/2' };
+      }
+    }
+    
+    // Default balanced layout
+    return { chat: 'w-2/3', workspace: 'w-1/3' };
+  };
 
-  const workspaceWidth = isWorkspaceExpanded ? 'w-1/2' : 'w-1/3';
+  const { chat: chatWidth, workspace: workspaceWidth } = getAdaptiveWorkspaceSize();
 
   return (
     <ProtectedRoute>
@@ -482,20 +537,40 @@ export default function ChatPage() {
           </div>
         </main>
 
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {workspaceContent && (
             <motion.div 
-              initial={{ x: '100%', opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '100%', opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className={`${workspaceWidth} bg-[var(--background-card)] border-l border-[var(--border-subtle)] transition-all duration-300`}
+              initial={{ 
+                x: '100%', 
+                opacity: 0,
+                scale: 0.95
+              }}
+              animate={{ 
+                x: 0, 
+                opacity: 1,
+                scale: 1
+              }}
+              exit={{ 
+                x: '100%', 
+                opacity: 0,
+                scale: 0.95
+              }}
+              transition={{ 
+                type: 'spring', 
+                stiffness: 200, 
+                damping: 25,
+                duration: 0.4
+              }}
+              className={`${workspaceWidth} bg-[var(--background-card)] border-l-2 border-[var(--accent-blue)] transition-all duration-500 ease-in-out shadow-xl`}
             >
               <SimpleWorkspace 
                 workspaceContent={workspaceContent}
                 isExpanded={isWorkspaceExpanded}
                 onClose={() => setWorkspaceContent(null)}
                 onSendToChat={handleWorkspaceToChat}
+                onInteraction={handleWorkspaceInteraction}
+                studentProfile={studentProfile}
+                adaptiveData={adaptiveData}
                 ref={workspaceRef}
               />
             </motion.div>

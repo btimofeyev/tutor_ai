@@ -17,7 +17,7 @@ const SUBJECT_CONTENT_TYPES = {
   },
   "language arts": {
     workspace_type: "language_practice",
-    content_types: ["reading_comprehension", "vocabulary", "grammar", "writing_prompt", "literary_analysis"],
+    content_types: ["reading_comprehension", "vocabulary", "grammar", "writing_prompt", "literary_analysis", "creative_writing", "essay_structure", "story_elements", "brainstorming", "revision"],
     evaluation_type: "rubric" // multi-criteria
   },
   "social studies": {
@@ -341,6 +341,70 @@ const WORKSPACE_TOOLS = [
   {
     type: "function",
     function: {
+      name: "create_creative_writing_toolkit",
+      description: "Create an interactive creative writing toolkit to help students brainstorm and organize their ideas",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt_type: {
+            type: "string",
+            enum: ["story", "essay", "poem", "character_sketch", "scene", "dialogue"],
+            description: "Type of creative writing assignment"
+          },
+          title: {
+            type: "string",
+            description: "Title for the writing project"
+          },
+          brainstorming_questions: {
+            type: "array",
+            description: "Guided questions to help student generate ideas",
+            items: {
+              type: "object",
+              properties: {
+                category: {
+                  type: "string",
+                  enum: ["character", "setting", "plot", "conflict", "theme", "style", "structure"],
+                  description: "What aspect of writing this question focuses on"
+                },
+                question: {
+                  type: "string",
+                  description: "The specific question to guide student thinking"
+                },
+                hint: {
+                  type: "string", 
+                  description: "Optional hint to help student if they're stuck"
+                }
+              },
+              required: ["category", "question"]
+            }
+          },
+          planning_sections: {
+            type: "array",
+            description: "Sections to help organize student's ideas",
+            items: {
+              type: "object",
+              properties: {
+                section_name: {
+                  type: "string",
+                  description: "Name of this planning section (e.g., 'Character Notes', 'Plot Outline')"
+                },
+                prompts: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Specific prompts for this section"
+                }
+              },
+              required: ["section_name", "prompts"]
+            }
+          }
+        },
+        required: ["prompt_type", "title", "brainstorming_questions"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "clear_workspace",
       description: "Clear the current workspace (use sparingly, only when starting completely new topic)",
       parameters: {
@@ -467,7 +531,12 @@ module.exports = {
         
       case 'language arts':
         if (text.includes('read') || text.includes('passage') || text.includes('comprehension')) return 'reading_comprehension';
-        if (text.includes('write') || text.includes('essay') || text.includes('paragraph')) return 'writing_prompt';
+        if (text.includes('story') || text.includes('creative') || text.includes('imagination') || text.includes('character')) return 'creative_writing';
+        if (text.includes('essay') || text.includes('thesis') || text.includes('argument')) return 'essay_structure';
+        if (text.includes('brainstorm') || text.includes('ideas') || text.includes('plan')) return 'brainstorming';
+        if (text.includes('revise') || text.includes('edit') || text.includes('improve')) return 'revision';
+        if (text.includes('plot') || text.includes('setting') || text.includes('theme')) return 'story_elements';
+        if (text.includes('write') || text.includes('paragraph')) return 'writing_prompt';
         if (text.includes('grammar') || text.includes('sentence')) return 'grammar';
         if (text.includes('vocabulary') || text.includes('word') || text.includes('meaning')) return 'vocabulary';
         return 'reading_comprehension';
@@ -514,7 +583,12 @@ module.exports = {
         writing_prompt: "Organize your thoughts before you start writing",
         vocabulary: "Use context clues to help determine the meaning",
         grammar: "Think about the rules for correct sentence structure",
-        literary_analysis: "What evidence from the text supports your answer?"
+        literary_analysis: "What evidence from the text supports your answer?",
+        creative_writing: "Let your imagination flow! Focus on creating vivid characters and settings",
+        essay_structure: "Start with a clear thesis, support with evidence, and conclude strongly",
+        story_elements: "Consider character, setting, plot, conflict, and theme in your story",
+        brainstorming: "Write down all your ideas first - don't worry about organizing them yet",
+        revision: "Read your work aloud and look for ways to make it clearer and more engaging"
       },
       "social studies": {
         map_analysis: "Look at the legend, scale, and compass rose for clues",
@@ -602,6 +676,97 @@ module.exports = {
     }
 
     return foundConnections;
+  },
+
+  // Adaptive difficulty adjustment based on performance
+  adaptDifficulty: function(currentDifficulty, recentPerformance, streakLength = 0) {
+    // recentPerformance is array of booleans (true = correct, false = incorrect)
+    if (!recentPerformance || recentPerformance.length < 3) {
+      return currentDifficulty; // Not enough data to adapt
+    }
+
+    const correctCount = recentPerformance.filter(correct => correct).length;
+    const accuracy = correctCount / recentPerformance.length;
+
+    // Performance thresholds
+    const highPerformance = accuracy >= 0.8 && streakLength >= 3;
+    const lowPerformance = accuracy <= 0.4;
+    const mediumPerformance = accuracy >= 0.6 && accuracy < 0.8;
+
+    // Adapt difficulty
+    if (highPerformance && currentDifficulty !== 'hard') {
+      return currentDifficulty === 'easy' ? 'medium' : 'hard';
+    } else if (lowPerformance && currentDifficulty !== 'easy') {
+      return currentDifficulty === 'hard' ? 'medium' : 'easy';
+    } else if (mediumPerformance && currentDifficulty === 'hard') {
+      return 'medium'; // Step down slightly if struggling with hard
+    }
+
+    return currentDifficulty; // No change needed
+  },
+
+  // Generate next problems based on performance and learning patterns
+  generateAdaptiveContent: function(subject, completedContent, performanceData, targetCount = 3) {
+    const contentTypes = this.getContentTypesForSubject(subject);
+    const evaluationType = this.getEvaluationTypeForSubject(subject);
+    
+    // Analyze performance by content type
+    const performanceByType = {};
+    completedContent.forEach((content, index) => {
+      const performance = performanceData[index];
+      if (!performanceByType[content.type]) {
+        performanceByType[content.type] = [];
+      }
+      performanceByType[content.type].push(performance);
+    });
+
+    // Determine what to practice next
+    const nextContent = [];
+    
+    // Prioritize content types that need more practice
+    const strugglingTypes = Object.entries(performanceByType)
+      .filter(([type, performances]) => {
+        const accuracy = performances.filter(p => p).length / performances.length;
+        return accuracy < 0.7;
+      })
+      .map(([type]) => type);
+
+    // Generate content focusing on struggling areas
+    let contentToGenerate = targetCount;
+    
+    if (strugglingTypes.length > 0) {
+      strugglingTypes.forEach(type => {
+        if (contentToGenerate > 0) {
+          const accuracy = performanceByType[type].filter(p => p).length / performanceByType[type].length;
+          const difficulty = accuracy < 0.5 ? 'easy' : 'medium';
+          
+          nextContent.push({
+            type: type,
+            difficulty: difficulty,
+            hint: this.generateHintForContentType(type, subject),
+            focus: 'remediation'
+          });
+          contentToGenerate--;
+        }
+      });
+    }
+
+    // Fill remaining with varied content
+    while (contentToGenerate > 0) {
+      const randomType = contentTypes[Math.floor(Math.random() * contentTypes.length)];
+      const recentPerformance = performanceData.slice(-5); // Last 5 attempts
+      const adaptedDifficulty = this.adaptDifficulty('medium', recentPerformance);
+      
+      nextContent.push({
+        type: randomType,
+        difficulty: adaptedDifficulty,
+        hint: this.generateHintForContentType(randomType, subject),
+        focus: 'practice'
+      });
+      contentToGenerate--;
+    }
+
+    return nextContent;
   },
 
   // Suggest complementary activities from other subjects

@@ -9,6 +9,13 @@ const { getCurrentDateInfo, getDueDateStatus } = require('../utils/dateUtils');
 const { KLIO_SYSTEM_PROMPT } = require('../utils/klioSystemPrompt');
 const { WORKSPACE_TOOLS, getEvaluationTypeForSubject, generateWorkspaceFromMaterial, detectSubjectFromMaterial, findCrossSubjectConnections, suggestComplementaryActivities } = require('../utils/workspaceTools');
 const { getWorkspaceHandler } = require('../utils/workspaceFunctionHandlers');
+const { 
+  analyzeStudentProfile, 
+  generateConversationStrategy, 
+  generatePersonalityContext,
+  shouldCelebrate,
+  generateContextualSuggestions
+} = require('../utils/conversationIntelligence');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -751,16 +758,81 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       }
     ];
 
-    // Call OpenAI with function calling
-    console.log('🎯 Requesting response with function calling...');
-    console.log(`📊 Context includes: ${materialContentForAI ? `Material Content ✅ (${foundMaterialTitle})` : 'No Material Content ❌'}`);
+    // 🧠 ADAPTIVE CONVERSATION INTELLIGENCE - Analyze student profile
+    console.log('🧠 Analyzing student profile for adaptive tutoring...');
+    const studentProfile = await analyzeStudentProfile(childId);
+    
+    // Determine current context for strategy adaptation
+    const currentContext = {
+      subject: currentWorkspace?.subject || mcpContext?.childSubjects?.[0]?.subject?.name?.toLowerCase() || 'general',
+      time_of_day: new Date().getHours() >= 17 ? 'evening' : 'day',
+      session_length: Math.floor((Date.now() - (session.start_time || Date.now())) / (1000 * 60)), // minutes
+      material_present: !!materialContentForAI,
+      workspace_active: !!currentWorkspace
+    };
+    
+    // Generate adaptive conversation strategy
+    const conversationStrategy = generateConversationStrategy(studentProfile, currentContext);
+    const personalityContext = generatePersonalityContext(conversationStrategy, message);
+    
+    console.log(`📊 Student Analysis: confidence=${studentProfile.confidence_level}, success_rate=${studentProfile.recent_success_rate}, engagement=${studentProfile.engagement_level}`);
+    console.log(`🎯 Strategy: response_style=${conversationStrategy.response_style}, guidance=${conversationStrategy.guidance_approach}, challenge=${conversationStrategy.challenge_level}`);
+    
+    // Check if we should trigger a celebration
+    const celebrationCheck = shouldCelebrate(message, conversationStrategy, studentProfile);
+    
+    // Generate contextual suggestions for this student
+    const contextualSuggestions = generateContextualSuggestions(studentProfile, currentContext, conversationStrategy);
+    
+    // Enhance system prompt with adaptive personality and strategy
+    const adaptivePersonalityPrompt = `
+    
+# 🎭 ADAPTIVE PERSONALITY FOR THIS RESPONSE:
+**Conversation Strategy:** ${conversationStrategy.response_style} (${conversationStrategy.guidance_approach} guidance)
+**Personality Tone:** ${personalityContext.tone}
+**Encouragement Level:** ${conversationStrategy.encouragement_level}
+**Challenge Level:** ${conversationStrategy.challenge_level}
+**Patience Level:** ${conversationStrategy.patience_level}
+
+**Response Guidelines for This Student:**
+- Start responses with phrases like: ${personalityContext.response_starters.join(' OR ')}
+- Use encouraging phrases: ${personalityContext.phrases.join(', ')}
+- Include appropriate emojis: ${personalityContext.emojis.join(' ')}
+- Celebration triggers: ${conversationStrategy.celebration_triggers.join(', ')}
+
+**Student Behavioral Patterns Detected:**
+- Tends to give up: ${studentProfile.response_patterns.tends_to_give_up ? '⚠️ YES - Be extra encouraging!' : '✅ No'}
+- Asks for help: ${studentProfile.response_patterns.asks_for_help ? '✅ Yes' : '⚠️ No - Offer proactive support'}
+- Explains thinking: ${studentProfile.response_patterns.explains_thinking ? '✅ Yes - Validate their reasoning!' : '⚠️ No - Encourage explanation'}
+- Recent success rate: ${Math.round(studentProfile.recent_success_rate * 100)}%
+
+${celebrationCheck.should_celebrate ? `🎉 CELEBRATION TRIGGER DETECTED: ${celebrationCheck.celebration_type} (${celebrationCheck.intensity} intensity)` : ''}
+
+**CRITICAL TUTORING ADAPTATIONS:**
+${conversationStrategy.guidance_approach === 'heavily_scaffolded' ? '🔧 Use HEAVY scaffolding - break everything into tiny steps, give lots of hints' : ''}
+${conversationStrategy.guidance_approach === 'minimal_scaffolding' ? '🚀 Use MINIMAL scaffolding - challenge them with harder questions, let them figure it out' : ''}
+${conversationStrategy.guidance_approach === 'questioning' ? '❓ Use SOCRATIC method - ask guiding questions instead of giving answers' : ''}
+${conversationStrategy.guidance_approach === 'proactive' ? '🤝 Be PROACTIVE - offer help before they ask for it' : ''}
+
+**Suggested Response Elements:**
+${contextualSuggestions.slice(0, 3).map(s => `- "${s}"`).join('\n')}`;
+
+    // Add adaptive prompt to system messages
+    const adaptiveSystemPrompt = systemPrompt + adaptivePersonalityPrompt;
+
+    // Update the openaiMessages with enhanced system prompt
+    openaiMessages[0].content = adaptiveSystemPrompt;
+    
+    // Call OpenAI with function calling and adaptive intelligence
+    console.log('🎯 Requesting response with adaptive intelligence and function calling...');
+    console.log(`📊 Context includes: ${materialContentForAI ? `Material Content ✅ (${foundMaterialTitle})` : 'No Material Content ❌'} | Strategy: ${conversationStrategy.response_style}`);
     
     let response;
     try {
       response = await openai.chat.completions.create({
         model: "gpt-4o", // Function calling works better on gpt-4o
         messages: openaiMessages,
-        temperature: 0.7,
+        temperature: conversationStrategy.response_style === 'encouraging' ? 0.8 : 0.7, // More creative for encouraging responses
         max_tokens: 1024,
         tools: WORKSPACE_TOOLS,
         tool_choice: "auto" // Let LLM decide when to use tools
@@ -800,6 +872,11 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
             break;
           case 'evaluate_content_item':
             result = await workspaceHandler.handleEvaluateContentItem(functionArgs, childId);
+            break;
+          
+          // Creative Writing Toolkit
+          case 'create_creative_writing_toolkit':
+            result = await workspaceHandler.handleCreateCreativeWritingToolkit(functionArgs, childId);
             break;
           
           // LEGACY: Math-specific functions (backward compatibility)
@@ -968,14 +1045,43 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
     console.log(`Material Content Used: ${!!materialContentForAI}`);
     console.log(`Found Material: ${foundMaterialTitle || 'None'}`);
 
-    // Return enhanced response with workspace actions
+    // Return enhanced response with workspace actions and adaptive intelligence
     res.json({
       success: true,
       message: finalMessage || '',
       timestamp: new Date().toISOString(),
       provider: 'openai',
-      workspaceActions: workspaceActions, // New: Function call results
-      currentWorkspace: workspaceHandler.getCurrentWorkspace(), // New: Current workspace state
+      workspaceActions: workspaceActions, // Function call results
+      currentWorkspace: workspaceHandler.getCurrentWorkspace(), // Current workspace state
+      
+      // 🧠 NEW: Adaptive Intelligence Data for Frontend
+      adaptiveIntelligence: {
+        studentProfile: {
+          confidence_level: studentProfile.confidence_level,
+          recent_success_rate: studentProfile.recent_success_rate,
+          engagement_level: studentProfile.engagement_level,
+          response_patterns: studentProfile.response_patterns
+        },
+        conversationStrategy: {
+          response_style: conversationStrategy.response_style,
+          guidance_approach: conversationStrategy.guidance_approach,
+          encouragement_level: conversationStrategy.encouragement_level,
+          challenge_level: conversationStrategy.challenge_level,
+          celebration_intensity: conversationStrategy.celebration_intensity
+        },
+        celebrationData: celebrationCheck.should_celebrate ? {
+          should_celebrate: true,
+          celebration_type: celebrationCheck.celebration_type,
+          intensity: celebrationCheck.intensity
+        } : { should_celebrate: false },
+        contextualSuggestions: contextualSuggestions.slice(0, 5), // Limit for performance
+        personalityContext: {
+          tone: personalityContext.tone,
+          emojis: personalityContext.emojis.slice(0, 3), // Top 3 emojis
+          response_starters: personalityContext.response_starters.slice(0, 2) // Top 2 starters
+        }
+      },
+      
       debugInfo: {
         currentDate,
         hasOverdueAssignments: mcpContext?.overdue?.length > 0,
@@ -987,7 +1093,10 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
         hasMaterialContent: !!materialContentForAI,
         specificQuestionDetected: !!specificQuestionRequest,
         foundMaterial: foundMaterialTitle,
-        questionNumber: specificQuestionRequest?.questionNumber
+        questionNumber: specificQuestionRequest?.questionNumber,
+        // Adaptive intelligence debug info
+        studentAnalysis: `confidence=${studentProfile.confidence_level}, success=${Math.round(studentProfile.recent_success_rate * 100)}%, engagement=${studentProfile.engagement_level}`,
+        adaptiveStrategy: `${conversationStrategy.response_style} (${conversationStrategy.guidance_approach})`
       }
     });
 

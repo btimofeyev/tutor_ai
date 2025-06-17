@@ -1,8 +1,8 @@
 // Simple Workspace - Like a teacher's whiteboard
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  FiX, FiSend, FiEdit3, FiCheckCircle, FiRotateCcw 
+  FiX, FiSend, FiEdit3, FiCheckCircle, FiRotateCcw, FiAward, FiStar, FiZap
 } from 'react-icons/fi';
 
 // Helper function to get emoji for different subjects
@@ -16,6 +16,184 @@ const getSubjectEmoji = (subject) => {
   };
   return emojiMap[subject] || '📝';
 };
+
+// Achievement Notification Component
+const AchievementNotification = ({ achievement, show, onClose }) => (
+  <AnimatePresence>
+    {show && achievement && (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8, y: -50 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.8, y: -50 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="fixed top-4 right-4 z-50 bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-4 rounded-lg shadow-xl border-2 border-yellow-300"
+      >
+        <div className="flex items-center space-x-3">
+          <div className="text-3xl">{achievement.icon}</div>
+          <div className="flex-1">
+            <h3 className="font-bold text-lg">{achievement.name}</h3>
+            <p className="text-sm opacity-90">{achievement.description}</p>
+            <p className="text-xs font-semibold">+{achievement.points} points!</p>
+          </div>
+          <button 
+            onClick={onClose}
+            className="text-white hover:text-yellow-200 transition-colors"
+          >
+            <FiX size={20} />
+          </button>
+        </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+);
+
+// Creative Writing Tools Component
+const CreativeWritingToolkit = ({ toolkit, onSendToChat }) => {
+  const [responses, setResponses] = useState({});
+  
+  const handleResponseChange = (questionId, value) => {
+    setResponses(prev => ({
+      ...prev,
+      [questionId]: value
+    }));
+  };
+
+  const sendResponse = (questionId, question, response) => {
+    if (!response.trim()) return;
+    
+    const message = `Here's my response to "${question}":\n\n${response}`;
+    onSendToChat(message);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Brainstorming Section */}
+      <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border-2 border-purple-200 p-4">
+        <h3 className="font-bold text-purple-800 mb-4 flex items-center text-lg">
+          <FiStar className="mr-2" />
+          {toolkit.brainstorming_section.title}
+        </h3>
+        
+        <div className="space-y-4">
+          {toolkit.brainstorming_section.questions.map((q, index) => (
+            <div key={q.id} className="bg-white rounded-lg p-4 border border-purple-200">
+              <div className="mb-2">
+                <span className="inline-block px-2 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full mb-2">
+                  {q.category}
+                </span>
+                <h4 className="font-medium text-gray-800">{q.question}</h4>
+                {q.hint && (
+                  <p className="text-sm text-gray-600 mt-1 italic">💡 {q.hint}</p>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <textarea
+                  value={responses[q.id] || ''}
+                  onChange={(e) => handleResponseChange(q.id, e.target.value)}
+                  placeholder="Type your ideas here..."
+                  className="flex-1 p-3 border border-gray-300 rounded-lg resize-none h-20 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                />
+                <button
+                  onClick={() => sendResponse(q.id, q.question, responses[q.id])}
+                  disabled={!responses[q.id]?.trim()}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  <FiSend size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Planning Sections */}
+      {toolkit.planning_sections.map((section, sectionIndex) => (
+        <div key={section.id} className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200 p-4">
+          <h3 className="font-bold text-blue-800 mb-4 flex items-center text-lg">
+            <FiEdit3 className="mr-2" />
+            {section.section_name}
+          </h3>
+          
+          <div className="space-y-3">
+            {section.prompts.map((prompt, promptIndex) => (
+              <div key={prompt.id} className="bg-white rounded-lg p-3 border border-blue-200">
+                <p className="font-medium text-gray-800 mb-2">{prompt.prompt}</p>
+                <div className="flex gap-2">
+                  <textarea
+                    value={responses[prompt.id] || ''}
+                    onChange={(e) => handleResponseChange(prompt.id, e.target.value)}
+                    placeholder="Write your response..."
+                    className="flex-1 p-2 border border-gray-300 rounded resize-none h-16 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <button
+                    onClick={() => sendResponse(prompt.id, prompt.prompt, responses[prompt.id])}
+                    disabled={!responses[prompt.id]?.trim()}
+                    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FiSend size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      
+      {/* Progress Indicator */}
+      <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-lg border-2 border-green-200 p-4">
+        <h3 className="font-bold text-green-800 mb-2 flex items-center">
+          <FiCheckCircle className="mr-2" />
+          Your Progress
+        </h3>
+        <div className="bg-white rounded-full h-4 overflow-hidden">
+          <div 
+            className="bg-gradient-to-r from-green-500 to-teal-500 h-full transition-all duration-500"
+            style={{ width: `${(toolkit.progress.completed / toolkit.progress.total_questions) * 100}%` }}
+          />
+        </div>
+        <p className="text-sm text-green-700 mt-2">
+          {toolkit.progress.completed} of {toolkit.progress.total_questions} questions completed
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const CreativeWritingTools = ({ onSendToChat }) => (
+  <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border-2 border-purple-200 mb-4">
+    <h4 className="font-bold text-purple-800 mb-3 flex items-center">
+      <FiStar className="mr-2" />
+      Creative Writing Toolkit
+    </h4>
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        onClick={() => onSendToChat("Help me brainstorm character ideas")}
+        className="p-2 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors text-sm"
+      >
+        Character Builder 👤
+      </button>
+      <button
+        onClick={() => onSendToChat("Help me develop my story setting")}
+        className="p-2 bg-pink-100 text-pink-700 rounded hover:bg-pink-200 transition-colors text-sm"
+      >
+        Setting Creator 🏞️
+      </button>
+      <button
+        onClick={() => onSendToChat("Help me plan my story plot")}
+        className="p-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors text-sm"
+      >
+        Plot Planner 📈
+      </button>
+      <button
+        onClick={() => onSendToChat("Help me revise and improve my writing")}
+        className="p-2 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors text-sm"
+      >
+        Revision Helper ✏️
+      </button>
+    </div>
+  </div>
+);
 
 // Helper function to get appropriate item label based on subject
 const getItemLabel = (subject, itemNumber) => {
@@ -33,6 +211,8 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
   const [problems, setProblems] = useState([]);
   const [workNotes, setWorkNotes] = useState({});
   const [problemStates, setProblemStates] = useState({}); // 'pending', 'correct', 'incorrect'
+  const [currentAchievement, setCurrentAchievement] = useState(null);
+  const [showAchievement, setShowAchievement] = useState(false);
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
@@ -42,6 +222,15 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
 
   // Initialize workspace when content changes  
   useEffect(() => {
+    // Handle creative writing toolkit differently
+    if (workspaceContent?.type === 'creative_writing_toolkit') {
+      console.log('✍️ Loading creative writing toolkit:', workspaceContent.title);
+      setProblems([]); // Clear problems for creative writing
+      setWorkNotes({});
+      setProblemStates({});
+      return;
+    }
+    
     // Handle both new subject workspaces (content) and legacy math workspaces (problems)
     const items = workspaceContent?.content || workspaceContent?.problems;
     
@@ -132,36 +321,93 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
     }
   };
 
+  // Handle creative writing toolkit separately
+  if (workspaceContent?.type === 'creative_writing_toolkit') {
+    return (
+      <>
+        {/* Achievement Notification */}
+        <AchievementNotification 
+          achievement={currentAchievement}
+          show={showAchievement}
+          onClose={() => setShowAchievement(false)}
+        />
+        
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="h-full flex flex-col bg-white border-l border-gray-200"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 bg-purple-50 border-b flex-shrink-0">
+            <h2 className="text-lg font-semibold text-gray-800">
+              ✍️ {workspaceContent.title}
+              <span className="ml-2 text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                {workspaceContent.prompt_type}
+              </span>
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <FiX size={20} />
+            </button>
+          </div>
+
+          {/* Creative Writing Toolkit Content */}
+          <div className="flex-1 p-4 overflow-y-auto">
+            <CreativeWritingToolkit 
+              toolkit={workspaceContent} 
+              onSendToChat={onSendToChat} 
+            />
+          </div>
+        </motion.div>
+      </>
+    );
+  }
+
   if (!workspaceContent || !problems.length) {
     return null;
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="h-full flex flex-col bg-white border-l border-gray-200"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-blue-50 border-b flex-shrink-0">
-        <h2 className="text-lg font-semibold text-gray-800">
-          {getSubjectEmoji(workspaceContent.subject)} {workspaceContent.title || 'Practice Activities'}
-          {workspaceContent.subject && (
-            <span className="ml-2 text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-              {workspaceContent.subject}
-            </span>
-          )}
-        </h2>
-        <button
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          <FiX size={20} />
-        </button>
-      </div>
+    <>
+      {/* Achievement Notification */}
+      <AchievementNotification 
+        achievement={currentAchievement}
+        show={showAchievement}
+        onClose={() => setShowAchievement(false)}
+      />
+      
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="h-full flex flex-col bg-white border-l border-gray-200"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 bg-blue-50 border-b flex-shrink-0">
+          <h2 className="text-lg font-semibold text-gray-800">
+            {getSubjectEmoji(workspaceContent.subject)} {workspaceContent.title || 'Practice Activities'}
+            {workspaceContent.subject && (
+              <span className="ml-2 text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                {workspaceContent.subject}
+              </span>
+            )}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <FiX size={20} />
+          </button>
+        </div>
 
       {/* Problems */}
       <div className="flex-1 p-4 overflow-y-auto">
+        {/* Creative Writing Tools for Language Arts */}
+        {workspaceContent.subject === 'language arts' && (
+          <CreativeWritingTools onSendToChat={onSendToChat} />
+        )}
+        
         {problems.map((problem, index) => {
           const status = problemStates[problem.id];
           
@@ -348,6 +594,7 @@ const SimpleWorkspace = forwardRef(({ workspaceContent, isExpanded, onClose, onS
         }
       `}</style>
     </motion.div>
+    </>
   );
 });
 

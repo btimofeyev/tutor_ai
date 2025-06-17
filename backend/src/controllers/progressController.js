@@ -56,7 +56,7 @@ exports.getLifetimeProgress = async (req, res) => {
   try {
     const { data: child, error } = await supabase
       .from('children')
-      .select('name, lifetime_correct, current_streak, best_streak, weekly_correct, week_start_date')
+      .select('name, lifetime_correct, current_streak, best_streak, weekly_correct, week_start_date, achievement_points, last_achievement')
       .eq('id', child_id)
       .single();
 
@@ -79,12 +79,23 @@ exports.getLifetimeProgress = async (req, res) => {
         .eq('id', child_id);
     }
 
+    // Get recent achievements
+    const { data: recentAchievements } = await supabase
+      .from('achievement_history')
+      .select('*')
+      .eq('child_id', child_id)
+      .order('achieved_at', { ascending: false })
+      .limit(5);
+
     const stats = {
       name: child.name,
       lifetime_correct: child.lifetime_correct || 0,
       current_streak: child.current_streak || 0,
       best_streak: child.best_streak || 0,
-      weekly_correct: weeklyCorrect
+      weekly_correct: weeklyCorrect,
+      achievement_points: child.achievement_points || 0,
+      last_achievement: child.last_achievement,
+      recent_achievements: recentAchievements || []
     };
 
     res.json({
@@ -94,6 +105,51 @@ exports.getLifetimeProgress = async (req, res) => {
   } catch (error) {
     console.error('Error fetching lifetime progress:', error);
     res.status(500).json({ error: 'Failed to fetch progress stats' });
+  }
+};
+
+// Get child's achievement history
+exports.getAchievements = async (req, res) => {
+  const child_id = req.child?.child_id;
+  
+  if (!child_id) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const { data: achievements, error } = await supabase
+      .from('achievement_history')
+      .select('*')
+      .eq('child_id', child_id)
+      .order('achieved_at', { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    // Get summary stats
+    const totalPoints = achievements.reduce((sum, ach) => sum + (ach.points_awarded || 0), 0);
+    const achievementsByMonth = {};
+    
+    achievements.forEach(ach => {
+      const month = new Date(ach.achieved_at).toISOString().substring(0, 7); // YYYY-MM
+      if (!achievementsByMonth[month]) {
+        achievementsByMonth[month] = [];
+      }
+      achievementsByMonth[month].push(ach);
+    });
+
+    res.json({
+      success: true,
+      achievements,
+      summary: {
+        total_achievements: achievements.length,
+        total_points: totalPoints,
+        achievements_by_month: achievementsByMonth
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching achievements:', error);
+    res.status(500).json({ error: 'Failed to fetch achievements' });
   }
 };
 

@@ -8,6 +8,55 @@ class WorkspaceFunctionHandlers {
     this.sessionId = null;
   }
 
+  async handleCreateCreativeWritingToolkit(args, childId) {
+    console.log('✍️ Creating creative writing toolkit:', args.title);
+    
+    try {
+      this.sessionId = `creative-writing-${Date.now()}-${childId}`;
+    } catch (error) {
+      console.warn('Failed to create session ID, using local tracking');
+      this.sessionId = `local-writing-${Date.now()}`;
+    }
+
+    const toolkit = {
+      type: 'creative_writing_toolkit',
+      prompt_type: args.prompt_type,
+      title: args.title,
+      sessionId: this.sessionId,
+      brainstorming_section: {
+        title: 'Brainstorming Ideas',
+        questions: args.brainstorming_questions.map((q, index) => ({
+          id: `brainstorm-${Date.now()}-${index}`,
+          category: q.category,
+          question: q.question,
+          hint: q.hint || null,
+          student_response: null,
+          status: 'pending'
+        }))
+      },
+      planning_sections: args.planning_sections ? args.planning_sections.map((section, index) => ({
+        id: `planning-${Date.now()}-${index}`,
+        section_name: section.section_name,
+        prompts: section.prompts.map((prompt, pIndex) => ({
+          id: `prompt-${Date.now()}-${index}-${pIndex}`,
+          prompt: prompt,
+          student_response: null,
+          status: 'pending'
+        }))
+      })) : [],
+      progress: {
+        total_questions: args.brainstorming_questions.length + 
+          (args.planning_sections ? args.planning_sections.reduce((sum, section) => sum + section.prompts.length, 0) : 0),
+        completed: 0,
+        phase: 'brainstorming' // brainstorming, planning, ready_to_write
+      },
+      createdAt: new Date().toISOString()
+    };
+
+    this.currentWorkspace = toolkit;
+    return toolkit;
+  }
+
   async handleCreateMathWorkspace(args, childId) {
     console.log('🎯 Creating new math workspace:', args.title);
     
@@ -91,10 +140,10 @@ class WorkspaceFunctionHandlers {
 
   async updateLifetimeProgress(childId, isCorrect) {
     try {
-      // Get current child progress stats
+      // Get current child progress stats with gamification fields
       const { data: child, error: fetchError } = await supabase
         .from('children')
-        .select('lifetime_correct, current_streak, best_streak, weekly_correct, week_start_date')
+        .select('lifetime_correct, current_streak, best_streak, weekly_correct, week_start_date, achievement_points, last_achievement')
         .eq('id', childId)
         .single();
 
@@ -109,7 +158,9 @@ class WorkspaceFunctionHandlers {
         current_streak: child?.current_streak || 0,
         best_streak: child?.best_streak || 0,
         weekly_correct: child?.weekly_correct || 0,
-        week_start_date: child?.week_start_date
+        week_start_date: child?.week_start_date,
+        achievement_points: child?.achievement_points || 0,
+        last_achievement: child?.last_achievement
       };
 
       let newStats = { ...currentStats };
@@ -131,6 +182,13 @@ class WorkspaceFunctionHandlers {
         if (newStats.current_streak > currentStats.best_streak) {
           newStats.best_streak = newStats.current_streak;
         }
+
+        // Check for achievements and award points
+        const achievementResult = this.checkAchievements(newStats, currentStats);
+        if (achievementResult.newAchievement) {
+          newStats.achievement_points = (currentStats.achievement_points || 0) + achievementResult.points;
+          newStats.last_achievement = achievementResult.achievement;
+        }
       } else {
         // Reset current streak on incorrect answer
         newStats.current_streak = 0;
@@ -145,6 +203,8 @@ class WorkspaceFunctionHandlers {
           best_streak: newStats.best_streak,
           weekly_correct: newStats.weekly_correct,
           week_start_date: newStats.week_start_date,
+          achievement_points: newStats.achievement_points,
+          last_achievement: newStats.last_achievement,
           updated_at: new Date().toISOString()
         })
         .eq('id', childId);
@@ -160,6 +220,60 @@ class WorkspaceFunctionHandlers {
       console.warn('Error updating lifetime progress:', error);
       return null;
     }
+  }
+
+  // Check for achievements and return points/achievement info
+  checkAchievements(newStats, oldStats) {
+    const achievements = [];
+
+    // Streak achievements
+    if (newStats.current_streak === 5 && oldStats.current_streak < 5) {
+      achievements.push({ name: "Hot Streak", description: "5 correct in a row!", points: 50, icon: "🔥" });
+    }
+    if (newStats.current_streak === 10 && oldStats.current_streak < 10) {
+      achievements.push({ name: "Perfect Ten", description: "10 correct in a row!", points: 100, icon: "🎯" });
+    }
+    if (newStats.current_streak === 20 && oldStats.current_streak < 20) {
+      achievements.push({ name: "Unstoppable", description: "20 correct in a row!", points: 250, icon: "⚡" });
+    }
+
+    // Milestone achievements
+    if (newStats.lifetime_correct === 100 && oldStats.lifetime_correct < 100) {
+      achievements.push({ name: "Century Club", description: "100 lifetime correct answers!", points: 200, icon: "💯" });
+    }
+    if (newStats.lifetime_correct === 500 && oldStats.lifetime_correct < 500) {
+      achievements.push({ name: "Scholar", description: "500 lifetime correct answers!", points: 500, icon: "🎓" });
+    }
+    if (newStats.lifetime_correct === 1000 && oldStats.lifetime_correct < 1000) {
+      achievements.push({ name: "Master Learner", description: "1000 lifetime correct answers!", points: 1000, icon: "🏆" });
+    }
+
+    // Weekly achievements
+    if (newStats.weekly_correct === 25 && oldStats.weekly_correct < 25) {
+      achievements.push({ name: "Weekly Warrior", description: "25 correct this week!", points: 75, icon: "📅" });
+    }
+    if (newStats.weekly_correct === 50 && oldStats.weekly_correct < 50) {
+      achievements.push({ name: "Study Champion", description: "50 correct this week!", points: 150, icon: "🏅" });
+    }
+
+    // Personal best achievements
+    if (newStats.best_streak > oldStats.best_streak && newStats.best_streak >= 5) {
+      achievements.push({ name: "Personal Best", description: `New record: ${newStats.best_streak} in a row!`, points: newStats.best_streak * 5, icon: "⭐" });
+    }
+
+    if (achievements.length > 0) {
+      const totalPoints = achievements.reduce((sum, ach) => sum + ach.points, 0);
+      const latestAchievement = achievements[achievements.length - 1];
+      
+      return {
+        newAchievement: true,
+        achievement: latestAchievement,
+        allAchievements: achievements,
+        points: totalPoints
+      };
+    }
+
+    return { newAchievement: false, points: 0 };
   }
 
   async handleMarkProblemCorrect(args, childId) {

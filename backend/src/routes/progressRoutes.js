@@ -21,4 +21,7 @@ router.get('/child/:child_id?', progressController.getChildProgress);
 // Lifetime progress stats
 router.get('/lifetime', progressController.getLifetimeProgress);
 
+// Achievement tracking
+router.get('/achievements', progressController.getAchievements);
+
 module.exports = router;

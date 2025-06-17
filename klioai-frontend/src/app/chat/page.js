@@ -48,6 +48,11 @@ export default function ChatPage() {
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(false);
   const workspaceRef = useRef(null); // Reference to workspace component
   
+  // 🧠 NEW: Adaptive Intelligence State - Focus on tutoring quality
+  const [adaptiveData, setAdaptiveData] = useState(null);
+  const [studentProfile, setStudentProfile] = useState(null);
+  const [dynamicSuggestions, setDynamicSuggestions] = useState([]);
+  
   // Add workspace action processor
   const workspaceActionProcessorRef = useRef(null);
   const currentChildIdRef = useRef(null);
@@ -215,6 +220,7 @@ export default function ChatPage() {
     handleSendMessage(message);
   };
 
+
   const handleSendMessage = async (messageText) => {
     if (!messageText.trim() || isLoading) return;
     
@@ -237,8 +243,27 @@ export default function ChatPage() {
 
       console.log('📨 Received function calling response:', {
         workspaceActionsCount: response.workspaceActions?.length || 0,
-        hasCurrentWorkspace: !!response.currentWorkspace
+        hasCurrentWorkspace: !!response.currentWorkspace,
+        hasAdaptiveIntelligence: !!response.adaptiveIntelligence
       });
+
+      // 🧠 Process Adaptive Intelligence Data - Focus on tutoring quality
+      if (response.adaptiveIntelligence) {
+        console.log('🧠 Processing adaptive intelligence data:', {
+          confidence: response.adaptiveIntelligence.studentProfile?.confidence_level,
+          success_rate: response.adaptiveIntelligence.studentProfile?.recent_success_rate,
+          strategy: response.adaptiveIntelligence.conversationStrategy?.response_style
+        });
+        
+        setAdaptiveData(response.adaptiveIntelligence);
+        setStudentProfile(response.adaptiveIntelligence.studentProfile);
+        
+        // Update dynamic suggestions based on student profile and needs
+        if (response.adaptiveIntelligence.contextualSuggestions) {
+          setDynamicSuggestions(response.adaptiveIntelligence.contextualSuggestions);
+          console.log('📝 Updated contextual suggestions based on student profile');
+        }
+      }
 
       const klioMessage = {
         id: `msg-${Date.now()}-klio`,
@@ -249,6 +274,8 @@ export default function ChatPage() {
         // NEW: Store function calling results
         workspaceActions: response.workspaceActions || [],
         currentWorkspace: response.currentWorkspace || null,
+        // NEW: Store adaptive intelligence data
+        adaptiveIntelligence: response.adaptiveIntelligence || null,
       };
       
       setMessages(prev => [...prev, klioMessage]);
@@ -431,12 +458,14 @@ export default function ChatPage() {
             <div ref={messagesEndRef} className="h-1"/>
           </div>
           
-          {showSuggestions && suggestions.length > 0 && (
+          {showSuggestions && (suggestions.length > 0 || dynamicSuggestions.length > 0) && (
              <div className="w-full flex justify-center px-4 sm:px-6 pb-2 pt-1 border-t border-[var(--border-subtle)] bg-[var(--background-card)]">
                 <div className="max-w-3xl w-full">
                     <SuggestionBubbles
-                        suggestions={suggestions}
+                        suggestions={dynamicSuggestions.length > 0 ? dynamicSuggestions : suggestions}
                         onSuggestionClick={handleSuggestionClick}
+                        isAdaptive={dynamicSuggestions.length > 0}
+                        studentProfile={studentProfile}
                     />
                 </div>
             </div>

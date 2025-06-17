@@ -1,19 +1,77 @@
 // klioai-frontend/src/components/ChatMessage.js - ENHANCED VERSION
 import { motion } from 'framer-motion';
-import { FiAlertTriangle } from 'react-icons/fi';
+import { FiAlertTriangle, FiStar, FiHeart, FiTrendingUp } from 'react-icons/fi';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
-const KlioAvatar = () => (
-  <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden mr-2 shadow-sm bg-[var(--background-card)]">
-    <Image
-      src="/klio_logo.png"
-      alt="Klio AI"
-      width={32}
-      height={32}
-      className="object-cover"
-    />
-  </div>
-);
+// Enhanced Klio Avatar with dynamic expressions
+const KlioAvatar = ({ messageType = 'default' }) => {
+  const getAvatarStyle = () => {
+    switch (messageType) {
+      case 'celebration':
+        return 'ring-2 ring-yellow-400 ring-offset-2 animate-pulse';
+      case 'encouragement':
+        return 'ring-2 ring-green-400 ring-offset-2';
+      case 'question':
+        return 'ring-2 ring-blue-400 ring-offset-2';
+      default:
+        return '';
+    }
+  };
+
+  return (
+    <div className={`flex-shrink-0 w-8 h-8 rounded-full overflow-hidden mr-2 shadow-sm bg-[var(--background-card)] ${getAvatarStyle()}`}>
+      <Image
+        src="/klio_logo.png"
+        alt="Klio AI"
+        width={32}
+        height={32}
+        className="object-cover"
+      />
+    </div>
+  );
+};
+
+// Detect the emotional tone and content type of messages
+const analyzeMessageTone = (content) => {
+  if (!content) return { type: 'default', hasEmojis: false, celebratory: false };
+  
+  const contentLower = content.toLowerCase();
+  
+  // Celebration indicators
+  const celebrationWords = [
+    'excellent', 'perfect', 'fantastic', 'amazing', 'great job', 'well done',
+    'correct', 'right', 'brilliant', 'outstanding', 'wonderful', 'superb'
+  ];
+  
+  // Encouragement indicators  
+  const encouragementWords = [
+    'keep going', 'you can do it', 'try again', 'almost there', 'good effort',
+    'nice work', 'getting better', 'improving', 'progress'
+  ];
+  
+  // Question indicators
+  const questionWords = [
+    'what do you think', 'can you', 'how about', 'what if', 'let\'s try',
+    'what would happen', 'can you tell me'
+  ];
+  
+  const hasEmojis = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(content);
+  
+  let type = 'default';
+  let celebratory = false;
+  
+  if (celebrationWords.some(word => contentLower.includes(word))) {
+    type = 'celebration';
+    celebratory = true;
+  } else if (encouragementWords.some(word => contentLower.includes(word))) {
+    type = 'encouragement';
+  } else if (questionWords.some(word => contentLower.includes(word)) || content.includes('?')) {
+    type = 'question';
+  }
+  
+  return { type, hasEmojis, celebratory };
+};
 
 // ENHANCED: Better detection for ALL types of structured content including LaTeX
 const hasStructuredContent = (content) => {
@@ -61,6 +119,18 @@ const hasStructuredContent = (content) => {
     /work through/i,
     /try solving/i,
     
+    // Creative writing patterns
+    /write.*story/i,
+    /create.*character/i,
+    /brainstorm.*ideas/i,
+    /develop.*plot/i,
+    /write.*essay/i,
+    /creative.*writing/i,
+    /story.*element/i,
+    /character.*development/i,
+    /setting.*description/i,
+    /narrative.*voice/i,
+    
     // Math instruction patterns
     /multiply.*together/i,
     /add.*numbers/i,
@@ -82,17 +152,22 @@ const hasStructuredContent = (content) => {
   const mathKeywords = ['solve', 'calculate', 'multiply', 'add', 'subtract', 'divide', 'problem', 'equation', 'answer', 'practice', 'try'];
   const hasMathKeywords = mathKeywords.some(keyword => content.toLowerCase().includes(keyword));
   
+  // Check for creative writing keywords
+  const writingKeywords = ['story', 'character', 'plot', 'setting', 'write', 'essay', 'paragraph', 'creative', 'narrative', 'brainstorm', 'draft', 'revise'];
+  const hasWritingKeywords = writingKeywords.some(keyword => content.toLowerCase().includes(keyword));
+  
   // Special check for numbered lists that look like practice problems
   const hasNumberedMathList = /^\s*\d+\.\s*\\?\(/m.test(content) || // 1. \( or 1. (
                               /^\s*\d+\.\s*[^.]*[\+\-\*×÷\/]/m.test(content); // 1. something with math
   
-  const result = hasIndicator || hasNumberedMathList || (hasMultipleNumbers && hasMathKeywords);
+  const result = hasIndicator || hasNumberedMathList || (hasMultipleNumbers && hasMathKeywords) || hasWritingKeywords;
   
   if (result) {
     console.log('✅ Structured content detected in:', content.substring(0, 100));
     console.log('   - Has math indicators:', hasIndicator);
     console.log('   - Has numbered math list:', hasNumberedMathList);
-    console.log('   - Has multiple numbers + keywords:', hasMultipleNumbers && hasMathKeywords);
+    console.log('   - Has multiple numbers + math keywords:', hasMultipleNumbers && hasMathKeywords);
+    console.log('   - Has writing keywords:', hasWritingKeywords);
   }
   
   return result;
@@ -167,10 +242,31 @@ function formatKlioMessage(content) {
 
 export default function ChatMessage({ message, onSendToWorkspace, hasStructuredWorkspace = false }) {
   const isKlio = message.role === 'klio';
+  const [showCelebration, setShowCelebration] = useState(false);
+  
+  // Analyze message tone for dynamic styling
+  const messageAnalysis = analyzeMessageTone(message.content);
+  
+  // Trigger celebration effect for celebratory messages
+  useEffect(() => {
+    if (isKlio && messageAnalysis.celebratory) {
+      setShowCelebration(true);
+      const timer = setTimeout(() => setShowCelebration(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isKlio, messageAnalysis.celebratory]);
 
   const messageVariants = {
     hidden: { opacity: 0, y: 10 },
-    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 200, damping: 20 } },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      transition: { 
+        type: "spring", 
+        stiffness: messageAnalysis.celebratory ? 400 : 200, 
+        damping: 20 
+      } 
+    },
     exit: { opacity: 0, transition: { duration: 0.15 } }
   };
 
@@ -188,10 +284,37 @@ export default function ChatMessage({ message, onSendToWorkspace, hasStructuredW
       roundedClasses = 'rounded-xl'; // Standard rounding for errors
       timestampClasses += ' text-[var(--accent-red)]/70 self-start';
     } else {
-      // Klio's Normal Message: Left and Bottom border in Accent Blue
-      borderBubbleClasses = `border-l-[3px] border-b-[3px] border-[var(--accent-blue)]`;
+      // Dynamic styling based on message tone
+      let borderColor = 'var(--accent-blue)';
+      let bgColor = 'var(--background-card)';
+      
+      switch (messageAnalysis.type) {
+        case 'celebration':
+          borderColor = 'var(--accent-yellow)';
+          bgColor = 'rgb(254 249 195)'; // yellow-100
+          baseBubbleClasses = `p-3 shadow-lg bg-gradient-to-r from-yellow-50 to-orange-50 text-[var(--text-primary)]`;
+          break;
+        case 'encouragement':
+          borderColor = 'var(--accent-green)';
+          bgColor = 'rgb(240 253 244)'; // green-50
+          baseBubbleClasses = `p-3 shadow-sm bg-gradient-to-r from-green-50 to-emerald-50 text-[var(--text-primary)]`;
+          break;
+        case 'question':
+          borderColor = 'var(--accent-blue)';
+          bgColor = 'rgb(239 246 255)'; // blue-50
+          baseBubbleClasses = `p-3 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50 text-[var(--text-primary)]`;
+          break;
+      }
+      
+      // Klio's Normal Message: Left and Bottom border with dynamic color
+      borderBubbleClasses = `border-l-[3px] border-b-[3px] border-[${borderColor}]`;
       roundedClasses = 'rounded-tr-xl rounded-br-xl rounded-tl-xl';
       timestampClasses += ' text-[var(--text-secondary)] self-start';
+      
+      // Add animation for celebration messages
+      if (messageAnalysis.celebratory) {
+        borderBubbleClasses += ' animate-pulse';
+      }
     }
   } else {
     // Child's Message: Right and Bottom border in Accent Yellow
@@ -246,7 +369,7 @@ export default function ChatMessage({ message, onSendToWorkspace, hasStructuredW
       layout
       className={`flex w-full ${!isKlio ? 'justify-end' : 'items-end'}`}
     >
-      {isKlio && !message.isError && <KlioAvatar />}
+      {isKlio && !message.isError && <KlioAvatar messageType={messageAnalysis.type} />}
       
       <div className={`flex flex-col max-w-[75%] sm:max-w-[70%] ${isKlio && message.isError ? 'ml-10' : ''}`}>
         <div className={finalBubbleClasses}>

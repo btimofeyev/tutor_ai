@@ -6,22 +6,28 @@ async function analyzeStudentProfile(childId) {
   try {
     // Get recent chat history (last 10 messages)
     const { data: recentChats, error: chatError } = await supabase
-      .from('chat_history')
+      .from('chat_messages')
       .select('*')
       .eq('child_id', childId)
-      .order('timestamp', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(10);
 
     if (chatError) {
       console.warn('Could not fetch chat history for student analysis:', chatError);
       
       // If table doesn't exist, use enhanced default profile based on child data
-      const { data: childData } = await supabase
-        .from('children')
-        .select('lifetime_correct, current_streak, created_at')
-        .eq('id', childId)
-        .single()
-        .catch(() => ({ data: null }));
+      let childData = null;
+      try {
+        const { data } = await supabase
+          .from('children')
+          .select('lifetime_correct, current_streak, created_at')
+          .eq('id', childId)
+          .single();
+        childData = data;
+      } catch (error) {
+        console.log('Could not fetch child data for analysis:', error.message);
+        childData = null;
+      }
       
       return getEnhancedDefaultProfile(childData);
     }

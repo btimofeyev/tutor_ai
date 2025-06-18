@@ -31,7 +31,7 @@ export function SubscriptionProvider({ children }) {
       // Get parent ID from child data to check subscription
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/children/${child.id}/parent-subscription`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('childToken')}`,
+          'Authorization': `Bearer ${localStorage.getItem('klio_access_token')}`,
           'Content-Type': 'application/json'
         }
       });

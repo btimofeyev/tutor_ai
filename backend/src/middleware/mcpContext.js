@@ -1,5 +1,5 @@
 // backend/src/middleware/mcpContext.js - SIMPLIFIED VERSION
-const mcpClient = require('../services/mcpClient');
+const mcpClient = require('../services/mcpClientWrapper');
 const { getCurrentDateInfo, getDueDateStatus } = require('../utils/dateUtils');
 
 // 🎯 SMART QUERY DETECTION

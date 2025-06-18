@@ -257,7 +257,8 @@ exports.getParentSubscription = async (req, res) => {
     const authenticatedChildId = req.child?.child_id;
 
     // Ensure the authenticated child matches the requested child_id
-    if (authenticatedChildId !== parseInt(child_id)) {
+    // Convert both to strings for comparison since JWT might store as string
+    if (String(authenticatedChildId) !== String(child_id)) {
       return res.status(403).json({ error: 'Access denied' });
     }
 

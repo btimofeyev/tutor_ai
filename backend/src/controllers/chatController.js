@@ -1,7 +1,7 @@
 // backend/src/controllers/chatController.js - FUNCTION CALLING VERSION
 const { OpenAI } = require('openai');
 const supabase = require('../utils/supabaseClient');
-const mcpClient = require('../services/mcpClient');
+const mcpClient = require('../services/mcpClientWrapper');
 const memoryService = require('../services/learningMemoryService');
 const chatHistoryService = require('../services/chatHistoryService');
 const { formatLearningContextForAI, isLessonQuery } = require('../middleware/mcpContext');

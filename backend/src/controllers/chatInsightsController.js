@@ -38,10 +38,10 @@ const getConversationDetail = async (req, res) => {
     const { conversationId } = req.params;
     try {
         const { data, error } = await supabase
-            .from('chat_history')
+            .from('chat_messages')
             .select('*')
             .eq('conversation_id', conversationId)
-            .order('timestamp', { ascending: true });
+            .order('created_at', { ascending: true });
 
         if (error) throw error;
         res.json(data);

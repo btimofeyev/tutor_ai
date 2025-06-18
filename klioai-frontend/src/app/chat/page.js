@@ -145,7 +145,7 @@ export default function ChatPage() {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/progress/lifetime`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('klio_child_token')}`
+          'Authorization': `Bearer ${localStorage.getItem('klio_access_token')}`
         }
       });
       

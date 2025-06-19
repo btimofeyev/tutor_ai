@@ -13,6 +13,9 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   const [aiScheduling, setAiScheduling] = useState(false);
   const [aiScheduleResults, setAiScheduleResults] = useState(null);
 
+  // State for batch operations to prevent flickering
+  const [batchMode, setBatchMode] = useState(false);
+
   // State for modals and UI
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -73,13 +76,21 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
           child_id: childId
         });
         
-        // Add the new entry to the local state
-        setScheduleEntries(prev => [...prev, response.data]);
+        // Add the new entry to the local state (skip if in batch mode)
+        if (!batchMode) {
+          setScheduleEntries(prev => [...prev, response.data]);
+        }
         setError(null);
         return { success: true, data: response.data };
       } catch (apiError) {
+        // If it's a conflict error (409), don't create local entry - return the error
+        if (apiError.response?.status === 409) {
+          const errorMessage = apiError.response?.data?.error || 'Scheduling conflict detected';
+          setError(errorMessage);
+          return { success: false, error: errorMessage };
+        }
         
-        // Create a local entry if API fails
+        // For other API errors, create a local entry as fallback
         const localEntry = {
           id: Date.now().toString(), // Simple ID generation
           child_id: childId,
@@ -95,8 +106,10 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
           updated_at: new Date().toISOString()
         };
         
-        // Add to local state
-        setScheduleEntries(prev => [...prev, localEntry]);
+        // Add to local state (skip if in batch mode)
+        if (!batchMode) {
+          setScheduleEntries(prev => [...prev, localEntry]);
+        }
         setError(null);
         return { success: true, data: localEntry };
       }
@@ -110,9 +123,14 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   };
 
   // Update an existing schedule entry
-  const updateScheduleEntry = async (entryId, updateData) => {
+  const updateScheduleEntry = async (entryId, updateData, childIdParam) => {
     try {
       setLoading(true);
+      
+      // Use provided childId or fall back to the current childId
+      const targetChildId = childIdParam || childId;
+      
+      console.log('Updating schedule entry:', { entryId, updateData, targetChildId });
       
       // Try API first, but fallback to local state if it fails
       try {
@@ -123,8 +141,10 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
           prev.map(entry => entry.id === entryId ? response.data : entry)
         );
         setError(null);
+        console.log('Successfully updated entry:', entryId);
         return { success: true, data: response.data };
       } catch (apiError) {
+        console.warn('API update failed, updating locally:', apiError.message);
         
         // Update local entry if API fails
         setScheduleEntries(prev => 
@@ -140,10 +160,12 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
           })
         );
         setError(null);
-        return { success: true };
+        console.log('Updated entry locally:', entryId);
+        return { success: true, localOnly: true };
       }
     } catch (err) {
       const errorMessage = 'Failed to update schedule entry';
+      console.error('Update schedule entry error:', err);
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
@@ -281,18 +303,64 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     }
   };
 
+  // Batch create multiple schedule entries (prevents individual refreshes)
+  const createScheduleEntriesBatch = async (entriesData) => {
+    try {
+      setLoading(true);
+      setBatchMode(true); // Enable batch mode to prevent individual state updates
+      
+      const results = [];
+      const successfulEntries = [];
+      
+      // Create entries one by one but don't update state individually
+      for (const entryData of entriesData) {
+        try {
+          const result = await createScheduleEntry(entryData);
+          results.push(result);
+          if (result.success) {
+            successfulEntries.push(result.data);
+          }
+        } catch (error) {
+          results.push({ success: false, error });
+        }
+      }
+      
+      // Update state with all successful entries at once
+      if (successfulEntries.length > 0) {
+        setScheduleEntries(prev => [...prev, ...successfulEntries]);
+      }
+      
+      return {
+        success: successfulEntries.length > 0,
+        results,
+        entriesCreated: successfulEntries.length,
+        entriesFailed: entriesData.length - successfulEntries.length
+      };
+    } catch (err) {
+      const errorMessage = 'Failed to create schedule entries in batch';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setBatchMode(false); // Disable batch mode
+      setLoading(false);
+    }
+  };
+
   // Convert schedule entries to calendar events
   const getCalendarEvents = () => {
     return scheduleEntries.map(entry => ({
       id: entry.id,
       title: entry.material?.title || entry.subject_name || 'Study Time',
       subject: entry.subject_name,
+      subject_name: entry.subject_name, // Add this for compatibility
       date: entry.scheduled_date,
       startTime: entry.start_time,
+      start_time: entry.start_time, // Add this for compatibility
       duration: entry.duration_minutes,
       duration_minutes: entry.duration_minutes, // Keep both for compatibility
       status: entry.status,
       notes: entry.notes,
+      child_id: entry.child_id, // Add the child_id field
       // Also keep the original calendar format for compatibility
       start: new Date(`${entry.scheduled_date}T${entry.start_time}`),
       end: new Date(new Date(`${entry.scheduled_date}T${entry.start_time}`).getTime() + (entry.duration_minutes * 60000)),
@@ -388,7 +456,9 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     
     // CRUD operations
     createScheduleEntry,
+    createScheduleEntriesBatch,
     updateScheduleEntry,
+    updateEvent: updateScheduleEntry, // Alias for drag-and-drop compatibility
     deleteScheduleEntry,
     updateSchedulePreferences,
     
@@ -413,6 +483,10 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     // Refresh - only if we have API connectivity, otherwise keep local state
     refresh: () => {
       // Only refresh if we don't have local entries or if we want to sync with server
+      fetchScheduleEntries(childId);
+    },
+    refreshEvents: () => {
+      // Alias for refresh for compatibility
       fetchScheduleEntries(childId);
     }
   };

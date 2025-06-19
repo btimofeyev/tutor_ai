@@ -12,6 +12,9 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   const [aiScheduling, setAiScheduling] = useState(false);
   const [aiScheduleResults, setAiScheduleResults] = useState(null);
 
+  // State for batch operations to prevent flickering
+  const [batchMode, setBatchMode] = useState(false);
+
   // State for modals and UI
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -33,12 +36,13 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
       
       const responses = await Promise.all(promises);
       
-      // Organize entries by child ID
+      // Organize entries by child ID - only include selected children
       const entriesByChild = {};
       childrenIds.forEach((childId, index) => {
         entriesByChild[childId] = responses[index]?.data || [];
       });
       
+      // Replace entire state with only selected children's data
       setAllScheduleEntries(entriesByChild);
       setError(null);
     } catch (err) {
@@ -53,7 +57,9 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   const getCombinedCalendarEvents = useCallback(() => {
     const allEvents = [];
     
-    Object.entries(allScheduleEntries).forEach(([childId, entries]) => {
+    // Only process entries for currently selected children
+    selectedChildrenIds.forEach(childId => {
+      const entries = allScheduleEntries[childId] || [];
       const child = allChildren.find(c => c.id === childId);
       const childName = child?.name || 'Unknown';
       
@@ -62,10 +68,13 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           id: `${childId}-${entry.id}`,
           title: entry.material?.title || entry.subject_name || 'Study Time',
           subject: entry.subject_name,
-          childId: childId,
+          subject_name: entry.subject_name, // Add for compatibility
+          child_id: childId, // Use child_id to match calendar components
+          childId: childId, // Keep childId for backward compatibility
           childName: childName,
           date: entry.scheduled_date,
           startTime: entry.start_time,
+          start_time: entry.start_time, // Add for compatibility
           duration: entry.duration_minutes,
           duration_minutes: entry.duration_minutes,
           status: entry.status,
@@ -76,6 +85,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           end: new Date(new Date(`${entry.scheduled_date}T${entry.start_time}`).getTime() + (entry.duration_minutes * 60000)),
           resource: {
             ...entry,
+            child_id: childId,
             childId: childId,
             childName: childName,
             subject: entry.subject_name,
@@ -86,8 +96,9 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
       });
     });
     
+    
     return allEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
-  }, [allScheduleEntries, allChildren]);
+  }, [allScheduleEntries, allChildren, selectedChildrenIds]);
 
   // Create a new schedule entry for a specific child
   const createScheduleEntry = async (entryData, targetChildId) => {
@@ -101,16 +112,24 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           child_id: targetChildId
         });
         
-        // Add the new entry to the local state for the specific child
-        setAllScheduleEntries(prev => ({
-          ...prev,
-          [targetChildId]: [...(prev[targetChildId] || []), response.data]
-        }));
+        // Add the new entry to the local state for the specific child (skip if in batch mode)
+        if (!batchMode) {
+          setAllScheduleEntries(prev => ({
+            ...prev,
+            [targetChildId]: [...(prev[targetChildId] || []), response.data]
+          }));
+        }
         setError(null);
         return { success: true, data: response.data };
       } catch (apiError) {
+        // If it's a conflict error (409), don't create local entry - return the error
+        if (apiError.response?.status === 409) {
+          const errorMessage = apiError.response?.data?.error || 'Scheduling conflict detected';
+          setError(errorMessage);
+          return { success: false, error: errorMessage };
+        }
         
-        // Create a local entry if API fails
+        // For other API errors, create a local entry as fallback
         const localEntry = {
           id: Date.now().toString(),
           child_id: targetChildId,
@@ -126,11 +145,13 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           updated_at: new Date().toISOString()
         };
         
-        // Add to local state for the specific child
-        setAllScheduleEntries(prev => ({
-          ...prev,
-          [targetChildId]: [...(prev[targetChildId] || []), localEntry]
-        }));
+        // Add to local state for the specific child (skip if in batch mode)
+        if (!batchMode) {
+          setAllScheduleEntries(prev => ({
+            ...prev,
+            [targetChildId]: [...(prev[targetChildId] || []), localEntry]
+          }));
+        }
         setError(null);
         return { success: true, data: localEntry };
       }
@@ -148,6 +169,16 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     try {
       setLoading(true);
       
+      // Ensure we have a valid childId
+      if (!childId) {
+        console.error('No childId provided for update');
+        const errorMessage = 'Cannot update entry: missing child information';
+        setError(errorMessage);
+        return { success: false, error: errorMessage };
+      }
+      
+      console.log('Updating schedule entry in multi-child mode:', { entryId, updateData, childId });
+      
       // Try API first, but fallback to local state if it fails
       try {
         const response = await api.put(`/schedule/${entryId}`, updateData);
@@ -160,8 +191,10 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           )
         }));
         setError(null);
+        console.log('Successfully updated entry:', entryId, 'for child:', childId);
         return { success: true, data: response.data };
       } catch (apiError) {
+        console.warn('API update failed, updating locally:', apiError.message);
         
         // Update local entry if API fails
         setAllScheduleEntries(prev => ({
@@ -178,10 +211,12 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           })
         }));
         setError(null);
-        return { success: true };
+        console.log('Updated entry locally in multi-child mode:', entryId, 'for child:', childId);
+        return { success: true, localOnly: true };
       }
     } catch (err) {
       const errorMessage = 'Failed to update schedule entry';
+      console.error('Update schedule entry error in multi-child mode:', err);
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
@@ -387,6 +422,61 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     }
   };
 
+  // Batch create multiple schedule entries for specific children (prevents individual refreshes)
+  const createScheduleEntriesBatch = async (entriesWithChildIds) => {
+    try {
+      setLoading(true);
+      setBatchMode(true); // Enable batch mode to prevent individual state updates
+      
+      const results = [];
+      const successfulEntriesByChild = {};
+      
+      // Create entries one by one but don't update state individually
+      for (const { entryData, targetChildId } of entriesWithChildIds) {
+        try {
+          const result = await createScheduleEntry(entryData, targetChildId);
+          results.push({ ...result, childId: targetChildId });
+          if (result.success) {
+            if (!successfulEntriesByChild[targetChildId]) {
+              successfulEntriesByChild[targetChildId] = [];
+            }
+            successfulEntriesByChild[targetChildId].push(result.data);
+          }
+        } catch (error) {
+          results.push({ success: false, error, childId: targetChildId });
+        }
+      }
+      
+      // Update state with all successful entries at once
+      if (Object.keys(successfulEntriesByChild).length > 0) {
+        setAllScheduleEntries(prev => {
+          const updated = { ...prev };
+          Object.entries(successfulEntriesByChild).forEach(([childId, entries]) => {
+            updated[childId] = [...(prev[childId] || []), ...entries];
+          });
+          return updated;
+        });
+      }
+      
+      const totalSuccessful = Object.values(successfulEntriesByChild).flat().length;
+      
+      return {
+        success: totalSuccessful > 0,
+        results,
+        entriesCreated: totalSuccessful,
+        entriesFailed: entriesWithChildIds.length - totalSuccessful,
+        entriesByChild: successfulEntriesByChild
+      };
+    } catch (err) {
+      const errorMessage = 'Failed to create schedule entries in batch';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setBatchMode(false); // Disable batch mode
+      setLoading(false);
+    }
+  };
+
   // Mark schedule entry as completed with sync notification
   const markEntryCompleted = async (entryId, childId) => {
     const result = await updateScheduleEntry(entryId, { status: 'completed' }, childId);
@@ -440,6 +530,9 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   useEffect(() => {
     if (selectedChildrenIds && selectedChildrenIds.length > 0) {
       fetchMultipleChildrenSchedules(selectedChildrenIds);
+    } else {
+      // Clear all entries if no children selected
+      setAllScheduleEntries({});
     }
   }, [selectedChildrenIds, fetchMultipleChildrenSchedules]);
 
@@ -463,6 +556,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     
     // CRUD operations
     createScheduleEntry,
+    createScheduleEntriesBatch,
     updateScheduleEntry,
     deleteScheduleEntry,
     

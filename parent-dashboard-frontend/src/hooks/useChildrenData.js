@@ -287,6 +287,37 @@ export function useChildrenData(session) {
     }
   }, []);
 
+  // Delete child
+  const deleteChild = useCallback(async (childId) => {
+    try {
+      const response = await api.delete(`/children/${childId}`);
+      
+      // Clear the child's cached data
+      invalidateChildCache(childId);
+      
+      // Refresh children list
+      await fetchChildren();
+      
+      // If the deleted child was selected, select the first remaining child or null
+      if (selectedChild?.id === childId) {
+        const remainingChildren = children.filter(child => child.id !== childId);
+        setSelectedChild(remainingChildren.length > 0 ? remainingChildren[0] : null);
+      }
+      
+      return { 
+        success: true, 
+        message: response.data.message || 'Child deleted successfully',
+        deleted_child: response.data.deleted_child
+      };
+    } catch (error) {
+      console.error('Delete child error:', error.response?.data);
+      return { 
+        success: false, 
+        error: error.response?.data?.error || error.response?.data?.message || "Failed to delete child" 
+      };
+    }
+  }, [selectedChild, children, fetchChildren, invalidateChildCache]);
+
   // Refresh child data when selected child changes
   useEffect(() => {
     if (selectedChild) {
@@ -323,6 +354,7 @@ export function useChildrenData(session) {
     
     // Actions
     handleAddChild,
+    deleteChild,
     refreshChildSpecificData,
     fetchChildren,
     invalidateChildCache,

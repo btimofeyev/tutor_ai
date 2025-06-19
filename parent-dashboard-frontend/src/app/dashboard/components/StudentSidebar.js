@@ -14,7 +14,8 @@ import {
   CreditCardIcon,
   CalendarDaysIcon,
   HomeIcon,
-  ChatBubbleLeftRightIcon
+  ChatBubbleLeftRightIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 import SubscriptionManager from '../../../components/SubscriptionManager';
@@ -33,6 +34,7 @@ export default function StudentSidebar({
   onNewChildGradeChange,
   onAddChildSubmit,
   onOpenChildLoginSettings,
+  onDeleteChild,
   subscription,
   canAddChild,
   onUpgradeNeeded,
@@ -141,20 +143,36 @@ export default function StudentSidebar({
                   </div>
                 </div>
               </button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => { e.stopPropagation(); onOpenChildLoginSettings(child);}}
-                className={`absolute top-1/2 right-1.5 -translate-y-1/2 p-1 rounded-full transition-all focus:ring-0
-                          ${isSelected
-                                ? 'text-[var(--text-on-accent)] opacity-70 hover:bg-[var(--accent-blue-hover)]/[0.5] hover:opacity-100'
-                                : 'text-text-tertiary hover:bg-[var(--accent-blue)]/30 hover:text-text-primary opacity-0 group-hover:opacity-100 focus:opacity-100'
-                          }`
-                        }
-                title={`Login settings for ${child.name}`}
-              >
-                <Cog6ToothIcon className="h-4 w-4" />
-              </Button>
+              <div className="absolute top-1/2 right-1.5 -translate-y-1/2 flex items-center space-x-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); onOpenChildLoginSettings(child);}}
+                  className={`p-1 rounded-full transition-all focus:ring-0
+                            ${isSelected
+                                  ? 'text-[var(--text-on-accent)] opacity-70 hover:bg-[var(--accent-blue-hover)]/[0.5] hover:opacity-100'
+                                  : 'text-text-tertiary hover:bg-[var(--accent-blue)]/30 hover:text-text-primary opacity-0 group-hover:opacity-100 focus:opacity-100'
+                            }`
+                          }
+                  title={`Login settings for ${child.name}`}
+                >
+                  <Cog6ToothIcon className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); onDeleteChild(child);}}
+                  className={`p-1 rounded-full transition-all focus:ring-0
+                            ${isSelected
+                                  ? 'text-[var(--text-on-accent)] opacity-70 hover:bg-red-500/50 hover:opacity-100'
+                                  : 'text-text-tertiary hover:bg-red-500/20 hover:text-red-600 opacity-0 group-hover:opacity-100 focus:opacity-100'
+                            }`
+                          }
+                  title={`Delete ${child.name}'s account`}
+                >
+                  <TrashIcon className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           );
         })}

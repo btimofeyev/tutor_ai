@@ -217,7 +217,8 @@ export default function SubjectsPage() {
                     />
                   </div>
                   <button type="submit" disabled={creatingSubject}
-                    className="w-full flex justify-center items-center text-sm px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-md font-medium disabled:opacity-70 transition-colors">
+                    className="w-full flex justify-center items-center text-sm px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md font-medium disabled:opacity-70 transition-colors border border-blue-600 shadow-sm"
+                    style={{ backgroundColor: '#2563eb', color: 'white', borderColor: '#2563eb' }}>
                     {creatingSubject ? 'Creating...' : 'Create Subject'}
                   </button>
                 </form>

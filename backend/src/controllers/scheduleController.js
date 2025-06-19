@@ -45,9 +45,23 @@ const getScheduleEntries = async (req, res) => {
     }
 
     // First, check if schedule_entries table exists
+    // Note: schedule_entries.material_id references lessons (lesson containers), not materials
+    // We need to join through lessons to get the actual materials
     const { data: scheduleEntries, error } = await supabase
       .from('schedule_entries')
-      .select('*')
+      .select(`
+        *,
+        lesson:lessons(
+          id,
+          title,
+          materials(
+            id,
+            title,
+            content_type,
+            lesson_json
+          )
+        )
+      `)
       .eq('child_id', child_id)
       .order('scheduled_date', { ascending: true })
       .order('start_time', { ascending: true });
@@ -171,12 +185,34 @@ const createScheduleEntry = async (req, res) => {
       });
     }
 
+    // If material_id is provided, we need to get the lesson container ID
+    // because the schedule_entries.material_id actually references lessons, not materials
+    let lessonContainerId = null;
+    if (material_id) {
+      console.log('Material ID provided:', material_id);
+      
+      // Look up the material to get its lesson_id (which is the lesson container)
+      const { data: materialData, error: materialError } = await supabase
+        .from('materials')
+        .select('lesson_id')
+        .eq('id', material_id)
+        .single();
+      
+      if (materialError) {
+        console.error('Error looking up material:', materialError);
+        return res.status(400).json({ error: 'Invalid material ID provided' });
+      }
+      
+      lessonContainerId = materialData.lesson_id;
+      console.log('Using lesson container ID:', lessonContainerId);
+    }
+
     // Create the schedule entry
     const { data: newEntry, error: createError } = await supabase
       .from('schedule_entries')
       .insert({
         child_id,
-        material_id,
+        material_id: lessonContainerId, // This references the lesson container, not the material
         subject_name,
         scheduled_date,
         start_time,
@@ -236,7 +272,19 @@ const updateScheduleEntry = async (req, res) => {
       .from('schedule_entries')
       .update(allowedUpdates)
       .eq('id', id)
-      .select('*')
+      .select(`
+        *,
+        lesson:lessons(
+          id,
+          title,
+          materials(
+            id,
+            title,
+            content_type,
+            lesson_json
+          )
+        )
+      `)
       .single();
 
     if (updateError) {

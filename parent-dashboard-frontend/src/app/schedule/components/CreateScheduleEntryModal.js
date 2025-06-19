@@ -160,41 +160,34 @@ export default function CreateScheduleEntryModal({
     setSelectedUnitId(unitId);
     setFormData(prev => ({ ...prev, material_id: '' }));
     
-    // Filter lessons by unit if unit is selected, otherwise show all lessons for the subject
+    console.log('Unit selection:', { unitId, selectedSubjectId });
+    
     if (selectedSubjectId) {
       const allLessons = lessonsBySubject[selectedSubjectId] || [];
+      console.log('All lessons for subject:', allLessons);
       
       if (unitId) {
-        // Filter by unit - check multiple possible unit_id property patterns
+        // Get lesson containers for this unit
+        const lessonContainersForUnit = lessonsByUnit[unitId] || [];
+        console.log('Lesson containers for unit:', lessonContainersForUnit);
+        
+        // Extract lesson container IDs
+        const lessonContainerIds = lessonContainersForUnit.map(container => container.id);
+        console.log('Lesson container IDs:', lessonContainerIds);
+        
+        // Filter materials that belong to these lesson containers
         const unitLessons = allLessons.filter(lesson => {
-          // Check if lesson has a direct unit_id property
-          if (lesson.unit_id === unitId) return true;
-          
-          // Check if lesson is part of a lesson container that belongs to this unit
-          // This handles the hierarchical structure: Unit -> Lesson Container -> Materials
-          if (lesson.lesson && lesson.lesson.unit_id === unitId) return true;
-          
-          // Check if lesson has lesson_container_id and we need to check container's unit
-          if (lesson.lesson_container_id) {
-            // Try to find the lesson container in lessonsByUnit
-            for (const [checkUnitId, containers] of Object.entries(lessonsByUnit || {})) {
-              if (checkUnitId === unitId) {
-                const container = containers.find(c => c.id === lesson.lesson_container_id);
-                if (container) return true;
-              }
-            }
-          }
-          
-          // Additional fallback: check if lesson has any property that matches the unit
-          if (lesson.unit && lesson.unit.id === unitId) return true;
-          
-          return false;
+          // Check if lesson belongs to a lesson container in this unit
+          const belongsToUnit = lesson.lesson_id && lessonContainerIds.includes(lesson.lesson_id);
+          console.log(`Lesson "${lesson.title}" belongs to unit:`, belongsToUnit, 'lesson_id:', lesson.lesson_id);
+          return belongsToUnit;
         });
         
-        console.log(`Filtered ${unitLessons.length} lessons for unit ${unitId} from ${allLessons.length} total lessons`);
+        console.log('Filtered lessons for unit:', unitLessons);
         setAvailableLessons(unitLessons);
       } else {
         // Show all lessons for the subject if no unit is selected
+        console.log('No unit selected, showing all lessons');
         setAvailableLessons(allLessons);
       }
     }

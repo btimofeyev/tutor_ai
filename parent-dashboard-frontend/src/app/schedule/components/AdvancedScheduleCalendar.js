@@ -182,6 +182,7 @@ export default function AdvancedScheduleCalendar({
     setCurrentDate(new Date());
   };
 
+
   // Handle time slot clicks
   const handleTimeSlotClick = (day, timeSlot) => {
     if (isTimeSlotOccupied(day, timeSlot)) return;
@@ -202,7 +203,11 @@ export default function AdvancedScheduleCalendar({
       eventTimeStr = eventTimeStr.length === 8 ? eventTimeStr.substring(0, 5) : eventTimeStr;
       const eventStartTime = new Date(`2000-01-01T${eventTimeStr}`);
       const eventDuration = event.duration || event.duration_minutes || 30;
-      const eventEndTime = new Date(eventStartTime.getTime() + (eventDuration * 60000));
+      
+      // Calculate visual end time based on how we display the event
+      const visualHeight = Math.ceil(eventDuration / 30);
+      const visualDurationMinutes = visualHeight * 30; // Convert back to minutes for overlap calculation
+      const eventEndTime = new Date(eventStartTime.getTime() + (visualDurationMinutes * 60000));
       
       const slotEndTime = new Date(slotTime.getTime() + (30 * 60000));
       return (slotTime < eventEndTime && slotEndTime > eventStartTime);
@@ -472,12 +477,16 @@ function WeekView({
                 eventTimeStr = eventTimeStr.length === 8 ? eventTimeStr.substring(0, 5) : eventTimeStr;
                 const eventStartTime = new Date(`2000-01-01T${eventTimeStr}`);
                 const eventDuration = event.duration || event.duration_minutes || 30;
-                const eventEndTime = new Date(eventStartTime.getTime() + (eventDuration * 60000));
+                
+                // Calculate visual end time based on how we display the event
+                const visualHeight = Math.ceil(eventDuration / 30);
+                const visualDurationMinutes = visualHeight * 30; // Convert back to minutes for overlap calculation
+                const eventEndTime = new Date(eventStartTime.getTime() + (visualDurationMinutes * 60000));
                 
                 const slotTime = new Date(`2000-01-01T${timeSlot}`);
                 const slotEndTime = new Date(slotTime.getTime() + (30 * 60000)); // 30-minute slot
                 
-                // Check if this time slot overlaps with the event
+                // Check if this time slot overlaps with the event's visual space
                 return (slotTime < eventEndTime && slotEndTime > eventStartTime);
               });
 
@@ -487,6 +496,7 @@ function WeekView({
                 const duration = eventStartingHere.duration || eventStartingHere.duration_minutes || 30;
                 const height = Math.ceil(duration / 30);
                 const subject = eventStartingHere.subject_name || eventStartingHere.title || 'Study';
+                const displayTitle = eventStartingHere.title || subject;
                 
                 // Get child name if multiple children are selected
                 const childName = selectedChildrenIds.length > 1 ? 
@@ -496,27 +506,68 @@ function WeekView({
                   <div 
                     key={`${day}-${timeSlot}`}
                     className="relative border-r border-b border-gray-200"
-                    style={{ minHeight: '44px' }}
+                    style={{ minHeight: '64px' }}
                   >
                     <div
                       className={`absolute inset-1 rounded-md p-1.5 cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] border ${
                         getSubjectColor(subject, childSubjects).bg
                       } ${getSubjectColor(subject, childSubjects).border}`}
                       onClick={() => openEditModal(eventStartingHere)}
-                      style={{ height: `${height * 44 - 8}px`, zIndex: 10 }}
+                      style={{ height: `${height * 64 - 8}px`, zIndex: 10 }}
                     >
-                      <div className="relative h-full pb-4">
-                        <div className={`text-xs font-medium truncate ${getSubjectColor(subject, childSubjects).text}`}>{subject}</div>
-                        {childName && (
-                          <div className={`text-xs font-medium ${getSubjectColor(subject, childSubjects).text} opacity-90`}>{childName}</div>
-                        )}
-                        {/* Duration positioned at bottom right */}
-                        <div className={`absolute bottom-0 right-0 text-xs ${getSubjectColor(subject, childSubjects).text} opacity-75`}>
-                          {duration}m
+{/* Different layouts based on duration */}
+                      {height === 1 ? (
+                        /* Compact layout for 30-minute slots */
+                        <div className="h-full flex items-center justify-between p-2 overflow-hidden">
+                          <div className="flex-1 min-w-0 pr-2">
+                            <div className={`font-semibold text-xs truncate leading-tight ${getSubjectColor(subject, childSubjects).text} ${eventStartingHere.status === 'completed' ? 'line-through' : ''}`}>
+                              {displayTitle}
+                            </div>
+                            <div className={`text-xs opacity-75 mt-0.5 ${getSubjectColor(subject, childSubjects).text}`}>
+                              {duration}m
+                            </div>
+                          </div>
+                          
+                          {eventStartingHere.status === 'completed' && (
+                            <CheckIcon className="h-3 w-3 text-green-600" />
+                          )}
                         </div>
-                      </div>
-                      {eventStartingHere.status === 'completed' && (
-                        <CheckIcon className="h-3 w-3 absolute top-1 right-1 text-green-600" />
+                      ) : (
+                        /* Full layout for longer slots */
+                        <div className="h-full flex flex-col justify-between p-2 overflow-hidden">
+                          {/* Main content area */}
+                          <div className="flex-1 overflow-hidden">
+                            {/* Subject/Title - Main heading */}
+                            <div className={`font-semibold text-xs mb-2 truncate ${getSubjectColor(subject, childSubjects).text} ${eventStartingHere.status === 'completed' ? 'line-through' : ''}`}>
+                              {displayTitle}
+                            </div>
+                            
+                            {/* Lesson title if available - Secondary info */}
+                            {eventStartingHere.lesson?.title && eventStartingHere.lesson.title !== displayTitle && (
+                              <div className={`text-xs opacity-90 mb-1 line-clamp-2 ${getSubjectColor(subject, childSubjects).text}`}>
+                                {eventStartingHere.lesson.title}
+                              </div>
+                            )}
+                            
+                            {/* Child name for multi-child view */}
+                            {childName && (
+                              <div className={`text-xs opacity-80 truncate ${getSubjectColor(subject, childSubjects).text}`}>
+                                {childName}
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Bottom section with duration and completion */}
+                          <div className="flex justify-between items-center mt-2">
+                            <div className={`text-xs opacity-75 ${getSubjectColor(subject, childSubjects).text}`}>
+                              {duration}m
+                            </div>
+                            
+                            {eventStartingHere.status === 'completed' && (
+                              <CheckIcon className="h-3 w-3 text-green-600" />
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -525,7 +576,8 @@ function WeekView({
                 return (
                   <div 
                     key={`${day}-${timeSlot}`}
-                    className={`h-11 border-r border-b border-gray-200 ${isWeekend ? 'bg-gray-50' : ''}`}
+                    className={`border-r border-b border-gray-200 ${isWeekend ? 'bg-gray-50' : ''}`}
+                    style={{ minHeight: '64px' }}
                   />
                 );
               }
@@ -533,9 +585,10 @@ function WeekView({
               return (
                 <div 
                   key={`${day}-${timeSlot}`}
-                  className={`h-11 border-r border-b border-gray-200 cursor-pointer transition-colors ${
+                  className={`border-r border-b border-gray-200 cursor-pointer transition-colors ${
                     isWeekend ? 'bg-gray-50 hover:bg-gray-100' : 'hover:bg-blue-50'
                   }`}
+                  style={{ minHeight: '64px' }}
                   onClick={() => handleTimeSlotClick(day, timeSlot)}
                 />
               );

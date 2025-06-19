@@ -124,11 +124,13 @@ export default function AddMaterialForm({
     if (!newLessonGroupTitle.trim()) { alert("Please enter a title for the new lesson group."); return; }
     if (!unitIdInApprovalForm) { alert("A unit must be selected in the approval form before creating a new lesson group."); return; }
     
-    // `onCreateNewLessonContainer` is already correctly wrapped by `AddMaterialTabs`
-    // to use `unitIdInApprovalForm` (which is `lessonJsonForApproval.unit_id`).
-    const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim());
+    const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim(), unitIdInApprovalForm);
     if (result && result.success) {
         setNewLessonGroupTitle(''); 
+        // Set the new lesson group as selected in the approval form
+        if (result.data && onSelectedLessonContainerChange) {
+          onSelectedLessonContainerChange({ target: { value: result.data.id } });
+        }
     } else {
         alert(result?.error || 'Failed to create lesson group. Please try again.');
     }

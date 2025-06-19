@@ -344,29 +344,53 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
 
   // Convert schedule entries to calendar events
   const getCalendarEvents = () => {
-    return scheduleEntries.map(entry => ({
-      id: entry.id,
-      title: entry.material?.title || entry.subject_name || 'Study Time',
-      subject: entry.subject_name,
-      subject_name: entry.subject_name, // Add this for compatibility
-      date: entry.scheduled_date,
-      startTime: entry.start_time,
-      start_time: entry.start_time, // Add this for compatibility
-      duration: entry.duration_minutes,
-      duration_minutes: entry.duration_minutes, // Keep both for compatibility
-      status: entry.status,
-      notes: entry.notes,
-      child_id: entry.child_id, // Add the child_id field
-      // Also keep the original calendar format for compatibility
-      start: new Date(`${entry.scheduled_date}T${entry.start_time}`),
-      end: new Date(new Date(`${entry.scheduled_date}T${entry.start_time}`).getTime() + (entry.duration_minutes * 60000)),
-      resource: {
-        ...entry,
-        subject: entry.subject_name,
-        type: entry.material?.content_type || 'study_time',
-        status: entry.status
+    return scheduleEntries.map(entry => {
+      // Extract material info from lesson container
+      const lesson = entry.lesson;
+      const materials = lesson?.materials || [];
+      const firstMaterial = materials[0]; // Take first material if multiple exist
+      
+      // Determine the display title
+      let displayTitle;
+      if (firstMaterial) {
+        // Show specific material title
+        displayTitle = `${entry.subject_name}: ${firstMaterial.title}`;
+      } else if (lesson) {
+        // Show lesson container title
+        displayTitle = `${entry.subject_name}: ${lesson.title}`;
+      } else {
+        // Fallback to general study
+        displayTitle = entry.subject_name || 'Study Time';
       }
-    }));
+      
+      return {
+        id: entry.id,
+        title: displayTitle,
+        subject: entry.subject_name,
+        subject_name: entry.subject_name, // Add this for compatibility
+        date: entry.scheduled_date,
+        startTime: entry.start_time,
+        start_time: entry.start_time, // Add this for compatibility
+        duration: entry.duration_minutes,
+        duration_minutes: entry.duration_minutes, // Keep both for compatibility
+        status: entry.status,
+        notes: entry.notes,
+        child_id: entry.child_id, // Add the child_id field
+        material: firstMaterial, // Include first material for backward compatibility
+        lesson: lesson, // Include lesson container info
+        materials: materials, // Include all materials in the lesson
+        content_type: firstMaterial?.content_type, // For styling/icons
+        // Also keep the original calendar format for compatibility
+        start: new Date(`${entry.scheduled_date}T${entry.start_time}`),
+        end: new Date(new Date(`${entry.scheduled_date}T${entry.start_time}`).getTime() + (entry.duration_minutes * 60000)),
+        resource: {
+          ...entry,
+          subject: entry.subject_name,
+          type: entry.material?.content_type || 'study_time',
+          status: entry.status
+        }
+      };
+    });
   };
 
   // Mark schedule entry as completed with sync notification

@@ -1,8 +1,13 @@
 const supabase = require('../utils/supabaseClient');
 const bcrypt = require('bcrypt');
 
-// Helper to get parent_id from request header
+// Helper to get parent_id from authenticated user or request header (for backward compatibility)
 function getParentId(req) {
+  // First try to get from authenticated user (preferred method)
+  if (req.user && req.user.id) {
+    return req.user.id;
+  }
+  // Fallback to header for backward compatibility
   return req.header('x-parent-id');
 }
 
@@ -123,22 +128,125 @@ exports.deleteChild = async (req, res) => {
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
 
   // Verify ownership
-  const { data: owned, error: ownErr } = await supabase
+  const { data: child, error: ownErr } = await supabase
     .from('children')
-    .select('id')
+    .select('id, name')
     .eq('id', child_id)
     .eq('parent_id', parent_id)
     .single();
 
-  if (ownErr || !owned) return res.status(404).json({ error: 'Child not found' });
+  if (ownErr || !child) return res.status(404).json({ error: 'Child not found' });
 
-  const { error } = await supabase
-    .from('children')
-    .delete()
-    .eq('id', child_id);
+  try {
+    // Get child subjects for this child to find related data
+    const { data: childSubjects } = await supabase
+      .from('child_subjects')
+      .select('id')
+      .eq('child_id', child_id);
 
-  if (error) return res.status(400).json({ error: error.message });
-  res.json({ message: 'Child deleted successfully.' });
+    if (childSubjects && childSubjects.length > 0) {
+      const childSubjectIds = childSubjects.map(cs => cs.id);
+
+      // Get units for these child subjects
+      const { data: units } = await supabase
+        .from('units')
+        .select('id')
+        .in('child_subject_id', childSubjectIds);
+
+      if (units && units.length > 0) {
+        const unitIds = units.map(u => u.id);
+
+        // Get lessons for these units
+        const { data: lessons } = await supabase
+          .from('lessons')
+          .select('id')
+          .in('unit_id', unitIds);
+
+        if (lessons && lessons.length > 0) {
+          const lessonIds = lessons.map(l => l.id);
+
+          // Delete materials first (they reference lessons)
+          const { error: materialsError } = await supabase
+            .from('materials')
+            .delete()
+            .in('lesson_id', lessonIds);
+
+          if (materialsError) {
+            return res.status(400).json({ error: `Failed to delete materials: ${materialsError.message}` });
+          }
+        }
+
+        // Delete lessons (they reference units)
+        const { error: lessonsError } = await supabase
+          .from('lessons')
+          .delete()
+          .in('unit_id', unitIds);
+
+        if (lessonsError) {
+          return res.status(400).json({ error: `Failed to delete lessons: ${lessonsError.message}` });
+        }
+
+        // Delete units (they reference child subjects)
+        const { error: unitsError } = await supabase
+          .from('units')
+          .delete()
+          .in('child_subject_id', childSubjectIds);
+
+        if (unitsError) {
+          return res.status(400).json({ error: `Failed to delete units: ${unitsError.message}` });
+        }
+      }
+
+      // Delete any remaining general materials (not in lesson containers)
+      const { error: generalMaterialsError } = await supabase
+        .from('materials')
+        .delete()
+        .in('child_subject_id', childSubjectIds);
+
+      if (generalMaterialsError) {
+        return res.status(400).json({ error: `Failed to delete general materials: ${generalMaterialsError.message}` });
+      }
+
+      // Delete child subjects
+      const { error: childSubjectsError } = await supabase
+        .from('child_subjects')
+        .delete()
+        .eq('child_id', child_id);
+
+      if (childSubjectsError) {
+        return res.status(400).json({ error: `Failed to delete child subjects: ${childSubjectsError.message}` });
+      }
+    }
+
+    // Delete schedule entries for this child
+    const { error: scheduleError } = await supabase
+      .from('schedule_entries')
+      .delete()
+      .eq('child_id', child_id);
+
+    if (scheduleError) {
+      return res.status(400).json({ error: `Failed to delete schedule entries: ${scheduleError.message}` });
+    }
+
+    // Finally, delete the child
+    const { error: childError } = await supabase
+      .from('children')
+      .delete()
+      .eq('id', child_id);
+
+    if (childError) {
+      return res.status(400).json({ error: `Failed to delete child: ${childError.message}` });
+    }
+
+    res.json({ 
+      message: `Child "${child.name}" and all associated data deleted successfully.`,
+      deleted_child: child
+    });
+
+  } catch (error) {
+    console.error('Error during child deletion:', error);
+    res.status(500).json({ error: 'An unexpected error occurred during deletion.' });
+  }
 };
 
 // Set/Update Child Username

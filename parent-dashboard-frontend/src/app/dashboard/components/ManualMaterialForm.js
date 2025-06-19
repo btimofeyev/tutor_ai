@@ -198,9 +198,13 @@ export default function ManualMaterialForm({
     if (!newLessonGroupTitle.trim()) { alert("Please enter a title for the new lesson group."); return; }
     if (!selectedUnitInManualForm) { alert("A unit must be selected before creating a lesson group."); return; }
     
-    const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim()); 
+    const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim(), selectedUnitInManualForm); 
     if (result && result.success) {
         setNewLessonGroupTitle(''); 
+        // Set the new lesson group as selected
+        if (result.data && onLessonContainerChange) {
+          onLessonContainerChange({ target: { value: result.data.id } });
+        }
     } else {
         alert(result?.error || 'Failed to create lesson group. Please try again.');
     }

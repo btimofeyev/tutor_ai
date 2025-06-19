@@ -49,7 +49,8 @@ export default function SubjectCard({
     subjectStats,
     onOpenEditModal,
     onManageUnits,
-    onToggleComplete
+    onToggleComplete,
+    onDeleteMaterial
 }) {
     const [expandedUnits, setExpandedUnits] = useState({});
     const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
@@ -120,6 +121,7 @@ export default function SubjectCard({
                                     lesson={material}
                                     onOpenEditModal={onOpenEditModal}
                                     onToggleComplete={onToggleComplete}
+                                    onDeleteMaterial={onDeleteMaterial}
                                 />
                             ))}
                         </div>
@@ -244,6 +246,7 @@ export default function SubjectCard({
                                     lesson={item}
                                     onOpenEditModal={onOpenEditModal}
                                     onToggleComplete={onToggleComplete}
+                                    onDeleteMaterial={onDeleteMaterial}
                                     isCompact={true}
                                 />
                             ))}
@@ -268,6 +271,7 @@ export default function SubjectCard({
                                             lesson={material}
                                             onOpenEditModal={onOpenEditModal}
                                             onToggleComplete={onToggleComplete}
+                                            onDeleteMaterial={onDeleteMaterial}
                                         />
                                     ))}
                                 </div>

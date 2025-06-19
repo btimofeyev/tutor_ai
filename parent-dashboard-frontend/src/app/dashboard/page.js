@@ -27,6 +27,8 @@ import StudentHeader from "./components/StudentHeader";
 import SubjectCard from "./components/SubjectCard";
 import AddMaterialTabs from "./components/AddMaterialTabs";
 import EditMaterialModal from "./components/EditMaterialModal";
+import MaterialDeleteModal from "./components/MaterialDeleteModal";
+import ChildAccountDeleteModal from "./components/ChildAccountDeleteModal";
 import ChildLoginSettingsModal from "./components/ChildLoginSettingsModal";
 import GradeInputModal from "./components/GradeInputModal";
 import QuickAccessSection from "./components/QuickAccessSection";
@@ -72,6 +74,7 @@ export default function DashboardPage() {
   const [managingUnitsForSubject, setManagingUnitsForSubject] = useState(null);
   const [currentSubjectUnitsInModal, setCurrentSubjectUnitsInModal] = useState([]);
   const [newUnitNameModalState, setNewUnitNameModalState] = useState("");
+  const [bulkUnitCount, setBulkUnitCount] = useState(1);
   const [editingUnit, setEditingUnit] = useState(null);
   const [isAddMaterialModalOpen, setIsAddMaterialModalOpen] = useState(false);
 
@@ -95,6 +98,16 @@ export default function DashboardPage() {
   const [gradingLesson, setGradingLesson] = useState(null);
   const [isSubmittingGrade, setIsSubmittingGrade] = useState(false);
 
+  // Material delete modal state
+  const [showDeleteMaterialModal, setShowDeleteMaterialModal] = useState(false);
+  const [deletingMaterial, setDeletingMaterial] = useState(null);
+  const [isDeletingMaterial, setIsDeletingMaterial] = useState(false);
+
+  // Child account delete modal state
+  const [showDeleteChildModal, setShowDeleteChildModal] = useState(false);
+  const [deletingChild, setDeletingChild] = useState(null);
+  const [isDeletingChild, setIsDeletingChild] = useState(false);
+
   const { assignedSubjectsForCurrentChild } = childrenData;
   const { totalStats } = filtersAndSorting;
 
@@ -103,6 +116,41 @@ export default function DashboardPage() {
     if (!selectedUnitId) return [];
     return childrenData.lessonsByUnit[selectedUnitId] || [];
   }, [materialManagement.lessonJsonForApproval?.unit_id, childrenData.lessonsByUnit]);
+
+  // Find lesson containers for the editing material
+  const editingMaterialLessonContainers = useMemo(() => {
+    if (!materialManagement.editingLesson || !materialManagement.editForm) return [];
+    
+    // Get all lesson containers for the material's subject
+    const subjectId = materialManagement.editForm.child_subject_id;
+    if (subjectId) {
+      const allLessonContainers = [];
+      const subjectUnits = childrenData.unitsBySubject[subjectId] || [];
+      
+      // Collect all lesson containers from all units in this subject
+      for (const unit of subjectUnits) {
+        const unitLessonContainers = childrenData.lessonsByUnit[unit.id] || [];
+        // Add unit info to each lesson container for better display
+        const containersWithUnitInfo = unitLessonContainers.map(lc => ({
+          ...lc,
+          unitName: unit.name,
+          unitId: unit.id
+        }));
+        allLessonContainers.push(...containersWithUnitInfo);
+      }
+      
+      // Sort by unit name then lesson container title
+      allLessonContainers.sort((a, b) => {
+        const unitCompare = a.unitName.localeCompare(b.unitName);
+        if (unitCompare !== 0) return unitCompare;
+        return a.title.localeCompare(b.title);
+      });
+      
+      return allLessonContainers;
+    }
+    
+    return [];
+  }, [materialManagement.editingLesson, materialManagement.editForm, childrenData.lessonsByUnit, childrenData.unitsBySubject]);
 
   useEffect(() => {
     if (session === false) {
@@ -121,6 +169,20 @@ export default function DashboardPage() {
       }
     }
   }, [searchParams, refetchSubscription]);
+
+  // Invalidate cache when returning from subject management page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && childrenData.selectedChild?.id) {
+        // Invalidate cache and force refresh when page becomes visible
+        childrenData.invalidateChildCache(childrenData.selectedChild.id);
+        childrenData.refreshChildSpecificData(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [childrenData.selectedChild?.id, childrenData.invalidateChildCache, childrenData.refreshChildSpecificData]);
 
 
   useEffect(() => {
@@ -305,6 +367,66 @@ export default function DashboardPage() {
       if (result.syncedEntries > 0) {
       }
     }
+  };
+
+  const handleDeleteMaterial = (material) => {
+    setDeletingMaterial(material);
+    setShowDeleteMaterialModal(true);
+  };
+
+  const handleConfirmDeleteMaterial = async (materialId) => {
+    setIsDeletingMaterial(true);
+    try {
+      const result = await materialManagement.deleteLesson(materialId);
+      if (result.success) {
+        showSuccess(result.message || 'Material deleted successfully');
+        setShowDeleteMaterialModal(false);
+        setDeletingMaterial(null);
+        // Force refresh the child data to update the UI immediately
+        if (childrenData.selectedChild?.id) {
+          await childrenData.refreshChildSpecificData(true);
+        }
+      } else {
+        showError(result.error || 'Failed to delete material');
+      }
+    } catch (error) {
+      showError('Failed to delete material');
+    } finally {
+      setIsDeletingMaterial(false);
+    }
+  };
+
+  const handleCloseDeleteMaterialModal = () => {
+    setShowDeleteMaterialModal(false);
+    setDeletingMaterial(null);
+  };
+
+  const handleDeleteChild = (child) => {
+    setDeletingChild(child);
+    setShowDeleteChildModal(true);
+  };
+
+  const handleConfirmDeleteChild = async (childId) => {
+    setIsDeletingChild(true);
+    try {
+      const result = await childrenData.deleteChild(childId);
+      if (result.success) {
+        showSuccess(result.message || 'Child account deleted successfully');
+        setShowDeleteChildModal(false);
+        setDeletingChild(null);
+      } else {
+        showError(result.error || 'Failed to delete child account');
+      }
+    } catch (error) {
+      showError('Failed to delete child account');
+    } finally {
+      setIsDeletingChild(false);
+    }
+  };
+
+  const handleCloseDeleteChildModal = () => {
+    setShowDeleteChildModal(false);
+    setDeletingChild(null);
   };
 
   const handleGradeSubmit = async (gradeValue) => {
@@ -545,6 +667,80 @@ export default function DashboardPage() {
     }
   };
 
+  const handleBulkAddUnits = async () => {
+    if (!newUnitNameModalState.trim() || !managingUnitsForSubject) return;
+
+    try {
+      const baseName = newUnitNameModalState.trim();
+      const existingUnits = childrenData.unitsBySubject[managingUnitsForSubject.id] || [];
+      const existingUnitNames = existingUnits.map(u => u.name.toLowerCase());
+      
+      // Find starting number that doesn't conflict
+      let startingNumber = 1;
+      while (existingUnitNames.includes(`${baseName} ${startingNumber}`.toLowerCase())) {
+        startingNumber++;
+      }
+      
+      const newUnits = [];
+      let createdCount = 0;
+      
+      // Create units one by one to avoid race conditions
+      for (let i = 0; i < bulkUnitCount; i++) {
+        const unitName = `${baseName} ${startingNumber + i}`;
+        
+        // Double-check this name doesn't exist
+        if (existingUnitNames.includes(unitName.toLowerCase())) {
+          continue; // Skip if somehow already exists
+        }
+        
+        try {
+          const payload = {
+            child_subject_id: managingUnitsForSubject.id,
+            name: unitName,
+          };
+          const response = await api.post("/units", payload);
+          newUnits.push(response.data);
+          existingUnitNames.push(unitName.toLowerCase()); // Add to list to avoid duplicates in this batch
+          createdCount++;
+        } catch (unitError) {
+          // If individual unit creation fails, continue with others
+          console.warn(`Failed to create unit "${unitName}":`, unitError.response?.data?.error);
+        }
+      }
+
+      if (createdCount === 0) {
+        showError("No units were created. They may already exist.");
+        return;
+      }
+
+      // Update the state with all new units
+      const updatedUnitsForSubject = [
+        ...existingUnits,
+        ...newUnits,
+      ].sort(
+        (a, b) =>
+          (a.sequence_order || 0) - (b.sequence_order || 0) ||
+          a.name.localeCompare(b.name)
+      );
+
+      childrenData.setUnitsBySubject((prev) => ({
+        ...prev,
+        [managingUnitsForSubject.id]: updatedUnitsForSubject,
+      }));
+      setCurrentSubjectUnitsInModal(updatedUnitsForSubject);
+      setNewUnitNameModalState("");
+      setBulkUnitCount(1);
+      
+      if (createdCount === bulkUnitCount) {
+        showSuccess(`Created ${createdCount} units successfully!`);
+      } else {
+        showWarning(`Created ${createdCount} out of ${bulkUnitCount} units. Some may have already existed.`);
+      }
+    } catch (error) {
+      showError(error.response?.data?.error || "Could not create units.");
+    }
+  };
+
   const handleUpdateUnit = async (e) => {
     e.preventDefault();
     if (!editingUnit || !editingUnit.name.trim() || !managingUnitsForSubject)
@@ -749,6 +945,7 @@ export default function DashboardPage() {
           onNewChildGradeChange={(e) => childrenData.setNewChildGrade(e.target.value)}
           onAddChildSubmit={handleAddChildSubmit}
           onOpenChildLoginSettings={handleOpenChildLoginSettingsModal}
+          onDeleteChild={handleDeleteChild}
           subscription={subscription}
           canAddChild={subscriptionPermissions.maxChildren > childrenData.children.length}
           onUpgradeNeeded={(targetPlan) => {
@@ -784,6 +981,7 @@ export default function DashboardPage() {
               lessonsBySubject={childrenData.lessonsBySubject}
               onToggleComplete={handleToggleLessonComplete}
               onEdit={handleOpenEditModal}
+              onDelete={handleDeleteMaterial}
               maxItems={5}
             />
             
@@ -912,6 +1110,7 @@ export default function DashboardPage() {
                         onOpenEditModal={handleOpenEditModal}
                         onManageUnits={() => openManageUnitsModal(subject)}
                         onToggleComplete={handleToggleLessonComplete}
+                        onDeleteMaterial={handleDeleteMaterial}
                       />
                     ))}
                   </div>
@@ -994,166 +1193,235 @@ export default function DashboardPage() {
       )}
 
       {isManageUnitsModalOpen && managingUnitsForSubject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 animate-fade-in">
-          <div className="bg-background-card rounded-lg shadow-xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col border border-border-subtle">
-            <div className="flex justify-between items-center mb-4 pb-3 border-b border-border-subtle">
-              <h3 className="text-xl font-semibold text-text-primary">
-                Manage Units for:{" "}
-                <span className="text-accent-blue">
-                  {managingUnitsForSubject.name}
-                </span>
-              </h3>
-              <button
-                onClick={() => setIsManageUnitsModalOpen(false)}
-                className="text-text-secondary hover:text-text-primary text-2xl p-1 rounded-full hover:bg-gray-100 transition-colors"
-              >
-                ×
-              </button>
-            </div>
-            <div className="flex-grow overflow-y-auto mb-4 pr-2 space-y-3">
-              {currentSubjectUnitsInModal.length === 0 && (
-                <p className="text-sm text-text-secondary italic py-4 text-center">
-                  No units created yet.
-                </p>
-              )}
-              {currentSubjectUnitsInModal.map((unit) => (
-                <div
-                  key={unit.id}
-                  className={`p-3 border border-border-subtle rounded-md transition-all duration-150 ${
-                    editingUnit?.id === unit.id
-                      ? "bg-accent-blue/10 border-accent-blue"
-                      : "hover:bg-gray-50"
-                  }`}
+        <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden border border-gray-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-blue-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">📚 Organize Your Curriculum</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Create units for <span className="font-semibold text-blue-700">{managingUnitsForSubject.name}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsManageUnitsModalOpen(false)}
+                  className="p-2 hover:bg-white hover:bg-opacity-80 rounded-full transition-colors"
                 >
-                  {editingUnit?.id === unit.id ? (
-                    <form onSubmit={handleUpdateUnit} className="space-y-3">
+                  <XMarkIcon className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Add New Unit - Top Section */}
+              {!editingUnit && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 mb-6 border border-blue-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                    <PlusCircleIcon className="h-5 w-5 text-blue-600 mr-2" />
+                    Add New Units
+                  </h3>
+                  
+                  {/* Bulk Creation Form */}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label
-                          htmlFor={`editUnitName-${unit.id}`}
-                          className={formLabelStyles}
-                        >
-                          Unit Name
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Base Name
                         </label>
                         <input
                           type="text"
-                          id={`editUnitName-${unit.id}`}
-                          value={editingUnit.name}
-                          onChange={(e) =>
-                            setEditingUnit({
-                              ...editingUnit,
-                              name: e.target.value,
-                            })
-                          }
-                          className={`${formInputStyles} mt-0.5`}
-                          autoFocus
+                          value={newUnitNameModalState}
+                          onChange={(e) => setNewUnitNameModalState(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          placeholder="Chapter, Unit, Module, etc."
                           required
                         />
                       </div>
                       <div>
-                        <label
-                          htmlFor={`editUnitDescription-${unit.id}`}
-                          className={formLabelStyles}
-                        >
-                          Description (Optional)
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          How Many?
                         </label>
-                        <textarea
-                          id={`editUnitDescription-${unit.id}`}
-                          value={editingUnit.description || ""}
-                          onChange={(e) =>
-                            setEditingUnit({
-                              ...editingUnit,
-                              description: e.target.value,
-                            })
-                          }
-                          rows="2"
-                          className={`${formInputStyles} mt-0.5`}
-                        />
-                      </div>
-                      <div className="flex items-center justify-end gap-2 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setEditingUnit(null)}
-                          className="px-3 py-1.5 text-xs text-text-primary bg-gray-100 hover:bg-gray-200 border border-border-subtle rounded-lg font-medium"
+                        <select
+                          value={bulkUnitCount}
+                          onChange={(e) => setBulkUnitCount(parseInt(e.target.value))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                         >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="btn-primary text-xs px-3 py-1.5"
-                        >
-                          Save Changes
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm font-medium text-text-primary">
-                          {unit.name}
-                        </p>
-                        {unit.description && (
-                          <p
-                            className="text-xs text-text-secondary mt-0.5 max-w-xs truncate"
-                            title={unit.description}
-                          >
-                            {unit.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex-shrink-0 space-x-1.5">
-                        <button
-                          onClick={() =>
-                            setEditingUnit({
-                              ...unit,
-                              description: unit.description || "",
-                            })
-                          }
-                          className="p-1.5 text-accent-blue hover:text-[var(--accent-blue-hover)] rounded-md hover:bg-accent-blue/10 transition-colors"
-                          title="Edit Unit"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUnit(unit.id)}
-                          className="p-1.5 text-[var(--messageTextDanger)] hover:opacity-75 rounded-md hover:bg-[var(--messageTextDanger)]/10 transition-opacity"
-                          title="Delete Unit"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                          <option value={1}>1 (Single Unit)</option>
+                          <option value={5}>5 Units</option>
+                          <option value={10}>10 Units</option>
+                          <option value={15}>15 Units</option>
+                          <option value={20}>20 Units</option>
+                          <option value={25}>25 Units</option>
+                        </select>
                       </div>
                     </div>
-                  )}
+                    
+                    {bulkUnitCount > 1 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm text-blue-800 mb-2">
+                          <strong>Preview:</strong> This will create {bulkUnitCount} units:
+                        </p>
+                        <div className="text-xs text-blue-700 space-y-1 max-h-24 overflow-y-auto">
+                          {Array.from({ length: Math.min(bulkUnitCount, 5) }, (_, i) => (
+                            <div key={i}>• {newUnitNameModalState || 'Unit'} {i + 1}</div>
+                          ))}
+                          {bulkUnitCount > 5 && (
+                            <div className="text-blue-600">... and {bulkUnitCount - 5} more</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <button
+                      onClick={handleBulkAddUnits}
+                      type="button"
+                      style={{ 
+                        backgroundColor: 'var(--accent-yellow)', 
+                        color: 'var(--text-primary)',
+                        border: '1px solid transparent',
+                        borderRadius: 'var(--radius-md)',
+                        fontWeight: '600',
+                        transition: 'all 150ms ease-out',
+                        boxShadow: 'var(--shadow-sm)',
+                        padding: '12px 16px',
+                        width: '100%'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-yellow-hover)'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--accent-yellow)'}
+                    >
+                      Create {bulkUnitCount} Unit{bulkUnitCount !== 1 ? 's' : ''}
+                    </button>
+                  </div>
                 </div>
-              ))}
+              )}
+
+              {/* Existing Units */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <span className="mr-2">📋</span>
+                  Current Units ({currentSubjectUnitsInModal.length})
+                </h3>
+                
+                {currentSubjectUnitsInModal.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-gray-400 text-6xl mb-4">📚</div>
+                    <p className="text-gray-500 text-lg mb-2">No units yet!</p>
+                    <p className="text-gray-400 text-sm">Create your first unit above to get started organizing content.</p>
+                  </div>
+                ) : (
+                  currentSubjectUnitsInModal.map((unit, index) => (
+                    <div
+                      key={unit.id}
+                      className={`bg-white border-2 rounded-xl transition-all duration-200 ${
+                        editingUnit?.id === unit.id
+                          ? "border-blue-300 shadow-lg bg-blue-50"
+                          : "border-gray-200 hover:border-blue-200 hover:shadow-md"
+                      }`}
+                    >
+                      {editingUnit?.id === unit.id ? (
+                        <div className="p-6">
+                          <form onSubmit={handleUpdateUnit} className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Unit Name
+                              </label>
+                              <input
+                                type="text"
+                                value={editingUnit.name}
+                                onChange={(e) =>
+                                  setEditingUnit({
+                                    ...editingUnit,
+                                    name: e.target.value,
+                                  })
+                                }
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                autoFocus
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Description (Optional)
+                              </label>
+                              <textarea
+                                value={editingUnit.description || ""}
+                                onChange={(e) =>
+                                  setEditingUnit({
+                                    ...editingUnit,
+                                    description: e.target.value,
+                                  })
+                                }
+                                rows="3"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                placeholder="Add a brief description of what this unit covers..."
+                              />
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditingUnit(null)}
+                                className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                              >
+                                Save Changes
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      ) : (
+                        <div className="p-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center mb-2">
+                                <span className="text-2xl mr-3">📖</span>
+                                <div>
+                                  <h4 className="text-lg font-semibold text-gray-900">
+                                    Unit {index + 1}: {unit.name}
+                                  </h4>
+                                  {unit.description && (
+                                    <p className="text-gray-600 text-sm mt-1 leading-relaxed">
+                                      {unit.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 ml-4">
+                              <button
+                                onClick={() =>
+                                  setEditingUnit({
+                                    ...unit,
+                                    description: unit.description || "",
+                                  })
+                                }
+                                className="p-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                                title="Edit Unit"
+                              >
+                                <PencilIcon className="h-5 w-5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUnit(unit.id)}
+                                className="p-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Delete Unit"
+                              >
+                                <TrashIcon className="h-5 w-5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-            {!editingUnit && (
-              <form onSubmit={handleAddUnit} className="mt-auto pt-4 border-t border-border-subtle">
-                <label
-                  htmlFor="newUnitNameModalState"
-                  className={formLabelStyles}
-                >
-                  Add New Unit
-                </label>
-                <div className="mt-1 flex rounded-lg shadow-sm">
-                  <input
-                    type="text"
-                    id="newUnitNameModalState"
-                    value={newUnitNameModalState}
-                    onChange={(e) => setNewUnitNameModalState(e.target.value)}
-                    className={`${formInputStyles} flex-1 min-w-0 rounded-r-none`}
-                    placeholder="E.g., Chapter 1: Introduction"
-                    required
-                  />
-                  <button
-                    type="submit"
-                    className="btn-primary inline-flex items-center px-4 py-2 rounded-l-none text-sm"
-                  >
-                    <PlusCircleIcon className="h-5 w-5 mr-1.5 sm:mr-2 text-text-primary" />
-                    Add
-                  </button>
-                </div>
-              </form>
-            )}
           </div>
         </div>
       )}
@@ -1168,8 +1436,8 @@ export default function DashboardPage() {
           isSaving={materialManagement.isSavingEdit}
           appContentTypes={APP_CONTENT_TYPES}
           appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
-          unitsForSubject={childrenData.unitsBySubject[childrenData.selectedChild?.id] || []}
-          lessonContainersForSubject={childrenData.lessonsByUnit[materialManagement.editForm?.lesson_id] || []}
+          unitsForSubject={childrenData.unitsBySubject[materialManagement.editForm?.child_subject_id] || []}
+          lessonContainersForSubject={editingMaterialLessonContainers}
         />
       )}
 
@@ -1221,6 +1489,27 @@ export default function DashboardPage() {
           isLoading={isSubmittingGrade}
         />
       )}
+
+      <MaterialDeleteModal
+        isOpen={showDeleteMaterialModal}
+        onClose={handleCloseDeleteMaterialModal}
+        onConfirm={handleConfirmDeleteMaterial}
+        material={deletingMaterial}
+        isDeleting={isDeletingMaterial}
+      />
+
+      <ChildAccountDeleteModal
+        isOpen={showDeleteChildModal}
+        onClose={handleCloseDeleteChildModal}
+        onConfirm={handleConfirmDeleteChild}
+        child={deletingChild}
+        childStats={deletingChild ? {
+          totalMaterials: Object.values(childrenData.lessonsBySubject).flat().length,
+          totalSubjects: childrenData.assignedSubjectsForCurrentChild.length,
+          completedMaterials: Object.values(childrenData.lessonsBySubject).flat().filter(m => m.completed_at).length
+        } : null}
+        isDeleting={isDeletingChild}
+      />
     </div>
   );
 }

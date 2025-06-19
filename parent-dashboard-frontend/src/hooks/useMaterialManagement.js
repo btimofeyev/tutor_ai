@@ -41,7 +41,7 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
       if (response.data.success) {
         setAddLessonSubject("");
         setSelectedLessonContainer("");
-        if (refreshChildData) await refreshChildData();
+        if (refreshChildData) await refreshChildData(true);
         return { success: true, message: 'Material added successfully!', material: response.data.material };
       } else {
         return { success: false, error: 'Failed to create material' };
@@ -180,7 +180,7 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
     if (!name.trim() || !childSubjectId) return { success: false, error: 'Name and subject are required.' };
     try {
         const { data } = await api.post('/units', { name, child_subject_id: childSubjectId });
-        if(refreshChildData) await refreshChildData();
+        if(refreshChildData) await refreshChildData(true);
         return { success: true, data, message: "Unit created!" };
     } catch (error) {
         return { success: false, error: error.response?.data?.error || "Could not create unit." };
@@ -191,7 +191,7 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
     if (!title.trim() || !unitId) return { success: false, error: 'Title and unit are required.' };
     try {
         const { data } = await api.post('/lesson-containers', { title, unit_id: unitId });
-        if(refreshChildData) await refreshChildData();
+        if(refreshChildData) await refreshChildData(true);
         return { success: true, data, message: "Lesson group created!" };
     } catch (error) {
         return { success: false, error: error.response?.data?.error || "Could not create lesson group." };

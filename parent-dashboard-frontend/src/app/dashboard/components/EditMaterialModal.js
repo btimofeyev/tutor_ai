@@ -58,8 +58,19 @@ export default function EditMaterialModal({
             <label htmlFor="edit-lesson_id" className="block text-sm font-medium text-gray-700 mb-1">Lesson Group</label>
             <select name="lesson_id" id="edit-lesson_id" value={editForm.lesson_id || ''} onChange={onFormChange} className="w-full border rounded px-3 py-2 text-sm h-[38px]">
               <option value="">-- No Group --</option>
-              {lessonContainersForSubject.map(lc => <option key={lc.id} value={lc.id}>{lc.title}</option>)}
+              {lessonContainersForSubject.length === 0 ? (
+                <option disabled>No lesson groups available</option>
+              ) : (
+                lessonContainersForSubject.map(lc => (
+                  <option key={lc.id} value={lc.id}>
+                    {lc.unitName ? `${lc.unitName} - ${lc.title}` : lc.title}
+                  </option>
+                ))
+              )}
             </select>
+            {lessonContainersForSubject.length === 0 && (
+              <p className="text-xs text-gray-500 mt-1">Create lesson groups in the subject management area first.</p>
+            )}
           </div>
 
           <div>

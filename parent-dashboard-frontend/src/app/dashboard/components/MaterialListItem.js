@@ -2,7 +2,7 @@
 'use client';
 import React, { useState, useCallback, useMemo } from 'react';
 import { CheckCircleIcon as CheckSolidIcon } from '@heroicons/react/24/solid';
-import { PencilSquareIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, CalendarDaysIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { APP_GRADABLE_CONTENT_TYPES } from '../../../utils/dashboardConstants';
 
 // Utility functions
@@ -135,7 +135,7 @@ const StatusBadge = ({ lesson, materialInfo }) => {
   return null;
 };
 
-export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComplete, isCompact = false }) {
+export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComplete, onDeleteMaterial, isCompact = false }) {
   const [isToggling, setIsToggling] = useState(false);
   const [error, setError] = useState('');
 
@@ -170,6 +170,11 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
     onOpenEditModal(lesson);
   }, [lesson, onOpenEditModal]);
 
+  const handleDeleteClick = useCallback((e) => {
+    e.stopPropagation();
+    onDeleteMaterial(lesson);
+  }, [lesson, onDeleteMaterial]);
+
   const itemBaseClasses = "flex items-center rounded-lg";
   const itemPadding = isCompact ? "px-3 py-2" : "p-3";
   const itemStateClasses = materialInfo.isCompleted 
@@ -195,14 +200,21 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
             </p>
           )}
         </div>
-        <div className="flex items-center space-x-3 ml-3 flex-shrink-0">
+        <div className="flex items-center space-x-2 ml-3 flex-shrink-0">
           <StatusBadge lesson={lesson} materialInfo={materialInfo} />
           <button 
             onClick={handleEditClick} 
-            className="p-2 sm:p-2.5 text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+            className="p-2 sm:p-2.5 text-gray-400 hover:text-blue-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" 
             title="Edit Material"
           >
             <PencilSquareIcon className="h-4 w-4" />
+          </button>
+          <button 
+            onClick={handleDeleteClick} 
+            className="p-2 sm:p-2.5 text-gray-400 hover:text-red-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors" 
+            title="Delete Material"
+          >
+            <TrashIcon className="h-4 w-4" />
           </button>
         </div>
       </div>

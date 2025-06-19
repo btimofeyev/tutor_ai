@@ -72,12 +72,16 @@ export default function ScheduleCalendar({
       eventTimeStr = eventTimeStr.length === 8 ? eventTimeStr.substring(0, 5) : eventTimeStr;
       const eventStartTime = new Date(`2000-01-01T${eventTimeStr}`);
       const eventDuration = event.duration || event.duration_minutes || 30;
-      const eventEndTime = new Date(eventStartTime.getTime() + (eventDuration * 60000));
       
-      // Check if this time slot falls within an existing event's duration
+      // Calculate visual end time based on how we display the event
+      const visualHeight = getEventHeight(eventDuration);
+      const visualDurationMinutes = visualHeight * 30; // Convert back to minutes for overlap calculation
+      const eventEndTime = new Date(eventStartTime.getTime() + (visualDurationMinutes * 60000));
+      
+      // Check if this time slot falls within an existing event's visual duration
       const slotEndTime = new Date(slotTime.getTime() + (30 * 60000)); // 30-minute slot
       
-      // Slot is occupied if it overlaps with an existing event
+      // Slot is occupied if it overlaps with an existing event's visual space
       return (slotTime < eventEndTime && slotEndTime > eventStartTime);
     });
   };
@@ -164,6 +168,7 @@ export default function ScheduleCalendar({
   const goToToday = () => {
     setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }));
   };
+
 
   return (
     <div className="p-6">
@@ -268,7 +273,7 @@ export default function ScheduleCalendar({
                     className={`relative transition-colors ${
                       !isOccupied ? 'hover:bg-blue-25 cursor-pointer' : ''
                     } ${dayIndex !== weekDays.length - 1 ? 'border-r border-gray-100' : ''}`}
-                    style={{ minHeight: '60px' }}
+                    style={{ minHeight: '80px' }}
                     onClick={() => {
                       if (!isOccupied) {
                         openCreateModal({
@@ -293,57 +298,111 @@ export default function ScheduleCalendar({
                           text-xs p-3 z-10
                         `}
                         style={{
-                          height: `${getEventHeight(eventStartingHere.duration || eventStartingHere.duration_minutes || 30) * 60 - 4}px`, // Account for margin
+                          height: `${getEventHeight(eventStartingHere.duration || eventStartingHere.duration_minutes || 30) * 80 - 4}px`, // Account for margin
                         }}
                       >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1 min-w-0">
-                            <div className={`font-semibold truncate ${eventStartingHere.status === 'completed' ? 'line-through' : ''}`}>
-                              {eventStartingHere.title}
-                            </div>
-                            {selectedChildrenIds.length > 1 && (
-                              <div className="text-xs font-medium opacity-90 mt-0.5">
-                                {eventStartingHere.childName || 'Unknown Child'}
+{/* Different layouts based on duration */}
+                        {getEventHeight(eventStartingHere.duration || eventStartingHere.duration_minutes || 30) === 1 ? (
+                          /* Compact layout for 30-minute slots */
+                          <div className="h-full flex items-center justify-between p-2 overflow-hidden">
+                            <div className="flex-1 min-w-0 pr-2">
+                              <div className={`font-semibold text-xs truncate leading-tight ${eventStartingHere.status === 'completed' ? 'line-through' : ''}`}>
+                                {eventStartingHere.title}
                               </div>
-                            )}
-                            <div className="opacity-80 text-xs mt-1">
-                              {eventStartingHere.duration || eventStartingHere.duration_minutes || 30} minutes
-                            </div>
-                            {eventStartingHere.notes && (
-                              <div className="opacity-70 text-xs mt-1 truncate">
-                                {eventStartingHere.notes}
+                              <div className="text-xs opacity-75 mt-0.5">
+                                {eventStartingHere.duration || eventStartingHere.duration_minutes || 30}m
                               </div>
-                            )}
+                            </div>
+                            
+                            {/* Completion Toggle Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const entryChildId = eventStartingHere.childId || eventStartingHere.originalEntry?.child_id;
+                                if (eventStartingHere.status === 'completed') {
+                                  scheduleManagement.updateScheduleEntry(
+                                    eventStartingHere.originalEntry?.id || eventStartingHere.id, 
+                                    { status: 'scheduled' },
+                                    entryChildId
+                                  );
+                                } else {
+                                  scheduleManagement.markEntryCompleted(
+                                    eventStartingHere.originalEntry?.id || eventStartingHere.id,
+                                    entryChildId
+                                  );
+                                }
+                              }}
+                              className={`p-0.5 rounded-full transition-all duration-200 hover:scale-110 shadow-sm ${
+                                eventStartingHere.status === 'completed' 
+                                  ? 'bg-white text-green-600 shadow-md' 
+                                  : 'bg-white/90 hover:bg-white text-gray-500 hover:text-green-600 hover:shadow-md'
+                              }`}
+                              title={eventStartingHere.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
+                            >
+                              <CheckIcon className="h-3 w-3" />
+                            </button>
                           </div>
-                          
-                          {/* Completion Toggle Button */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const entryChildId = eventStartingHere.childId || eventStartingHere.originalEntry?.child_id;
-                              if (eventStartingHere.status === 'completed') {
-                                scheduleManagement.updateScheduleEntry(
-                                  eventStartingHere.originalEntry?.id || eventStartingHere.id, 
-                                  { status: 'scheduled' },
-                                  entryChildId
-                                );
-                              } else {
-                                scheduleManagement.markEntryCompleted(
-                                  eventStartingHere.originalEntry?.id || eventStartingHere.id,
-                                  entryChildId
-                                );
-                              }
-                            }}
-                            className={`ml-2 p-1.5 rounded-full transition-all duration-200 hover:scale-110 shadow-sm ${
-                              eventStartingHere.status === 'completed' 
-                                ? 'bg-white text-green-600 shadow-md' 
-                                : 'bg-white/90 hover:bg-white text-gray-500 hover:text-green-600 hover:shadow-md'
-                            }`}
-                            title={eventStartingHere.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
-                          >
-                            <CheckIcon className="h-4 w-4" />
-                          </button>
-                        </div>
+                        ) : (
+                          /* Full layout for longer slots */
+                          <div className="h-full flex flex-col justify-between p-2 overflow-hidden">
+                            {/* Main content area */}
+                            <div className="flex-1 overflow-hidden">
+                              {/* Subject/Title - Main heading */}
+                              <div className={`font-semibold text-xs mb-2 truncate ${eventStartingHere.status === 'completed' ? 'line-through' : ''}`}>
+                                {eventStartingHere.title}
+                              </div>
+                              
+                              {/* Lesson title if available - Secondary info */}
+                              {eventStartingHere.lesson?.title && eventStartingHere.lesson.title !== eventStartingHere.title && (
+                                <div className="text-xs opacity-90 mb-1 line-clamp-2">
+                                  {eventStartingHere.lesson.title}
+                                </div>
+                              )}
+                              
+                              {/* Child name for multi-child view */}
+                              {selectedChildrenIds.length > 1 && (
+                                <div className="text-xs opacity-80 truncate">
+                                  {eventStartingHere.childName || 'Unknown Child'}
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Bottom section with duration and completion */}
+                            <div className="flex justify-between items-center mt-2">
+                              <div className="text-xs opacity-75">
+                                {eventStartingHere.duration || eventStartingHere.duration_minutes || 30}m
+                              </div>
+                              
+                              {/* Completion Toggle Button */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const entryChildId = eventStartingHere.childId || eventStartingHere.originalEntry?.child_id;
+                                  if (eventStartingHere.status === 'completed') {
+                                    scheduleManagement.updateScheduleEntry(
+                                      eventStartingHere.originalEntry?.id || eventStartingHere.id, 
+                                      { status: 'scheduled' },
+                                      entryChildId
+                                    );
+                                  } else {
+                                    scheduleManagement.markEntryCompleted(
+                                      eventStartingHere.originalEntry?.id || eventStartingHere.id,
+                                      entryChildId
+                                    );
+                                  }
+                                }}
+                                className={`p-1 rounded-full transition-all duration-200 hover:scale-110 shadow-sm ${
+                                  eventStartingHere.status === 'completed' 
+                                    ? 'bg-white text-green-600 shadow-md' 
+                                    : 'bg-white/90 hover:bg-white text-gray-500 hover:text-green-600 hover:shadow-md'
+                                }`}
+                                title={eventStartingHere.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
+                              >
+                                <CheckIcon className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

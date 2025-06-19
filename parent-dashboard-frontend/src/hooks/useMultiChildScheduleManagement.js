@@ -64,9 +64,27 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
       const childName = child?.name || 'Unknown';
       
       entries.forEach(entry => {
+        // Extract material info from lesson container (matches single-child hook logic)
+        const lesson = entry.lesson;
+        const materials = lesson?.materials || [];
+        const firstMaterial = materials[0]; // Take first material if multiple exist
+        
+        // Determine the display title (matches single-child hook logic)
+        let displayTitle;
+        if (firstMaterial) {
+          // Show specific material title
+          displayTitle = `${entry.subject_name}: ${firstMaterial.title}`;
+        } else if (lesson) {
+          // Show lesson container title
+          displayTitle = `${entry.subject_name}: ${lesson.title}`;
+        } else {
+          // Fallback to general study
+          displayTitle = entry.subject_name || 'Study Time';
+        }
+        
         allEvents.push({
           id: `${childId}-${entry.id}`,
-          title: entry.material?.title || entry.subject_name || 'Study Time',
+          title: displayTitle,
           subject: entry.subject_name,
           subject_name: entry.subject_name, // Add for compatibility
           child_id: childId, // Use child_id to match calendar components
@@ -79,6 +97,10 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           duration_minutes: entry.duration_minutes,
           status: entry.status,
           notes: entry.notes,
+          material: firstMaterial, // Include first material for backward compatibility
+          lesson: lesson, // Include lesson container info
+          materials: materials, // Include all materials in the lesson
+          content_type: firstMaterial?.content_type, // For styling/icons
           originalEntry: entry, // Keep reference to original entry
           // Also keep the original calendar format for compatibility
           start: new Date(`${entry.scheduled_date}T${entry.start_time}`),
@@ -89,7 +111,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
             childId: childId,
             childName: childName,
             subject: entry.subject_name,
-            type: entry.material?.content_type || 'study_time',
+            type: firstMaterial?.content_type || 'study_time',
             status: entry.status
           }
         });

@@ -1,12 +1,12 @@
 // app/dashboard/components/QuickAccessSection.js
 'use client';
 import React, { useMemo } from 'react';
-import { ExclamationTriangleIcon, ClockIcon, CheckCircleIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, ClockIcon, CheckCircleIcon, PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckSolidIcon } from '@heroicons/react/24/solid';
 import { isDateOverdue, isDateDueSoon } from '../../../utils/dashboardHelpers';
 import { APP_GRADABLE_CONTENT_TYPES } from '../../../utils/dashboardConstants';
 
-const QuickAccessItem = ({ lesson, onToggleComplete, onEdit, type }) => {
+const QuickAccessItem = ({ lesson, onToggleComplete, onEdit, onDelete, type }) => {
   const isCompleted = !!lesson.completed_at;
   const isGradable = APP_GRADABLE_CONTENT_TYPES.includes(lesson.content_type);
   const hasMaxScore = lesson.grade_max_value && String(lesson.grade_max_value).trim() !== '';
@@ -111,6 +111,14 @@ const QuickAccessItem = ({ lesson, onToggleComplete, onEdit, type }) => {
           >
             <PencilSquareIcon className="h-4 w-4 text-gray-400 hover:text-blue-500" />
           </button>
+          
+          <button
+            onClick={() => onDelete(lesson)}
+            className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+            title="Delete"
+          >
+            <TrashIcon className="h-4 w-4 text-gray-400 hover:text-red-500" />
+          </button>
         </div>
       </div>
     </div>
@@ -121,6 +129,7 @@ export default function QuickAccessSection({
   lessonsBySubject, 
   onToggleComplete, 
   onEdit,
+  onDelete,
   maxItems = 5 
 }) {
   const { overdueItems, upcomingItems } = useMemo(() => {
@@ -166,6 +175,7 @@ export default function QuickAccessSection({
                   lesson={lesson}
                   onToggleComplete={onToggleComplete}
                   onEdit={onEdit}
+                  onDelete={onDelete}
                   type="overdue"
                 />
               ))}
@@ -189,6 +199,7 @@ export default function QuickAccessSection({
                   lesson={lesson}
                   onToggleComplete={onToggleComplete}
                   onEdit={onEdit}
+                  onDelete={onDelete}
                   type="upcoming"
                 />
               ))}

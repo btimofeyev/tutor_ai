@@ -26,8 +26,8 @@
   --accent-green-hover: #8BEDC1;
   --accent-orange: #FDE68A;
   --accent-orange-hover: #FCD34D;
-  --accent-red: #FDA4AF;
-  --accent-red-hover: #FC8B9A;
+  --accent-red: #dc2626;
+  --accent-red-hover: #b91c1c;
 
   /* UI Elements */
   --accent-dark: #374151;
@@ -312,6 +312,103 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Schedule Modal Specific Styles */
+.modal-container {
+  z-index: 1000;
+}
+
+/* Force dropdown styling across all browsers and OS */
+.schedule-select {
+  position: relative;
+  z-index: 15;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: white !important;
+  color: #1f2937 !important;
+  border: 2px solid #d1d5db !important;
+  font-weight: 500 !important;
+  text-shadow: none !important;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTUgNy41TDEwIDEyLjVMMTUgNy41IiBzdHJva2U9IiM2QjcyODAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+  background-size: 16px !important;
+  padding-right: 40px !important;
+}
+
+.schedule-select:focus {
+  border-color: #7CC4E8 !important;
+  box-shadow: 0 0 0 1px #7CC4E8 !important;
+  outline: none !important;
+}
+
+/* Force option styling - critical for visibility */
+.schedule-select option {
+  background-color: white !important;
+  color: #1f2937 !important;
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+  border: none !important;
+}
+
+.schedule-select option:hover {
+  background-color: #f9fafb !important;
+  color: #1f2937 !important;
+}
+
+.schedule-select option:checked {
+  background-color: #dbeafe !important;
+  color: #1e40af !important;
+  font-weight: 600 !important;
+}
+
+/* Additional fallback for webkit browsers */
+.schedule-select::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+/* Hierarchical dropdown z-index management */
+.hierarchical-selection .schedule-select:nth-child(1) {
+  z-index: 15;
+}
+
+.hierarchical-selection .schedule-select:nth-child(2) {
+  z-index: 14;
+}
+
+.hierarchical-selection .schedule-select:nth-child(3) {
+  z-index: 13;
+}
+
+/* Ensure proper contrast for all select dropdowns in modals */
+.modal-container select,
+.modal-container .schedule-select {
+  background: white !important;
+  color: #1f2937 !important;
+  border: 2px solid #d1d5db !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.modal-container select option,
+.modal-container .schedule-select option {
+  background: white !important;
+  color: #1f2937 !important;
+  font-size: 14px !important;
+  padding: 12px 16px !important;
+  font-weight: 500 !important;
+}
+
+/* Additional styling for better visibility on all browsers */
+.modal-container select:focus,
+.modal-container .schedule-select:focus {
+  outline: none !important;
+  border-color: #7CC4E8 !important;
+  box-shadow: 0 0 0 1px #7CC4E8 !important;
+}
+
 .card {
   background: var(--background-card);
   border: 1px solid var(--border-subtle);
@@ -353,6 +450,41 @@ body {
 
 input, button, textarea, select {
   font-family: inherit;
+}
+
+/* Dropdown and Select Styling Fixes */
+select {
+  position: relative;
+  z-index: 10;
+}
+
+/* Ensure dropdowns don't get clipped in modals */
+.modal-container {
+  position: relative;
+  z-index: 50;
+}
+
+.modal-form {
+  position: relative;
+  z-index: 51;
+}
+
+/* Fix for material selection dropdowns */
+.hierarchical-selection select {
+  position: relative;
+  z-index: 12;
+}
+
+.hierarchical-selection .space-y-3 > div:nth-child(1) select {
+  z-index: 15; /* Subject dropdown has highest priority */
+}
+
+.hierarchical-selection .space-y-3 > div:nth-child(2) select {
+  z-index: 14; /* Unit dropdown */
+}
+
+.hierarchical-selection .space-y-3 > div:nth-child(3) select {
+  z-index: 13; /* Lesson dropdown */
 }
 
 button {

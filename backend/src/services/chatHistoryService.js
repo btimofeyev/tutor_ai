@@ -145,15 +145,12 @@ class ChatHistoryService {
       messageCountRatio: 0.01 // Very flexible validation
     };
 
-    console.log(`📊 Summary validation: length=${summary?.length}, criteria.maxLength=${validationCriteria.maxLength}`);
 
     if (!summary || summary.length < validationCriteria.minLength) {
-      console.log(`❌ Summary too short: ${summary?.length} < ${validationCriteria.minLength}`);
       return { valid: false, reason: 'Summary too short' };
     }
 
     if (summary.length > validationCriteria.maxLength) {
-      console.log(`❌ Summary too long: ${summary.length} > ${validationCriteria.maxLength}`);
       return { valid: false, reason: 'Summary too long' };
     }
 
@@ -166,7 +163,6 @@ class ChatHistoryService {
       summary.toLowerCase().includes(keyword)
     );
     if (!hasKeyTopics) {
-      console.log(`⚠️ Summary lacks educational keywords but accepting anyway`);
       // Accept anyway for now - just log the warning
     }
 
@@ -209,7 +205,6 @@ class ChatHistoryService {
         return null;
       }
 
-      console.log(`💾 Exported ${messages.length} messages before cleanup`);
       return data;
     } catch (error) {
       console.error('Error in exportDataBeforeCleanup:', error);
@@ -222,7 +217,6 @@ class ChatHistoryService {
    */
   async summarizeAndCleanup(childId) {
     try {
-      console.log(`🧹 Starting enhanced summarization and cleanup for child ${childId}`);
 
       // Get messages older than the recent limit
       const { data: oldMessages, error } = await supabase
@@ -232,7 +226,6 @@ class ChatHistoryService {
         .order('created_at', { ascending: true });
 
       if (error || !oldMessages || oldMessages.length <= this.config.RECENT_MESSAGES_LIMIT) {
-        console.log('No old messages to summarize');
         return;
       }
 
@@ -240,7 +233,6 @@ class ChatHistoryService {
       const messagesToSummarize = oldMessages.slice(0, -this.config.RECENT_MESSAGES_LIMIT);
       
       if (messagesToSummarize.length < this.config.SUMMARIZATION_BATCH_SIZE) {
-        console.log('Not enough old messages to warrant summarization');
         return;
       }
 

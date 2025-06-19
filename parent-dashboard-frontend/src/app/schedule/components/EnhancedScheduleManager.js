@@ -71,7 +71,6 @@ export default function EnhancedScheduleManager({
   const handleApplyTemplate = async (template, startDate) => {
     // Prevent multiple simultaneous applications
     if (applyingTemplate) {
-      console.log('Template application already in progress, skipping...');
       return { success: false, entriesCreated: 0 };
     }
 
@@ -81,7 +80,6 @@ export default function EnhancedScheduleManager({
       // Give UI time to show loading skeleton
       await new Promise(resolve => setTimeout(resolve, 150));
       
-      console.log('Applying template:', template.name, 'starting from:', startDate);
       
       // Determine which children to apply the template to
       const targetChildIds = selectedChildrenIds.length >= 1 
@@ -93,7 +91,6 @@ export default function EnhancedScheduleManager({
         return { success: false, entriesCreated: 0 };
       }
       
-      console.log('Applying template to children:', targetChildIds);
       
       // Get existing schedule entries to check for conflicts
       let existingEntries = [];
@@ -116,7 +113,6 @@ export default function EnhancedScheduleManager({
       const allEntriesToCreate = [];
       
       for (const targetChildId of targetChildIds) {
-        console.log(`Preparing entries for child: ${targetChildId}`);
         
         // Convert template sessions to actual schedule entries for this child
         const scheduleEntries = template.sessions.map(session => {
@@ -155,7 +151,6 @@ export default function EnhancedScheduleManager({
       }
 
       // Use batch create to prevent individual refreshes
-      console.log(`Creating ${allEntriesToCreate.length} entries in batch mode...`);
       
       let batchResult;
       if (selectedChildrenIds.length >= 1) {
@@ -170,7 +165,6 @@ export default function EnhancedScheduleManager({
       if (batchResult.success) {
         totalSuccessfulEntries = batchResult.entriesCreated;
         totalFailedEntries = batchResult.entriesFailed;
-        console.log('Batch create completed:', batchResult);
       } else {
         totalFailedEntries = allEntriesToCreate.length;
         console.error('Batch create failed:', batchResult.error);
@@ -179,7 +173,6 @@ export default function EnhancedScheduleManager({
       const totalChildren = targetChildIds.length;
       const totalEntriesAttempted = template.sessions.length * totalChildren;
 
-      console.log(`Template applied: ${totalSuccessfulEntries} entries created across ${totalChildren} children, ${totalFailedEntries} failed out of ${totalEntriesAttempted} attempted`);
       
       // Note: No explicit refresh needed - batch create automatically updates the state
       
@@ -204,7 +197,6 @@ export default function EnhancedScheduleManager({
       alert('Failed to apply template. Please try again.');
       throw error;
     } finally {
-      console.log('Resetting applyingTemplate to false');
       setApplyingTemplate(false);
       
       // Force a calendar refresh after state reset
@@ -278,7 +270,6 @@ export default function EnhancedScheduleManager({
         children_count: selectedChildrenIds.length || 1
       };
 
-      console.log('Saving template:', template);
       
       // Switch to templates view and trigger save
       setActiveView('templates');

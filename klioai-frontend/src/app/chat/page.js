@@ -77,7 +77,6 @@ export default function ChatPage() {
   // Clear session data when child changes (user switching)
   useEffect(() => {
     if (child?.id && currentChildIdRef.current && currentChildIdRef.current !== child.id) {
-      console.log(`🔄 Child changed from ${currentChildIdRef.current} to ${child.id} - clearing chat`);
       // Reset chat state for new user
       setMessages([]);
       setWorkspaceContent(null);
@@ -191,7 +190,6 @@ export default function ChatPage() {
 
   // LEGACY: Handle workspace content for backward compatibility
   const handleSendToWorkspace = (message, structuredContent = null) => {
-    console.log('🔄 Processing legacy workspace request');
     
     // For function calling, this is mostly used for manual workspace creation
     const problems = [];
@@ -218,10 +216,8 @@ export default function ChatPage() {
         type: 'math_problems',
         problems: problems
       };
-      console.log('📋 Setting legacy workspace content:', legacyContent);
       setWorkspaceContent(legacyContent);
     } else {
-      console.log('❌ No workspace content found in any method');
     }
   };
 
@@ -310,7 +306,6 @@ export default function ChatPage() {
 
       // ENHANCED: Process function calling workspace actions
       if (response.workspaceActions && response.workspaceActions.length > 0) {
-        console.log('🎯 Processing workspace actions from function calls');
         
         const processor = workspaceActionProcessorRef.current;
         if (processor) {
@@ -322,17 +317,14 @@ export default function ChatPage() {
           // Update learning stats if any problems were marked correct
           const correctActions = response.workspaceActions.filter(action => action.action === 'mark_correct') || [];
           if (correctActions.length > 0) {
-            console.log(`🎉 ${correctActions.length} problems marked correct - updating stats`);
             // Refresh stats to show progress
             fetchLearningStats().then(stats => {
               if (stats) setLearningStats(stats);
             });
           }
           
-          console.log('✅ Workspace updated via function calls');
         }
       } else {
-        console.log('📝 No workspace actions in response');
       }
 
       // REMOVED: Auto-progress detection (now handled by function calls)
@@ -385,7 +377,6 @@ export default function ChatPage() {
     const childSpecificKey = `klio_chat_history_${child.id}`;
     sessionStorage.setItem(childSpecificKey, JSON.stringify([welcomeMessage]));
     
-    console.log('🆕 Started new chat session');
   };
 
   const handleClearChat = () => {
@@ -407,7 +398,6 @@ export default function ChatPage() {
     if (window.confirm('Are you sure you want to sign out?')) {
       // Clear any sensitive session data before logout
       if (child?.id) {
-        console.log(`🧹 Logging out child ${child.id}`);
         // Note: We keep chat history in sessionStorage so they can continue where they left off
         // If we wanted to clear it: sessionStorage.removeItem(`klio_chat_history_${child.id}`);
       }

@@ -130,7 +130,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
       // Use provided childId or fall back to the current childId
       const targetChildId = childIdParam || childId;
       
-      console.log('Updating schedule entry:', { entryId, updateData, targetChildId });
       
       // Try API first, but fallback to local state if it fails
       try {
@@ -141,10 +140,8 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
           prev.map(entry => entry.id === entryId ? response.data : entry)
         );
         setError(null);
-        console.log('Successfully updated entry:', entryId);
         return { success: true, data: response.data };
       } catch (apiError) {
-        console.warn('API update failed, updating locally:', apiError.message);
         
         // Update local entry if API fails
         setScheduleEntries(prev => 
@@ -160,7 +157,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
           })
         );
         setError(null);
-        console.log('Updated entry locally:', entryId);
         return { success: true, localOnly: true };
       }
     } catch (err) {

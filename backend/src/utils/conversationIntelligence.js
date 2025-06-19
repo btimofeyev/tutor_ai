@@ -13,7 +13,6 @@ async function analyzeStudentProfile(childId) {
       .limit(10);
 
     if (chatError) {
-      console.warn('Could not fetch chat history for student analysis:', chatError);
       
       // If table doesn't exist, use enhanced default profile based on child data
       let childData = null;
@@ -25,7 +24,6 @@ async function analyzeStudentProfile(childId) {
           .single();
         childData = data;
       } catch (error) {
-        console.log('Could not fetch child data for analysis:', error.message);
         childData = null;
       }
       

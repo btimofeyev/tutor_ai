@@ -27,7 +27,6 @@ class MCPClientService {
 
   async _establishConnection() {
     try {
-      console.log("Connecting to FIXED enhanced MCP server...");
 
       const mcpServerPath =
         process.env.MCP_SERVER_PATH ||
@@ -55,7 +54,6 @@ class MCPClientService {
       );
 
       await this.client.connect(this.transport);
-      console.log("✅ Connected to FIXED enhanced MCP server");
       this.isConnected = true;
       return this.client;
     } catch (error) {
@@ -77,9 +75,6 @@ class MCPClientService {
     try {
       await this.connect();
 
-      console.log(
-        `📖 Getting material content: "${materialIdentifier}" for child: ${childId}`
-      );
 
       const result = await this.client.callTool({
         name: "get_material_content",
@@ -90,20 +85,15 @@ class MCPClientService {
       });
 
       if (!result?.content?.[0]?.text) {
-        console.log("❌ No material content returned");
         return null;
       }
 
       const materialData = JSON.parse(result.content[0].text);
 
       if (materialData.error) {
-        console.log(`❌ Material error: ${materialData.error}`);
         return null;
       }
 
-      console.log(
-        `✅ Retrieved material: "${materialData.material.title}" with ${materialData.total_questions} questions`
-      );
 
       return materialData;
     } catch (error) {
@@ -121,9 +111,6 @@ class MCPClientService {
       );
 
       if (!materialData || !materialData.questions) {
-        console.log(
-          `❌ No questions found for material: ${materialIdentifier}`
-        );
         return null;
       }
 
@@ -136,9 +123,6 @@ class MCPClientService {
       );
 
       if (questionIndex === -1) {
-        console.log(
-          `❌ Question ${questionNumber} not found in ${materialIdentifier}`
-        );
         return null;
       }
 
@@ -178,9 +162,6 @@ class MCPClientService {
         },
       };
 
-      console.log(
-        `✅ Found question ${questionNumber}: "${result.question.cleanText}"`
-      );
       return result;
     } catch (error) {
       console.error(`❌ Error getting specific question:`, error);
@@ -193,9 +174,6 @@ class MCPClientService {
     try {
       await this.connect();
 
-      console.log(
-        `🔍 Searching: "${query}" (type: ${searchType}) for child: ${childId}`
-      );
 
       const result = await this.client.callTool({
         name: "search_database",
@@ -207,26 +185,18 @@ class MCPClientService {
       });
 
       if (!result?.content?.[0]?.text) {
-        console.log("❌ No search results returned");
         return { results: {}, summary: "No results found" };
       }
 
       const searchData = JSON.parse(result.content[0].text);
-      console.log(`✅ Search completed: ${searchData?.summary || "unknown"}`);
-      console.log(
-        "🔍 Search response structure:",
-        Object.keys(searchData || {})
-      );
 
       // Ensure the response has the expected structure
       if (!searchData || typeof searchData !== "object") {
-        console.log("❌ Invalid search response structure");
         return { results: {}, summary: "Invalid response structure" };
       }
 
       // Ensure results field exists
       if (!searchData.results) {
-        console.log("❌ Missing results field in search response");
         return {
           results: {},
           summary: searchData.summary || "Missing results field",
@@ -248,7 +218,6 @@ class MCPClientService {
 
   async getLearningContext(childId) {
     try {
-      console.log("📚 Getting learning context for child:", childId);
 
       const [overdue, recent, assignments] = await Promise.all([
         this.search(childId, "overdue due late", "overdue").catch(() => ({
@@ -260,9 +229,6 @@ class MCPClientService {
         this.search(childId, "", "assignments").catch(() => ({ results: {} })),
       ]);
 
-      console.log("🔍 Debug - overdue response:", overdue);
-      console.log("🔍 Debug - recent response:", recent);
-      console.log("🔍 Debug - assignments response:", assignments);
 
       const context = {
         childSubjects: [],
@@ -290,12 +256,6 @@ class MCPClientService {
         }
       }
 
-      console.log("📊 Context summary:", {
-        currentMaterials: context.currentMaterials.length,
-        overdue: context.overdue.length,
-        recentWork: context.recentWork.length,
-        hasFocus: !!context.currentFocus,
-      });
 
       return context;
     } catch (error) {
@@ -316,10 +276,6 @@ class MCPClientService {
 
   async getEnhancedLearningContext(childId) {
     try {
-      console.log(
-        "📈 Getting enhanced context (with grades) for child:",
-        childId
-      );
 
       const [basicContext, gradesData] = await Promise.all([
         this.getLearningContext(childId),
@@ -358,8 +314,6 @@ class MCPClientService {
 
   // 🎯 ENHANCED: Find specific material with content access
   async findMaterial(childId, materialName) {
-    console.log(`🎯 Looking for material: "${materialName}"`);
-
     // First try search
     const searchResult = await this.search(
       childId,
@@ -373,7 +327,6 @@ class MCPClientService {
 
     if (assignments.length > 0) {
       const material = assignments[0];
-      console.log(`✅ Found material: ${material.title}`);
 
       // Try to get full content if it has lesson_json
       if (material.has_content) {
@@ -392,16 +345,12 @@ class MCPClientService {
       return material;
     }
 
-    console.log(`❌ Material not found: "${materialName}"`);
     return null;
   }
 
   // 🎯 NEW: Enhanced material details that includes full content
   async getMaterialDetails(materialId) {
     // For backward compatibility - this would need the child_id to work properly
-    console.log(
-      `⚠️ getMaterialDetails(${materialId}) - requires child_id for enhanced version`
-    );
     return null;
   }
 
@@ -573,17 +522,11 @@ class MCPClientService {
 
   // Deprecated methods (log warnings)
   async getCurrentLesson(childId) {
-    console.warn(
-      "getCurrentLesson is deprecated, use getCurrentMaterials instead"
-    );
     const materials = await this.getCurrentMaterials(childId);
     return materials.length > 0 ? materials[0] : null;
   }
 
   async getLessonDetails(lessonId) {
-    console.warn(
-      "getLessonDetails is deprecated, use getMaterialContent instead"
-    );
     return null;
   }
 }

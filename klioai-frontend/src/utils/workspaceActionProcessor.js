@@ -10,12 +10,10 @@ export class WorkspaceActionProcessor {
       return null;
     }
 
-    console.log(`🔄 Processing ${actions.length} workspace actions`);
 
     let updatedWorkspace = currentWorkspace;
 
     actions.forEach((action, index) => {
-      console.log(`Processing action ${index + 1}:`, action.action);
 
       switch (action.action) {
         case 'create_workspace':
@@ -51,7 +49,6 @@ export class WorkspaceActionProcessor {
           break;
           
         default:
-          console.warn('Unknown workspace action:', action.action);
       }
     });
 
@@ -59,7 +56,6 @@ export class WorkspaceActionProcessor {
   }
 
   handleCreateWorkspace(action) {
-    console.log('✨ Creating new workspace:', action.workspace.title);
     
     // Handle both new subject workspaces and legacy math workspaces
     const workspace = action.workspace;
@@ -124,13 +120,11 @@ export class WorkspaceActionProcessor {
   }
 
   handleAddProblems(action, currentWorkspace) {
-    console.log(`➕ Adding ${action.newProblems.length} problems to workspace`);
     
     // Update the existing workspace content, or create from currentWorkspace if none exists
     this.setWorkspaceContent(prevContent => {
       // If no existing workspace content but we have currentWorkspace from backend, create it
       if (!prevContent && currentWorkspace) {
-        console.log('🔄 Creating workspace from backend currentWorkspace data');
         return {
           type: 'function_calling_workspace',
           title: currentWorkspace.title,
@@ -147,7 +141,6 @@ export class WorkspaceActionProcessor {
       
       // If no workspace content and no currentWorkspace, can't add problems
       if (!prevContent) {
-        console.warn('Cannot add problems: no existing workspace');
         return prevContent;
       }
       
@@ -174,7 +167,6 @@ export class WorkspaceActionProcessor {
   }
 
   handleMarkCorrect(action) {
-    console.log(`✅ Marking problem ${action.problemIndex} as correct`);
     
     // Update workspace content
     this.setWorkspaceContent(prevContent => {
@@ -203,7 +195,6 @@ export class WorkspaceActionProcessor {
   }
 
   handleMarkIncorrect(action) {
-    console.log(`❌ Marking problem ${action.problemIndex} as incorrect`);
     
     // Update workspace content
     this.setWorkspaceContent(prevContent => {
@@ -233,13 +224,11 @@ export class WorkspaceActionProcessor {
 
   // NEW: Handle adding content to subject workspaces
   handleAddContent(action, currentWorkspace) {
-    console.log(`➕ Adding ${action.newContent.length} content items to workspace`);
     
     // Update the existing workspace content
     this.setWorkspaceContent(prevContent => {
       // If no existing workspace content but we have currentWorkspace from backend, create it
       if (!prevContent && currentWorkspace) {
-        console.log('🔄 Creating workspace from backend currentWorkspace data');
         return {
           type: 'function_calling_workspace',
           subject: currentWorkspace.subject || 'math',
@@ -261,7 +250,6 @@ export class WorkspaceActionProcessor {
       }
       
       if (!prevContent) {
-        console.warn('Cannot add content: no existing workspace');
         return prevContent;
       }
       
@@ -293,7 +281,6 @@ export class WorkspaceActionProcessor {
 
   // NEW: Handle subject-agnostic content evaluation
   handleEvaluateContent(action) {
-    console.log(`📝 Evaluating content item ${action.contentIndex} as: ${action.item.status}`);
     
     // Update workspace content
     this.setWorkspaceContent(prevContent => {

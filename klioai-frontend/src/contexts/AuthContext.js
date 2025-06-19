@@ -41,7 +41,6 @@ export function AuthProvider({ children }) {
             if (fetchError.message === 'Session invalid') {
               throw fetchError;
             }
-            console.warn('Session validation failed, but keeping auth state:', fetchError);
           }
         }
       } catch (error) {

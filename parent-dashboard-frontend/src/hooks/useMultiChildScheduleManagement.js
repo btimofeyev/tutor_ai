@@ -177,7 +177,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         return { success: false, error: errorMessage };
       }
       
-      console.log('Updating schedule entry in multi-child mode:', { entryId, updateData, childId });
       
       // Try API first, but fallback to local state if it fails
       try {
@@ -191,10 +190,8 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           )
         }));
         setError(null);
-        console.log('Successfully updated entry:', entryId, 'for child:', childId);
         return { success: true, data: response.data };
       } catch (apiError) {
-        console.warn('API update failed, updating locally:', apiError.message);
         
         // Update local entry if API fails
         setAllScheduleEntries(prev => ({
@@ -211,7 +208,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           })
         }));
         setError(null);
-        console.log('Updated entry locally in multi-child mode:', entryId, 'for child:', childId);
         return { success: true, localOnly: true };
       }
     } catch (err) {

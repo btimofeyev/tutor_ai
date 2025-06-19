@@ -48,7 +48,6 @@ export default function ChatInsightsPage() {
 
   // Handle child login settings (placeholder - reuse existing functionality)
   const handleOpenChildLoginSettings = (child) => {
-    console.log('Open child login settings for:', child);
     // This would integrate with existing child login settings modal
   };
 

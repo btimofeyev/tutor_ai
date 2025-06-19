@@ -279,14 +279,12 @@ export default function DragDropScheduleCalendar({
     setDragOverInfo(null);
 
     if (!over) {
-      console.log('No drop target found');
       return;
     }
 
     // Parse the drop target ID to get day and time
     const dropTargetId = over.id;
     if (!dropTargetId || !dropTargetId.includes('_')) {
-      console.log('Invalid drop target ID:', dropTargetId);
       return;
     }
 
@@ -296,7 +294,6 @@ export default function DragDropScheduleCalendar({
     const eventToMove = calendarEvents?.find(e => e.id === active.id);
 
     if (!eventToMove) {
-      console.log('Event to move not found:', active.id);
       return;
     }
 
@@ -321,7 +318,6 @@ export default function DragDropScheduleCalendar({
           // Reconstruct the two UUIDs
           childIdToUse = parts.slice(0, 5).join('-');
           realEntryId = parts.slice(5).join('-');
-          console.log('Parsed composite UUID:', { originalId: eventToMove.id, childId: childIdToUse, entryId: realEntryId });
         }
       }
     }
@@ -336,26 +332,17 @@ export default function DragDropScheduleCalendar({
       childIdToUse = childId;
     }
 
-    console.log('Event details:', { 
-      compositeId: eventToMove.id, 
-      realEntryId, 
-      childIdToUse,
-      hasOriginalEntry: !!eventToMove.originalEntry 
-    });
 
     // Don't move if it's the same slot
     const currentDayStr = eventToMove.date || format(new Date(eventToMove.start), 'yyyy-MM-dd');
     const currentTime = eventToMove.startTime || eventToMove.start_time || format(new Date(eventToMove.start), 'HH:mm');
     if (currentDayStr === dayStr && currentTime === timeStr) {
-      console.log('Event dropped in same slot');
       return;
     }
 
     // Removed conflict checking - allow any scheduling
 
     try {
-      console.log('Moving event from', currentDayStr, currentTime, 'to', dayStr, timeStr);
-      console.log('Using entry ID:', realEntryId, 'and child ID:', childIdToUse);
       
       // Only send the fields that need to be updated
       // For multi-child management, we need to pass the child_id as well
@@ -364,7 +351,6 @@ export default function DragDropScheduleCalendar({
         start_time: timeStr
       }, childIdToUse);
       
-      console.log('Event moved successfully');
       
       // Show indicator if changes are local only
       if (updateResult.localOnly) {
@@ -387,7 +373,6 @@ export default function DragDropScheduleCalendar({
   // Handle event resizing
   const handleEventResize = useCallback(async (event, direction) => {
     // Implement resize logic
-    console.log('Resize event:', event, direction);
   }, []);
 
   // Check if a time slot is occupied

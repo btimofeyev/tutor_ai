@@ -348,7 +348,6 @@ export default function ScheduleExportManager({
     const text = formatAsText(generatedContent);
     navigator.clipboard.writeText(text).then(() => {
       // Show success feedback
-      console.log('Copied to clipboard');
     });
   };
 

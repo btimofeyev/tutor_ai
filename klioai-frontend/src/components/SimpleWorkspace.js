@@ -232,7 +232,6 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
   useEffect(() => {
     // Handle creative writing toolkit differently
     if (workspaceContent?.type === 'creative_writing_toolkit') {
-      console.log('✍️ Loading creative writing toolkit:', workspaceContent.title);
       setProblems([]); // Clear problems for creative writing
       setWorkNotes({});
       setProblemStates({});

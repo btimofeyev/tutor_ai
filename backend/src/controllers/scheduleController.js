@@ -110,10 +110,8 @@ const createScheduleEntry = async (req, res) => {
     }
 
     // If material_id is provided, verify it exists and belongs to this child
-    // For now, skip complex validation until we have proper lesson structure
     if (material_id) {
       console.log('Material ID provided:', material_id);
-      // TODO: Add proper material validation when lesson schema is confirmed
     }
 
     // Check for scheduling conflicts across ALL children for this parent

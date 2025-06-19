@@ -15,7 +15,6 @@ class ChatService {
 
   async sendMessage(message, sessionHistory = [], lessonContext = null) {
     try {
-      console.log('📤 Sending message to function calling endpoint...');
       
       const response = await this.api.post('/message', {
         message,
@@ -23,11 +22,6 @@ class ChatService {
         lessonContext
       });
 
-      console.log('📥 Received function calling response:', {
-        hasMessage: !!response.data.message,
-        workspaceActionsCount: response.data.workspaceActions?.length || 0,
-        currentWorkspace: !!response.data.currentWorkspace
-      });
 
       // Enhanced response structure for function calling
       return {

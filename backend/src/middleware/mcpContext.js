@@ -206,7 +206,6 @@ exports.enrichWithMCPContext = async (req, res, next) => {
   }
 
   try {
-    console.log('🔍 enrichWithMCPContext - childId:', childId);
 
     // Check if this is a grade-related query
     const message = req.body?.message || '';
@@ -215,10 +214,8 @@ exports.enrichWithMCPContext = async (req, res, next) => {
     let learningContext;
     
     if (isGradeRelatedQuery) {
-      console.log('📊 Grade-related query detected, using enhanced context...');
       learningContext = await mcpClient.getEnhancedLearningContext(childId);
     } else {
-      console.log('📚 Regular query, using basic context...');
       learningContext = await mcpClient.getLearningContext(childId);
     }
 
@@ -227,18 +224,6 @@ exports.enrichWithMCPContext = async (req, res, next) => {
     req.isGradeQuery = isGradeRelatedQuery;
 
     // Log summary
-    console.log('📋 MCP Context Summary:');
-    console.log('- Is Grade Query:', isGradeRelatedQuery);
-    console.log('- Current Materials:', learningContext.currentMaterials?.length || 0);
-    console.log('- Overdue Items:', learningContext.overdue?.length || 0);
-    console.log('- Recent Work:', learningContext.recentWork?.length || 0);
-    console.log('- Current Focus:', learningContext.currentFocus?.title || 'None');
-    
-    if (isGradeRelatedQuery && learningContext.gradeAnalysis) {
-      console.log('- Grade Analysis Available:', !!learningContext.gradeAnalysis);
-      console.log('- Average Grade:', learningContext.averageGrade || 'N/A');
-      console.log('- Materials for Review:', learningContext.materialsForReview?.length || 0);
-    }
 
     next();
   } catch (error) {

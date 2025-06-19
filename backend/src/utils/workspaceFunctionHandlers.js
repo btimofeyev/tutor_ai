@@ -9,12 +9,10 @@ class WorkspaceFunctionHandlers {
   }
 
   async handleCreateCreativeWritingToolkit(args, childId) {
-    console.log('✍️ Creating creative writing toolkit:', args.title);
     
     try {
       this.sessionId = `creative-writing-${Date.now()}-${childId}`;
     } catch (error) {
-      console.warn('Failed to create session ID, using local tracking');
       this.sessionId = `local-writing-${Date.now()}`;
     }
 
@@ -58,14 +56,12 @@ class WorkspaceFunctionHandlers {
   }
 
   async handleCreateMathWorkspace(args, childId) {
-    console.log('🎯 Creating new math workspace:', args.title);
     
     // Start new practice session
     try {
       // Create a simple session ID for tracking
       this.sessionId = `practice-${Date.now()}-${childId}`;
     } catch (error) {
-      console.warn('Failed to create session ID, using local tracking');
       this.sessionId = `local-${Date.now()}`;
     }
 
@@ -113,7 +109,6 @@ class WorkspaceFunctionHandlers {
       };
     }
 
-    console.log(`➕ Adding ${args.problems.length} problems to workspace`);
 
     const newProblems = args.problems.map((problem, index) => ({
       id: `problem-${Date.now()}-${index}`,
@@ -148,7 +143,6 @@ class WorkspaceFunctionHandlers {
         .single();
 
       if (fetchError) {
-        console.warn('Failed to fetch child progress:', fetchError);
         return;
       }
 
@@ -165,7 +159,6 @@ class WorkspaceFunctionHandlers {
 
       // Check if we need to reset weekly count (new week started)
       if (!currentStats.week_start_date || currentStats.week_start_date !== currentWeekStart) {
-        console.log(`📅 New week detected - resetting weekly count. Previous: ${currentStats.weekly_correct}`);
         newStats.weekly_correct = 0;
         newStats.week_start_date = currentWeekStart;
       }
@@ -201,14 +194,11 @@ class WorkspaceFunctionHandlers {
         .eq('id', childId);
 
       if (updateError) {
-        console.warn('Failed to update child progress:', updateError);
       } else {
-        console.log(`📊 Updated progress: lifetime=${newStats.lifetime_correct}, weekly=${newStats.weekly_correct}, streak=${newStats.current_streak}, best=${newStats.best_streak}`);
       }
 
       return newStats;
     } catch (error) {
-      console.warn('Error updating lifetime progress:', error);
       return null;
     }
   }
@@ -225,7 +215,6 @@ class WorkspaceFunctionHandlers {
       return { action: 'error', message: 'Problem not found' };
     }
 
-    console.log(`✅ Marking problem ${args.problem_index} correct`);
 
     // Update problem status
     const wasCorrect = problem.status === 'correct';
@@ -233,7 +222,6 @@ class WorkspaceFunctionHandlers {
     problem.feedback = args.feedback || 'Correct! Great work! 🎉';
 
     // Simple feedback only - no progress tracking for MVP
-    console.log(`✅ Problem ${args.problem_index} marked correct - no tracking needed`);
 
     return {
       action: 'mark_correct',
@@ -254,14 +242,12 @@ class WorkspaceFunctionHandlers {
       return { action: 'error', message: 'Problem not found' };
     }
 
-    console.log(`❌ Marking problem ${args.problem_index} incorrect`);
 
     // Update problem status
     problem.status = 'incorrect';
     problem.feedback = args.guidance || 'Not quite right. Try again! 💪';
 
     // Simple feedback only - no progress tracking for MVP
-    console.log(`❌ Problem ${args.problem_index} marked incorrect - no tracking needed`);
 
     return {
       action: 'mark_incorrect',
@@ -273,7 +259,6 @@ class WorkspaceFunctionHandlers {
   }
 
   async handleClearWorkspace(args, childId) {
-    console.log('🗑️ Clearing workspace:', args.reason);
     
     const oldWorkspace = this.currentWorkspace;
     this.currentWorkspace = null;
@@ -289,13 +274,11 @@ class WorkspaceFunctionHandlers {
 
   // NEW: Subject-agnostic workspace creation
   async handleCreateSubjectWorkspace(args, childId) {
-    console.log(`🎯 Creating new ${args.subject} workspace:`, args.title);
     
     // Start new practice session
     try {
       this.sessionId = `${args.subject}-${Date.now()}-${childId}`;
     } catch (error) {
-      console.warn('Failed to create session ID, using local tracking');
       this.sessionId = `local-${Date.now()}`;
     }
 
@@ -351,7 +334,6 @@ class WorkspaceFunctionHandlers {
       };
     }
 
-    console.log(`➕ Adding ${args.content.length} content items to workspace`);
 
     const newContent = args.content.map((item, index) => ({
       id: `content-${Date.now()}-${index}`,
@@ -399,7 +381,6 @@ class WorkspaceFunctionHandlers {
       return { action: 'error', message: 'Content item not found' };
     }
 
-    console.log(`📝 Evaluating ${this.currentWorkspace.subject || 'math'} content item ${args.content_index} as: ${args.evaluation_result}`);
 
     // Update item status and feedback
     item.status = args.evaluation_result;

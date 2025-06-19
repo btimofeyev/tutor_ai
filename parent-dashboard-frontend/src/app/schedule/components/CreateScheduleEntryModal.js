@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { XMarkIcon, ClockIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 
-const formInputStyles = "block w-full border-[var(--border-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-input-focus)] focus:border-[var(--border-input-focus)] rounded-[var(--radius-md)] bg-background-card text-text-primary placeholder-text-tertiary shadow-sm text-sm px-3 py-2";
-const formLabelStyles = "block text-sm font-medium text-text-primary mb-1";
+const formInputStyles = "block w-full border-2 border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 rounded-md bg-white text-gray-900 placeholder-gray-500 shadow-sm text-sm px-3 py-2 relative z-10 schedule-select font-medium";
+const formLabelStyles = "block text-sm font-medium text-gray-900 mb-1";
+const stepLabelStyles = "text-sm font-medium text-gray-600 mb-1 block";
 
 export default function CreateScheduleEntryModal({ 
   isOpen, 
@@ -16,6 +17,7 @@ export default function CreateScheduleEntryModal({
   materials = [],
   lessonsBySubject = {},
   unitsBySubject = {},
+  lessonsByUnit = {},
   isSaving = false,
   selectedChildrenIds = [],
   allChildren = [],
@@ -58,6 +60,12 @@ export default function CreateScheduleEntryModal({
         is_material_based: false
       });
       setErrors({});
+      
+      // Reset hierarchical selection state to prevent null value errors
+      setSelectedSubjectId('');
+      setSelectedUnitId('');
+      setAvailableUnits([]);
+      setAvailableLessons([]);
     }
   }, [isOpen, selectedSlot, selectedChildrenIds]);
 
@@ -128,7 +136,7 @@ export default function CreateScheduleEntryModal({
   const handleSubjectSelection = (subjectId) => {
     setSelectedSubjectId(subjectId);
     setSelectedUnitId('');
-    setFormData(prev => ({ ...prev, material_id: null }));
+    setFormData(prev => ({ ...prev, material_id: '' }));
     
     // Find the subject
     const subject = childSubjects.find(s => s.child_subject_id === subjectId);
@@ -137,10 +145,12 @@ export default function CreateScheduleEntryModal({
       
       // Get units for this subject
       const units = unitsBySubject[subjectId] || [];
+      console.log(`Found ${units.length} units for subject ${subject.name}:`, units);
       setAvailableUnits(units);
       
       // Get lessons for this subject
       const lessons = lessonsBySubject[subjectId] || [];
+      console.log(`Found ${lessons.length} lessons for subject ${subject.name}:`, lessons.map(l => ({ id: l.id, title: l.title, unit_id: l.unit_id, lesson_container_id: l.lesson_container_id })));
       setAvailableLessons(lessons);
     }
   };
@@ -148,13 +158,45 @@ export default function CreateScheduleEntryModal({
   // Handle unit selection
   const handleUnitSelection = (unitId) => {
     setSelectedUnitId(unitId);
-    setFormData(prev => ({ ...prev, material_id: null }));
+    setFormData(prev => ({ ...prev, material_id: '' }));
     
-    // Filter lessons by unit if unit is selected
-    if (unitId && selectedSubjectId) {
+    // Filter lessons by unit if unit is selected, otherwise show all lessons for the subject
+    if (selectedSubjectId) {
       const allLessons = lessonsBySubject[selectedSubjectId] || [];
-      const unitLessons = allLessons.filter(lesson => lesson.unit_id === unitId);
-      setAvailableLessons(unitLessons);
+      
+      if (unitId) {
+        // Filter by unit - check multiple possible unit_id property patterns
+        const unitLessons = allLessons.filter(lesson => {
+          // Check if lesson has a direct unit_id property
+          if (lesson.unit_id === unitId) return true;
+          
+          // Check if lesson is part of a lesson container that belongs to this unit
+          // This handles the hierarchical structure: Unit -> Lesson Container -> Materials
+          if (lesson.lesson && lesson.lesson.unit_id === unitId) return true;
+          
+          // Check if lesson has lesson_container_id and we need to check container's unit
+          if (lesson.lesson_container_id) {
+            // Try to find the lesson container in lessonsByUnit
+            for (const [checkUnitId, containers] of Object.entries(lessonsByUnit || {})) {
+              if (checkUnitId === unitId) {
+                const container = containers.find(c => c.id === lesson.lesson_container_id);
+                if (container) return true;
+              }
+            }
+          }
+          
+          // Additional fallback: check if lesson has any property that matches the unit
+          if (lesson.unit && lesson.unit.id === unitId) return true;
+          
+          return false;
+        });
+        
+        console.log(`Filtered ${unitLessons.length} lessons for unit ${unitId} from ${allLessons.length} total lessons`);
+        setAvailableLessons(unitLessons);
+      } else {
+        // Show all lessons for the subject if no unit is selected
+        setAvailableLessons(allLessons);
+      }
     }
   };
 
@@ -285,8 +327,8 @@ export default function CreateScheduleEntryModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-fade-in">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col border border-border-subtle">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-fade-in modal-container">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col border border-[var(--border-subtle)] relative z-50">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-[var(--border-subtle)] bg-[var(--background-card)]">
           <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
@@ -302,7 +344,7 @@ export default function CreateScheduleEntryModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 bg-white">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 bg-[var(--background-card)] relative modal-form">
           <div className="space-y-4">
             {/* Child Selection (only in multi-child mode) */}
             {selectedChildrenIds.length > 1 && (
@@ -419,14 +461,14 @@ export default function CreateScheduleEntryModal({
                   </label>
                   
                   {childSubjects.length === 0 ? (
-                    <div className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded border">
+                    <div className="text-sm text-[var(--text-tertiary)] italic p-3 bg-[var(--background-main)] rounded border border-[var(--border-subtle)]">
                       No subjects assigned yet. Add subjects to your curriculum first, or uncheck the box above to schedule general study time.
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 hierarchical-selection">
                       {/* Step 1: Select Subject */}
                       <div>
-                        <label className="text-sm font-medium text-gray-700 mb-1 block">
+                        <label className={stepLabelStyles}>
                           1. Choose Subject
                         </label>
                         <select
@@ -446,7 +488,7 @@ export default function CreateScheduleEntryModal({
                       {/* Step 2: Select Unit (if available) */}
                       {selectedSubjectId && availableUnits.length > 0 && (
                         <div>
-                          <label className="text-sm font-medium text-gray-700 mb-1 block">
+                          <label className={stepLabelStyles}>
                             2. Choose Unit (Optional)
                           </label>
                           <select
@@ -457,7 +499,7 @@ export default function CreateScheduleEntryModal({
                             <option value="">All lessons from this subject</option>
                             {availableUnits.map(unit => (
                               <option key={unit.id} value={unit.id}>
-                                {unit.title}
+                                {unit.name || unit.title || `Unit ${unit.id}`}
                               </option>
                             ))}
                           </select>
@@ -467,11 +509,11 @@ export default function CreateScheduleEntryModal({
                       {/* Step 3: Select Specific Lesson */}
                       {selectedSubjectId && (
                         <div>
-                          <label className="text-sm font-medium text-gray-700 mb-1 block">
+                          <label className={stepLabelStyles}>
                             {availableUnits.length > 0 ? '3. Choose Specific Lesson' : '2. Choose Specific Lesson'}
                           </label>
                           {availableLessons.length === 0 ? (
-                            <div className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded border">
+                            <div className="text-sm text-[var(--text-tertiary)] italic p-3 bg-[var(--background-main)] rounded border border-[var(--border-subtle)]">
                               No lessons found for this {selectedUnitId ? 'unit' : 'subject'}. Upload lessons or select a different option.
                             </div>
                           ) : (

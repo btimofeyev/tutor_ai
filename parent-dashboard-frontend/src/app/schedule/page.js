@@ -338,6 +338,7 @@ export default function SchedulePage() {
         materials={materialsForCurrentChild}
         lessonsBySubject={childrenData.lessonsBySubject}
         unitsBySubject={childrenData.unitsBySubject}
+        lessonsByUnit={childrenData.lessonsByUnit}
         isSaving={scheduleManagement.loading}
         selectedChildrenIds={selectedChildrenIds}
         allChildren={childrenData.children}
@@ -355,6 +356,7 @@ export default function SchedulePage() {
         materials={materialsForCurrentChild}
         lessonsBySubject={childrenData.lessonsBySubject}
         unitsBySubject={childrenData.unitsBySubject}
+        lessonsByUnit={childrenData.lessonsByUnit}
         isSaving={scheduleManagement.loading}
       />
 

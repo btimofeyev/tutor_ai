@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { XMarkIcon, ClockIcon, CalendarDaysIcon, TrashIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 
-const formInputStyles = "block w-full border-[var(--border-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-input-focus)] focus:border-[var(--border-input-focus)] rounded-[var(--radius-md)] bg-background-card text-text-primary placeholder-text-tertiary shadow-sm text-sm px-3 py-2";
-const formLabelStyles = "block text-sm font-medium text-[var(--text-primary)] mb-1";
+const formInputStyles = "block w-full border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 rounded-md bg-white text-gray-900 placeholder-gray-500 shadow-sm text-sm px-3 py-2 relative z-10 schedule-select";
+const formLabelStyles = "block text-sm font-medium text-gray-900 mb-1";
 
 export default function EditScheduleEntryModal({ 
   isOpen, 
@@ -17,6 +17,7 @@ export default function EditScheduleEntryModal({
   materials = [],
   lessonsBySubject = {},
   unitsBySubject = {},
+  lessonsByUnit = {},
   isSaving = false 
 }) {
   // Form state
@@ -184,8 +185,8 @@ export default function EditScheduleEntryModal({
   if (!isOpen || !scheduleEntry) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-fade-in">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col border border-border-subtle">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-fade-in modal-container">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col border border-[var(--border-subtle)] relative z-50">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-[var(--border-subtle)] bg-[var(--background-card)]">
           <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
@@ -201,7 +202,7 @@ export default function EditScheduleEntryModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 bg-white">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 bg-[var(--background-card)] relative modal-form">
           <div className="space-y-4">
             {/* Status Pills */}
             <div>

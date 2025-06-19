@@ -1,41 +1,57 @@
 @import "tailwindcss";
 
 :root {
-  --background-main: #f9fafb;
+  /* Unified Color Palette - Harmonizing with Student App */
+  --background-main: #fafbfc;
   --background-card: #ffffff;
   --background-card-hover: #f9fafb;
 
-  --text-primary: #1f2937;
+  --text-primary: #374151;
   --text-secondary: #6b7280;
   --text-tertiary: #9ca3af;
-  --text-on-accent: #111827;
+  --text-on-accent: #374151;
 
-  --accent-blue: #a5f3fc;
-  --accent-blue-hover: #67e8f9;
-  --accent-blue-darker-for-border: #0e7490;
+  /* Primary Blue - Matching Student App */
+  --accent-blue: #B3E0F8;
+  --accent-blue-hover: #9DD5F2;
+  --accent-blue-darker-for-border: #7CC4E8;
 
-  --accent-yellow: #fde68a;
-  --accent-yellow-hover: #fcd34d;
-  --accent-yellow-darker-for-border: #b45309;
+  /* Secondary Yellow - Matching Student App */
+  --accent-yellow: #FFE6A7;
+  --accent-yellow-hover: #FFD993;
+  --accent-yellow-darker-for-border: #F5CE6B;
   
-  --accent-dark: #374151;
-  --accent-green: #34d399;
-  --accent-orange: #f97316;
-  --accent-red: #ef4444;
+  /* Supporting Colors - Matching Student App */
+  --accent-green: #A7F3D0;
+  --accent-green-hover: #8BEDC1;
+  --accent-orange: #FDE68A;
+  --accent-orange-hover: #FCD34D;
+  --accent-red: #FDA4AF;
+  --accent-red-hover: #FC8B9A;
 
+  /* UI Elements */
+  --accent-dark: #374151;
   --border-subtle: #e5e7eb;
+  --border-lighter: #f3f4f6;
   --border-input: #d1d5db;
   --border-input-focus: var(--accent-blue-darker-for-border);
 
   --messageTextDanger: #ef4444;
 
-  --radius-sm: 0.25rem;
+  /* Spacing & Radius */
+  --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  /* Modern Shadows */
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.08);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+
+  /* Button Heights */
+  --button-height-sm: 36px;
+  --button-height-md: 40px;
+  --button-height-lg: 48px;
 
   --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
@@ -157,49 +173,135 @@
   }
 }
 
+/* Modern Button Styles with Proper Spacing */
 .btn-primary {
   background: var(--accent-blue);
   color: var(--text-primary);
-  border: 1px solid var(--accent-blue-darker-for-border);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   font-weight: 600;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 150ms ease-out;
+  box-shadow: var(--shadow-sm);
+  min-height: var(--button-height-md);
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .btn-primary:hover {
   background: var(--accent-blue-hover);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+}
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-secondary {
-  background: var(--accent-yellow);
-  color: var(--text-primary);
-  border: 1px solid var(--accent-yellow-darker-for-border);
+  background: var(--background-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  font-weight: 600;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  font-weight: 500;
+  transition: all 150ms ease-out;
+  box-shadow: var(--shadow-sm);
+  min-height: var(--button-height-md);
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .btn-secondary:hover {
-  background: var(--accent-yellow-hover);
+  background: var(--accent-yellow);
+  border-color: transparent;
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+}
+.btn-secondary:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-danger {
-  background: #fecaca;
-  color: #991b1b;
-  border: 1px solid #fca5a5;
+  background: var(--accent-red);
+  color: var(--text-primary);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   font-weight: 600;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 150ms ease-out;
+  box-shadow: var(--shadow-sm);
+  min-height: var(--button-height-md);
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .btn-danger:hover {
-  background: #fca5a5;
+  background: var(--accent-red-hover);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+}
+.btn-danger:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-yellow {
+  background: var(--accent-yellow);
+  color: var(--text-primary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  transition: all 150ms ease-out;
+  box-shadow: var(--shadow-sm);
+  min-height: var(--button-height-md);
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-yellow:hover {
+  background: var(--accent-yellow-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+.btn-yellow:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Icon-only buttons */
+.btn-icon {
+  width: var(--button-height-md);
+  height: var(--button-height-md);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--background-card);
+  border: 1px solid var(--border-subtle);
+  transition: all 150ms ease-out;
+}
+.btn-icon:hover {
+  background: var(--background-card-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Button Groups */
+.btn-group {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.btn-group-lg {
+  gap: 16px;
 }
 
 body {

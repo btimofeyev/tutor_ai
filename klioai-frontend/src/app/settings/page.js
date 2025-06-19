@@ -72,7 +72,7 @@ export default function SettingsPage() {
                 
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">Auto-read Klio's messages</p>
+                    <p className="font-medium">Auto-read Klio&apos;s messages</p>
                     <p className="text-sm text-gray-600">Klio will speak automatically</p>
                   </div>
                   <button
@@ -115,7 +115,7 @@ export default function SettingsPage() {
               <div className="border-b pb-6">
                 <h2 className="text-xl font-semibold text-gray-700 mb-4">ℹ️ About</h2>
                 <p className="text-gray-600">
-                  Hi {child?.name}! I'm Klio, your AI learning friend. I'm here to help you learn
+                  Hi {child?.name}! I&apos;m Klio, your AI learning friend. I&apos;m here to help you learn
                   and have fun! Version 1.0 🎉
                 </p>
               </div>

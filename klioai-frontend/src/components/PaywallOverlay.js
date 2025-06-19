@@ -77,7 +77,7 @@ export default function PaywallOverlay({ feature = 'AI Features', children, show
                     </div>
                     <div className="mt-3 pt-2 border-t border-gray-200">
                       <p className="text-xs text-gray-500">
-                        Ask your parent to upgrade your family's subscription to unlock AI features.
+                        Ask your parent to upgrade your family&apos;s subscription to unlock AI features.
                       </p>
                     </div>
                   </div>

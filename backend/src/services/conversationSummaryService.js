@@ -81,16 +81,8 @@ class ConversationSummaryService {
         throw summariesError;
       }
 
-      // Get chat interactions for additional context
-      const { data: interactions, error: interactionsError } = await supabase
-        .from('chat_interactions')
-        .select('child_id, message_count, has_lesson_context, has_workspace_content, function_calls_count')
-        .gte('interaction_at', `${dateString}T00:00:00Z`)
-        .lt('interaction_at', `${dateString}T23:59:59Z`);
-
-      if (interactionsError) {
-        throw interactionsError;
-      }
+      // Skip chat_interactions table for now - use conversation_summaries data only
+      const interactions = [];
 
       // Combine and aggregate data by child
       const childrenMap = new Map();
@@ -118,18 +110,10 @@ class ConversationSummaryService {
         const child = childrenMap.get(childId);
         child.conversationSummaries.push(summary.summary);
         child.totalMessages += summary.message_count;
+        child.totalSessions += 1; // Count each summary as a session
       });
 
-      // Process interactions for additional context
-      interactions.forEach(interaction => {
-        if (childrenMap.has(interaction.child_id)) {
-          const child = childrenMap.get(interaction.child_id);
-          child.totalSessions += 1;
-          if (interaction.has_lesson_context) child.hasLessonContext = true;
-          if (interaction.has_workspace_content) child.hasWorkspace = true;
-          child.functionCalls += interaction.function_calls_count || 0;
-        }
-      });
+      // Note: interactions processing skipped - using conversation_summaries data only
 
       // Filter children with meaningful activity
       return Array.from(childrenMap.values()).filter(child => 
@@ -204,12 +188,22 @@ Format as a JSON object with these fields:
 
       const summaryText = response.choices[0].message.content;
       
-      // Parse JSON response
+      // Parse JSON response (handle markdown code blocks)
       let summaryData;
       try {
-        summaryData = JSON.parse(summaryText);
+        // Remove markdown code blocks if present
+        let cleanSummaryText = summaryText.trim();
+        if (cleanSummaryText.startsWith('```json')) {
+          cleanSummaryText = cleanSummaryText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        } else if (cleanSummaryText.startsWith('```')) {
+          cleanSummaryText = cleanSummaryText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+        }
+        
+        summaryData = JSON.parse(cleanSummaryText);
+        console.log('✅ Successfully parsed AI-generated summary');
       } catch (parseError) {
         console.warn('Failed to parse AI summary as JSON, using fallback format');
+        console.warn('Raw AI response:', summaryText);
         summaryData = this.createFallbackSummary(childData, summaryText);
       }
 

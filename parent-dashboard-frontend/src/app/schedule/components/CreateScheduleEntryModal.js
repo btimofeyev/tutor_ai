@@ -18,7 +18,8 @@ export default function CreateScheduleEntryModal({
   unitsBySubject = {},
   isSaving = false,
   selectedChildrenIds = [],
-  allChildren = []
+  allChildren = [],
+  calendarEvents = []
 }) {
   // Form state
   const [formData, setFormData] = useState({
@@ -91,13 +92,43 @@ export default function CreateScheduleEntryModal({
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+    
+    // Re-check conflicts when time-related fields change
+    if (name === 'scheduled_date' || name === 'start_time' || name === 'duration_minutes') {
+      // Clear existing conflict error first
+      setErrors(prev => ({ ...prev, time_conflict: '' }));
+      
+      // Check for conflicts with new values (after state update)
+      setTimeout(() => {
+        const newValue = type === 'number' ? parseInt(value) || 0 : value;
+        const updatedFormData = { ...formData, [name]: newValue };
+        
+        if (updatedFormData.scheduled_date && updatedFormData.start_time) {
+          const conflicts = checkTimeConflicts(
+            updatedFormData.scheduled_date, 
+            updatedFormData.start_time, 
+            updatedFormData.duration_minutes
+          );
+          
+          if (conflicts.length > 0) {
+            const conflictDetails = conflicts.map(conflict => {
+              const childName = allChildren.find(c => c.id === conflict.child_id)?.name || 'Unknown Child';
+              const subject = conflict.subject_name || conflict.title || 'Study';
+              return `${subject} (${childName})`;
+            }).join(', ');
+            
+            setErrors(prev => ({ ...prev, time_conflict: `Cannot schedule - time conflicts with: ${conflictDetails}` }));
+          }
+        }
+      }, 0);
+    }
   };
 
   // Handle subject selection in hierarchical mode
   const handleSubjectSelection = (subjectId) => {
     setSelectedSubjectId(subjectId);
     setSelectedUnitId('');
-    setFormData(prev => ({ ...prev, material_id: '' }));
+    setFormData(prev => ({ ...prev, material_id: null }));
     
     // Find the subject
     const subject = childSubjects.find(s => s.child_subject_id === subjectId);
@@ -117,7 +148,7 @@ export default function CreateScheduleEntryModal({
   // Handle unit selection
   const handleUnitSelection = (unitId) => {
     setSelectedUnitId(unitId);
-    setFormData(prev => ({ ...prev, material_id: '' }));
+    setFormData(prev => ({ ...prev, material_id: null }));
     
     // Filter lessons by unit if unit is selected
     if (unitId && selectedSubjectId) {
@@ -137,6 +168,25 @@ export default function CreateScheduleEntryModal({
       material_id: materialId,
       subject_name: selectedMaterial ? selectedMaterial.subject_name : ''
     }));
+  };
+
+  // Check for scheduling conflicts across all children
+  const checkTimeConflicts = (date, time, duration) => {
+    const targetStart = new Date(`${date}T${time}`);
+    const targetEnd = new Date(targetStart.getTime() + duration * 60000);
+    
+    return calendarEvents.filter(event => {
+      const eventDate = event.date || format(new Date(event.start), 'yyyy-MM-dd');
+      if (eventDate !== date) return false;
+      
+      const eventTime = event.startTime || event.start_time || format(new Date(event.start), 'HH:mm');
+      const eventStart = new Date(`${eventDate}T${eventTime}`);
+      const eventDuration = event.duration || event.duration_minutes || 30;
+      const eventEnd = new Date(eventStart.getTime() + eventDuration * 60000);
+      
+      // Check for overlap
+      return targetStart < eventEnd && targetEnd > eventStart;
+    });
   };
 
   // Validate form
@@ -170,6 +220,20 @@ export default function CreateScheduleEntryModal({
       }
     }
 
+    // Check for time conflicts (now blocking)
+    if (formData.scheduled_date && formData.start_time) {
+      const conflicts = checkTimeConflicts(formData.scheduled_date, formData.start_time, formData.duration_minutes);
+      if (conflicts.length > 0) {
+        const conflictDetails = conflicts.map(conflict => {
+          const childName = allChildren.find(c => c.id === conflict.child_id)?.name || 'Unknown Child';
+          const subject = conflict.subject_name || conflict.title || 'Study';
+          return `${subject} (${childName})`;
+        }).join(', ');
+        
+        newErrors.time_conflict = `Cannot schedule - time conflicts with: ${conflictDetails}`;
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -183,11 +247,26 @@ export default function CreateScheduleEntryModal({
     }
 
     try {
+      // Clean the form data to ensure proper types
+      const cleanedData = {
+        ...formData,
+        material_id: formData.material_id || null,
+        duration_minutes: parseInt(formData.duration_minutes),
+        child_id: formData.child_id || selectedChildrenIds[0]
+      };
+      
       // Determine target child ID - use form selection or default to first selected child
-      const targetChildId = formData.child_id || selectedChildrenIds[0];
-      await onSave(formData, targetChildId);
-      onClose();
+      const targetChildId = cleanedData.child_id;
+      const result = await onSave(cleanedData, targetChildId);
+      
+      if (result.success) {
+        onClose();
+      } else {
+        // Display the specific error from the backend/hooks
+        setErrors({ submit: result.error || 'Failed to save schedule entry. Please try again.' });
+      }
     } catch (error) {
+      console.error('Error creating schedule entry:', error);
       setErrors({ submit: 'Failed to save schedule entry. Please try again.' });
     }
   };
@@ -475,6 +554,15 @@ export default function CreateScheduleEntryModal({
                 className={formInputStyles}
               />
             </div>
+
+            {/* Time Conflict Error */}
+            {errors.time_conflict && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-800 text-sm font-medium">❌ Scheduling Conflict</p>
+                <p className="text-red-700 text-sm">{errors.time_conflict}</p>
+                <p className="text-red-600 text-xs mt-1">Please choose a different time to avoid conflicts.</p>
+              </div>
+            )}
 
             {/* Submit Error */}
             {errors.submit && (

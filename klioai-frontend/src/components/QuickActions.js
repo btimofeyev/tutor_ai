@@ -70,7 +70,7 @@ export default function QuickActions({ onActionClick, isVisible = true }) {
             Quick Actions
           </h3>
           <span className="text-xs text-[var(--text-tertiary)]">
-            Choose what you'd like to work on
+            Choose what you&apos;d like to work on
           </span>
         </div>
         

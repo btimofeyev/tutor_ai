@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 
 const SubscriptionContext = createContext({
@@ -17,7 +17,7 @@ export function SubscriptionProvider({ children }) {
   const [error, setError] = useState(null);
   const { child, isAuthenticated } = useAuth();
 
-  const checkSubscription = async () => {
+  const checkSubscription = useCallback(async () => {
     if (!isAuthenticated || !child) {
       setSubscription(null);
       setLoading(false);
@@ -52,11 +52,13 @@ export function SubscriptionProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [child?.id]);
 
   useEffect(() => {
-    checkSubscription();
-  }, [child, isAuthenticated]);
+    if (isAuthenticated && child) {
+      checkSubscription();
+    }
+  }, [child, isAuthenticated, checkSubscription]);
 
   // Determine subscription permissions
   const hasActiveSubscription = subscription && subscription.status === 'active';

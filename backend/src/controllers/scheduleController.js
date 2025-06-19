@@ -116,11 +116,25 @@ const createScheduleEntry = async (req, res) => {
       // TODO: Add proper material validation when lesson schema is confirmed
     }
 
-    // Check for scheduling conflicts
+    // Check for scheduling conflicts across ALL children for this parent
+    // First get all children for this parent
+    const { data: parentChildren, error: childrenError } = await supabase
+      .from('children')
+      .select('id')
+      .eq('parent_id', parentId);
+
+    if (childrenError) {
+      console.error('Error fetching parent children:', childrenError);
+      return res.status(500).json({ error: 'Failed to check family scheduling conflicts' });
+    }
+
+    const childIds = parentChildren.map(child => child.id);
+
+    // Check for conflicts across ALL children for this parent
     const { data: conflicts, error: conflictError } = await supabase
       .from('schedule_entries')
-      .select('id, start_time, duration_minutes')
-      .eq('child_id', child_id)
+      .select('id, start_time, duration_minutes, child_id')
+      .in('child_id', childIds)
       .eq('scheduled_date', scheduled_date)
       .neq('status', 'skipped');
 
@@ -129,20 +143,33 @@ const createScheduleEntry = async (req, res) => {
       return res.status(500).json({ error: 'Failed to check scheduling conflicts' });
     }
 
-    // Check for overlapping time slots
+    // Check for overlapping time slots across all children
     const newStartTime = new Date(`1970-01-01T${start_time}`);
     const newEndTime = new Date(newStartTime.getTime() + (duration_minutes * 60000));
 
-    const hasConflict = conflicts.some(existing => {
+    const conflictingEntries = conflicts.filter(existing => {
       const existingStartTime = new Date(`1970-01-01T${existing.start_time}`);
       const existingEndTime = new Date(existingStartTime.getTime() + (existing.duration_minutes * 60000));
       
       return (newStartTime < existingEndTime && newEndTime > existingStartTime);
     });
 
-    if (hasConflict) {
+    if (conflictingEntries.length > 0) {
+      // Get child names for the conflicting entries to provide better error message
+      const conflictChildIds = conflictingEntries.map(entry => entry.child_id);
+      const { data: conflictChildren } = await supabase
+        .from('children')
+        .select('id, name')
+        .in('id', conflictChildIds);
+
+      const conflictDetails = conflictingEntries.map(entry => {
+        const child = conflictChildren.find(c => c.id === entry.child_id);
+        return `${child?.name || 'Unknown Child'} at ${entry.start_time}`;
+      }).join(', ');
+
       return res.status(409).json({ 
-        error: 'Scheduling conflict: This time slot overlaps with an existing entry' 
+        error: `Scheduling conflict: This time slot overlaps with existing entries for ${conflictDetails}`,
+        conflictingEntries: conflictingEntries
       });
     }
 

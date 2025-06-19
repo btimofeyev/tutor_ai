@@ -133,9 +133,22 @@ export default function EditScheduleEntryModal({
     }
 
     try {
-      await onSave(scheduleEntry.id, formData);
+      // Clean the form data to remove fields that don't exist in database
+      const cleanedData = {
+        subject_name: formData.subject_name,
+        material_id: formData.material_id || null,
+        scheduled_date: formData.scheduled_date,
+        start_time: formData.start_time,
+        duration_minutes: parseInt(formData.duration_minutes),
+        notes: formData.notes,
+        status: formData.status
+        // Don't include is_material_based - it's not a database field
+      };
+      
+      await onSave(scheduleEntry.id, cleanedData);
       onClose();
     } catch (error) {
+      console.error('Error updating schedule entry:', error);
       setErrors({ submit: 'Failed to update schedule entry. Please try again.' });
     }
   };

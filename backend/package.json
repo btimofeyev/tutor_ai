@@ -4,7 +4,10 @@
     "main": "src/app.js",
     "type": "commonjs",
     "scripts": {
-        "start": "node src/server.js"
+        "start": "node src/server.js",
+        "maintenance": "node scripts/daily-maintenance.js",
+        "cleanup:batch": "node scripts/batch-chat-cleanup.js",
+        "fix-summary": "node scripts/fix-existing-summary.js"
     },
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.12.0",

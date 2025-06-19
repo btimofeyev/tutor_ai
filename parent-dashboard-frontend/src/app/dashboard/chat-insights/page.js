@@ -59,11 +59,18 @@ export default function ChatInsightsPage() {
         <StudentSidebar
           childrenList={childrenData.children}
           selectedChild={childrenData.selectedChild}
-          onSelectChild={childrenData.handleSelectChild}
+          onSelectChild={childrenData.setSelectedChild}
           showAddChild={false} // Hide add child functionality on insights page
+          onToggleShowAddChild={() => {}} // Required prop, but not used on insights page
+          newChildName=""
+          onNewChildNameChange={() => {}}
+          newChildGrade=""
+          onNewChildGradeChange={() => {}}
+          onAddChildSubmit={(e) => e.preventDefault()}
+          onOpenChildLoginSettings={handleOpenChildLoginSettings}
           subscription={subscription.subscription}
           canAddChild={subscription.permissions?.maxChildren > childrenData.children.length}
-          onOpenChildLoginSettings={handleOpenChildLoginSettings}
+          onUpgradeNeeded={() => {}}
         />
       </div>
 

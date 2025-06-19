@@ -46,8 +46,11 @@ export function AuthProvider({ children }) {
         }
       } catch (error) {
         console.error('Auth check failed:', error);
-        authService.logout();
-        setChild(null);
+        // Only logout on actual auth errors, not network issues
+        if (error.message === 'Session invalid') {
+          authService.logout();
+          setChild(null);
+        }
       } finally {
         setLoading(false);
       }

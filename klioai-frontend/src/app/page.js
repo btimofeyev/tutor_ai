@@ -52,7 +52,7 @@ export default function HomePage() {
         </div>
 
         <h1 className="text-5xl sm:text-6xl font-bold mb-4">
-          Hi! I'm <span className="text-[var(--accent-blue)]">Klio</span>
+          Hi! I&apos;m <span className="text-[var(--accent-blue)]">Klio</span>
         </h1>
         
         <p className="text-xl sm:text-2xl text-[var(--text-secondary)] mb-10">
@@ -67,7 +67,7 @@ export default function HomePage() {
           <Link href="/login" className="inline-block">
             {/* Using Button component is preferred if available and themed */}
             {/* <Button variant="primary" size="lg" className="text-xl sm:text-2xl px-10 sm:px-12 py-5 sm:py-6">
-                Let's Learn! 🎯
+                Let&apos;s Learn! 🎯
             </Button> */}
             <button 
               className="btn-primary text-xl sm:text-2xl px-10 sm:px-12 py-5 sm:py-6 rounded-[var(--radius-lg)]"
@@ -79,7 +79,7 @@ export default function HomePage() {
               // onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.97)'}
               // onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
             >
-              Let's Learn! 🎯
+              Let&apos;s Learn! 🎯
             </button>
           </Link>
         </div>

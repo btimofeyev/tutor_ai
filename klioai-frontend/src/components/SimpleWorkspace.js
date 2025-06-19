@@ -207,7 +207,7 @@ const getItemLabel = (subject, itemNumber) => {
   return labelMap[subject] || `Item ${itemNumber}`;
 };
 
-const SimpleWorkspace = forwardRef(({ 
+const SimpleWorkspace = forwardRef(function SimpleWorkspace({ 
   workspaceContent, 
   isExpanded, 
   onClose, 
@@ -215,7 +215,7 @@ const SimpleWorkspace = forwardRef(({
   onInteraction,
   studentProfile,
   adaptiveData 
-}, ref) => {
+}, ref) {
   const [problems, setProblems] = useState([]);
   const [workNotes, setWorkNotes] = useState({});
   const [problemStates, setProblemStates] = useState({}); // 'pending', 'correct', 'incorrect'
@@ -632,7 +632,7 @@ const SimpleWorkspace = forwardRef(({
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="text-yellow-500 inline-block mr-2 font-bold">⚠</div>
-                      <strong>Good effort! Let's work on this together. 💪</strong>
+                      <strong>Good effort! Let&apos;s work on this together. 💪</strong>
                       {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
                     </div>
                     <button
@@ -694,7 +694,7 @@ const SimpleWorkspace = forwardRef(({
                   animate={{ opacity: 1, y: 0 }}
                   className="text-sm p-3 bg-green-50 border-l-4 border-green-400 rounded-lg mt-3"
                 >
-                  <strong className="text-green-600">🌟 You're doing great!</strong> Keep working through it step by step!
+                  <strong className="text-green-600">🌟 You&apos;re doing great!</strong> Keep working through it step by step!
                 </motion.div>
               )}
               

@@ -259,12 +259,14 @@ const getChatInsights = async (req, res) => {
             
             groupedInsights[date].summaries.push({
                 id: insight.id,
-                status: insight.status, // Use 'status' instead of 'is_read'
-                summary: insight.summary_data,
-                childName: insight.children?.name || 'Unknown Child',
+                status: insight.status,
                 childId: insight.child_id,
                 createdAt: insight.created_at,
-                conversationId: insight.id // Use notification id as conversation reference
+                conversationId: insight.id,
+                // Flatten summary_data to top level for frontend compatibility
+                ...insight.summary_data,
+                // Override childName if it exists in summary_data
+                childName: insight.summary_data?.childName || insight.children?.name || 'Unknown Child'
             });
         });
         

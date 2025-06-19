@@ -77,6 +77,10 @@ export default function EnhancedScheduleManager({
 
     try {
       setApplyingTemplate(true);
+      
+      // Give UI time to show loading skeleton
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
       console.log('Applying template:', template.name, 'starting from:', startDate);
       
       // Determine which children to apply the template to
@@ -183,6 +187,12 @@ export default function EnhancedScheduleManager({
         const message = totalChildren > 1 
           ? `Template applied successfully! Created ${totalSuccessfulEntries} schedule entries across ${totalChildren} children.${totalFailedEntries > 0 ? ` (${totalFailedEntries} entries failed to create)` : ''}`
           : `Template applied successfully! Created ${totalSuccessfulEntries} schedule entries.${totalFailedEntries > 0 ? ` (${totalFailedEntries} entries failed to create)` : ''}`;
+        
+        // Switch to calendar view to show the results
+        if (activeView === 'templates') {
+          setActiveView('advanced');
+        }
+        
         alert(message);
       } else {
         alert(`Failed to apply template. All ${totalEntriesAttempted} entries failed to create. Please check for scheduling conflicts or try again.`);
@@ -194,7 +204,16 @@ export default function EnhancedScheduleManager({
       alert('Failed to apply template. Please try again.');
       throw error;
     } finally {
+      console.log('Resetting applyingTemplate to false');
       setApplyingTemplate(false);
+      
+      // Force a calendar refresh after state reset
+      setTimeout(() => {
+        const refreshFunction = refresh || refreshEvents;
+        if (refreshFunction) {
+          refreshFunction();
+        }
+      }, 100);
     }
   };
 
@@ -424,7 +443,7 @@ export default function EnhancedScheduleManager({
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showMoreMenu]);
 
-  if (loading) {
+  if (loading && !applyingTemplate) {
     return (
       <div className="p-6">
         <div className="animate-pulse">
@@ -514,43 +533,141 @@ export default function EnhancedScheduleManager({
 
       {/* Main calendar view */}
       {activeView === 'advanced' && (
-        <AdvancedScheduleCalendar
-          childId={childId}
-          selectedChildrenIds={selectedChildrenIds}
-          allChildren={allChildren}
-          subscriptionPermissions={subscriptionPermissions}
-          scheduleManagement={finalScheduleManagement}
-          childSubjects={childSubjects}
-          schedulePreferences={schedulePreferences}
-        />
+        <>
+          {applyingTemplate ? (
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="animate-pulse space-y-4">
+                {/* Calendar header skeleton */}
+                <div className="flex justify-between items-center mb-6">
+                  <div className="h-6 bg-gray-200 rounded w-32"></div>
+                  <div className="flex gap-2">
+                    <div className="h-8 bg-gray-200 rounded w-16"></div>
+                    <div className="h-8 bg-gray-200 rounded w-16"></div>
+                  </div>
+                </div>
+                
+                {/* Week days header */}
+                <div className="grid grid-cols-7 gap-2 mb-4">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <div key={i} className="h-8 bg-gray-200 rounded"></div>
+                  ))}
+                </div>
+                
+                {/* Calendar grid skeleton */}
+                <div className="grid grid-cols-7 gap-2">
+                  {Array.from({ length: 35 }).map((_, i) => (
+                    <div key={i} className="h-24 bg-gray-100 rounded border border-gray-200 p-2">
+                      <div className="h-4 bg-gray-200 rounded w-6 mb-2"></div>
+                      {Math.random() > 0.7 && (
+                        <div className="space-y-1">
+                          <div className="h-3 bg-blue-200 rounded"></div>
+                          {Math.random() > 0.5 && <div className="h-3 bg-green-200 rounded"></div>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Loading indicator */}
+                <div className="text-center py-4">
+                  <div className="inline-flex items-center gap-2 text-blue-600">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm font-medium">Creating schedule entries...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <AdvancedScheduleCalendar
+              childId={childId}
+              selectedChildrenIds={selectedChildrenIds}
+              allChildren={allChildren}
+              subscriptionPermissions={subscriptionPermissions}
+              scheduleManagement={finalScheduleManagement}
+              childSubjects={childSubjects}
+              schedulePreferences={schedulePreferences}
+            />
+          )}
+        </>
       )}
 
       {activeView === 'dragdrop' && (
-        <DragDropScheduleCalendar
-          childId={childId}
-          selectedChildrenIds={selectedChildrenIds}
-          allChildren={allChildren}
-          subscriptionPermissions={subscriptionPermissions}
-          scheduleManagement={finalScheduleManagement}
-          childSubjects={childSubjects}
-          onEventUpdate={handleEventUpdate}
-        />
+        <>
+          {applyingTemplate ? (
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="animate-pulse space-y-4">
+                {/* Drag-drop header skeleton */}
+                <div className="flex justify-between items-center mb-6">
+                  <div className="h-6 bg-gray-200 rounded w-40"></div>
+                  <div className="h-8 bg-gray-200 rounded w-24"></div>
+                </div>
+                
+                {/* Time slots skeleton */}
+                <div className="space-y-3">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <div className="h-4 bg-gray-200 rounded w-16"></div>
+                      <div className="flex-1 grid grid-cols-7 gap-2">
+                        {Array.from({ length: 7 }).map((_, j) => (
+                          <div key={j} className="h-12 bg-gray-100 rounded border border-gray-200 flex items-center justify-center">
+                            {Math.random() > 0.8 && (
+                              <div className="h-8 bg-blue-200 rounded w-full mx-1"></div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Loading indicator */}
+                <div className="text-center py-4">
+                  <div className="inline-flex items-center gap-2 text-blue-600">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm font-medium">Organizing schedule entries...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <DragDropScheduleCalendar
+              childId={childId}
+              selectedChildrenIds={selectedChildrenIds}
+              allChildren={allChildren}
+              subscriptionPermissions={subscriptionPermissions}
+              scheduleManagement={finalScheduleManagement}
+              childSubjects={childSubjects}
+              onEventUpdate={handleEventUpdate}
+            />
+          )}
+        </>
       )}
 
       {activeView === 'templates' && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <ScheduleTemplatesManager
-            isOpen={true}
-            onClose={() => setActiveView('advanced')}
-            onApplyTemplate={handleApplyTemplate}
-            childId={childId}
-            selectedChildrenIds={selectedChildrenIds}
-            allChildren={allChildren}
-            childSubjects={childSubjects}
-            schedulePreferences={schedulePreferences}
-            inlineMode={true}
-            isApplying={applyingTemplate}
-          />
+          {applyingTemplate ? (
+            <div className="text-center py-12">
+              <div className="mx-auto mb-4 w-16 h-16 relative">
+                <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-pulse"></div>
+                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Applying Template</h3>
+              <p className="text-gray-600">Creating schedule entries... You'll be redirected to the calendar view when complete.</p>
+            </div>
+          ) : (
+            <ScheduleTemplatesManager
+              isOpen={true}
+              onClose={() => setActiveView('advanced')}
+              onApplyTemplate={handleApplyTemplate}
+              childId={childId}
+              selectedChildrenIds={selectedChildrenIds}
+              allChildren={allChildren}
+              childSubjects={childSubjects}
+              schedulePreferences={schedulePreferences}
+              inlineMode={true}
+              isApplying={applyingTemplate}
+            />
+          )}
         </div>
       )}
 

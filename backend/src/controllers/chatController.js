@@ -829,7 +829,7 @@ ${contextualSuggestions.slice(0, 3).map(s => `- "${s}"`).join('\n')}`;
     let response;
     try {
       response = await openai.chat.completions.create({
-        model: "gpt-4o", // Function calling works better on gpt-4o
+        model: "gpt-4.1-mini", // Function calling works better on gpt-4o
         messages: openaiMessages,
         temperature: conversationStrategy.response_style === 'encouraging' ? 0.8 : 0.7, // More creative for encouraging responses
         max_tokens: 1024,

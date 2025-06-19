@@ -1,18 +1,18 @@
 // Centralized subject color management
 // This ensures consistent colors across the entire application
 
-// Available soft pastel colors for subjects - perfect for educational/school theme
+// Soft pastel colors aligned with student app design system
 export const SUBJECT_COLORS = [
-  { bg: 'bg-rose-200', text: 'text-rose-700', border: 'border-rose-300', name: 'Rose', bgDark: 'bg-rose-300' },
-  { bg: 'bg-sky-200', text: 'text-sky-700', border: 'border-sky-300', name: 'Sky', bgDark: 'bg-sky-300' },
-  { bg: 'bg-emerald-200', text: 'text-emerald-700', border: 'border-emerald-300', name: 'Emerald', bgDark: 'bg-emerald-300' },
-  { bg: 'bg-violet-200', text: 'text-violet-700', border: 'border-violet-300', name: 'Violet', bgDark: 'bg-violet-300' },
-  { bg: 'bg-amber-200', text: 'text-amber-700', border: 'border-amber-300', name: 'Amber', bgDark: 'bg-amber-300' },
-  { bg: 'bg-indigo-200', text: 'text-indigo-700', border: 'border-indigo-300', name: 'Indigo', bgDark: 'bg-indigo-300' },
-  { bg: 'bg-pink-200', text: 'text-pink-700', border: 'border-pink-300', name: 'Pink', bgDark: 'bg-pink-300' },
-  { bg: 'bg-teal-200', text: 'text-teal-700', border: 'border-teal-300', name: 'Teal', bgDark: 'bg-teal-300' },
-  { bg: 'bg-orange-200', text: 'text-orange-700', border: 'border-orange-300', name: 'Orange', bgDark: 'bg-orange-300' },
-  { bg: 'bg-cyan-200', text: 'text-cyan-700', border: 'border-cyan-300', name: 'Cyan', bgDark: 'bg-cyan-300' }
+  { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', name: 'Blue', bgDark: 'bg-blue-200' },
+  { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200', name: 'Green', bgDark: 'bg-green-200' },
+  { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-200', name: 'Yellow', bgDark: 'bg-yellow-200' },
+  { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', name: 'Purple', bgDark: 'bg-purple-200' },
+  { bg: 'bg-pink-100', text: 'text-pink-700', border: 'border-pink-200', name: 'Pink', bgDark: 'bg-pink-200' },
+  { bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-200', name: 'Indigo', bgDark: 'bg-indigo-200' },
+  { bg: 'bg-teal-100', text: 'text-teal-700', border: 'border-teal-200', name: 'Teal', bgDark: 'bg-teal-200' },
+  { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200', name: 'Orange', bgDark: 'bg-orange-200' },
+  { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', name: 'Red', bgDark: 'bg-red-200' },
+  { bg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-200', name: 'Cyan', bgDark: 'bg-cyan-200' }
 ];
 
 /**

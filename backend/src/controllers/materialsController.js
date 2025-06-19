@@ -192,7 +192,7 @@ async function analyzeUploadedFiles(files, userHintContentType) {
   }
   
   const response = await openai.chat.completions.create({ 
-    model: "gpt-4o", 
+    model: "gpt-4.1-mini", 
     messages, 
     max_tokens: 3500, 
     temperature: 0.1, 

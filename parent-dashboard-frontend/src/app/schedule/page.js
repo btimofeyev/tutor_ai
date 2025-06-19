@@ -12,12 +12,14 @@ import StudentHeader from "../dashboard/components/StudentHeader";
 
 // Schedule-specific components
 import ScheduleCalendar from "./components/ScheduleCalendar";
+import EnhancedScheduleManager from "./components/EnhancedScheduleManager";
 import ScheduleSettingsModal from "./components/ScheduleSettingsModal";
 import CreateScheduleEntryModal from "./components/CreateScheduleEntryModal";
 import EditScheduleEntryModal from "./components/EditScheduleEntryModal";
 import AIScheduleModal from "./components/AIScheduleModal";
 import { useScheduleManagement } from "../../hooks/useScheduleManagement";
 import { useMultiChildScheduleManagement } from "../../hooks/useMultiChildScheduleManagement";
+import { Cog6ToothIcon, SparklesIcon } from '@heroicons/react/24/outline';
 
 export default function SchedulePage() {
   const session = useSession();
@@ -47,14 +49,14 @@ export default function SchedulePage() {
     childrenData.children
   );
 
-  // Choose the appropriate schedule management based on selection
-  const scheduleManagement = selectedChildrenIds.length > 1 
+  // Always use multi-child management when using checkboxes, even for single child
+  const scheduleManagement = selectedChildrenIds.length >= 1 
     ? multiChildScheduleManagement 
     : singleChildScheduleManagement;
 
   // Helper function to safely get entries count
   const getTotalEntriesCount = () => {
-    if (selectedChildrenIds.length > 1) {
+    if (selectedChildrenIds.length >= 1) {
       const allEntries = multiChildScheduleManagement.allScheduleEntries || {};
       return Object.values(allEntries).flat().length;
     } else {
@@ -62,15 +64,13 @@ export default function SchedulePage() {
     }
   };
 
-  // Initialize selected children when children data loads
+  // Initialize with ALL children by default when children data loads
   useEffect(() => {
     if (childrenData.children.length > 0 && selectedChildrenIds.length === 0) {
-      // Default to showing the currently selected child
-      if (childrenData.selectedChild) {
-        setSelectedChildrenIds([childrenData.selectedChild.id]);
-      }
+      // Default to showing ALL children's schedules
+      setSelectedChildrenIds(childrenData.children.map(child => child.id));
     }
-  }, [childrenData.children, childrenData.selectedChild, selectedChildrenIds.length]);
+  }, [childrenData.children.length]);
 
   // Redirect to login if no session
   useEffect(() => {
@@ -94,7 +94,7 @@ export default function SchedulePage() {
 
   // Handle creating new schedule entries
   const handleCreateEntry = async (entryData, targetChildId) => {
-    const isMultiChild = selectedChildrenIds.length > 1;
+    const isMultiChild = selectedChildrenIds.length >= 1;
     
     if (isMultiChild) {
       const result = await multiChildScheduleManagement.createScheduleEntry(entryData, targetChildId);
@@ -125,7 +125,7 @@ export default function SchedulePage() {
 
   // Handle clearing entire schedule
   const handleClearSchedule = async () => {
-    const isMultiChild = selectedChildrenIds.length > 1;
+    const isMultiChild = selectedChildrenIds.length >= 1;
     const confirmMessage = isMultiChild 
       ? 'Are you sure you want to delete all scheduled entries for the selected children? This action cannot be undone.'
       : 'Are you sure you want to delete all scheduled entries? This action cannot be undone.';
@@ -151,7 +151,7 @@ export default function SchedulePage() {
 
   // Handle rebuilding schedule with AI
   const handleRebuildSchedule = async () => {
-    const isMultiChild = selectedChildrenIds.length > 1;
+    const isMultiChild = selectedChildrenIds.length >= 1;
     const confirmMessage = isMultiChild
       ? 'This will clear the current schedules for all selected children and generate new ones with AI. Continue?'
       : 'This will clear your current schedule and generate a new one with AI. Continue?';
@@ -212,17 +212,6 @@ export default function SchedulePage() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        {childrenData.selectedChild && (
-          <div className="border-b border-border-subtle bg-background-card">
-            <div className="p-6">
-              <StudentHeader
-                selectedChild={childrenData.selectedChild}
-                dashboardStats={{}} // We'll populate this later
-              />
-            </div>
-          </div>
-        )}
 
         {/* Schedule Content */}
         <div className="flex-1 p-6 overflow-auto">
@@ -236,99 +225,102 @@ export default function SchedulePage() {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Schedule Header */}
+              {/* Clean Schedule Header */}
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
-                  <h1 className="text-2xl font-bold text-text-primary">
-                    Family Schedule Planner
+                  <h1 className="text-xl font-semibold text-text-primary">
+                    Schedule
                   </h1>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <button 
                       onClick={scheduleManagement.openSettingsModal}
-                      className="btn-secondary text-sm px-4 py-2"
+                      className="btn-secondary"
                     >
+                      <Cog6ToothIcon className="h-4 w-4" />
                       Settings
                     </button>
                     
                     {getTotalEntriesCount() > 0 && (
-                      <>
+                      <div className="btn-group">
                         <button 
                           onClick={handleClearSchedule}
-                          className="btn-danger text-sm px-4 py-2"
+                          className="btn-secondary"
                         >
                           Clear All
                         </button>
                         <button 
                           onClick={handleRebuildSchedule}
-                          className="btn-secondary text-sm px-4 py-2"
+                          className="btn-secondary"
                         >
-                          Rebuild Schedule
+                          Rebuild
                         </button>
-                      </>
+                      </div>
                     )}
                     
                     <button 
                       onClick={scheduleManagement.openAIModal}
-                      className="btn-primary text-sm px-4 py-2"
+                      className="btn-primary"
                     >
+                      <SparklesIcon className="h-4 w-4" />
                       AI Schedule
                     </button>
                   </div>
                 </div>
 
-                {/* Multi-Child Selection */}
+                {/* Child Schedule Filter */}
                 {childrenData.children.length > 1 && (
-                  <div className="bg-slate-50 rounded-xl p-4 border border-gray-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-gray-700">Select Children to View:</h3>
-                      <div className="flex gap-2">
+                  <div className="bg-white rounded-lg border border-gray-200 p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap gap-2">
+                        <span className="text-sm font-medium text-gray-600 self-center mr-2">Show schedules for:</span>
+                        {childrenData.children.map((child) => (
+                          <label key={child.id} className="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={selectedChildrenIds.includes(child.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedChildrenIds(prev => [...prev, child.id]);
+                                } else {
+                                  setSelectedChildrenIds(prev => prev.filter(id => id !== child.id));
+                                }
+                              }}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm font-medium text-gray-700">{child.name}</span>
+                            <span className="text-xs text-gray-400">G{child.grade}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex gap-1">
                         <button
                           onClick={() => setSelectedChildrenIds(childrenData.children.map(c => c.id))}
-                          className="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+                          className="text-xs px-2 py-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         >
-                          Select All
+                          Show All
                         </button>
                         <button
-                          onClick={() => setSelectedChildrenIds([childrenData.selectedChild?.id].filter(Boolean))}
-                          className="text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                          onClick={() => setSelectedChildrenIds([])}
+                          className="text-xs px-2 py-1 text-gray-600 hover:bg-gray-50 rounded transition-colors"
                         >
-                          Current Only
+                          Hide All
                         </button>
                       </div>
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      {childrenData.children.map((child) => (
-                        <label key={child.id} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedChildrenIds.includes(child.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedChildrenIds(prev => [...prev, child.id]);
-                              } else {
-                                setSelectedChildrenIds(prev => prev.filter(id => id !== child.id));
-                              }
-                            }}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="text-sm font-medium text-gray-700">{child.name}</span>
-                          <span className="text-xs text-gray-500">Grade {child.grade}</span>
-                        </label>
-                      ))}
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Modern Calendar View */}
+              {/* Enhanced Calendar View */}
               <div className="bg-background-card rounded-xl shadow-sm">
-                <ScheduleCalendar 
-                  childId={childrenData.selectedChild.id}
+                <EnhancedScheduleManager 
+                  childId={selectedChildrenIds.length >= 1 ? selectedChildrenIds[0] : childrenData.selectedChild?.id}
                   selectedChildrenIds={selectedChildrenIds}
                   allChildren={childrenData.children}
                   subscriptionPermissions={subscriptionPermissions}
-                  scheduleManagement={scheduleManagement}
                   childSubjects={assignedSubjectsForCurrentChild}
+                  schedulePreferences={scheduleManagement.schedulePreferences}
+                  scheduleManagement={scheduleManagement}
                 />
               </div>
             </div>
@@ -349,6 +341,7 @@ export default function SchedulePage() {
         isSaving={scheduleManagement.loading}
         selectedChildrenIds={selectedChildrenIds}
         allChildren={childrenData.children}
+        calendarEvents={selectedChildrenIds.length >= 1 ? multiChildScheduleManagement.calendarEvents : singleChildScheduleManagement.calendarEvents}
       />
 
       {/* Edit Schedule Entry Modal */}
@@ -380,7 +373,7 @@ export default function SchedulePage() {
         isOpen={scheduleManagement.showAIModal}
         onClose={scheduleManagement.closeAIModal}
         onGenerateSchedule={
-          selectedChildrenIds.length > 1 
+          selectedChildrenIds.length >= 1 
             ? multiChildScheduleManagement.generateMultiChildAISchedule 
             : singleChildScheduleManagement.generateAISchedule
         }

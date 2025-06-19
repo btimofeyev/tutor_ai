@@ -57,7 +57,7 @@ export default function DashboardPage() {
   } = useSubscription();
 
   // Custom hooks
-  const childrenData = useChildrenData(session, subscription, subscriptionPermissions);
+  const childrenData = useChildrenData(session);
   const materialManagement = useMaterialManagement(childrenData.refreshChildSpecificData, childrenData.invalidateChildCache);
   const filtersAndSorting = useFiltersAndSorting(
     childrenData.lessonsBySubject, 
@@ -751,6 +751,10 @@ export default function DashboardPage() {
           onOpenChildLoginSettings={handleOpenChildLoginSettingsModal}
           subscription={subscription}
           canAddChild={subscriptionPermissions.maxChildren > childrenData.children.length}
+          onUpgradeNeeded={(targetPlan) => {
+            setUpgradeFeature('children');
+            setShowUpgradePrompt(true);
+          }}
         />
       </div>
 

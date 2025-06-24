@@ -6,14 +6,12 @@ import {
   Cog6ToothIcon,
   DocumentDuplicateIcon,
   ArrowsUpDownIcon,
-  PrinterIcon,
-  SparklesIcon
+  PrinterIcon
 } from '@heroicons/react/24/outline';
 import AdvancedScheduleCalendar from './AdvancedScheduleCalendar';
 import DragDropScheduleCalendar from './DragDropScheduleCalendar';
 import ScheduleTemplatesManager from './ScheduleTemplatesManager';
 import PDFGenerator from './PDFGenerator';
-import AIScheduleModal from './AIScheduleModal';
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
 
 export default function EnhancedScheduleManager({
@@ -30,8 +28,11 @@ export default function EnhancedScheduleManager({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [applyingTemplate, setApplyingTemplate] = useState(false);
   
+  // Always call the hook to satisfy React rules
+  const fallbackScheduleManagement = useScheduleManagement(childId, subscriptionPermissions);
+  
   // Use provided schedule management or create our own
-  const finalScheduleManagement = scheduleManagement || useScheduleManagement(childId, subscriptionPermissions);
+  const finalScheduleManagement = scheduleManagement ?? fallbackScheduleManagement;
   const { calendarEvents, loading, error, refresh, refreshEvents } = finalScheduleManagement;
 
   // PDF Generator instance
@@ -360,18 +361,6 @@ export default function EnhancedScheduleManager({
   // Render action buttons - enhanced styling
   const renderActionButtons = () => (
     <div className="flex items-center gap-3">
-      {/* AI Schedule Generator button - show in calendar views */}
-      {(activeView === 'advanced' || activeView === 'dragdrop') && (
-        <button
-          onClick={() => finalScheduleManagement.openAIScheduleModal()}
-          className="btn-primary bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-          title="Generate AI-optimized schedule"
-        >
-          <SparklesIcon className="h-4 w-4" />
-          AI Scheduler
-        </button>
-      )}
-
       {/* Quick Save as Template button - show in calendar views */}
       {(activeView === 'advanced' || activeView === 'dragdrop') && (
         <button
@@ -657,7 +646,7 @@ export default function EnhancedScheduleManager({
                 <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Applying Template</h3>
-              <p className="text-gray-600">Creating schedule entries... You'll be redirected to the calendar view when complete.</p>
+              <p className="text-gray-600">Creating schedule entries... You&apos;ll be redirected to the calendar view when complete.</p>
             </div>
           ) : (
             <ScheduleTemplatesManager
@@ -691,19 +680,6 @@ export default function EnhancedScheduleManager({
         />
       )}
 
-      {/* AI Schedule Modal */}
-      <AIScheduleModal
-        isOpen={finalScheduleManagement.showAIScheduleModal}
-        onClose={finalScheduleManagement.closeAIScheduleModal}
-        onGenerate={finalScheduleManagement.generateAISchedule}
-        childName={allChildren.find(c => c.id === childId)?.name || 'Student'}
-        selectedChildrenIds={selectedChildrenIds}
-        allChildren={allChildren}
-        childSubjects={childSubjects}
-        schedulePreferences={schedulePreferences}
-        isGenerating={finalScheduleManagement.aiScheduling}
-        generationResult={finalScheduleManagement.aiScheduleResult}
-      />
 
     </div>
   );

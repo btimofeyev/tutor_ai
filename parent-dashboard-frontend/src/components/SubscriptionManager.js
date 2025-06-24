@@ -7,7 +7,7 @@ import api from '../utils/api';
 import { PRICE_IDS } from '../utils/subscriptionConstants';
 
 export default function SubscriptionManager({
-  children = [], // Represents the list of children, used for childCount
+  childrenList = [], // Represents the list of children, used for childCount
   compact = false,
   initialSubscription = null,
 }) {
@@ -74,7 +74,7 @@ export default function SubscriptionManager({
 
   const hasSubscription = subscription && subscription.status === 'active';
   const planType = subscription?.plan_type;
-  const childCount = Array.isArray(children) ? children.length : 0;
+  const childCount = Array.isArray(childrenList) ? childrenList.length : 0;
 
   // Max children allowed by current plan
   let maxChildrenForCurrentPlan = 1; // Default for free
@@ -264,7 +264,7 @@ export default function SubscriptionManager({
             <AcademicCapIcon className="h-12 w-12 text-purple-500 mx-auto mb-4" />
             <h3 className="text-xl font-semibold mb-2">Expand Your Academy!</h3>
             <p className="text-text-secondary mb-4">
-              You've reached the limit for the Family Plan. Upgrade to Academy for up to {PRICE_IDS.academy_max_children || 10} children.
+              You&apos;ve reached the limit for the Family Plan. Upgrade to Academy for up to {PRICE_IDS.academy_max_children || 10} children.
             </p>
             <Button variant="outline" onClick={() => handleUpgrade(PRICE_IDS.academy)} disabled={upgrading}>
               Upgrade to Academy Plan

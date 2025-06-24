@@ -1,6 +1,6 @@
 // app/schedule/components/ScheduleTemplatesManager.js
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   PlusIcon, 
   TrashIcon, 
@@ -14,6 +14,284 @@ import {
   FolderIcon
 } from '@heroicons/react/24/outline';
 import { format, addDays, startOfWeek } from 'date-fns';
+
+// Sample default templates
+const DEFAULT_TEMPLATES = [
+  {
+    id: 'morning-focus',
+    name: 'Morning Focus',
+    description: 'High-cognitive subjects in the morning, lighter subjects in afternoon',
+    category: 'weekly',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 45, subject: 'Mathematics' },
+      { day: 'monday', time: '10:00', duration: 45, subject: 'Science' },
+      { day: 'monday', time: '14:00', duration: 30, subject: 'Art' },
+      { day: 'tuesday', time: '09:00', duration: 45, subject: 'English Language Arts' },
+      { day: 'tuesday', time: '10:00', duration: 45, subject: 'Mathematics' },
+      { day: 'tuesday', time: '14:00', duration: 30, subject: 'Physical Education' },
+      { day: 'wednesday', time: '09:00', duration: 45, subject: 'Science' },
+      { day: 'wednesday', time: '10:00', duration: 45, subject: 'Mathematics' },
+      { day: 'wednesday', time: '14:00', duration: 30, subject: 'Music' },
+      { day: 'thursday', time: '09:00', duration: 45, subject: 'English Language Arts' },
+      { day: 'thursday', time: '10:00', duration: 45, subject: 'Social Studies' },
+      { day: 'thursday', time: '14:00', duration: 30, subject: 'Art' },
+      { day: 'friday', time: '09:00', duration: 45, subject: 'Mathematics' },
+      { day: 'friday', time: '10:00', duration: 45, subject: 'Science' },
+      { day: 'friday', time: '14:00', duration: 30, subject: 'Physical Education' }
+    ]
+  },
+  {
+    id: 'balanced-daily',
+    name: 'Balanced Daily',
+    description: 'Evenly distributed subjects throughout the day',
+    category: 'weekly',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 30, subject: 'Mathematics' },
+      { day: 'monday', time: '11:00', duration: 30, subject: 'English Language Arts' },
+      { day: 'monday', time: '14:00', duration: 30, subject: 'Science' },
+      { day: 'tuesday', time: '09:00', duration: 30, subject: 'Science' },
+      { day: 'tuesday', time: '11:00', duration: 30, subject: 'Mathematics' },
+      { day: 'tuesday', time: '14:00', duration: 30, subject: 'Social Studies' },
+      { day: 'wednesday', time: '09:00', duration: 30, subject: 'English Language Arts' },
+      { day: 'wednesday', time: '11:00', duration: 30, subject: 'Science' },
+      { day: 'wednesday', time: '14:00', duration: 30, subject: 'Art' },
+      { day: 'thursday', time: '09:00', duration: 30, subject: 'Mathematics' },
+      { day: 'thursday', time: '11:00', duration: 30, subject: 'Social Studies' },
+      { day: 'thursday', time: '14:00', duration: 30, subject: 'Music' },
+      { day: 'friday', time: '09:00', duration: 30, subject: 'Science' },
+      { day: 'friday', time: '11:00', duration: 30, subject: 'English Language Arts' },
+      { day: 'friday', time: '14:00', duration: 30, subject: 'Physical Education' }
+    ]
+  },
+  {
+    id: 'math-intensive',
+    name: 'Math Intensive',
+    description: 'Extra focus on mathematics with supporting subjects',
+    category: 'subject',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 60, subject: 'Mathematics' },
+      { day: 'monday', time: '11:00', duration: 30, subject: 'Science' },
+      { day: 'tuesday', time: '09:00', duration: 60, subject: 'Mathematics' },
+      { day: 'tuesday', time: '11:00', duration: 30, subject: 'English Language Arts' },
+      { day: 'wednesday', time: '09:00', duration: 60, subject: 'Mathematics' },
+      { day: 'wednesday', time: '11:00', duration: 30, subject: 'Science' },
+      { day: 'thursday', time: '09:00', duration: 60, subject: 'Mathematics' },
+      { day: 'thursday', time: '11:00', duration: 30, subject: 'Social Studies' },
+      { day: 'friday', time: '09:00', duration: 45, subject: 'Mathematics' },
+      { day: 'friday', time: '11:00', duration: 30, subject: 'Art' }
+    ]
+  },
+  // Subject-Specific Templates
+  {
+    id: 'science-explorer',
+    name: 'Science Explorer',
+    description: 'Hands-on science experiments with related reading and math',
+    category: 'subject',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 60, subject: 'Science' },
+      { day: 'monday', time: '11:00', duration: 30, subject: 'Mathematics' },
+      { day: 'monday', time: '14:00', duration: 30, subject: 'Science Journal Writing' },
+      { day: 'tuesday', time: '09:00', duration: 45, subject: 'Science' },
+      { day: 'tuesday', time: '11:00', duration: 45, subject: 'English Language Arts' },
+      { day: 'wednesday', time: '09:00', duration: 60, subject: 'Science Lab' },
+      { day: 'wednesday', time: '11:00', duration: 30, subject: 'Mathematics' },
+      { day: 'thursday', time: '09:00', duration: 45, subject: 'Science' },
+      { day: 'thursday', time: '11:00', duration: 30, subject: 'Research Skills' },
+      { day: 'friday', time: '09:00', duration: 45, subject: 'Science Review' },
+      { day: 'friday', time: '11:00', duration: 30, subject: 'Art' }
+    ]
+  },
+  {
+    id: 'language-arts-intensive',
+    name: 'Language Arts Focus',
+    description: 'Reading, writing, and communication skills intensive',
+    category: 'subject',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 60, subject: 'English Language Arts' },
+      { day: 'monday', time: '11:00', duration: 30, subject: 'Creative Writing' },
+      { day: 'monday', time: '14:00', duration: 30, subject: 'Reading' },
+      { day: 'tuesday', time: '09:00', duration: 45, subject: 'Grammar & Vocabulary' },
+      { day: 'tuesday', time: '11:00', duration: 45, subject: 'Literature' },
+      { day: 'wednesday', time: '09:00', duration: 60, subject: 'Writing Workshop' },
+      { day: 'wednesday', time: '11:00', duration: 30, subject: 'Mathematics' },
+      { day: 'thursday', time: '09:00', duration: 45, subject: 'Reading Comprehension' },
+      { day: 'thursday', time: '11:00', duration: 30, subject: 'Public Speaking' },
+      { day: 'friday', time: '09:00', duration: 45, subject: 'Language Arts Review' },
+      { day: 'friday', time: '11:00', duration: 30, subject: 'Science' }
+    ]
+  },
+  {
+    id: 'stem-power-week',
+    name: 'STEM Power Week',
+    description: 'Science, Technology, Engineering, and Math combined focus',
+    category: 'subject',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 45, subject: 'Mathematics' },
+      { day: 'monday', time: '10:00', duration: 45, subject: 'Science' },
+      { day: 'monday', time: '14:00', duration: 30, subject: 'Engineering Design' },
+      { day: 'tuesday', time: '09:00', duration: 45, subject: 'Science' },
+      { day: 'tuesday', time: '10:00', duration: 45, subject: 'Mathematics' },
+      { day: 'tuesday', time: '14:00', duration: 30, subject: 'Technology Skills' },
+      { day: 'wednesday', time: '09:00', duration: 60, subject: 'STEM Project' },
+      { day: 'wednesday', time: '11:00', duration: 30, subject: 'English Language Arts' },
+      { day: 'thursday', time: '09:00', duration: 45, subject: 'Mathematics' },
+      { day: 'thursday', time: '10:00', duration: 45, subject: 'Science Lab' },
+      { day: 'friday', time: '09:00', duration: 60, subject: 'STEM Showcase' },
+      { day: 'friday', time: '11:00', duration: 30, subject: 'Art' }
+    ]
+  },
+  {
+    id: 'arts-creativity',
+    name: 'Arts & Creativity',
+    description: 'Focus on creative expression, art, music, and creative writing',
+    category: 'subject',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 45, subject: 'Art' },
+      { day: 'monday', time: '10:00', duration: 30, subject: 'Mathematics' },
+      { day: 'monday', time: '14:00', duration: 45, subject: 'Creative Writing' },
+      { day: 'tuesday', time: '09:00', duration: 60, subject: 'Music' },
+      { day: 'tuesday', time: '11:00', duration: 30, subject: 'English Language Arts' },
+      { day: 'wednesday', time: '09:00', duration: 45, subject: 'Drama & Theater' },
+      { day: 'wednesday', time: '10:00', duration: 30, subject: 'Science' },
+      { day: 'wednesday', time: '14:00', duration: 45, subject: 'Art History' },
+      { day: 'thursday', time: '09:00', duration: 60, subject: 'Creative Project' },
+      { day: 'thursday', time: '11:00', duration: 30, subject: 'Mathematics' },
+      { day: 'friday', time: '09:00', duration: 45, subject: 'Art Showcase' },
+      { day: 'friday', time: '10:00', duration: 30, subject: 'Physical Education' }
+    ]
+  },
+  {
+    id: 'history-deep-dive',
+    name: 'History Deep Dive',
+    description: 'Social studies intensive with timeline projects and research',
+    category: 'subject',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 60, subject: 'Social Studies' },
+      { day: 'monday', time: '11:00', duration: 30, subject: 'Mathematics' },
+      { day: 'monday', time: '14:00', duration: 30, subject: 'Geography' },
+      { day: 'tuesday', time: '09:00', duration: 45, subject: 'History Research' },
+      { day: 'tuesday', time: '10:00', duration: 45, subject: 'English Language Arts' },
+      { day: 'wednesday', time: '09:00', duration: 60, subject: 'Historical Writing' },
+      { day: 'wednesday', time: '11:00', duration: 30, subject: 'Science' },
+      { day: 'thursday', time: '09:00', duration: 45, subject: 'Social Studies' },
+      { day: 'thursday', time: '10:00', duration: 30, subject: 'Current Events' },
+      { day: 'friday', time: '09:00', duration: 45, subject: 'History Presentation' },
+      { day: 'friday', time: '10:00', duration: 30, subject: 'Art' }
+    ]
+  },
+  // Seasonal Templates
+  {
+    id: 'back-to-school',
+    name: 'Back to School Routine',
+    description: 'Gentle start with gradually increasing intensity',
+    category: 'seasonal',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 30, subject: 'Mathematics' },
+      { day: 'monday', time: '10:00', duration: 30, subject: 'English Language Arts' },
+      { day: 'monday', time: '14:00', duration: 20, subject: 'Study Skills' },
+      { day: 'tuesday', time: '09:00', duration: 30, subject: 'Science' },
+      { day: 'tuesday', time: '10:00', duration: 30, subject: 'Mathematics' },
+      { day: 'tuesday', time: '14:00', duration: 20, subject: 'Organization' },
+      { day: 'wednesday', time: '09:00', duration: 30, subject: 'English Language Arts' },
+      { day: 'wednesday', time: '10:00', duration: 30, subject: 'Social Studies' },
+      { day: 'thursday', time: '09:00', duration: 30, subject: 'Mathematics' },
+      { day: 'thursday', time: '10:00', duration: 30, subject: 'Science' },
+      { day: 'friday', time: '09:00', duration: 30, subject: 'Review' },
+      { day: 'friday', time: '10:00', duration: 30, subject: 'Fun Learning' }
+    ]
+  },
+  {
+    id: 'holiday-break-light',
+    name: 'Holiday Break Light',
+    description: 'Reduced intensity with fun educational activities',
+    category: 'seasonal',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '10:00', duration: 30, subject: 'Holiday Math Games' },
+      { day: 'monday', time: '14:00', duration: 30, subject: 'Holiday Reading' },
+      { day: 'tuesday', time: '10:00', duration: 30, subject: 'Science Experiments' },
+      { day: 'tuesday', time: '14:00', duration: 30, subject: 'Creative Writing' },
+      { day: 'wednesday', time: '10:00', duration: 30, subject: 'Cultural Studies' },
+      { day: 'wednesday', time: '14:00', duration: 30, subject: 'Art & Crafts' },
+      { day: 'thursday', time: '10:00', duration: 30, subject: 'Nature Study' },
+      { day: 'thursday', time: '14:00', duration: 30, subject: 'Music' },
+      { day: 'friday', time: '10:00', duration: 30, subject: 'Review Games' },
+      { day: 'friday', time: '14:00', duration: 30, subject: 'Family Learning' }
+    ]
+  },
+  {
+    id: 'test-prep-week',
+    name: 'Test Prep Week',
+    description: 'Intensive review and practice for upcoming assessments',
+    category: 'seasonal',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 60, subject: 'Math Review' },
+      { day: 'monday', time: '11:00', duration: 45, subject: 'Practice Test' },
+      { day: 'monday', time: '14:00', duration: 30, subject: 'Test Strategy' },
+      { day: 'tuesday', time: '09:00', duration: 60, subject: 'Language Arts Review' },
+      { day: 'tuesday', time: '11:00', duration: 45, subject: 'Writing Practice' },
+      { day: 'wednesday', time: '09:00', duration: 60, subject: 'Science Review' },
+      { day: 'wednesday', time: '11:00', duration: 45, subject: 'Practice Questions' },
+      { day: 'thursday', time: '09:00', duration: 60, subject: 'Social Studies Review' },
+      { day: 'thursday', time: '11:00', duration: 45, subject: 'Mock Test' },
+      { day: 'friday', time: '09:00', duration: 45, subject: 'Final Review' },
+      { day: 'friday', time: '10:00', duration: 30, subject: 'Relaxation & Confidence' }
+    ]
+  },
+  // Duration-Based Templates
+  {
+    id: 'quick-30min',
+    name: '30-Minute Sessions',
+    description: 'Shorter focused sessions perfect for younger children',
+    category: 'duration',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 30, subject: 'Mathematics' },
+      { day: 'monday', time: '10:00', duration: 30, subject: 'English Language Arts' },
+      { day: 'monday', time: '11:00', duration: 30, subject: 'Science' },
+      { day: 'tuesday', time: '09:00', duration: 30, subject: 'English Language Arts' },
+      { day: 'tuesday', time: '10:00', duration: 30, subject: 'Mathematics' },
+      { day: 'tuesday', time: '11:00', duration: 30, subject: 'Art' },
+      { day: 'wednesday', time: '09:00', duration: 30, subject: 'Science' },
+      { day: 'wednesday', time: '10:00', duration: 30, subject: 'Social Studies' },
+      { day: 'wednesday', time: '11:00', duration: 30, subject: 'Physical Education' },
+      { day: 'thursday', time: '09:00', duration: 30, subject: 'Mathematics' },
+      { day: 'thursday', time: '10:00', duration: 30, subject: 'English Language Arts' },
+      { day: 'thursday', time: '11:00', duration: 30, subject: 'Music' },
+      { day: 'friday', time: '09:00', duration: 30, subject: 'Review' },
+      { day: 'friday', time: '10:00', duration: 30, subject: 'Free Choice Learning' }
+    ]
+  },
+  {
+    id: 'deep-focus-60min',
+    name: '60-Minute Deep Focus',
+    description: 'Extended sessions for complex subjects and older students',
+    category: 'duration',
+    isDefault: true,
+    sessions: [
+      { day: 'monday', time: '09:00', duration: 60, subject: 'Mathematics' },
+      { day: 'monday', time: '11:00', duration: 60, subject: 'English Language Arts' },
+      { day: 'tuesday', time: '09:00', duration: 60, subject: 'Science' },
+      { day: 'tuesday', time: '11:00', duration: 60, subject: 'Social Studies' },
+      { day: 'wednesday', time: '09:00', duration: 60, subject: 'Mathematics' },
+      { day: 'wednesday', time: '11:00', duration: 60, subject: 'Research Project' },
+      { day: 'thursday', time: '09:00', duration: 60, subject: 'English Language Arts' },
+      { day: 'thursday', time: '11:00', duration: 60, subject: 'Science Lab' },
+      { day: 'friday', time: '09:00', duration: 60, subject: 'Independent Study' },
+      { day: 'friday', time: '11:00', duration: 60, subject: 'Creative Project' }
+    ]
+  }
+];
 
 export default function ScheduleTemplatesManager({
   isOpen,
@@ -30,6 +308,8 @@ export default function ScheduleTemplatesManager({
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [newTemplate, setNewTemplate] = useState({
     name: '',
     description: '',
@@ -44,88 +324,11 @@ export default function ScheduleTemplatesManager({
     weekly: 'Weekly Routines',
     subject: 'Subject-Specific',
     seasonal: 'Seasonal Schedules',
+    duration: 'Session Length',
     custom: 'Custom Templates'
   };
 
-  // Sample default templates
-  const DEFAULT_TEMPLATES = [
-    {
-      id: 'morning-focus',
-      name: 'Morning Focus',
-      description: 'High-cognitive subjects in the morning, lighter subjects in afternoon',
-      category: 'weekly',
-      isDefault: true,
-      sessions: [
-        { day: 'monday', time: '09:00', duration: 45, subject: 'Mathematics' },
-        { day: 'monday', time: '10:00', duration: 45, subject: 'Science' },
-        { day: 'monday', time: '14:00', duration: 30, subject: 'Art' },
-        { day: 'tuesday', time: '09:00', duration: 45, subject: 'English Language Arts' },
-        { day: 'tuesday', time: '10:00', duration: 45, subject: 'Mathematics' },
-        { day: 'tuesday', time: '14:00', duration: 30, subject: 'Physical Education' },
-        { day: 'wednesday', time: '09:00', duration: 45, subject: 'Science' },
-        { day: 'wednesday', time: '10:00', duration: 45, subject: 'Mathematics' },
-        { day: 'wednesday', time: '14:00', duration: 30, subject: 'Music' },
-        { day: 'thursday', time: '09:00', duration: 45, subject: 'English Language Arts' },
-        { day: 'thursday', time: '10:00', duration: 45, subject: 'Social Studies' },
-        { day: 'thursday', time: '14:00', duration: 30, subject: 'Art' },
-        { day: 'friday', time: '09:00', duration: 45, subject: 'Mathematics' },
-        { day: 'friday', time: '10:00', duration: 45, subject: 'Science' },
-        { day: 'friday', time: '14:00', duration: 30, subject: 'Physical Education' }
-      ]
-    },
-    {
-      id: 'balanced-daily',
-      name: 'Balanced Daily',
-      description: 'Evenly distributed subjects throughout the day',
-      category: 'weekly',
-      isDefault: true,
-      sessions: [
-        { day: 'monday', time: '09:00', duration: 30, subject: 'Mathematics' },
-        { day: 'monday', time: '11:00', duration: 30, subject: 'English Language Arts' },
-        { day: 'monday', time: '14:00', duration: 30, subject: 'Science' },
-        { day: 'tuesday', time: '09:00', duration: 30, subject: 'Science' },
-        { day: 'tuesday', time: '11:00', duration: 30, subject: 'Mathematics' },
-        { day: 'tuesday', time: '14:00', duration: 30, subject: 'Social Studies' },
-        { day: 'wednesday', time: '09:00', duration: 30, subject: 'English Language Arts' },
-        { day: 'wednesday', time: '11:00', duration: 30, subject: 'Science' },
-        { day: 'wednesday', time: '14:00', duration: 30, subject: 'Art' },
-        { day: 'thursday', time: '09:00', duration: 30, subject: 'Mathematics' },
-        { day: 'thursday', time: '11:00', duration: 30, subject: 'Social Studies' },
-        { day: 'thursday', time: '14:00', duration: 30, subject: 'Music' },
-        { day: 'friday', time: '09:00', duration: 30, subject: 'Science' },
-        { day: 'friday', time: '11:00', duration: 30, subject: 'English Language Arts' },
-        { day: 'friday', time: '14:00', duration: 30, subject: 'Physical Education' }
-      ]
-    },
-    {
-      id: 'math-intensive',
-      name: 'Math Intensive',
-      description: 'Extra focus on mathematics with supporting subjects',
-      category: 'subject',
-      isDefault: true,
-      sessions: [
-        { day: 'monday', time: '09:00', duration: 60, subject: 'Mathematics' },
-        { day: 'monday', time: '11:00', duration: 30, subject: 'Science' },
-        { day: 'tuesday', time: '09:00', duration: 60, subject: 'Mathematics' },
-        { day: 'tuesday', time: '11:00', duration: 30, subject: 'English Language Arts' },
-        { day: 'wednesday', time: '09:00', duration: 60, subject: 'Mathematics' },
-        { day: 'wednesday', time: '11:00', duration: 30, subject: 'Science' },
-        { day: 'thursday', time: '09:00', duration: 60, subject: 'Mathematics' },
-        { day: 'thursday', time: '11:00', duration: 30, subject: 'Social Studies' },
-        { day: 'friday', time: '09:00', duration: 45, subject: 'Mathematics' },
-        { day: 'friday', time: '11:00', duration: 30, subject: 'Art' }
-      ]
-    }
-  ];
-
-  // Load templates on component mount
-  useEffect(() => {
-    if (isOpen) {
-      loadTemplates();
-    }
-  }, [isOpen, childId]);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
       // In a real implementation, this would fetch from the API
       // For now, we'll use default templates plus any saved custom templates
@@ -135,7 +338,14 @@ export default function ScheduleTemplatesManager({
       console.error('Error loading templates:', error);
       setTemplates(DEFAULT_TEMPLATES);
     }
-  };
+  }, [childId]);
+
+  // Load templates on component mount
+  useEffect(() => {
+    if (isOpen) {
+      loadTemplates();
+    }
+  }, [isOpen, loadTemplates]);
 
   const saveTemplate = async (template) => {
     try {
@@ -167,6 +377,110 @@ export default function ScheduleTemplatesManager({
       await loadTemplates();
     } catch (error) {
       console.error('Error deleting template:', error);
+    }
+  };
+
+  // Filter templates based on category and search term
+  const filteredTemplates = templates.filter(template => {
+    const matchesCategory = filterCategory === 'all' || template.category === filterCategory;
+    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         template.description.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  // Quick action templates for easy access
+  const quickActionTemplates = filteredTemplates.filter(t => 
+    ['morning-focus', 'balanced-daily', 'math-intensive', 'science-explorer'].includes(t.id)
+  ).slice(0, 3);
+
+  // Quick Action Functions
+  const copyLastWeekAsTemplate = async () => {
+    try {
+      // Get last week's date range
+      const today = new Date();
+      const lastWeekStart = new Date(today);
+      lastWeekStart.setDate(today.getDate() - 7);
+      const lastWeekEnd = new Date(today);
+      lastWeekEnd.setDate(today.getDate() - 1);
+
+      // This would normally fetch from API, but for now we'll simulate
+      // In a real implementation, you'd call an API to get schedule entries for the date range
+      const mockLastWeekSchedule = [
+        // This would be populated with actual schedule entries
+      ];
+
+      if (mockLastWeekSchedule.length === 0) {
+        alert('No schedule entries found for last week to copy.');
+        return;
+      }
+
+      // Convert schedule entries to template format
+      const templateSessions = mockLastWeekSchedule.map(entry => ({
+        day: new Date(entry.scheduled_date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase(),
+        time: entry.start_time,
+        duration: entry.duration_minutes,
+        subject: entry.subject_name
+      }));
+
+      const template = {
+        name: `Last Week Copy - ${new Date().toLocaleDateString()}`,
+        description: 'Copy of last week\'s schedule',
+        category: 'custom',
+        sessions: templateSessions
+      };
+
+      await saveTemplate(template);
+      alert('Last week\'s schedule has been saved as a template!');
+    } catch (error) {
+      console.error('Error copying last week:', error);
+      alert('Failed to copy last week\'s schedule. Please try again.');
+    }
+  };
+
+  const copyCurrentWeekAsTemplate = async () => {
+    try {
+      // Get current week's date range
+      const today = new Date();
+      const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+      const weekEnd = addDays(weekStart, 6);
+
+      // This would normally fetch current week's actual schedule
+      const mockCurrentSchedule = [
+        // This would be populated with actual schedule entries
+      ];
+
+      if (mockCurrentSchedule.length === 0) {
+        alert('No schedule entries found for this week to copy.');
+        return;
+      }
+
+      const templateSessions = mockCurrentSchedule.map(entry => ({
+        day: new Date(entry.scheduled_date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase(),
+        time: entry.start_time,
+        duration: entry.duration_minutes,
+        subject: entry.subject_name
+      }));
+
+      const template = {
+        name: `Current Week Copy - ${new Date().toLocaleDateString()}`,
+        description: 'Copy of this week\'s schedule',
+        category: 'custom',
+        sessions: templateSessions
+      };
+
+      await saveTemplate(template);
+      alert('This week\'s schedule has been saved as a template!');
+    } catch (error) {
+      console.error('Error copying current week:', error);
+      alert('Failed to copy current week\'s schedule. Please try again.');
+    }
+  };
+
+  const applyQuickTemplate = async (templateId) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template && onApplyTemplate) {
+      const startDate = new Date().toISOString().split('T')[0];
+      await onApplyTemplate(template, startDate);
     }
   };
 
@@ -558,27 +872,113 @@ export default function ScheduleTemplatesManager({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-gray-900">Available Templates</h4>
-                <span className="text-sm text-gray-500">{templates.length} templates</span>
+                <span className="text-sm text-gray-500">{filteredTemplates.length} templates</span>
+              </div>
+
+              {/* Quick Actions Bar */}
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <h5 className="text-sm font-medium text-blue-900 mb-3 flex items-center gap-2">
+                  ⚡ Quick Actions
+                </h5>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={copyLastWeekAsTemplate}
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
+                  >
+                    <DocumentDuplicateIcon className="h-3 w-3 mr-1" />
+                    Copy Last Week
+                  </button>
+                  <button
+                    onClick={copyCurrentWeekAsTemplate}
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
+                  >
+                    <CalendarDaysIcon className="h-3 w-3 mr-1" />
+                    Copy This Week
+                  </button>
+                  {quickActionTemplates.map(template => (
+                    <button
+                      key={template.id}
+                      onClick={() => applyQuickTemplate(template.id)}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 transition-colors"
+                    >
+                      <CheckIcon className="h-3 w-3 mr-1" />
+                      Apply {template.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Search and Filter */}
+              <div className="space-y-3">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search templates..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-8 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={() => setFilterCategory('all')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                      filterCategory === 'all'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {Object.entries(TEMPLATE_CATEGORIES).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setFilterCategory(key)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                        filterCategory === key
+                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
               
-              {Object.entries(TEMPLATE_CATEGORIES).map(([category, label]) => {
-                const categoryTemplates = templates.filter(t => t.category === category);
-                if (categoryTemplates.length === 0) return null;
-                
-                return (
-                  <div key={category}>
-                    <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                      {label}
-                      <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
-                        {categoryTemplates.length}
-                      </span>
-                    </h5>
-                    <div className="space-y-2">
-                      {categoryTemplates.map(renderTemplateCard)}
+              {/* Templates by Category */}
+              {filteredTemplates.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="text-4xl mb-2">🔍</div>
+                  <p className="text-sm">No templates found</p>
+                  <p className="text-xs">Try adjusting your search or filter</p>
+                </div>
+              ) : (
+                Object.entries(TEMPLATE_CATEGORIES).map(([category, label]) => {
+                  const categoryTemplates = filteredTemplates.filter(t => t.category === category);
+                  if (categoryTemplates.length === 0) return null;
+                  
+                  return (
+                    <div key={category}>
+                      <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        {label}
+                        <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                          {categoryTemplates.length}
+                        </span>
+                      </h5>
+                      <div className="space-y-2">
+                        {categoryTemplates.map(renderTemplateCard)}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             {/* Template Preview */}
@@ -637,21 +1037,115 @@ export default function ScheduleTemplatesManager({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Templates List */}
               <div className="space-y-4">
-                <h4 className="font-medium text-gray-900">Available Templates</h4>
-                
-                {Object.entries(TEMPLATE_CATEGORIES).map(([category, label]) => {
-                  const categoryTemplates = templates.filter(t => t.category === category);
-                  if (categoryTemplates.length === 0) return null;
-                  
-                  return (
-                    <div key={category}>
-                      <h5 className="text-sm font-medium text-gray-700 mb-2">{label}</h5>
-                      <div className="space-y-2">
-                        {categoryTemplates.map(renderTemplateCard)}
-                      </div>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-gray-900">Available Templates</h4>
+                  <span className="text-sm text-gray-500">{filteredTemplates.length} templates</span>
+                </div>
+
+                {/* Quick Actions Bar */}
+                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                  <h5 className="text-sm font-medium text-blue-900 mb-3 flex items-center gap-2">
+                    ⚡ Quick Actions
+                  </h5>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={copyLastWeekAsTemplate}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
+                    >
+                      <DocumentDuplicateIcon className="h-3 w-3 mr-1" />
+                      Copy Last Week
+                    </button>
+                    <button
+                      onClick={copyCurrentWeekAsTemplate}
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
+                    >
+                      <CalendarDaysIcon className="h-3 w-3 mr-1" />
+                      Copy This Week
+                    </button>
+                    {quickActionTemplates.map(template => (
+                      <button
+                        key={template.id}
+                        onClick={() => applyQuickTemplate(template.id)}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 transition-colors"
+                      >
+                        <CheckIcon className="h-3 w-3 mr-1" />
+                        Apply {template.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Search and Filter */}
+                <div className="space-y-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search templates..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
                     </div>
-                  );
-                })}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1">
+                    <button
+                      onClick={() => setFilterCategory('all')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                        filterCategory === 'all'
+                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {Object.entries(TEMPLATE_CATEGORIES).map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setFilterCategory(key)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                          filterCategory === key
+                            ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Templates by Category */}
+                {filteredTemplates.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="text-4xl mb-2">🔍</div>
+                    <p className="text-sm">No templates found</p>
+                    <p className="text-xs">Try adjusting your search or filter</p>
+                  </div>
+                ) : (
+                  Object.entries(TEMPLATE_CATEGORIES).map(([category, label]) => {
+                    const categoryTemplates = filteredTemplates.filter(t => t.category === category);
+                    if (categoryTemplates.length === 0) return null;
+                    
+                    return (
+                      <div key={category}>
+                        <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                          {label}
+                          <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                            {categoryTemplates.length}
+                          </span>
+                        </h5>
+                        <div className="space-y-2">
+                          {categoryTemplates.map(renderTemplateCard)}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               {/* Template Preview */}

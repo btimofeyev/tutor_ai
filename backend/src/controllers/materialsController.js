@@ -298,7 +298,10 @@ exports.saveMaterial = async (req, res) => {
     lesson_json, 
     grade_max_value, 
     due_date, 
-    completed_at 
+    completed_at,
+    parent_material_id, // NEW: Links to parent lesson material
+    material_relationship, // NEW: 'primary_lesson', 'worksheet_for', 'assignment_for', 'supplement_for'
+    is_primary_lesson // NEW: Boolean flag for primary lesson content
   } = req.body;
 
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
@@ -330,7 +333,10 @@ exports.saveMaterial = async (req, res) => {
       status: 'approved',
       grade_max_value: normalizeStringOrNull(grade_max_value),
       due_date: normalizeStringOrNull(due_date),
-      completed_at: completed_at ? new Date(completed_at).toISOString() : null
+      completed_at: completed_at ? new Date(completed_at).toISOString() : null,
+      parent_material_id: normalizeStringOrNull(parent_material_id), // Links to parent lesson
+      material_relationship: normalizeStringOrNull(material_relationship), // Type of relationship
+      is_primary_lesson: is_primary_lesson === true // Ensure boolean
     };
 
     const { data, error } = await supabase
@@ -482,6 +488,69 @@ exports.listMaterialsForChildSubject = async (req, res) => {
   }
 };
 
+// --- Get Materials Grouped by Lesson ---
+exports.getMaterialsByLessonGrouped = async (req, res) => {
+  const parent_id = getParentId(req);
+  const { lesson_id } = req.params;
+
+  if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
+  if (!lesson_id) return res.status(400).json({ error: 'lesson_id is required' });
+
+  try {
+    // Verify parent owns the lesson
+    const isOwner = await verifyLessonOwnership(parent_id, lesson_id);
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Access denied to this lesson' });
+    }
+
+    // Get all materials for this lesson, ordered by primary lesson first, then by relationship
+    const { data: materials, error } = await supabase
+      .from('materials')
+      .select('*')
+      .eq('lesson_id', lesson_id)
+      .order('is_primary_lesson', { ascending: false })
+      .order('material_relationship')
+      .order('created_at');
+
+    if (error) {
+      console.error('Error fetching materials:', error);
+      return res.status(500).json({ error: 'Failed to fetch materials' });
+    }
+
+    // Group materials by their relationship to the primary lesson
+    const grouped = {
+      primary_lesson: null,
+      worksheets: [],
+      assignments: [],
+      supplements: [],
+      other: []
+    };
+
+    materials.forEach(material => {
+      if (material.is_primary_lesson) {
+        grouped.primary_lesson = material;
+      } else if (material.material_relationship === 'worksheet_for') {
+        grouped.worksheets.push(material);
+      } else if (material.material_relationship === 'assignment_for') {
+        grouped.assignments.push(material);
+      } else if (material.material_relationship === 'supplement_for') {
+        grouped.supplements.push(material);
+      } else {
+        grouped.other.push(material);
+      }
+    });
+
+    res.json({ 
+      lesson_id,
+      materials: grouped,
+      total_materials: materials.length 
+    });
+  } catch (error) {
+    console.error('Error in getMaterialsByLessonGrouped:', error);
+    res.status(500).json({ error: 'Failed to fetch grouped materials' });
+  }
+};
+
 // --- Update Material Details ---
 exports.updateMaterialDetails = async (req, res) => {
   const parent_id = getParentId(req);
@@ -495,41 +564,75 @@ exports.updateMaterialDetails = async (req, res) => {
     grade_max_value, 
     grading_notes,
     completed_at, 
-    due_date
+    due_date,
+    parent_material_id, // NEW: Update parent material link
+    material_relationship, // NEW: Update relationship type
+    is_primary_lesson // NEW: Update primary lesson flag
   } = req.body;
 
   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
   if (!material_id) return res.status(400).json({ error: 'material_id is required' });
 
   try {
-    // First get the material to verify ownership
+    // First get the material with basic info
     const { data: material, error: materialError } = await supabase
       .from('materials')
-      .select(`
-        id,
-        lesson:lesson_id (
-          id,
-          unit:unit_id (
-            id,
-            child_subject:child_subject_id (
-              id,
-              child:child_id (
-                id,
-                parent_id
-              )
-            )
-          )
-        )
-      `)
+      .select('id, lesson_id, child_subject_id')
       .eq('id', material_id)
       .single();
 
-    if (materialError || !material || material.lesson.unit.child_subject.child.parent_id !== parent_id) {
-      return res.status(403).json({ error: 'Access denied to this material' });
+    console.log('Material ownership check:', { 
+      materialError, 
+      material, 
+      parent_id
+    });
+
+    if (materialError) {
+      console.error('Supabase error fetching material:', materialError);
+      return res.status(500).json({ error: 'Database error fetching material' });
+    }
+
+    if (!material) {
+      return res.status(404).json({ error: 'Material not found' });
+    }
+
+    // Verify ownership based on whether the material has a lesson_id or not
+    let ownershipVerified = false;
+
+    if (material.lesson_id) {
+      // Material belongs to a lesson - verify through lesson ownership
+      const isOwner = await verifyLessonOwnership(parent_id, material.lesson_id);
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Access denied to this material via lesson' });
+      }
+      ownershipVerified = true;
+    } else if (material.child_subject_id) {
+      // Material belongs directly to a child subject - verify through child subject
+      const { data: childSubject, error: csError } = await supabase
+        .from('child_subjects')
+        .select(`
+          id,
+          child:child_id (
+            id,
+            parent_id
+          )
+        `)
+        .eq('id', material.child_subject_id)
+        .single();
+
+      if (csError || !childSubject || childSubject.child.parent_id !== parent_id) {
+        console.log('Child subject ownership check failed:', { csError, childSubject });
+        return res.status(403).json({ error: 'Access denied to this material via child subject' });
+      }
+      ownershipVerified = true;
+    }
+
+    if (!ownershipVerified) {
+      return res.status(403).json({ error: 'Could not verify ownership of this material' });
     }
 
     // If changing lesson_id, verify ownership of the new lesson
-    if (lesson_id && lesson_id !== material.lesson.id) {
+    if (lesson_id && lesson_id !== material.lesson_id) {
       const isNewLessonOwner = await verifyLessonOwnership(parent_id, lesson_id);
       if (!isNewLessonOwner) {
         return res.status(403).json({ error: 'Access denied to the target lesson' });
@@ -557,6 +660,11 @@ exports.updateMaterialDetails = async (req, res) => {
       updateData.completed_at = completed_at ? new Date(completed_at).toISOString() : null;
     }
     if (due_date !== undefined) updateData.due_date = normalizeStringOrNull(due_date);
+    
+    // Handle new relationship fields
+    if (parent_material_id !== undefined) updateData.parent_material_id = normalizeStringOrNull(parent_material_id);
+    if (material_relationship !== undefined) updateData.material_relationship = normalizeStringOrNull(material_relationship);
+    if (is_primary_lesson !== undefined) updateData.is_primary_lesson = is_primary_lesson === true;
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No valid update data provided' });

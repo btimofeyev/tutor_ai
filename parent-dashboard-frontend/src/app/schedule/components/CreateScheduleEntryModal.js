@@ -145,13 +145,11 @@ export default function CreateScheduleEntryModal({
       
       // Get units for this subject
       const units = unitsBySubject[subjectId] || [];
-      console.log(`Found ${units.length} units for subject ${subject.name}:`, units);
       setAvailableUnits(units);
       
       // Get lessons for this subject and filter out completed/scheduled ones
       const allLessons = lessonsBySubject[subjectId] || [];
       const availableLessons = filterAvailableLessons(allLessons);
-      console.log(`Found ${availableLessons.length} available lessons for subject ${subject.name}`);
       setAvailableLessons(availableLessons);
     }
   };
@@ -161,20 +159,16 @@ export default function CreateScheduleEntryModal({
     setSelectedUnitId(unitId);
     setFormData(prev => ({ ...prev, material_id: '' }));
     
-    console.log('Unit selection:', { unitId, selectedSubjectId });
     
     if (selectedSubjectId) {
       const allLessons = lessonsBySubject[selectedSubjectId] || [];
-      console.log('All lessons for subject:', allLessons);
       
       if (unitId) {
         // Get lesson containers for this unit
         const lessonContainersForUnit = lessonsByUnit[unitId] || [];
-        console.log('Lesson containers for unit:', lessonContainersForUnit);
         
         // Extract lesson container IDs
         const lessonContainerIds = lessonContainersForUnit.map(container => container.id);
-        console.log('Lesson container IDs:', lessonContainerIds);
         
         // Filter materials that belong to these lesson containers
         const unitLessons = allLessons.filter(lesson => {

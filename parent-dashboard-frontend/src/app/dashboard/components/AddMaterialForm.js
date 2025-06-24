@@ -1,6 +1,6 @@
 // app/dashboard/components/AddMaterialForm.js
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   DocumentArrowUpIcon, 
   CheckCircleIcon as CheckSolidIcon, 
@@ -53,42 +53,71 @@ export default function AddMaterialForm({
   lessonCompletedForApproval,
   onLessonCompletedForApprovalChange,
 
-  lessonContainersForSelectedUnit, 
+  lessonContainersForSelectedUnit,
+  
+  // New props for pre-upload unit/lesson selection
+  lessonsByUnit,
+  setLessonsByUnit,
 }) {
 
-  const [newLessonGroupTitle, setNewLessonGroupTitle] = useState('');
-  const [isCreatingLessonGroup, setIsCreatingLessonGroup] = useState(false);
-  const [newUnitName, setNewUnitName] = useState('');
-  const [isCreatingUnit, setIsCreatingUnit] = useState(false);
+  // Removed newLessonGroupTitle, isCreatingLessonGroup, newUnitName, isCreatingUnit 
+  // since unit and lesson group are now pre-selected before upload
+  
+  // Pre-upload unit and lesson container selection
+  const [preUploadSelectedUnit, setPreUploadSelectedUnit] = useState('');
+  const [preUploadSelectedLessonContainer, setPreUploadSelectedLessonContainer] = useState('');
+  const [preUploadLessonContainers, setPreUploadLessonContainers] = useState([]);
+  const [preUploadSelectedUnitName, setPreUploadSelectedUnitName] = useState('');
+  const [preUploadSelectedLessonContainerName, setPreUploadSelectedLessonContainerName] = useState('');
+  const hasSyncedPreUploadSelections = useRef(false);
 
   // Unit in this approval form is driven by lessonJsonForApproval.unit_id
   const unitIdInApprovalForm = lessonJsonForApproval?.unit_id || '';
 
-  // Effect to reset lesson container when the unit in lessonJsonForApproval changes
-  useEffect(() => {
-    // onLessonContainerChange is a global handler
-    if(onLessonContainerChange) { // Ensure prop exists
-        onLessonContainerChange({ target: { value: '' } }); 
-    }
-    setIsCreatingLessonGroup(false); 
-    setNewLessonGroupTitle('');
-  }, [unitIdInApprovalForm, onLessonContainerChange]);
+  // Note: Unit and lesson container management removed since they're pre-selected
   
-  // Sync isCreatingLessonGroup with the global selectedLessonContainer state
+  // Effect to reset pre-upload selections when subject changes
   useEffect(() => {
-    setIsCreatingLessonGroup(selectedLessonContainer === '__create_new__');
-    if (selectedLessonContainer !== '__create_new__') {
-      setNewLessonGroupTitle('');
-    }
-  }, [selectedLessonContainer]);
-
-  // Sync isCreatingUnit with the approval form's unit selection
+    setPreUploadSelectedUnit('');
+    setPreUploadSelectedLessonContainer('');
+    setPreUploadSelectedUnitName('');
+    setPreUploadSelectedLessonContainerName('');
+    hasSyncedPreUploadSelections.current = false; // Reset sync flag
+  }, [currentAddLessonSubject]);
+  
+  // Effect to reset pre-upload lesson container when unit changes
   useEffect(() => {
-    setIsCreatingUnit(unitIdInApprovalForm === '__create_new__');
-    if (unitIdInApprovalForm !== '__create_new__') {
-      setNewUnitName('');
+    setPreUploadSelectedLessonContainer('');
+    setPreUploadSelectedLessonContainerName('');
+  }, [preUploadSelectedUnit]);
+  
+  // Effect to sync pre-upload selections to approval form when file is uploaded
+  useEffect(() => {
+    // Reset sync flag when starting fresh (no lesson JSON)
+    if (!lessonJsonForApproval) {
+      hasSyncedPreUploadSelections.current = false;
+      return;
     }
-  }, [unitIdInApprovalForm]);
+    
+    if (lessonJsonForApproval && !hasSyncedPreUploadSelections.current) {
+      // Set the unit in the approval form to match pre-upload selection
+      if (preUploadSelectedUnit && onUpdateLessonJsonField) {
+        onUpdateLessonJsonField('unit_id', preUploadSelectedUnit);
+      }
+      
+      // Use a timeout to ensure unit is set before setting lesson container
+      setTimeout(() => {
+        if (preUploadSelectedLessonContainer && onLessonContainerChange) {
+          onLessonContainerChange({ target: { value: preUploadSelectedLessonContainer } });
+        }
+      }, 100);
+      
+      // Mark as synced to prevent re-running
+      hasSyncedPreUploadSelections.current = true;
+    }
+  }, [lessonJsonForApproval, preUploadSelectedUnit, preUploadSelectedLessonContainer]);
+  
+  // Note: Removed unit and lesson group creation logic since they're pre-selected before upload
 
   const handleJsonFieldChange = (e, fieldName) => {
     if(onUpdateLessonJsonField) onUpdateLessonJsonField(fieldName, e.target.value);
@@ -104,37 +133,54 @@ export default function AddMaterialForm({
   const commonLabelClasses = "block text-xs font-medium text-text-secondary mb-1";
   const commonSelectClasses = `${commonInputClasses} h-10`;
 
-  const handleInternalCreateNewUnit = async () => { 
-    if (!newUnitName.trim()) { alert("Please enter a name for the new unit."); return; }
-    if (!currentAddLessonSubject) { alert("A subject must be selected before creating a new unit."); return; }
+  // Note: Removed unit and lesson group creation handlers since they're handled before upload
+  
+  // Handler for pre-upload unit selection
+  const handlePreUploadUnitChange = async (e) => {
+    const unitId = e.target.value;
+    setPreUploadSelectedUnit(unitId);
     
-    const result = await onCreateNewUnit(newUnitName.trim(), currentAddLessonSubject);
-    if (result && result.success) {
-        setNewUnitName('');
-        // Select the newly created unit in the approval form
-        if (onUpdateLessonJsonField && result.data) {
-          onUpdateLessonJsonField('unit_id', result.data.id);
+    // Store the unit name for display
+    const selectedUnit = unitsForSelectedSubject?.find(u => u.id === unitId);
+    setPreUploadSelectedUnitName(selectedUnit?.name || '');
+    
+    // Fetch lesson containers for this unit if not already loaded
+    if (unitId && (!lessonsByUnit[unitId] || !Array.isArray(lessonsByUnit[unitId]))) {
+      try {
+        const api = (await import('../../../utils/api')).default;
+        const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
+        const lessonContainers = lessonsRes.data || [];
+        
+        if (setLessonsByUnit) {
+          setLessonsByUnit(prev => ({
+            ...prev,
+            [unitId]: lessonContainers
+          }));
         }
-    } else {
-        alert(result?.error || 'Failed to create unit. Please try again.');
+        // Update local state as well
+        setPreUploadLessonContainers(lessonContainers);
+      } catch (error) {
+        console.error('Failed to fetch lesson containers:', error);
+        if (setLessonsByUnit) {
+          setLessonsByUnit(prev => ({
+            ...prev,
+            [unitId]: []
+          }));
+        }
+        // Update local state as well
+        setPreUploadLessonContainers([]);
+      }
     }
   };
-
-  const handleInternalCreateNewLessonGroup = async () => { 
-    if (!newLessonGroupTitle.trim()) { alert("Please enter a title for the new lesson group."); return; }
-    if (!unitIdInApprovalForm) { alert("A unit must be selected in the approval form before creating a new lesson group."); return; }
-    
-    const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim(), unitIdInApprovalForm);
-    if (result && result.success) {
-        setNewLessonGroupTitle(''); 
-        // Set the new lesson group as selected in the approval form
-        if (result.data && onSelectedLessonContainerChange) {
-          onSelectedLessonContainerChange({ target: { value: result.data.id } });
-        }
+  
+  // Update preUploadLessonContainers when unit selection changes
+  useEffect(() => {
+    if (preUploadSelectedUnit && lessonsByUnit[preUploadSelectedUnit]) {
+      setPreUploadLessonContainers(lessonsByUnit[preUploadSelectedUnit] || []);
     } else {
-        alert(result?.error || 'Failed to create lesson group. Please try again.');
+      setPreUploadLessonContainers([]);
     }
-  };
+  }, [preUploadSelectedUnit, lessonsByUnit]);
 
   return (
     <div className="space-y-6"> 
@@ -162,6 +208,75 @@ export default function AddMaterialForm({
             </select>
           </div>
         </div>
+        
+        {/* Pre-upload unit and lesson group selection */}
+        {currentAddLessonSubject && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div>
+              <label htmlFor="pre-upload-unit" className={commonLabelClasses}>
+                Unit <span className="text-text-tertiary">(Optional - to group with existing lessons)</span>
+              </label>
+              <select 
+                id="pre-upload-unit" 
+                value={preUploadSelectedUnit} 
+                onChange={handlePreUploadUnitChange} 
+                className={commonSelectClasses}
+              >
+                <option value="">Select unit to see lesson groups...</option>
+                {(unitsForSelectedSubject || []).map(unit => (
+                  <option key={unit.id} value={unit.id}>{unit.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="pre-upload-lesson-container" className={commonLabelClasses}>
+                Group with Previous Lesson <span className="text-text-tertiary">(Optional)</span>
+              </label>
+              <select 
+                id="pre-upload-lesson-container" 
+                value={preUploadSelectedLessonContainer} 
+                onChange={(e) => {
+                  const lessonId = e.target.value;
+                  setPreUploadSelectedLessonContainer(lessonId);
+                  // Store the lesson container name for display
+                  const selectedLesson = preUploadLessonContainers.find(l => l.id === lessonId);
+                  setPreUploadSelectedLessonContainerName(selectedLesson?.title || '');
+                }}
+                className={commonSelectClasses}
+                disabled={!preUploadSelectedUnit}
+              >
+                <option value="">Create new lesson group...</option>
+                {preUploadLessonContainers.map(lesson => (
+                  <option key={lesson.id} value={lesson.id}>{lesson.title}</option>
+                ))}
+              </select>
+              {!preUploadSelectedUnit && (
+                <p className="text-xs text-text-tertiary italic mt-0.5">Select a unit first to see lesson groups.</p>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Show selected organization info when lesson group is selected */}
+        {preUploadSelectedLessonContainer && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <h4 className="text-sm font-medium text-green-800 mb-2">📁 Organization Selected</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-green-700">Unit:</span>
+                <span className="font-medium text-green-900">{preUploadSelectedUnitName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-green-700">Lesson Group:</span>
+                <span className="font-medium text-green-900">{preUploadSelectedLessonContainerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-green-700">Content Type:</span>
+                <span className="font-medium text-green-900">{formatContentTypeName(currentAddLessonUserContentType)}</span>
+              </div>
+            </div>
+          </div>
+        )}
         
         <div>
             <label htmlFor="lesson-file-input-main" className={commonLabelClasses}>File(s) *</label>
@@ -205,7 +320,7 @@ export default function AddMaterialForm({
       </form>
 
       {lessonJsonForApproval && (
-        <div className="mt-6 border-t border-border-subtle pt-6 space-y-4 animate-fade-in">
+        <div className="mt-4 border-t border-border-subtle pt-4 space-y-3 animate-fade-in">
           <div>
             <h3 className="text-md font-semibold text-text-primary mb-1">Review & Approve</h3>
             <p className="text-sm text-text-secondary mb-3">Confirm or adjust the details extracted by Klio AI.</p>
@@ -217,18 +332,19 @@ export default function AddMaterialForm({
             <h4 className="text-sm font-semibold text-accent-blue mb-2 flex items-center">
                 <BookOpenIcon className="h-4 w-4 mr-1.5"/> Material Details
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2">
               <div>
                 <label htmlFor="lesson-title-approval" className={commonLabelClasses}>Title *</label>
                 <input id="lesson-title-approval" value={lessonTitleForApproval || ''} onChange={onLessonTitleForApprovalChange} className={commonInputClasses} required/>
               </div>
               <div>
-                <label htmlFor="lesson-content-type-approval" className={commonLabelClasses}>Content Type *</label>
-                <select id="lesson-content-type-approval" value={lessonContentTypeForApproval || ''} onChange={onLessonContentTypeForApprovalChange} className={commonSelectClasses} required>
-                  {(appContentTypes || []).map(type => ( <option key={type} value={type}>{formatContentTypeName(type)}</option> ))}
-                </select>
+                <label className={commonLabelClasses}>Content Type</label>
+                <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 text-sm">
+                  {formatContentTypeName(currentAddLessonUserContentType)} 
+                  <span className="text-gray-500 ml-2">(selected before upload)</span>
+                </div>
               </div>
-              {(appGradableContentTypes || []).includes(lessonContentTypeForApproval) && (
+              {(appGradableContentTypes || []).includes(currentAddLessonUserContentType) && (
                 <div>
                     <label htmlFor="lesson-max-points-approval" className={commonLabelClasses}>Max Score</label>
                     <input type="number" id="lesson-max-points-approval" value={lessonMaxPointsForApproval || ''} onChange={onLessonMaxPointsForApprovalChange} className={commonInputClasses} placeholder="e.g., 100"/>
@@ -242,97 +358,30 @@ export default function AddMaterialForm({
                     <input type="date" id="lesson-due-date-approval" value={lessonDueDateForApproval || ''} onChange={onLessonDueDateForApprovalChange} className={commonInputClasses}/>
                 </div>
             </div>
-            <div>
-                <label htmlFor="lesson-unit-approval" className={`${commonLabelClasses} mt-2`}>Assign to Unit *</label>
-                <select 
-                    id="lesson-unit-approval" 
-                    value={unitIdInApprovalForm} 
-                    onChange={(e) => onUpdateLessonJsonField('unit_id', e.target.value || null)}
-                    className={commonSelectClasses} 
-                    disabled={!currentAddLessonSubject} 
-                    required
-                > 
-                    <option value="">-- Select a Unit --</option>
-                    <option value="__create_new__" className="font-medium text-accent-blue">+ Create New Unit</option>
-                    {(unitsForSelectedSubject || []).map(unit => ( <option key={unit.id} value={unit.id}>{unit.name}</option> ))}
-                </select>
-                {!currentAddLessonSubject && <p className="text-xs text-text-tertiary italic mt-0.5">Select a subject first to manage units.</p>}
-            </div>
-
-            {isCreatingUnit && currentAddLessonSubject && (
-              <div className="mt-2 p-3 border border-dashed border-blue-300 rounded-md bg-blue-50/50 animate-fade-in">
-                <label htmlFor="new-unit-name-approval" className={`${commonLabelClasses} text-accent-blue`}>New Unit Name *</label>
-                <div className="flex gap-2 mt-1 items-center">
-                  <input
-                    type="text"
-                    id="new-unit-name-approval"
-                    value={newUnitName}
-                    onChange={(e) => setNewUnitName(e.target.value)}
-                    className={`${commonInputClasses} flex-1`}
-                    placeholder="e.g., Unit 3: Fractions"
-                    required={isCreatingUnit}
-                  />
-                  <Button
-                    type="button"
-                    variant="primary" 
-                    size="sm" 
-                    onClick={handleInternalCreateNewUnit}
-                    className="h-10 whitespace-nowrap"
-                    disabled={!newUnitName.trim() || savingLesson}
-                  >
-                    <PlusIcon className="h-4 w-4 mr-1.5"/> Create
-                  </Button>
+            {/* Unit and Lesson Group are pre-selected during upload, so we show them as read-only info */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <h4 className="text-sm font-medium text-green-800 mb-2">Assignment Details</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-green-700">Unit:</span>
+                  <span className="font-medium text-green-900">
+                    {preUploadSelectedUnitName || unitsForSelectedSubject?.find(u => u.id === unitIdInApprovalForm)?.name || 'Selected Unit'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-green-700">Lesson Group:</span>
+                  <span className="font-medium text-green-900">
+                    {preUploadSelectedLessonContainerName || 
+                     (unitIdInApprovalForm && lessonsByUnit[unitIdInApprovalForm]?.find(l => l.id === selectedLessonContainer)?.title) || 
+                     lessonContainersForSelectedUnit?.find(l => l.id === selectedLessonContainer)?.title || 
+                     (selectedLessonContainer ? 'Selected Lesson Group' : 'New Lesson Group')}
+                  </span>
                 </div>
               </div>
-            )}
-            
-            <div className="mt-3">
-                <label htmlFor="lesson-container-approval" className={commonLabelClasses}>
-                    Lesson Group * <span className="text-highlight-yellow">(e.g., &quot;Week 1 Algebra&quot;)</span>
-                </label>
-                <select 
-                    id="lesson-container-approval" 
-                    value={selectedLessonContainer || ''} 
-                    onChange={onLessonContainerChange}
-                    className={commonSelectClasses} 
-                    required
-                    disabled={!unitIdInApprovalForm}
-                >
-                    <option value="">-- Choose or Create Lesson Group --</option>
-                    <option value="__create_new__" className="font-medium text-accent-blue">+ Create New Lesson Group</option>
-                    {(lessonContainersForSelectedUnit || []).map(lesson => ( 
-                        <option key={lesson.id} value={lesson.id}>{lesson.title}</option> 
-                    ))}
-                </select>
-                {!unitIdInApprovalForm && <p className="text-xs text-text-tertiary italic mt-0.5">Select a unit first to manage lesson groups.</p>}
+              <p className="text-xs text-green-600 mt-2 italic">
+                These were selected before upload. To change them, cancel and start over.
+              </p>
             </div>
-
-            {isCreatingLessonGroup && unitIdInApprovalForm && (
-              <div className="mt-2 p-3 border border-dashed border-blue-300 rounded-md bg-blue-50/50 animate-fade-in">
-                <label htmlFor="new-lesson-group-title-approval" className={`${commonLabelClasses} text-accent-blue`}>New Lesson Group Title *</label>
-                <div className="flex gap-2 mt-1 items-center">
-                  <input
-                    type="text"
-                    id="new-lesson-group-title-approval"
-                    value={newLessonGroupTitle}
-                    onChange={(e) => setNewLessonGroupTitle(e.target.value)}
-                    className={`${commonInputClasses} flex-1`}
-                    placeholder="e.g., Chapter 1 Activities"
-                    required={isCreatingLessonGroup}
-                  />
-                  <Button
-                    type="button"
-                    variant="primary" 
-                    size="sm" 
-                    onClick={handleInternalCreateNewLessonGroup}
-                    className="h-10 whitespace-nowrap"
-                    disabled={!newLessonGroupTitle.trim() || savingLesson}
-                  >
-                    <PlusIcon className="h-4 w-4 mr-1.5"/> Create
-                  </Button>
-                </div>
-              </div>
-            )}
 
             <div className="flex items-center pt-2">
                 <input type="checkbox" id="lesson-completed-approval" checked={lessonCompletedForApproval} onChange={onLessonCompletedForApprovalChange} className="h-4 w-4 text-accent-blue border-border-input rounded focus:ring-accent-blue"/>
@@ -393,11 +442,13 @@ export default function AddMaterialForm({
           )}
           
           <Button 
-            onClick={onApprove} 
+            onClick={() => onApprove({
+              // Simplified - no material relationship needed since we infer from content type
+            })} 
             variant="primary" 
             size="md"
             className="w-full !bg-[#ABEBC6] !text-green-900 !border-b-[#7DCEA0] hover:!bg-[#A2E4B9] hover:!border-b-[#68C38B] active:!bg-[#7DCEA0] focus:!ring-[#7DCEA0]"
-            disabled={savingLesson || !lessonTitleForApproval || !lessonContentTypeForApproval || !selectedLessonContainer || (selectedLessonContainer === '__create_new__') || (json && json.error) || !unitIdInApprovalForm || (unitIdInApprovalForm === '__create_new__') }>
+            disabled={savingLesson || !lessonTitleForApproval || !currentAddLessonUserContentType || !selectedLessonContainer || (selectedLessonContainer === '__create_new__') || (json && json.error) || !unitIdInApprovalForm || (unitIdInApprovalForm === '__create_new__') }>
             {savingLesson ? (
                 <><ArrowPathIcon className="h-5 w-5 mr-2 animate-spin"/>Saving...</>
             ) : (

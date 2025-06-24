@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import api from '../../utils/api';
 
 export default function LessonsPage() {
@@ -150,7 +151,7 @@ export default function LessonsPage() {
         </div>
       )}
       <div style={{ marginTop: 16 }}>
-        <a href="/">Back to Dashboard</a>
+        <Link href="/">Back to Dashboard</Link>
       </div>
     </div>
   );

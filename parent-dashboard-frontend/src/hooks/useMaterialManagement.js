@@ -9,7 +9,6 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
   const [addLessonUserContentType, setAddLessonUserContentType] = useState(APP_CONTENT_TYPES[0]);
   const [lessonJsonForApproval, setLessonJsonForApproval] = useState(null);
   const [lessonTitleForApproval, setLessonTitleForApproval] = useState("");
-  const [lessonContentTypeForApproval, setLessonContentTypeForApproval] = useState(APP_CONTENT_TYPES[0]);
   const [lessonMaxPointsForApproval, setLessonMaxPointsForApproval] = useState("");
   const [lessonDueDateForApproval, setLessonDueDateForApproval] = useState("");
   const [lessonCompletedForApproval, setLessonCompletedForApproval] = useState(false);
@@ -55,21 +54,23 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
 
   const handleSaveLesson = useCallback(async (childId) => {
     if (!lessonJsonForApproval) return { success: false, error: "No lesson data to save" };
+    if (!addLessonSubject) return { success: false, error: "No subject selected" };
     setSavingLesson(true);
     try {
       const lessonData = {
         lesson_id: selectedLessonContainer,
+        child_subject_id: addLessonSubject,
         title: lessonTitleForApproval,
-        content_type: lessonContentTypeForApproval,
+        content_type: addLessonUserContentType, // Use upfront selection instead of approval form
         lesson_json: lessonJsonForApproval,
         grade_max_value: lessonMaxPointsForApproval || null,
         due_date: lessonDueDateForApproval || null,
         completed_at: lessonCompletedForApproval ? new Date().toISOString() : null,
+        // Simplified: Material relationship inferred from content_type on backend
       };
       await api.post('/materials/save', lessonData);
       setLessonJsonForApproval(null);
       setLessonTitleForApproval("");
-      setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
       setLessonMaxPointsForApproval("");
       setLessonDueDateForApproval("");
       setLessonCompletedForApproval(false);
@@ -84,7 +85,7 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
     } finally {
       setSavingLesson(false);
     }
-  }, [lessonJsonForApproval, selectedLessonContainer, lessonTitleForApproval, lessonContentTypeForApproval, lessonMaxPointsForApproval, lessonDueDateForApproval, lessonCompletedForApproval, refreshChildData, invalidateChildCache]);
+  }, [lessonJsonForApproval, addLessonSubject, selectedLessonContainer, lessonTitleForApproval, addLessonUserContentType, lessonMaxPointsForApproval, lessonDueDateForApproval, lessonCompletedForApproval, refreshChildData, invalidateChildCache]);
 
   const updateLessonApprovalField = useCallback((fieldName, value) => {
     setLessonJsonForApproval((prevJson) => ({ ...(prevJson || {}), [fieldName]: value }));
@@ -224,7 +225,6 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
     addLessonUserContentType, setAddLessonUserContentType,
     lessonJsonForApproval, setLessonJsonForApproval,
     lessonTitleForApproval, setLessonTitleForApproval,
-    lessonContentTypeForApproval, setLessonContentTypeForApproval,
     lessonMaxPointsForApproval, setLessonMaxPointsForApproval,
     lessonDueDateForApproval, setLessonDueDateForApproval,
     lessonCompletedForApproval, setLessonCompletedForApproval,

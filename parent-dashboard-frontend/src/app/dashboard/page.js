@@ -494,7 +494,7 @@ export default function DashboardPage() {
     if (
       !materialManagement.lessonJsonForApproval ||
       !materialManagement.lessonTitleForApproval ||
-      !materialManagement.lessonContentTypeForApproval
+      !materialManagement.addLessonUserContentType
     ) {
       alert("Missing data for approval.");
       return;
@@ -505,7 +505,7 @@ export default function DashboardPage() {
       return;
     }
     
-    const result = await materialManagement.handleSaveLesson(childrenData.selectedChild?.id, materialRelationshipData);
+    const result = await materialManagement.handleSaveLesson(childrenData.selectedChild?.id);
   
     if (result.success) {
       const fileInput = document.getElementById("lesson-file-input-main"); 
@@ -740,9 +740,22 @@ export default function DashboardPage() {
       const existingUnits = childrenData.unitsBySubject[managingUnitsForSubject.id] || [];
       const existingUnitNames = existingUnits.map(u => u.name.toLowerCase());
       
+      // Parse the base name to extract existing number
+      const match = baseName.match(/^(.+?)\s+(\d+)$/);
+      let namePrefix, startingNumber;
+      
+      if (match) {
+        // Base name contains a number (e.g., "Section 1")
+        namePrefix = match[1]; // "Section"
+        startingNumber = parseInt(match[2]); // 1
+      } else {
+        // Base name doesn't contain a number (e.g., "Chapter")
+        namePrefix = baseName;
+        startingNumber = 1;
+      }
+      
       // Find starting number that doesn't conflict
-      let startingNumber = 1;
-      while (existingUnitNames.includes(`${baseName} ${startingNumber}`.toLowerCase())) {
+      while (existingUnitNames.includes(`${namePrefix} ${startingNumber}`.toLowerCase())) {
         startingNumber++;
       }
       
@@ -751,7 +764,7 @@ export default function DashboardPage() {
       
       // Create units one by one to avoid race conditions
       for (let i = 0; i < bulkUnitCount; i++) {
-        const unitName = `${baseName} ${startingNumber + i}`;
+        const unitName = `${namePrefix} ${startingNumber + i}`;
         
         // Double-check this name doesn't exist
         if (existingUnitNames.includes(unitName.toLowerCase())) {
@@ -850,6 +863,7 @@ export default function DashboardPage() {
       return;
 
     try {
+      console.log('Attempting to delete unit:', unitId);
       await api.delete(`/units/${unitId}`);
       const updatedUnitsList = (
         childrenData.unitsBySubject[managingUnitsForSubject.id] || []
@@ -863,8 +877,11 @@ export default function DashboardPage() {
 
       if (editingUnit?.id === unitId) setEditingUnit(null);
       await childrenData.refreshChildSpecificData();
+      showSuccess("Unit deleted successfully.");
     } catch (error) {
-      alert(error.response?.data?.error || "Could not delete unit.");
+      console.error("Error deleting unit:", error);
+      const errorMessage = error.response?.data?.error || error.message || "Could not delete unit.";
+      showError(`Failed to delete unit: ${errorMessage}`);
     }
   };
 
@@ -1213,10 +1230,6 @@ export default function DashboardPage() {
                   onLessonTitleForApprovalChange={(e) =>
                     materialManagement.setLessonTitleForApproval(e.target.value)
                   }
-                  lessonContentTypeForApproval={materialManagement.lessonContentTypeForApproval}
-                  onLessonContentTypeForApprovalChange={(e) =>
-                    materialManagement.setLessonContentTypeForApproval(e.target.value)
-                  }
                   lessonMaxPointsForApproval={materialManagement.lessonMaxPointsForApproval}
                   onLessonMaxPointsForApprovalChange={(e) =>
                     materialManagement.setLessonMaxPointsForApproval(e.target.value)
@@ -1449,7 +1462,7 @@ export default function DashboardPage() {
                                 <span className="text-2xl mr-3">📖</span>
                                 <div>
                                   <h4 className="text-lg font-semibold text-gray-900">
-                                    Unit {index + 1}: {unit.name}
+                                    {unit.name}
                                   </h4>
                                   {unit.description && (
                                     <p className="text-gray-600 text-sm mt-1 leading-relaxed">

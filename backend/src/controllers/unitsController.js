@@ -267,6 +267,8 @@ exports.deleteUnit = async (req, res) => {
   const parent_id = getParentId(req);
   const { unit_id } = req.params;
 
+  console.log('Deleting unit:', { parent_id, unit_id });
+
   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
   if (!unit_id) return res.status(400).json({ error: 'unit_id is required' });
 
@@ -285,7 +287,9 @@ exports.deleteUnit = async (req, res) => {
         )
       `)
       .eq('id', unit_id)
-      .single();
+      .maybeSingle();
+
+    console.log('Unit query result:', { unitData, fetchError });
 
     if (fetchError) throw fetchError;
     if (!unitData) return res.status(404).json({ error: 'Unit not found' });
@@ -296,24 +300,35 @@ exports.deleteUnit = async (req, res) => {
     }
 
     // Check if unit has lessons (which would have materials)
-    const { count: lessonsCount } = await supabase
+    const { count: lessonsCount, error: countError } = await supabase
       .from('lessons')
       .select('*', { count: 'exact', head: true })
       .eq('unit_id', unit_id);
 
+    console.log('Lessons count check:', { lessonsCount, countError });
+
+    if (countError) {
+      console.error('Error checking lessons count:', countError);
+      // Continue with deletion if count check fails
+    }
+
     if (lessonsCount > 0) {
+      console.log(`Unit has ${lessonsCount} lessons, cannot delete`);
       return res.status(400).json({ 
-        error: `Cannot delete unit with ${lessonsCount} existing lessons. Delete lessons first or move them to another unit.`
+        error: `Cannot delete unit with ${lessonsCount} existing lessons. Delete lesson groups first or move them to another unit.`
       });
     }
 
     // Delete the unit
-    const { error } = await supabase
+    console.log('Proceeding with unit deletion');
+    const { error: deleteError } = await supabase
       .from('units')
       .delete()
       .eq('id', unit_id);
 
-    if (error) throw error;
+    console.log('Deletion result:', { deleteError });
+
+    if (deleteError) throw deleteError;
     res.json({ 
       message: 'Unit deleted successfully',
       deleted_unit: {

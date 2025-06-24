@@ -70,6 +70,8 @@ exports.createLessonContainer = async (req, res) => {
   const parent_id = getParentId(req);
   const { unit_id, title, lesson_number, description, sequence_order } = req.body;
 
+  // console.log('Creating lesson container:', { parent_id, unit_id, title, lesson_number, description, sequence_order });
+
   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
   if (!unit_id || !title) {
     return res.status(400).json({ error: 'unit_id and title are required' });
@@ -110,10 +112,8 @@ exports.createLessonContainer = async (req, res) => {
         .limit(1)
         .maybeSingle();
 
-      // Add timestamp component to avoid race conditions during bulk creation
-      const baseOrder = lastLesson ? (lastLesson.sequence_order || 0) + 1 : 1;
-      const timestampComponent = Date.now() % 1000; // Last 3 digits of timestamp
-      finalSequenceOrder = baseOrder * 1000 + timestampComponent;
+      // Simple sequential numbering to avoid race conditions
+      finalSequenceOrder = lastLesson ? (lastLesson.sequence_order || 0) + 1 : 1;
     }
 
     // Create the lesson container
@@ -129,11 +129,21 @@ exports.createLessonContainer = async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error creating lesson container:', error);
+      throw error;
+    }
     res.status(201).json(data);
   } catch (error) {
-    console.error('Error creating lesson container:', error);
-    res.status(500).json({ error: error.message || 'Failed to create lesson container' });
+    console.error('Error creating lesson container:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      statusCode: error.statusCode,
+      full_error: error
+    });
+    res.status(500).json({ error: error.message || error.details || 'Failed to create lesson container' });
   }
 };
 

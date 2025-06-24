@@ -149,10 +149,29 @@ export default function SchedulePage() {
   };
 
 
-  // Get assigned subjects for the current child
+  // Get assigned subjects for the current child or all selected children
   const assignedSubjectsForCurrentChild = childrenData.selectedChild 
     ? childrenData.childSubjects[childrenData.selectedChild.id] || []
     : [];
+
+  // Get all subjects for selected children (for AI scheduling)
+  const allSubjectsForSelectedChildren = selectedChildrenIds.length >= 1
+    ? selectedChildrenIds.reduce((allSubjects, childId) => {
+        const childSubjects = childrenData.childSubjects[childId] || [];
+        
+        // Combine subjects, avoiding duplicates by subject name
+        childSubjects.forEach(subject => {
+          const subjectName = subject.custom_subject_name_override || subject.name;
+          
+          if (subjectName && !allSubjects.some(s => 
+            (s.custom_subject_name_override || s.name) === subjectName
+          )) {
+            allSubjects.push(subject);
+          }
+        });
+        return allSubjects;
+      }, [])
+    : assignedSubjectsForCurrentChild;
 
   // Get lessons/materials for the current child across all subjects
   const materialsForCurrentChild = childrenData.selectedChild && childrenData.lessonsBySubject
@@ -273,7 +292,7 @@ export default function SchedulePage() {
                   selectedChildrenIds={selectedChildrenIds}
                   allChildren={childrenData.children}
                   subscriptionPermissions={subscriptionPermissions}
-                  childSubjects={assignedSubjectsForCurrentChild}
+                  childSubjects={allSubjectsForSelectedChildren}
                   schedulePreferences={scheduleManagement.schedulePreferences}
                   scheduleManagement={scheduleManagement}
                 />
@@ -289,7 +308,7 @@ export default function SchedulePage() {
         onClose={scheduleManagement.closeCreateModal}
         onSave={handleCreateEntry}
         selectedSlot={scheduleManagement.editingEntry}
-        childSubjects={assignedSubjectsForCurrentChild}
+        childSubjects={allSubjectsForSelectedChildren}
         materials={materialsForCurrentChild}
         lessonsBySubject={childrenData.lessonsBySubject}
         unitsBySubject={childrenData.unitsBySubject}
@@ -307,7 +326,7 @@ export default function SchedulePage() {
         onSave={handleUpdateEntry}
         onDelete={handleDeleteEntry}
         scheduleEntry={scheduleManagement.editingEntry}
-        childSubjects={assignedSubjectsForCurrentChild}
+        childSubjects={allSubjectsForSelectedChildren}
         materials={materialsForCurrentChild}
         lessonsBySubject={childrenData.lessonsBySubject}
         unitsBySubject={childrenData.unitsBySubject}

@@ -55,6 +55,7 @@ export default function SubjectCard({
     onDeleteMaterial,
     onCreateLessonGroup
 }) {
+    const [isSubjectExpanded, setIsSubjectExpanded] = useState(true); // Subject card collapsible state
     const [expandedUnits, setExpandedUnits] = useState({});
     const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
     const [creatingLessonGroupForUnit, setCreatingLessonGroupForUnit] = useState(null);
@@ -307,9 +308,17 @@ export default function SubjectCard({
             {/* Header Section */}
             <div className="p-4 sm:p-6 bg-gradient-to-r from-gray-50/80 to-white">
                 <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-                    {/* Left Side: Title and Stats */}
-                    <div className="flex-1 min-w-[200px]">
-                        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 truncate">{subject.name}</h3>
+                    {/* Left Side: Title and Stats - Clickable to expand/collapse */}
+                    <button 
+                        className="flex-1 min-w-[200px] text-left focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg -m-2 p-2"
+                        onClick={() => setIsSubjectExpanded(!isSubjectExpanded)}
+                    >
+                        <div className="flex items-center gap-2 mb-2">
+                            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{subject.name}</h3>
+                            <div className={`transition-transform duration-200 ${isSubjectExpanded ? 'rotate-180' : ''}`}>
+                                <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+                            </div>
+                        </div>
                         {subjectStats && (
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                                 <div className="flex items-center gap-2">
@@ -328,7 +337,7 @@ export default function SubjectCard({
                                 )}
                             </div>
                         )}
-                    </div>
+                    </button>
 
                     {/* Right Side: Chart and Buttons */}
                     <div className="flex items-center gap-x-4 sm:gap-x-6">
@@ -359,26 +368,28 @@ export default function SubjectCard({
                 </div>
             </div>
 
-            {/* Content Section */}
-            <div className="p-4 sm:p-6">
+            {/* Content Section - Collapsible */}
+            <div className={`transition-all duration-300 ease-in-out ${isSubjectExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
+                <div className="p-4 sm:p-6">
                 {upcomingDueItems.length > 0 && (
-                    <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-orange-200">
-                        <h4 className="text-sm font-semibold text-orange-800 mb-3 flex items-center">
-                            <ClockIcon className="h-4 w-4 mr-2 sm:mr-3" />
-                            Upcoming Deadlines
+                    <div className="mb-3 p-2 bg-amber-50 rounded border-l-2 border-orange-300">
+                        <h4 className="text-xs font-medium text-orange-700 mb-1 flex items-center">
+                            <ClockIcon className="h-3 w-3 mr-1" />
+                            Upcoming Deadlines ({upcomingDueItems.length})
                         </h4>
-                        <ul className="space-y-2">
-                            {upcomingDueItems.map(item => (
-                                <MaterialListItem
-                                    key={item.id}
-                                    lesson={item}
-                                    onOpenEditModal={onOpenEditModal}
-                                    onToggleComplete={onToggleComplete}
-                                    onDeleteMaterial={onDeleteMaterial}
-                                    isCompact={true}
-                                />
+                        <div className="text-xs text-orange-600 space-y-0.5">
+                            {upcomingDueItems.slice(0, 3).map(item => (
+                                <div key={item.id} className="flex justify-between items-center">
+                                    <span className="truncate mr-2">{item.title}</span>
+                                    <span className="text-orange-500 whitespace-nowrap">
+                                        {new Date(item.due_date + 'T00:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                    </span>
+                                </div>
                             ))}
-                        </ul>
+                            {upcomingDueItems.length > 3 && (
+                                <div className="text-orange-500 italic">+ {upcomingDueItems.length - 3} more</div>
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -412,6 +423,7 @@ export default function SubjectCard({
                         <p className="text-gray-500 text-sm">No materials or units for this subject yet.</p>
                     </div>
                 )}
+                </div>
             </div>
         </div>
     );

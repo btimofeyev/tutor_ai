@@ -200,7 +200,7 @@ export default function StudentSidebar({
           {showSubscriptionDetails && (
             <div className="mt-2 px-2">
               <SubscriptionManager
-                children={childrenList || []}
+                childrenList={childrenList || []}
                 compact={true}
                 initialSubscription={subscription}
               />

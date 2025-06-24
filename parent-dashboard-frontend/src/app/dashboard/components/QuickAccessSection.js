@@ -54,70 +54,34 @@ const QuickAccessItem = ({ lesson, onToggleComplete, onEdit, onDelete, type }) =
   const borderColor = type === 'overdue' ? 'border-l-red-500' : 'border-l-orange-500';
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow border-l-4 ${borderColor}`}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            {type === 'overdue' ? (
-              <ExclamationTriangleIcon className={`h-4 w-4 ${iconColor} flex-shrink-0`} />
-            ) : (
-              <ClockIcon className={`h-4 w-4 ${iconColor} flex-shrink-0`} />
-            )}
-            <h4 className="text-sm font-medium text-gray-900 truncate" title={lesson.title}>
-              {lesson.title}
-            </h4>
-          </div>
-          
-          <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
-            <span className="capitalize">{lesson.content_type?.replace(/_/g, ' ')}</span>
-            {lesson.subject_name && (
-              <>
-                <span>•</span>
-                <span>{lesson.subject_name}</span>
-              </>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500">
-              Due: {formatDueDate(lesson.due_date)}
-            </span>
-            
-            {statusInfo && (
-              <span className={`text-xs px-2 py-1 rounded-full ${statusInfo.color} ${statusInfo.bgColor} font-medium`}>
-                {statusInfo.text}
-              </span>
-            )}
-          </div>
+    <div className={`border-l-2 ${borderColor} bg-gray-50 p-2 rounded text-xs`}>
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          {type === 'overdue' ? (
+            <ExclamationTriangleIcon className={`h-3 w-3 ${iconColor} flex-shrink-0`} />
+          ) : (
+            <ClockIcon className={`h-3 w-3 ${iconColor} flex-shrink-0`} />
+          )}
+          <span className="font-medium text-gray-900 truncate" title={lesson.title}>
+            {lesson.title}
+          </span>
+          <span className="text-gray-500">•</span>
+          <span className="text-gray-500 whitespace-nowrap">
+            {formatDueDate(lesson.due_date)}
+          </span>
         </div>
 
         <div className="flex items-center gap-1 ml-2 flex-shrink-0">
           <button
             onClick={() => onToggleComplete(lesson.id, !isCompleted)}
-            className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+            className="p-0.5 rounded hover:bg-gray-200 transition-colors"
             title={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
           >
             {isCompleted ? (
-              <CheckSolidIcon className="h-4 w-4 text-green-500" />
+              <CheckSolidIcon className="h-3 w-3 text-green-500" />
             ) : (
-              <div className="h-4 w-4 border-2 border-gray-300 rounded-full hover:border-green-500" />
+              <div className="h-3 w-3 border border-gray-400 rounded-full hover:border-green-500" />
             )}
-          </button>
-          
-          <button
-            onClick={() => onEdit(lesson)}
-            className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-            title="Edit"
-          >
-            <PencilSquareIcon className="h-4 w-4 text-gray-400 hover:text-blue-500" />
-          </button>
-          
-          <button
-            onClick={() => onDelete(lesson)}
-            className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-            title="Delete"
-          >
-            <TrashIcon className="h-4 w-4 text-gray-400 hover:text-red-500" />
           </button>
         </div>
       </div>
@@ -157,18 +121,18 @@ export default function QuickAccessSection({
   }
 
   return (
-    <div className="mb-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="mb-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* Overdue Items */}
         {overdueItems.length > 0 && (
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />
-              <h3 className="text-lg font-semibold text-red-700">
+            <div className="flex items-center gap-1 mb-2">
+              <ExclamationTriangleIcon className="h-4 w-4 text-red-500" />
+              <h3 className="text-sm font-semibold text-red-700">
                 Overdue ({overdueItems.length})
               </h3>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {overdueItems.map(lesson => (
                 <QuickAccessItem
                   key={`overdue-${lesson.id}`}
@@ -186,13 +150,13 @@ export default function QuickAccessSection({
         {/* Upcoming Items */}
         {upcomingItems.length > 0 && (
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <ClockIcon className="h-5 w-5 text-orange-500" />
-              <h3 className="text-lg font-semibold text-orange-700">
+            <div className="flex items-center gap-1 mb-2">
+              <ClockIcon className="h-4 w-4 text-orange-500" />
+              <h3 className="text-sm font-semibold text-orange-700">
                 Due Soon ({upcomingItems.length})
               </h3>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {upcomingItems.map(lesson => (
                 <QuickAccessItem
                   key={`upcoming-${lesson.id}`}

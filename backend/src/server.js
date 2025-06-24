@@ -1,6 +1,15 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
+
+// Create tmp directory for file uploads if it doesn't exist
+const tmpDir = path.join(__dirname, '..', 'tmp');
+if (!fs.existsSync(tmpDir)) {
+  fs.mkdirSync(tmpDir, { recursive: true });
+  console.log('Created tmp directory for file uploads');
+}
 
 const childrenRoutes = require('./routes/childrenRoutes');
 const subjectsRoutes = require('./routes/subjectsRoutes');

@@ -17,12 +17,8 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showAIScheduleModal, setShowAIScheduleModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
 
-  // State for AI scheduling
-  const [aiScheduling, setAiScheduling] = useState(false);
-  const [aiScheduleResult, setAiScheduleResult] = useState(null);
 
   // Fetch schedule entries for a child
   const fetchScheduleEntries = useCallback(async (childId) => {
@@ -393,74 +389,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     setShowSettingsModal(false);
   };
 
-  // AI Schedule Modal helpers
-  const openAIScheduleModal = () => {
-    setShowAIScheduleModal(true);
-  };
-
-  const closeAIScheduleModal = () => {
-    setShowAIScheduleModal(false);
-    setAiScheduleResult(null);
-  };
-
-  // Generate AI schedule
-  const generateAISchedule = async (options = {}) => {
-    try {
-      setAiScheduling(true);
-      setError(null);
-      
-      // Default options
-      const {
-        start_date = new Date().toISOString().split('T')[0],
-        end_date = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
-        scheduling_mode = 'balanced',
-        focus_subjects = [],
-        max_daily_sessions = 4,
-        session_duration = 45,
-        break_duration = 15
-      } = options;
-
-      console.log('🤖 Generating AI schedule for child:', childId);
-
-      const response = await api.post('/schedule/ai-generate', {
-        child_id: childId,
-        start_date,
-        end_date,
-        scheduling_mode,
-        focus_subjects,
-        max_daily_sessions,
-        session_duration,
-        break_duration
-      });
-
-      if (response.data.success) {
-        // Update schedule entries with the new AI-generated ones
-        await fetchScheduleEntries(childId);
-        
-        setAiScheduleResult(response.data);
-        setError(null);
-        
-        return {
-          success: true,
-          data: response.data,
-          summary: response.data.summary
-        };
-      } else {
-        throw new Error(response.data.error || 'Failed to generate AI schedule');
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to generate AI schedule';
-      setError(errorMessage);
-      console.error('AI scheduling error:', err);
-      
-      return {
-        success: false,
-        error: errorMessage
-      };
-    } finally {
-      setAiScheduling(false);
-    }
-  };
 
   // Load data when childId changes
   useEffect(() => {
@@ -484,12 +412,8 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     showCreateModal,
     showEditModal,
     showSettingsModal,
-    showAIScheduleModal,
     editingEntry,
 
-    // AI Scheduling states
-    aiScheduling,
-    aiScheduleResult,
     
     // CRUD operations
     createScheduleEntry,
@@ -510,11 +434,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     closeEditModal,
     openSettingsModal,
     closeSettingsModal,
-    openAIScheduleModal,
-    closeAIScheduleModal,
-
-    // AI Scheduling functions
-    generateAISchedule,
     
     // Refresh - only if we have API connectivity, otherwise keep local state
     refresh: () => {

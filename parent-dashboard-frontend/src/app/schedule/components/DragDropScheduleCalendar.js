@@ -199,6 +199,9 @@ export default function DragDropScheduleCalendar({
   const [dragOverInfo, setDragOverInfo] = useState(null);
   const [localChanges, setLocalChanges] = useState(false);
 
+  // Always call the hook to satisfy React rules
+  const fallbackScheduleManagement = useScheduleManagement(childId, subscriptionPermissions);
+  
   const {
     calendarEvents,
     loading,
@@ -206,7 +209,7 @@ export default function DragDropScheduleCalendar({
     openCreateModal,
     openEditModal,
     updateScheduleEntry
-  } = scheduleManagement || useScheduleManagement(childId, subscriptionPermissions);
+  } = scheduleManagement ?? fallbackScheduleManagement;
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -368,7 +371,7 @@ export default function DragDropScheduleCalendar({
       console.error('Failed to update event:', error);
       alert('Failed to move the event. Please try again.');
     }
-  }, [calendarEvents, updateScheduleEntry, onEventUpdate, allChildren]);
+  }, [calendarEvents, updateScheduleEntry, onEventUpdate, childId]);
 
   // Handle event resizing
   const handleEventResize = useCallback(async (event, direction) => {

@@ -475,36 +475,275 @@ class MCPClientHttpService {
     return { title: line.replace('- ', '').trim() };
   }
 
+  // New parsing methods for comprehensive content types
+  parseLessonsFromText(text) {
+    const lessons = [];
+    const lines = text.split('\n');
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('- ')) {
+        // Updated regex to handle new format: - 📄 **Title** [content_type] (Subject) - Due: date
+        const lessonMatch = line.match(/- (?:📄|📚|📝|❓|📋)\s*\*\*(.+?)\*\*\s*\[(.+?)\]\s*\((.+?)\)(?:\s*-\s*Due:\s*(.+))?$/);
+        if (lessonMatch) {
+          const lesson = {
+            title: lessonMatch[1].trim(),
+            content_type: lessonMatch[2].trim(),
+            subject: lessonMatch[3].trim(),
+            due_date: lessonMatch[4] ? lessonMatch[4].trim() : null
+          };
+          
+          // Parse enhanced lesson content from subsequent lines
+          let j = i + 1;
+          while (j < lines.length && lines[j].trim().startsWith('  ')) {
+            const contentLine = lines[j].trim();
+            
+            if (contentLine.startsWith('📋 Objectives:')) {
+              lesson.objectives = contentLine.replace('📋 Objectives:', '').trim().split(', ');
+            } else if (contentLine.startsWith('📖 Focus:')) {
+              lesson.focus = contentLine.replace('📖 Focus:', '').trim();
+            } else if (contentLine.startsWith('🔑 Key concepts:')) {
+              lesson.keywords = contentLine.replace('🔑 Key concepts:', '').trim().split(', ');
+            } else if (contentLine.startsWith('📊 Level:')) {
+              lesson.difficulty_level = contentLine.replace('📊 Level:', '').trim();
+            }
+            
+            j++;
+          }
+          
+          lessons.push(lesson);
+          i = j - 1; // Skip the lines we just processed
+        }
+      }
+    }
+    
+    return lessons;
+  }
+
+  parseAssignmentsFromText(text) {
+    const assignments = [];
+    const lines = text.split('\n');
+    
+    lines.forEach((line, i) => {
+      if (line.trim().startsWith('- ')) {
+        const match = line.match(/- (?:\*\*)?(.+?)(?:\*\*)?\s*(?:\[(.+?)\])?\s*\((.+?)\)\s*-\s*Due:\s*(.+)$/);
+        if (match) {
+          const assignment = {
+            title: match[1].trim(),
+            content_type: match[2] ? match[2].trim() : 'assignment',
+            subject: match[3].trim(),
+            due_date: match[4].trim(),
+            status: 'overdue'
+          };
+          
+          // Check next line for related lesson
+          if (i + 1 < lines.length && lines[i + 1].trim().startsWith('Related to:')) {
+            assignment.related_lesson = lines[i + 1].trim().replace('Related to:', '').trim();
+          }
+          
+          assignments.push(assignment);
+        }
+      }
+    });
+    
+    return assignments;
+  }
+
+  parseTestsQuizzesFromText(text) {
+    const items = [];
+    const lines = text.split('\n');
+    
+    lines.forEach(line => {
+      if (line.trim().startsWith('- ')) {
+        const match = line.match(/- (📋 Test|❓ Quiz):\s*(?:\*\*)?(.+?)(?:\*\*)?\s*\((.+?)\)(?:\s*-\s*Due:\s*(.+))?$/);
+        if (match) {
+          items.push({
+            type: match[1].includes('Test') ? 'test' : 'quiz',
+            title: match[2].trim(),
+            subject: match[3].trim(),
+            due_date: match[4] ? match[4].trim() : null,
+            content_type: match[1].includes('Test') ? 'test' : 'quiz'
+          });
+        }
+      }
+    });
+    
+    return items;
+  }
+
+  parseWorksheetsFromText(text) {
+    const worksheets = [];
+    const lines = text.split('\n');
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('- ')) {
+        const match = line.match(/- (?:\*\*)?(.+?)(?:\*\*)?\s*\((.+?)\)(?:\s*-\s*Due:\s*(.+))?$/);
+        if (match) {
+          const worksheet = {
+            title: match[1].trim(),
+            subject: match[2].trim(),
+            due_date: match[3] ? match[3].trim() : null,
+            content_type: 'worksheet'
+          };
+          
+          // Check next line for lesson info
+          if (i + 1 < lines.length && lines[i + 1].trim().startsWith('From lesson:')) {
+            worksheet.related_lesson = lines[i + 1].trim().replace('From lesson:', '').trim();
+            i++; // Skip lesson line
+          }
+          
+          worksheets.push(worksheet);
+        }
+      }
+    }
+    
+    return worksheets;
+  }
+
+  parseStudyMaterialsFromText(text) {
+    const materials = [];
+    const lines = text.split('\n');
+    
+    lines.forEach(line => {
+      if (line.trim().startsWith('- ')) {
+        const match = line.match(/- (📝 Notes|📖 Reading):\s*(?:\*\*)?(.+?)(?:\*\*)?\s*\((.+?)\)$/);
+        if (match) {
+          materials.push({
+            type: match[1].includes('Notes') ? 'notes' : 'reading_material',
+            title: match[2].trim(),
+            subject: match[3].trim(),
+            content_type: match[1].includes('Notes') ? 'notes' : 'reading_material'
+          });
+        }
+      }
+    });
+    
+    return materials;
+  }
+
+  parseGradesFromText(text) {
+    const grades = [];
+    const lines = text.split('\n');
+    
+    lines.forEach(line => {
+      if (line.trim().startsWith('- ')) {
+        const match = line.match(/- (.+?)(?:\s*\[(.+?)\])?\s*-\s*(\d+)\/(\d+)\s*\((\d+)%\)$/);
+        if (match) {
+          grades.push({
+            title: match[1].trim(),
+            content_type: match[2] ? match[2].trim() : 'assignment',
+            grade_value: parseInt(match[3]),
+            grade_max_value: parseInt(match[4]),
+            percentage: parseInt(match[5]),
+            completed_at: true
+          });
+        }
+      }
+    });
+    
+    return grades;
+  }
+
   // 🚀 ENHANCED CONTEXT METHODS
 
   async getLearningContext(childId) {
     try {
       console.log('📚 Getting learning context for child:', childId);
 
-      const [overdue, recent, assignments] = await Promise.all([
-        this.search(childId, 'overdue due late', 'overdue').catch(() => ({
-          results: {},
-        })),
-        this.search(childId, 'recent today yesterday', 'recent').catch(() => ({
-          results: {},
-        })),
-        this.search(childId, '', 'assignments').catch(() => ({ results: {} })),
-      ]);
+      // Get comprehensive educational context with the new 'all' search
+      const fullContext = await this.search(childId, '', 'all').catch(() => ({
+        results: {},
+        raw_response: ''
+      }));
 
-      console.log('🔍 Debug - overdue response:', overdue);
-      console.log('🔍 Debug - recent response:', recent);
-      console.log('🔍 Debug - assignments response:', assignments);
+      console.log('🔍 Debug - full context response:', fullContext);
 
       const context = {
         childSubjects: [],
-        currentMaterials: assignments?.results?.assignments || [],
-        allMaterials: assignments?.results?.assignments || [],
+        currentMaterials: [],
+        allMaterials: [],
         upcomingAssignments: [],
-        overdue: overdue?.results?.overdue || [],
-        recentWork: recent?.results?.recent || [],
+        overdue: [],
+        recentWork: [],
         currentFocus: null,
         progress: null,
+        // New fields for comprehensive context
+        lessons: [],
+        tests: [],
+        quizzes: [],
+        worksheets: [],
+        studyMaterials: [],
+        fullContextText: fullContext.raw_response || ''
       };
+
+      // Parse the comprehensive response
+      if (fullContext.raw_response) {
+        const response = fullContext.raw_response;
+        
+        // Extract lessons - updated to handle new "Educational Materials" format
+        if (response.includes('Educational Materials')) {
+          const lessonSection = response.match(/Educational Materials[\s\S]*?(?=\n\n📊|$)/);
+          if (lessonSection) {
+            context.lessons = this.parseLessonsFromText(lessonSection[0]);
+          }
+        } else if (response.includes('Current Lessons')) {
+          const lessonSection = response.match(/Current Lessons[\s\S]*?(?=\n\n|$)/);
+          if (lessonSection) {
+            context.lessons = this.parseLessonsFromText(lessonSection[0]);
+          }
+        }
+
+        // Extract overdue assignments
+        if (response.includes('Overdue Assignments')) {
+          const overdueSection = response.match(/Overdue Assignments[\s\S]*?(?=\n\n|$)/);
+          if (overdueSection) {
+            context.overdue = this.parseAssignmentsFromText(overdueSection[0]);
+          }
+        }
+
+        // Extract tests and quizzes
+        if (response.includes('Upcoming Tests & Quizzes')) {
+          const testSection = response.match(/Upcoming Tests & Quizzes[\s\S]*?(?=\n\n|$)/);
+          if (testSection) {
+            const items = this.parseTestsQuizzesFromText(testSection[0]);
+            context.tests = items.filter(i => i.type === 'test');
+            context.quizzes = items.filter(i => i.type === 'quiz');
+          }
+        }
+
+        // Extract worksheets
+        if (response.includes('Worksheets to Complete')) {
+          const worksheetSection = response.match(/Worksheets to Complete[\s\S]*?(?=\n\n|$)/);
+          if (worksheetSection) {
+            context.worksheets = this.parseWorksheetsFromText(worksheetSection[0]);
+          }
+        }
+
+        // Extract study materials
+        if (response.includes('Study Materials Available')) {
+          const studySection = response.match(/Study Materials Available[\s\S]*?(?=\n\n|$)/);
+          if (studySection) {
+            context.studyMaterials = this.parseStudyMaterialsFromText(studySection[0]);
+          }
+        }
+
+        // Extract recent work/grades
+        if (response.includes('Recent Grades')) {
+          const gradesSection = response.match(/Recent Grades[\s\S]*?(?=\n\n|$)/);
+          if (gradesSection) {
+            context.recentWork = this.parseGradesFromText(gradesSection[0]);
+          }
+        }
+      }
+
+      // Combine all materials for backward compatibility
+      context.allMaterials = [
+        ...context.overdue,
+        ...context.worksheets,
+        ...(context.recentWork || [])
+      ];
+      context.currentMaterials = context.allMaterials.filter(m => !m.completed_at);
 
       // Find current focus (most urgent item)
       if (context.overdue.length > 0) {
@@ -522,8 +761,13 @@ class MCPClientHttpService {
       }
 
       console.log('📊 Context summary:', {
+        lessons: context.lessons.length,
         currentMaterials: context.currentMaterials.length,
         overdue: context.overdue.length,
+        tests: context.tests.length,
+        quizzes: context.quizzes.length,
+        worksheets: context.worksheets.length,
+        studyMaterials: context.studyMaterials.length,
         recentWork: context.recentWork.length,
         hasFocus: !!context.currentFocus,
       });
@@ -540,6 +784,11 @@ class MCPClientHttpService {
         recentWork: [],
         currentFocus: null,
         progress: null,
+        lessons: [],
+        tests: [],
+        quizzes: [],
+        worksheets: [],
+        studyMaterials: [],
         error: error.message,
       };
     }

@@ -37,15 +37,56 @@ exports.formatLearningContextForAI = (mcpContext, currentDate = null) => {
   
   let context = `📅 **Current Date**: ${displayDate}\n\n`;
 
+  // If we have the full context text from the new MCP server, include it
+  if (mcpContext.fullContextText) {
+    context += mcpContext.fullContextText;
+    return context;
+  }
+
+  // Otherwise, use the legacy formatting
   // 🚨 OVERDUE ASSIGNMENTS (HIGHEST PRIORITY)
   if (mcpContext.overdue?.length > 0) {
     context += `🚨 **OVERDUE ASSIGNMENTS** - Need immediate attention!\n`;
     mcpContext.overdue.forEach((material, index) => {
-      const subjectName = material.lesson?.unit?.child_subject?.subject?.name || 
+      const subjectName = material.subject || material.lesson?.unit?.child_subject?.subject?.name || 
                          material.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
       const status = getDueDateStatus(material.due_date, today);
       const completionStatus = material.completed_at ? ' (Completed late)' : '';
       context += `${index + 1}. **${material.title}** (${subjectName}) - ${status.text}${completionStatus} 🚨\n`;
+    });
+    context += "\n";
+  }
+
+  // 📚 CURRENT LESSONS (ENHANCED!)
+  if (mcpContext.lessons?.length > 0) {
+    context += `📚 **Current Lessons (${mcpContext.lessons.length}):**\n`;
+    mcpContext.lessons.forEach((lesson, index) => {
+      context += `${index + 1}. **${lesson.title}** (${lesson.subject || 'General'})\n`;
+      
+      // Add learning objectives if available
+      if (lesson.objectives && lesson.objectives.length > 0) {
+        context += `   📋 Learning Goals: ${lesson.objectives.join(', ')}\n`;
+      }
+      
+      // Add lesson focus if available
+      if (lesson.focus) {
+        context += `   📖 Focus: ${lesson.focus}\n`;
+      }
+      
+      // Add key concepts if available
+      if (lesson.keywords && lesson.keywords.length > 0) {
+        context += `   🔑 Key Concepts: ${lesson.keywords.join(', ')}\n`;
+      }
+      
+      // Add difficulty level for confidence building
+      if (lesson.difficulty_level) {
+        context += `   📊 Level: ${lesson.difficulty_level}\n`;
+      }
+      
+      // Add due date if available
+      if (lesson.due_date) {
+        context += `   📅 Due: ${lesson.due_date}\n`;
+      }
     });
     context += "\n";
   }

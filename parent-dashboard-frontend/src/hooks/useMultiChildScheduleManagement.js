@@ -16,12 +16,8 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showAIScheduleModal, setShowAIScheduleModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
 
-  // State for AI scheduling
-  const [aiScheduling, setAiScheduling] = useState(false);
-  const [aiScheduleResult, setAiScheduleResult] = useState(null);
 
   // Fetch schedule entries for multiple children
   const fetchMultipleChildrenSchedules = useCallback(async (childrenIds) => {
@@ -409,72 +405,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     setShowSettingsModal(false);
   };
 
-  // AI Schedule Modal helpers
-  const openAIScheduleModal = () => {
-    setShowAIScheduleModal(true);
-  };
-
-  const closeAIScheduleModal = () => {
-    setShowAIScheduleModal(false);
-    setAiScheduleResult(null);
-  };
-
-  // Generate AI schedule for multiple children (family coordination)
-  const generateAISchedule = async (options = {}) => {
-    try {
-      setAiScheduling(true);
-      setError(null);
-      
-      // Default options
-      const {
-        start_date = new Date().toISOString().split('T')[0],
-        end_date = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
-        coordination_mode = 'balanced',
-        daily_hours = { start: '09:00', end: '15:00' },
-        blocked_times = [{ start: '12:00', end: '13:00', reason: 'Lunch' }],
-        session_duration = 45
-      } = options;
-
-      console.log('🤖 Generating family AI schedule for children:', selectedChildrenIds);
-
-      const response = await api.post('/schedule/ai-generate-family', {
-        children_ids: selectedChildrenIds,
-        start_date,
-        end_date,
-        coordination_mode,
-        daily_hours,
-        blocked_times,
-        session_duration
-      });
-
-      if (response.data.success) {
-        // Refresh all children's schedules to show the new AI-generated ones
-        await fetchMultipleChildrenSchedules(selectedChildrenIds);
-        
-        setAiScheduleResult(response.data);
-        setError(null);
-        
-        return {
-          success: true,
-          data: response.data,
-          summary: response.data.summary
-        };
-      } else {
-        throw new Error(response.data.error || 'Failed to generate family AI schedule');
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to generate family AI schedule';
-      setError(errorMessage);
-      console.error('Family AI scheduling error:', err);
-      
-      return {
-        success: false,
-        error: errorMessage
-      };
-    } finally {
-      setAiScheduling(false);
-    }
-  };
 
   // Load data when selected children change
   useEffect(() => {
@@ -499,12 +429,8 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     showCreateModal,
     showEditModal,
     showSettingsModal,
-    showAIScheduleModal,
     editingEntry,
 
-    // AI Scheduling states
-    aiScheduling,
-    aiScheduleResult,
     
     // CRUD operations
     createScheduleEntry,
@@ -522,11 +448,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     closeEditModal,
     openSettingsModal,
     closeSettingsModal,
-    openAIScheduleModal,
-    closeAIScheduleModal,
-
-    // AI Scheduling functions
-    generateAISchedule,
     
     // Refresh
     refresh: () => {

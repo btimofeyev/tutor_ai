@@ -15,6 +15,20 @@ export const SUBJECT_COLORS = [
   { bg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-200', name: 'Cyan', bgDark: 'bg-cyan-200' }
 ];
 
+// Predefined colors for common generic learning types
+const GENERIC_SUBJECT_COLORS = {
+  'Review': { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200', name: 'Emerald', bgDark: 'bg-emerald-200' },
+  'Fun Learning': { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200', name: 'Amber', bgDark: 'bg-amber-200' },
+  'Study Skills': { bg: 'bg-violet-100', text: 'text-violet-700', border: 'border-violet-200', name: 'Violet', bgDark: 'bg-violet-200' },
+  'Organization': { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200', name: 'Slate', bgDark: 'bg-slate-200' },
+  'Break': { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200', name: 'Gray', bgDark: 'bg-gray-200' },
+  'Free Time': { bg: 'bg-sky-100', text: 'text-sky-700', border: 'border-sky-200', name: 'Sky', bgDark: 'bg-sky-200' },
+  'Reading Time': { bg: 'bg-rose-100', text: 'text-rose-700', border: 'border-rose-200', name: 'Rose', bgDark: 'bg-rose-200' },
+  'Creative Time': { bg: 'bg-fuchsia-100', text: 'text-fuchsia-700', border: 'border-fuchsia-200', name: 'Fuchsia', bgDark: 'bg-fuchsia-200' },
+  'Practice': { bg: 'bg-lime-100', text: 'text-lime-700', border: 'border-lime-200', name: 'Lime', bgDark: 'bg-lime-200' },
+  'Assessment': { bg: 'bg-stone-100', text: 'text-stone-700', border: 'border-stone-200', name: 'Stone', bgDark: 'bg-stone-200' }
+};
+
 /**
  * Get consistent color for a subject based on its position in the child's subjects list
  * @param {string} subjectName - Name of the subject
@@ -27,8 +41,13 @@ export function getSubjectColor(subjectName, childSubjects) {
     return SUBJECT_COLORS[subjectIndex % SUBJECT_COLORS.length];
   }
   
-  // Fallback for subjects not in child's list
-  return { bg: 'bg-gray-400', text: 'text-gray-400', border: 'border-gray-400', name: 'Gray' };
+  // Check for predefined generic subject colors
+  if (GENERIC_SUBJECT_COLORS[subjectName]) {
+    return GENERIC_SUBJECT_COLORS[subjectName];
+  }
+  
+  // Enhanced fallback - use a pleasant default color instead of grey
+  return { bg: 'bg-neutral-100', text: 'text-neutral-700', border: 'border-neutral-200', name: 'Neutral', bgDark: 'bg-neutral-200' };
 }
 
 /**
@@ -89,4 +108,21 @@ export function getMultiChildSubjectStyle(subjectName, childId, childSubjects, a
  */
 export function getChildVariation(childIndex) {
   return CHILD_VARIATIONS[childIndex % CHILD_VARIATIONS.length];
+}
+
+/**
+ * Get all available generic subject colors for reference
+ * @returns {Object} All predefined generic subject colors
+ */
+export function getGenericSubjectColors() {
+  return GENERIC_SUBJECT_COLORS;
+}
+
+/**
+ * Check if a subject name has a predefined generic color
+ * @param {string} subjectName - Name of the subject
+ * @returns {boolean} True if subject has a predefined generic color
+ */
+export function hasGenericSubjectColor(subjectName) {
+  return GENERIC_SUBJECT_COLORS.hasOwnProperty(subjectName);
 }

@@ -143,7 +143,9 @@ export default function AddMaterialTabs(props) {
           onAddLessonUserContentTypeChange={onAddLessonUserContentTypeChange}
           onAddLessonFileChange={onAddLessonFileChange}
           currentAddLessonFile={currentAddLessonFile}
-          lessonContainersForSelectedUnit={lessonContainersForApprovalForm} 
+          lessonContainersForSelectedUnit={lessonContainersForApprovalForm}
+          lessonsByUnit={lessonsByUnit}
+          setLessonsByUnit={setLessonsByUnit} 
         />
       )}
       

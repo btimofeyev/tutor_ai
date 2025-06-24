@@ -7,6 +7,9 @@ const chatHistoryService = require('../services/chatHistoryService');
 const { formatLearningContextForAI, isLessonQuery } = require('../middleware/mcpContext');
 const { getCurrentDateInfo, getDueDateStatus } = require('../utils/dateUtils');
 const { KLIO_SYSTEM_PROMPT } = require('../utils/klioSystemPrompt');
+const { ENHANCED_KLIO_SYSTEM_PROMPT } = require('../utils/enhancedSystemPrompt');
+const { formatEnhancedLearningContext } = require('../utils/enhancedContextFormatter');
+const { enhanceConversationContext, addConversationGuidance, generatePersonalizedResponse } = require('../utils/conversationEnhancer');
 const { WORKSPACE_TOOLS, getEvaluationTypeForSubject, generateWorkspaceFromMaterial, detectSubjectFromMaterial, findCrossSubjectConnections, suggestComplementaryActivities } = require('../utils/workspaceTools');
 const { getWorkspaceHandler } = require('../utils/workspaceFunctionHandlers');
 const { 
@@ -23,8 +26,8 @@ const openai = new OpenAI({
 });
 
 
-// Enhanced system prompt for function calling
-const ENHANCED_SYSTEM_PROMPT = `${KLIO_SYSTEM_PROMPT}
+// Enhanced system prompt for function calling using new streamlined prompt
+const ENHANCED_SYSTEM_PROMPT = `${ENHANCED_KLIO_SYSTEM_PROMPT}
 
 # 🔧 MULTI-SUBJECT WORKSPACE MANAGEMENT
 
@@ -702,9 +705,12 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       - NEVER use function calls without conversational text!`;
     }
 
-    // Build the enhanced system prompt
-    const formattedLearningContext = formatLearningContextForAI(mcpContext, currentDate);
+    // Build the enhanced system prompt with conversation awareness
+    const formattedLearningContext = formatEnhancedLearningContext(mcpContext, currentDate);
     const memoryContext = buildMemoryContext(recentMemories, learningProfile);
+    
+    // Enhance conversation context with lesson awareness
+    const conversationEnhancements = enhanceConversationContext(message, mcpContext, child);
     
     const subjects = mcpContext?.childSubjects
       ?.map(cs => cs.subject?.name || cs.custom_subject_name_override)
@@ -715,14 +721,20 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
       Math.max(1, Math.floor((today - new Date(learningProfile.created_at)) / (1000 * 60 * 60 * 24))) : 
       1;
 
-    const systemPrompt = ENHANCED_SYSTEM_PROMPT
+    // Build base system prompt
+    let systemPrompt = ENHANCED_SYSTEM_PROMPT
       .replace(/{currentDate}/g, currentDate)
       .replace(/{currentTime}/g, currentTime)
       .replace('{childName}', child?.name || 'Friend')
       .replace('{childGrade}', child?.grade || 'Elementary')
       .replace('{subjects}', subjects)
-      .replace('{learningContext}', formattedLearningContext) + 
-      `\n\n**LEARNING RELATIONSHIP CONTEXT:**
+      .replace('{learningContext}', formattedLearningContext);
+    
+    // Add conversation-specific guidance based on the enhanced context
+    systemPrompt = addConversationGuidance(systemPrompt, conversationEnhancements, mcpContext, child);
+    
+    // Add learning relationship context
+    systemPrompt += `\n\n**LEARNING RELATIONSHIP CONTEXT:**
       You have been tutoring ${child?.name} for ${daysTogether} day${daysTogether !== 1 ? 's' : ''} with ${learningProfile.total_interactions} total interactions.
       
       **RELEVANT LEARNING MEMORIES:**

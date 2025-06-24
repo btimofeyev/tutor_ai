@@ -17,13 +17,17 @@ export default function ScheduleCalendar({
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 })); // Start on Monday
   
   // Use schedule management from props or create our own
+  // Always call the hook to satisfy React rules
+  const fallbackScheduleManagement = useScheduleManagement(childId, subscriptionPermissions);
+  
+  // Use provided management or fallback
   const {
     calendarEvents,
     loading,
     error,
     openCreateModal,
     openEditModal
-  } = scheduleManagement || useScheduleManagement(childId, subscriptionPermissions);
+  } = scheduleManagement ?? fallbackScheduleManagement;
   
   // No sample events - use real data only
 
@@ -224,7 +228,7 @@ export default function ScheduleCalendar({
             <CalendarDaysIcon className="h-12 w-12 mx-auto mb-3 text-slate-400" />
             <h3 className="font-semibold text-lg">No Schedule Entries Yet</h3>
             <p className="text-sm text-slate-600 mt-2 max-w-md mx-auto">
-              Click "Add Study Time" to create your first schedule entry, or use "AI Schedule" to generate an intelligent weekly plan.
+              Click &quot;Add Study Time&quot; to create your first schedule entry, or use Templates to apply pre-built learning patterns.
             </p>
           </div>
         </div>

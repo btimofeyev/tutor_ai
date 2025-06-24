@@ -164,8 +164,11 @@ class AdvancedSchedulingService {
             analysis.byContentType[material.content_type] =
                 (analysis.byContentType[material.content_type] || 0) + 1;
 
-            // Subject distribution
-            const subject = material.lesson?.unit?.child_subject?.custom_subject_name_override || 'Unknown';
+            // Subject distribution with proper fallback chain
+            const subject = material.lesson?.unit?.child_subject?.custom_subject_name_override || 
+                           material.lesson?.unit?.child_subject?.subject?.name ||
+                           this.inferSubjectFromTitle(material.title) ||
+                           'Unknown';
             analysis.bySubject[subject] = (analysis.bySubject[subject] || 0) + 1;
 
             // Calculate urgency based on due date
@@ -714,7 +717,12 @@ IMPORTANT:
     const grouped = {};
     
     materials.forEach(material => {
-      const subject = material.lesson?.unit?.child_subject?.custom_subject_name_override || 'General';
+      // Enhanced subject name detection with proper fallback chain
+      const subject = material.lesson?.unit?.child_subject?.custom_subject_name_override || 
+                     material.lesson?.unit?.child_subject?.subject?.name ||
+                     this.inferSubjectFromTitle(material.title) ||
+                     'General';
+      
       if (!grouped[subject]) {
         grouped[subject] = [];
       }
@@ -722,6 +730,66 @@ IMPORTANT:
     });
     
     return grouped;
+  }
+
+  /**
+   * Infer subject name from material title
+   */
+  inferSubjectFromTitle(title) {
+    if (!title) return null;
+    
+    const lowerTitle = title.toLowerCase();
+    
+    // Math/Mathematics keywords
+    if (lowerTitle.includes('math') || 
+        lowerTitle.includes('counting') || 
+        lowerTitle.includes('numbers') || 
+        lowerTitle.includes('equal') || 
+        lowerTitle.includes('groups') || 
+        lowerTitle.includes('algebra') || 
+        lowerTitle.includes('geometry') || 
+        lowerTitle.includes('word problems')) {
+      return 'Mathematics';
+    }
+    
+    // History/Social Studies keywords
+    if (lowerTitle.includes('history') || 
+        lowerTitle.includes('timeline') || 
+        lowerTitle.includes('past') || 
+        lowerTitle.includes('artifacts') || 
+        lowerTitle.includes('symbols') || 
+        lowerTitle.includes('washington') || 
+        lowerTitle.includes('community') || 
+        lowerTitle.includes('family') || 
+        lowerTitle.includes('traditions') || 
+        lowerTitle.includes('holidays') ||
+        lowerTitle.includes('american') ||
+        lowerTitle.includes('world')) {
+      return 'History';
+    }
+    
+    // Science keywords
+    if (lowerTitle.includes('science') || 
+        lowerTitle.includes('experiment') || 
+        lowerTitle.includes('physics') || 
+        lowerTitle.includes('chemistry') || 
+        lowerTitle.includes('biology') || 
+        lowerTitle.includes('nature')) {
+      return 'Science';
+    }
+    
+    // English/Language Arts keywords
+    if (lowerTitle.includes('reading') || 
+        lowerTitle.includes('writing') || 
+        lowerTitle.includes('grammar') || 
+        lowerTitle.includes('literature') || 
+        lowerTitle.includes('english') || 
+        lowerTitle.includes('story') || 
+        lowerTitle.includes('essay')) {
+      return 'English Language Arts';
+    }
+    
+    return null; // Let it fall back to 'General'
   }
 
   /**
@@ -1066,22 +1134,12 @@ IMPORTANT:
         
         // Get the actual subject name from the material data
         
-        // Enhanced subject name detection with title analysis
+        // Enhanced subject name detection with consistent fallback chain
         let actualSubjectName = material.lesson?.unit?.child_subject?.custom_subject_name_override || 
                                 material.lesson?.unit?.child_subject?.subject?.name ||
-                                assignment.subject;
-        
-        // Fallback: infer subject from lesson title if no subject found
-        if (!actualSubjectName || actualSubjectName === 'General' || actualSubjectName === 'Study') {
-          const title = material.title.toLowerCase();
-          if (title.includes('groups') || title.includes('counting') || title.includes('equal') || title.includes('math') || title.includes('word problems')) {
-            actualSubjectName = 'Math';
-          } else if (title.includes('history') || title.includes('timeline') || title.includes('past') || title.includes('artifacts') || title.includes('symbols') || title.includes('washington') || title.includes('community') || title.includes('family') || title.includes('traditions') || title.includes('holidays')) {
-            actualSubjectName = 'History';
-          } else {
-            actualSubjectName = assignment.subject || 'Study';
-          }
-        }
+                                this.inferSubjectFromTitle(material.title) ||
+                                assignment.subject ||
+                                'Study';
         
         schedule.push({
           id: `session_${index + 1}`,
@@ -1529,7 +1587,8 @@ IMPORTANT:
     );
     
     // Build schedule and reserve used slots
-    const schedule = this.buildScheduleAndReserveSlots(assignments, availableSlots, childRequest.materials, familyTimeSlots);
+    const assignmentArray = assignments.assignments || assignments;
+    const schedule = this.buildScheduleAndReserveSlots(assignmentArray, availableSlots, childRequest.materials, familyTimeSlots);
     
     return {
       sessions: schedule,
@@ -1537,7 +1596,7 @@ IMPORTANT:
         generator: 'family_coordinated',
         confidence: 0.85,
         total_sessions: schedule.length,
-        slots_used: assignments.length,
+        slots_used: assignmentArray.length,
         slots_available: availableSlots.length
       }
     };

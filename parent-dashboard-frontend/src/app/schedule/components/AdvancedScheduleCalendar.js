@@ -49,6 +49,9 @@ export default function AdvancedScheduleCalendar({
   const [viewType, setViewType] = useState(VIEW_TYPES.WEEK);
   const [weeksToShow, setWeeksToShow] = useState(2); // For multi-week view
   
+  // Always call the hook to satisfy React rules
+  const fallbackScheduleManagement = useScheduleManagement(childId, subscriptionPermissions);
+  
   // Use schedule management from props or create our own
   const {
     calendarEvents,
@@ -56,7 +59,7 @@ export default function AdvancedScheduleCalendar({
     error,
     openCreateModal,
     openEditModal
-  } = scheduleManagement || useScheduleManagement(childId, subscriptionPermissions);
+  } = scheduleManagement ?? fallbackScheduleManagement;
 
   // Calculate date ranges based on view type
   const dateRange = useMemo(() => {

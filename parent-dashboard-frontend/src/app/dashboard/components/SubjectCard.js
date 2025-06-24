@@ -107,13 +107,40 @@ export default function SubjectCard({
             // Bulk lesson group creation
             try {
                 const baseName = newLessonGroupTitle.trim();
+                let successCount = 0;
+                
                 for (let i = 1; i <= bulkLessonGroupCount; i++) {
                     const title = `${baseName} ${i}`;
-                    await onCreateLessonGroup(unitId, title);
+                    try {
+                        const result = await onCreateLessonGroup(unitId, title);
+                        if (result.success) {
+                            successCount++;
+                        }
+                        // Add small delay between requests to prevent overwhelming the server
+                        if (i < bulkLessonGroupCount) {
+                            await new Promise(resolve => setTimeout(resolve, 200));
+                        }
+                    } catch (error) {
+                        console.error(`Error creating lesson group "${title}":`, error);
+                        // Continue with next lesson group even if one fails
+                    }
                 }
-                setNewLessonGroupTitle("");
-                setCreatingLessonGroupForUnit(null);
-                setBulkLessonGroupCount(1);
+                
+                if (successCount === bulkLessonGroupCount) {
+                    // All succeeded
+                    setNewLessonGroupTitle("");
+                    setCreatingLessonGroupForUnit(null);
+                    setBulkLessonGroupCount(1);
+                } else if (successCount > 0) {
+                    // Partial success
+                    console.log(`Created ${successCount} out of ${bulkLessonGroupCount} lesson groups`);
+                    setNewLessonGroupTitle("");
+                    setCreatingLessonGroupForUnit(null);
+                    setBulkLessonGroupCount(1);
+                } else {
+                    // All failed - don't reset form so user can try again
+                    console.error('Failed to create any lesson groups');
+                }
             } catch (error) {
                 console.error('Error in bulk lesson group creation:', error);
             }

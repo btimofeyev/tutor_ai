@@ -87,7 +87,7 @@ exports.createLessonContainer = async (req, res) => {
       return res.status(403).json({ error: 'Access denied to this unit' });
     }
 
-    // Check if lesson title already exists in this unit
+    // Check if lesson title already exists in this unit (exact match, case-insensitive)
     const { data: existing } = await supabase
       .from('lessons')
       .select('id')
@@ -110,7 +110,10 @@ exports.createLessonContainer = async (req, res) => {
         .limit(1)
         .maybeSingle();
 
-      finalSequenceOrder = lastLesson ? (lastLesson.sequence_order || 0) + 1 : 1;
+      // Add timestamp component to avoid race conditions during bulk creation
+      const baseOrder = lastLesson ? (lastLesson.sequence_order || 0) + 1 : 1;
+      const timestampComponent = Date.now() % 1000; // Last 3 digits of timestamp
+      finalSequenceOrder = baseOrder * 1000 + timestampComponent;
     }
 
     // Create the lesson container

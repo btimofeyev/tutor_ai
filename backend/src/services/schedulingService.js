@@ -102,7 +102,18 @@ class AdvancedSchedulingService {
      * Stage 1: Comprehensive Context Analysis
      */
     async analyzeSchedulingContext(request) {
-        const { child_id, materials, start_date, end_date, focus_subjects, preferences } = request;
+        const { 
+            child_id, 
+            materials, 
+            start_date, 
+            end_date, 
+            focus_subjects, 
+            preferences,
+            subject_config,
+            priority_mode,
+            default_session_length,
+            schedule_days
+        } = request;
 
         console.log('📊 Analyzing scheduling context...');
 
@@ -127,7 +138,11 @@ class AdvancedSchedulingService {
             childProfile,
             timeConstraints,
             aiInsights,
-            focus_subjects: focus_subjects || []
+            focus_subjects: focus_subjects || [],
+            subject_config: subject_config || {},
+            priority_mode: priority_mode || 'balanced',
+            default_session_length: default_session_length || 45,
+            schedule_days: schedule_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
         };
     }
 
@@ -229,7 +244,7 @@ class AdvancedSchedulingService {
         const startDate = new Date(start_date);
         const endDate = new Date(end_date);
         const { preferences } = childProfile;
-
+        
         const availableDays = [];
         const currentDate = new Date(startDate);
 
@@ -292,7 +307,19 @@ Provide strategic insights in this JSON format:
   "confidence": 0.85
 }`;
 
-        // Skip AI call if no API key, use rule-based approach
+        // Try AI call first, fallback to rule-based if it fails
+        console.log('🔍 Attempting AI-powered scheduling insights...');
+        
+        try {
+            const aiResponse = await this.generateAIInsights(materialAnalysis, childProfile, {});
+            if (aiResponse) {
+                console.log('✅ AI insights generated successfully');
+                return aiResponse;
+            }
+        } catch (error) {
+            console.log('⚠️ AI insights failed, falling back to rule-based approach:', error.message);
+        }
+        
         console.log('🔍 Generating rule-based scheduling insights...');
         
         const highUrgencyCount = materialAnalysis.urgencyLevels.filter(u => u.urgency === 'high').length;
@@ -429,10 +456,12 @@ Provide strategic insights in this JSON format:
             childProfile
         );
 
-        // Create preliminary schedule from assignments
-        const schedule = this.buildPreliminarySchedule(assignments, timeSlots, materials);
+        // Extract assignments from AI response and create preliminary schedule
+        const assignmentsArray = assignments.assignments || assignments || [];
+        console.log(`📊 AI returned ${Array.isArray(assignmentsArray) ? assignmentsArray.length : 'non-array'} assignments`);
+        const schedule = this.buildPreliminarySchedule(assignmentsArray, timeSlots, materials);
 
-        console.log(`📚 Assigned ${assignments.length} materials to time slots`);
+        console.log(`📚 Assigned ${assignmentsArray.length} materials to time slots`);
         console.log(`📋 Built ${schedule.length} schedule entries from assignments`);
         
         if (schedule.length === 0) {
@@ -497,9 +526,21 @@ IMPORTANT:
 - Use the exact slot_id values provided in the TIME SLOTS list above (e.g., "2025-06-17_slot_0")
 - Use the exact material IDs provided in the MATERIALS BY SUBJECT list above (e.g., "mat-1")`;
 
-    // Skip AI call, use rule-based assignment directly
-    console.log('🤖 Using rule-based assignment (AI API not available)');
-    return this.generateRuleBasedAssignments(materialsBySubject, timeSlots, childProfile);
+    // Try AI assignment first, fallback to rule-based if it fails
+    console.log('🤖 Attempting AI-powered material assignment...');
+    
+    try {
+        const aiResponse = await this.callOpenAIForAssignments(materialsBySubject, timeSlots, aiInsights, childProfile);
+        if (aiResponse && aiResponse.assignments) {
+            console.log('✅ AI assignment completed successfully');
+            return aiResponse;
+        }
+    } catch (error) {
+        console.log('⚠️ AI assignment failed, falling back to rule-based:', error.message);
+    }
+    
+    console.log('🤖 Using rule-based assignment fallback');
+    return this.generateRuleBasedAssignments(materialsBySubject, timeSlots, childProfile, context);
   }
 
   /**
@@ -579,7 +620,8 @@ IMPORTANT:
       const assignments = this.generateRuleBasedAssignments(
         this.groupMaterialsBySubject(materials),
         timeSlots,
-        childProfile
+        childProfile,
+        context
       );
       
       // Build schedule with enhanced logic
@@ -637,7 +679,7 @@ IMPORTANT:
           start_time: '09:00',
           duration_minutes: 45,
           status: 'scheduled',
-          created_by: 'emergency_ai',
+          created_by: 'ai_suggestion',
           notes: `Emergency scheduled: ${material.title}`,
           reasoning: 'Emergency fallback scheduling due to system limitations'
         });
@@ -866,12 +908,28 @@ IMPORTANT:
   /**
    * Generate rule-based assignments as fallback
    */
-  generateRuleBasedAssignments(materialsBySubject, timeSlots, childProfile) {
+  generateRuleBasedAssignments(materialsBySubject, timeSlots, childProfile, context = {}) {
     const assignments = [];
     const { preferences } = childProfile;
+    const { subject_config = {}, schedule_days = [] } = context;
     
-    // Sort time slots by optimality
-    const sortedSlots = timeSlots.sort((a, b) => b.efficiency - a.efficiency);
+    // Sort time slots by date first, then by optimality within each day
+    const timeSlotsArray = Array.isArray(timeSlots) ? timeSlots : [];
+    const slotsByDate = new Map();
+    
+    // Group slots by date
+    timeSlotsArray.forEach(slot => {
+      const date = slot.date;
+      if (!slotsByDate.has(date)) {
+        slotsByDate.set(date, []);
+      }
+      slotsByDate.get(date).push(slot);
+    });
+    
+    // Sort slots within each day by efficiency
+    slotsByDate.forEach((slots) => {
+      slots.sort((a, b) => b.efficiency - a.efficiency);
+    });
     
     // Sort subjects by cognitive load
     const sortedSubjects = Object.entries(materialsBySubject).sort((a, b) => {
@@ -880,21 +938,85 @@ IMPORTANT:
       return preferences.difficult_subjects_morning ? loadB - loadA : loadA - loadB;
     });
     
-    let slotIndex = 0;
+    // Create frequency-aware material distribution
+    const allMaterials = [];
+    const weekDays = schedule_days.length || 5; // Default to 5 days if not specified
     
+    // Calculate how many times each subject should appear per week based on frequency
     for (const [subject, materials] of sortedSubjects) {
-      for (const material of materials) {
-        if (slotIndex < sortedSlots.length) {
+      // Find subject config by matching subject name or child_subject_id
+      const subjectConfigEntry = Object.entries(subject_config).find(([configSubjectId, config]) => {
+        // Try to match by subject name or child_subject_id
+        return materials.some(material => {
+          const materialSubjectId = material.lesson?.unit?.child_subject?.id || material.child_subject_id;
+          return materialSubjectId === configSubjectId || 
+                 material.subject_name === subject ||
+                 config.subject_name === subject;
+        });
+      });
+      
+      const frequency = subjectConfigEntry?.[1]?.frequency || 2; // Default frequency
+      const timesPerWeek = Math.min(frequency, weekDays); // Can't exceed available days
+      
+      console.log(`📚 Subject: ${subject}, Frequency: ${frequency}, Times per week: ${timesPerWeek}`);
+      
+      // Distribute materials for this subject across the week
+      for (let i = 0; i < materials.length && allMaterials.length < timeSlotsArray.length; i++) {
+        // Repeat this material according to its subject frequency
+        for (let freq = 0; freq < timesPerWeek && allMaterials.length < timeSlotsArray.length; freq++) {
+          allMaterials.push({ 
+            subject, 
+            material: materials[i],
+            frequencyIndex: freq,
+            subjectFrequency: timesPerWeek
+          });
+        }
+      }
+    }
+    
+    // Distribute materials across days in round-robin fashion
+    const dates = Array.from(slotsByDate.keys()).sort();
+    let currentDateIndex = 0;
+    let slotIndexPerDay = new Map();
+    
+    // Initialize slot index tracker for each day
+    dates.forEach(date => slotIndexPerDay.set(date, 0));
+    
+    for (const { subject, material } of allMaterials) {
+      // Find next available slot, cycling through days
+      let assigned = false;
+      let attempts = 0;
+      
+      while (!assigned && attempts < dates.length) {
+        const currentDate = dates[currentDateIndex];
+        const availableSlots = slotsByDate.get(currentDate);
+        const slotIndex = slotIndexPerDay.get(currentDate);
+        
+        if (slotIndex < availableSlots.length) {
+          const slot = availableSlots[slotIndex];
           assignments.push({
-            slot_id: sortedSlots[slotIndex].id,
+            slot_id: slot.id,
             subject,
             material_ids: [material.id],
             child_id: material.child_id || childProfile.child_id,
-            reasoning: `Rule-based assignment: ${subject} scheduled based on cognitive load and time efficiency`,
-            cognitive_match: this.calculateCognitiveMatch(subject, sortedSlots[slotIndex])
+            reasoning: `Distributed assignment: ${subject} scheduled on ${currentDate} for balanced daily distribution`,
+            cognitive_match: this.calculateCognitiveMatch(subject, slot)
           });
-          slotIndex++;
+          
+          // Update slot index for this day
+          slotIndexPerDay.set(currentDate, slotIndex + 1);
+          assigned = true;
         }
+        
+        // Move to next day (round-robin)
+        currentDateIndex = (currentDateIndex + 1) % dates.length;
+        attempts++;
+      }
+      
+      // If we couldn't assign to any day, we're out of slots
+      if (!assigned) {
+        console.log(`⚠️ No available slots for material: ${material.title || material.id}`);
+        break;
       }
     }
     
@@ -919,31 +1041,63 @@ IMPORTANT:
     const schedule = [];
     const slotMap = new Map(timeSlots.map(slot => [slot.id, slot]));
     const materialMap = new Map(materials.map(material => [material.id, material]));
+    const usedMaterials = new Set(); // Track used materials to prevent duplicates
     
     assignments.forEach((assignment, index) => {
       const slot = slotMap.get(assignment.slot_id);
       const material = materialMap.get(assignment.material_ids[0]); // Using first material for now
       
-      console.log(`🔨 Processing assignment ${index}: slot=${!!slot}, material=${!!material}, slot_id=${assignment.slot_id}, material_id=${assignment.material_ids[0]}`);
+      const materialId = assignment.material_ids[0];
+      console.log(`🔨 Processing assignment ${index}: slot=${!!slot}, material=${!!material}, slot_id=${assignment.slot_id}, material_id=${materialId}`);
+      
+      // Check for duplicate material
+      if (usedMaterials.has(materialId)) {
+        console.log(`⚠️ Skipping duplicate material: ${materialId}`);
+        return;
+      }
       
       if (slot && material) {
+        usedMaterials.add(materialId); // Mark material as used
         // Determine child_id from multiple possible sources
         const child_id = material.lesson?.unit?.child_subject?.child_id || 
                         material.child_id || 
                         assignment.child_id ||
                         'unknown';
         
+        // Get the actual subject name from the material data
+        
+        // Enhanced subject name detection with title analysis
+        let actualSubjectName = material.lesson?.unit?.child_subject?.custom_subject_name_override || 
+                                material.lesson?.unit?.child_subject?.subject?.name ||
+                                assignment.subject;
+        
+        // Fallback: infer subject from lesson title if no subject found
+        if (!actualSubjectName || actualSubjectName === 'General' || actualSubjectName === 'Study') {
+          const title = material.title.toLowerCase();
+          if (title.includes('groups') || title.includes('counting') || title.includes('equal') || title.includes('math') || title.includes('word problems')) {
+            actualSubjectName = 'Math';
+          } else if (title.includes('history') || title.includes('timeline') || title.includes('past') || title.includes('artifacts') || title.includes('symbols') || title.includes('washington') || title.includes('community') || title.includes('family') || title.includes('traditions') || title.includes('holidays')) {
+            actualSubjectName = 'History';
+          } else {
+            actualSubjectName = assignment.subject || 'Study';
+          }
+        }
+        
         schedule.push({
           id: `session_${index + 1}`,
           child_id: child_id,
-          material_id: null, // Set to null to avoid foreign key constraint issues
-          subject_name: assignment.subject,
+          material_id: material.lesson_id, // Use lesson_id to reference the lesson container
+          subject_name: actualSubjectName,
           scheduled_date: slot.date,
           start_time: slot.startTime,
           duration_minutes: slot.durationMinutes,
           status: 'scheduled',
           created_by: 'ai_suggestion',
-          notes: material.title || `${assignment.subject} study session`,
+          notes: JSON.stringify({
+            specific_material_id: material.id,
+            material_title: material.title,
+            ai_reasoning: assignment.reasoning
+          }),
           reasoning: assignment.reasoning,
           cognitive_match: assignment.cognitive_match,
           efficiency_score: slot.efficiency
@@ -1439,8 +1593,20 @@ IMPORTANT:
 - Use ONLY the exact material IDs from the MATERIALS BY SUBJECT list above
 - Do not double-assign materials or slots`;
 
-    // Skip AI call, use rule-based assignment directly for family scheduling
-    console.log('🤖 Using rule-based assignment for family scheduling (AI API not available)');
+    // Try AI assignment first, fallback to rule-based if it fails
+    console.log('🤖 Attempting AI-powered family scheduling assignment...');
+    
+    try {
+        const aiResponse = await this.callOpenAIForFamilyAssignments(materialsBySubject, availableSlots, childProfile);
+        if (aiResponse && aiResponse.assignments) {
+            console.log('✅ AI family assignment completed successfully');
+            return aiResponse;
+        }
+    } catch (error) {
+        console.log('⚠️ AI family assignment failed, falling back to rule-based:', error.message);
+    }
+    
+    console.log('🤖 Using rule-based assignment for family scheduling (fallback)');
     return this.generateRuleBasedAssignmentsForAvailableSlots(materialsBySubject, availableSlots, childProfile);
   }
 
@@ -1758,7 +1924,10 @@ Provide coordination adjustments in this JSON format:
         max_tokens: 1500
       });
 
-      const aiCoordination = JSON.parse(response.choices[0].message.content);
+      const content = response.choices[0].message.content;
+      // Clean up markdown code blocks if present
+      const cleanedContent = content.replace(/```json\n?|```\n?/g, '').trim();
+      const aiCoordination = JSON.parse(cleanedContent);
       return this.applyAIAdjustments(schedules, aiCoordination.adjustments);
     } catch (error) {
       console.warn('⚠️ AI coordination failed, using rule-based approach');
@@ -1986,6 +2155,174 @@ Provide coordination adjustments in this JSON format:
   addSubjectVariety(schedule) { return schedule; }
   validateMaterialCoverage(schedule, materials) { return schedule; }
   optimizeForLearningEfficiency(schedule) { return schedule; }
+
+  /**
+   * Generate AI-powered contextual insights
+   */
+  async generateAIInsights(materialAnalysis, childProfile, weeklySchedule) {
+    const prompt = `As an expert educational scheduler, analyze this student's learning context and provide strategic insights.
+
+STUDENT PROFILE:
+- Study preferences: ${JSON.stringify(childProfile.preferences)}
+- Total materials to schedule: ${materialAnalysis.totalMaterials}
+- High urgency items: ${materialAnalysis.urgencyLevels.filter(u => u.urgency === 'high').length}
+
+MATERIAL ANALYSIS:
+${Object.entries(materialAnalysis.bySubject || {}).map(([subject, count]) => `${subject}: ${count} items`).join('\n')}
+
+RESPOND ONLY WITH VALID JSON in this exact format (no explanation, no markdown):
+{
+  "schedulingStrategy": "balanced|front_loaded|due_date_focused",
+  "prioritizationApproach": "cognitive_load|urgency|subject_rotation",
+  "sessionLengthRecommendation": "short|medium|long",
+  "cognitiveLoadDistribution": "even|front_loaded|back_loaded",
+  "riskFactors": ["potential issues"],
+  "opportunityAreas": ["optimization opportunities"],
+  "confidence": 0.85
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 800
+    });
+
+    const content = response.choices[0].message.content;
+    // Clean up markdown code blocks if present
+    const cleanedContent = content.replace(/```json\n?|```\n?/g, '').trim();
+    return JSON.parse(cleanedContent);
+  }
+
+  /**
+   * Call OpenAI for material assignments
+   */
+  async callOpenAIForAssignments(materialsBySubject, timeSlots, aiInsights, childProfile) {
+    const totalMaterials = Object.values(materialsBySubject).flat().length;
+    const prompt = `As an expert educational scheduler, create optimal material assignments for time slots based on cognitive science and learning efficiency.
+
+IMPORTANT: You have EXACTLY ${totalMaterials} materials to schedule. Do not create more assignments than materials available.
+
+TIME SLOTS AVAILABLE:
+${timeSlots.map(slot => 
+  `ID: ${slot.id} | ${slot.date} ${slot.startTime}-${slot.endTime} (${slot.cognitiveWindow}, efficiency: ${slot.efficiency})`
+).join('\n')}
+
+MATERIALS BY SUBJECT:
+${Object.entries(materialsBySubject).map(([subject, materials]) => 
+  `${subject}:\n${materials.map(m => `  - MATERIAL_ID: ${m.id} | Title: "${m.title}"`).join('\n')}`
+).join('\n\n')}
+
+STUDENT PREFERENCES:
+- Difficult subjects in morning: ${childProfile.preferences.difficult_subjects_morning}
+- AI Strategy: ${aiInsights.schedulingStrategy}
+- Prioritization: ${aiInsights.prioritizationApproach}
+
+Create assignments following these CRITICAL rules:
+1. ONLY create assignments for the EXACT materials listed above - do NOT invent new materials
+2. NEVER assign the same material_id to multiple time slots - each material can only be used ONCE
+3. FOLLOW NUMERICAL LESSON ORDER: Schedule "Lesson 1" before "Lesson 2" before "Lesson 3", etc. within each subject
+4. Match high cognitive load subjects to high efficiency time slots
+5. Respect student preference for difficult subjects timing
+6. Balance subjects across days for variety
+7. Consider material urgency (due dates)
+8. Ensure each assignment uses exactly ONE unique material_id from the provided list
+9. SEQUENCE PRIORITY: Within each subject, prioritize lessons by their number (1, 2, 3, 4...)
+
+Provide assignments in this JSON format:
+{
+  "assignments": [
+    {
+      "slot_id": "use_exact_slot_id_from_list_above",
+      "subject": "actual_subject_name_from_materials_list_above", 
+      "material_ids": ["copy_exact_MATERIAL_ID_values_from_above_list"],
+      "reasoning": "why this assignment is optimal",
+      "cognitive_match": 0.85
+    }
+  ],
+  "overall_strategy": "description of overall approach",
+  "confidence": 0.90
+}
+
+CRITICAL REQUIREMENTS:
+- ONLY use exact slot_id values from TIME SLOTS (e.g., "2025-06-27_slot_0")
+- ONLY use exact material IDs from MATERIALS BY SUBJECT (the ID: values, NOT the titles)
+- DO NOT use lesson titles or names as material_ids
+- NEVER repeat the same material_id - each material can only appear ONCE in your entire response
+- Schedule lessons in sequential order when possible (Lesson 1, then Lesson 2, etc.)
+- Example: Use "a1b2c3d4-1234-5678-abcd-123456789012" NOT "Lesson 1 Understanding Groups"`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 2000
+    });
+
+    const content = response.choices[0].message.content;
+    // Clean up markdown code blocks if present
+    const cleanedContent = content.replace(/```json\n?|```\n?/g, '').trim();
+    return JSON.parse(cleanedContent);
+  }
+
+  /**
+   * Call OpenAI for family assignment (multi-child coordination)
+   */
+  async callOpenAIForFamilyAssignments(materialsBySubject, availableSlots, childProfile) {
+    const prompt = `As an expert family educational scheduler, create optimal material assignments considering family coordination and resource sharing.
+
+AVAILABLE TIME SLOTS:
+${availableSlots.map(slot => 
+  `ID: ${slot.id} | ${slot.date} ${slot.startTime}-${slot.endTime} (efficiency: ${slot.efficiency})`
+).join('\n')}
+
+MATERIALS BY SUBJECT:
+${Object.entries(materialsBySubject).map(([subject, materials]) => 
+  `${subject}: ${materials.map(m => `ID:${m.id} "${m.title}"`).join(', ')}`
+).join('\n')}
+
+STUDENT PREFERENCES:
+${JSON.stringify(childProfile.preferences)}
+
+Create optimal assignments following these rules:
+1. Match high cognitive load subjects to high efficiency time slots  
+2. Balance subjects across available days
+3. Only use the provided available slot IDs
+4. Each material should be assigned to exactly one slot
+5. Consider family coordination needs
+
+Provide assignments in this JSON format:
+{
+  "assignments": [
+    {
+      "slot_id": "use_exact_slot_id_from_list_above",
+      "subject": "subject_name", 
+      "material_ids": ["material1", "material2"],
+      "reasoning": "why this assignment is optimal for family coordination",
+      "efficiency_match": 0.85
+    }
+  ],
+  "coordination_strategy": "description of family coordination approach",
+  "confidence": 0.90
+}
+
+IMPORTANT: 
+- Use ONLY the exact slot_id values from the AVAILABLE TIME SLOTS list above
+- Use ONLY the exact material IDs from the MATERIALS BY SUBJECT list above
+- Do not double-assign materials or slots`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 2000
+    });
+
+    const content = response.choices[0].message.content;
+    // Clean up markdown code blocks if present
+    const cleanedContent = content.replace(/```json\n?|```\n?/g, '').trim();
+    return JSON.parse(cleanedContent);
+  }
 }
 
 module.exports = AdvancedSchedulingService;

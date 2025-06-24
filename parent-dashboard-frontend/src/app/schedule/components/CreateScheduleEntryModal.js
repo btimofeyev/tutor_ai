@@ -148,10 +148,11 @@ export default function CreateScheduleEntryModal({
       console.log(`Found ${units.length} units for subject ${subject.name}:`, units);
       setAvailableUnits(units);
       
-      // Get lessons for this subject
-      const lessons = lessonsBySubject[subjectId] || [];
-      console.log(`Found ${lessons.length} lessons for subject ${subject.name}:`, lessons.map(l => ({ id: l.id, title: l.title, unit_id: l.unit_id, lesson_container_id: l.lesson_container_id })));
-      setAvailableLessons(lessons);
+      // Get lessons for this subject and filter out completed/scheduled ones
+      const allLessons = lessonsBySubject[subjectId] || [];
+      const availableLessons = filterAvailableLessons(allLessons);
+      console.log(`Found ${availableLessons.length} available lessons for subject ${subject.name}`);
+      setAvailableLessons(availableLessons);
     }
   };
 
@@ -184,24 +185,62 @@ export default function CreateScheduleEntryModal({
         });
         
         console.log('Filtered lessons for unit:', unitLessons);
-        setAvailableLessons(unitLessons);
+        const availableUnitLessons = filterAvailableLessons(unitLessons);
+        setAvailableLessons(availableUnitLessons);
       } else {
-        // Show all lessons for the subject if no unit is selected
-        console.log('No unit selected, showing all lessons');
-        setAvailableLessons(allLessons);
+        // Show all available lessons for the subject if no unit is selected
+        console.log('No unit selected, showing all available lessons');
+        const availableLessons = filterAvailableLessons(allLessons);
+        setAvailableLessons(availableLessons);
       }
     }
+  };
+
+  // Filter lessons to exclude completed ones only (temporarily disable scheduling check)
+  const filterAvailableLessons = (lessons) => {
+    console.log('Filtering lessons - only excluding completed ones for now');
+    
+    return lessons.filter(lesson => {
+      // Only exclude completed lessons for now
+      if (lesson.completed_at && lesson.completed_at !== null && lesson.completed_at !== '') {
+        console.log(`Excluding completed lesson: ${lesson.title}`);
+        return false;
+      }
+      
+      console.log(`Including lesson: ${lesson.title}`);
+      return true;
+    });
   };
 
   // Handle material selection
   const handleMaterialChange = (e) => {
     const materialId = e.target.value;
-    const selectedMaterial = materials.find(m => m.id === materialId);
+    
+    console.log('=== MATERIAL SELECTION DEBUG ===');
+    console.log('Selected dropdown value (material ID):', materialId);
+    
+    // Find the material from the available lessons
+    const selectedMaterial = availableLessons.find(m => m.id === materialId);
+    console.log('Material found in availableLessons:', selectedMaterial);
+    
+    // Show all available lessons for comparison
+    console.log('All available lessons:');
+    availableLessons.forEach((lesson, index) => {
+      console.log(`  [${index}] ID: ${lesson.id} | Title: ${lesson.title} | Selected: ${lesson.id === materialId ? 'YES' : 'no'}`);
+    });
+    
+    // Additional validation
+    if (materialId && !selectedMaterial) {
+      console.error('ERROR: Selected material ID not found in availableLessons array!');
+      console.error('This could indicate a data synchronization issue.');
+    }
+    
+    console.log('=== END MATERIAL SELECTION DEBUG ===');
     
     setFormData(prev => ({
       ...prev,
       material_id: materialId,
-      subject_name: selectedMaterial ? selectedMaterial.subject_name : ''
+      subject_name: selectedMaterial ? selectedMaterial.subject_name : prev.subject_name
     }));
   };
 
@@ -289,6 +328,15 @@ export default function CreateScheduleEntryModal({
         duration_minutes: parseInt(formData.duration_minutes),
         child_id: formData.child_id || selectedChildrenIds[0]
       };
+      
+      // Debug: Log what's being submitted
+      const selectedMaterial = availableLessons.find(m => m.id === formData.material_id);
+      console.log('=== SUBMITTING SCHEDULE ENTRY ===');
+      console.log('Form data:', formData);
+      console.log('Cleaned data:', cleanedData);
+      console.log('Selected material from dropdown:', selectedMaterial);
+      console.log('Available lessons:', availableLessons.map(l => ({ id: l.id, title: l.title })));
+      console.log('====================================');
       
       // Determine target child ID - use form selection or default to first selected child
       const targetChildId = cleanedData.child_id;
@@ -507,7 +555,10 @@ export default function CreateScheduleEntryModal({
                           </label>
                           {availableLessons.length === 0 ? (
                             <div className="text-sm text-[var(--text-tertiary)] italic p-3 bg-[var(--background-main)] rounded border border-[var(--border-subtle)]">
-                              No lessons found for this {selectedUnitId ? 'unit' : 'subject'}. Upload lessons or select a different option.
+                              {selectedSubjectId && (lessonsBySubject[selectedSubjectId] || []).length > 0 ? 
+                                'All lessons for this subject have been completed or are already scheduled.' :
+                                `No lessons found for this ${selectedUnitId ? 'unit' : 'subject'}. Upload lessons or select a different option.`
+                              }
                             </div>
                           ) : (
                             <select
@@ -518,9 +569,17 @@ export default function CreateScheduleEntryModal({
                               className={formInputStyles}
                             >
                               <option value="">Select a specific lesson...</option>
-                              {availableLessons.map(lesson => (
+                              {availableLessons
+                                .sort((a, b) => {
+                                  // Sort by title to ensure consistent ordering
+                                  const titleA = a.title || '';
+                                  const titleB = b.title || '';
+                                  return titleA.localeCompare(titleB);
+                                })
+                                .map((lesson) => (
                                 <option key={lesson.id} value={lesson.id}>
                                   {lesson.title?.replace(/\(\)$/, '') || 'Untitled Lesson'}
+                                  {lesson.content_type && ` • ${lesson.content_type.replace(/_/g, ' ')}`}
                                 </option>
                               ))}
                             </select>

@@ -102,7 +102,7 @@ function DraggableScheduleEvent({
 
         {/* Event content */}
         <div className="pr-4 pb-4 relative">
-          <div className="text-xs font-medium truncate">{subject}</div>
+          <div className="text-xs font-medium truncate">{event.title || subject}</div>
           {childName && (
             <div className="text-xs opacity-90 font-medium">{childName}</div>
           )}

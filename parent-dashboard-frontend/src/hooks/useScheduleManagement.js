@@ -9,9 +9,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // State for AI scheduling
-  const [aiScheduling, setAiScheduling] = useState(false);
-  const [aiScheduleResults, setAiScheduleResults] = useState(null);
 
   // State for batch operations to prevent flickering
   const [batchMode, setBatchMode] = useState(false);
@@ -20,8 +17,12 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false);
+  const [showAIScheduleModal, setShowAIScheduleModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
+
+  // State for AI scheduling
+  const [aiScheduling, setAiScheduling] = useState(false);
+  const [aiScheduleResult, setAiScheduleResult] = useState(null);
 
   // Fetch schedule entries for a child
   const fetchScheduleEntries = useCallback(async (childId) => {
@@ -215,89 +216,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     }
   };
 
-  // Generate AI schedule
-  const generateAISchedule = async (parameters = {}) => {
-    if (!subscriptionPermissions?.hasAIAccess) {
-      setError('AI scheduling requires AI access - upgrade your plan or add Klio AI Pack');
-      return { success: false, error: 'AI scheduling requires AI access - upgrade your plan or add Klio AI Pack' };
-    }
-
-    try {
-      setAiScheduling(true);
-      
-      const requestData = {
-        child_id: childId,
-        ...parameters
-      };
-      
-      const response = await api.post('/schedule/ai-generate', requestData);
-      
-      setAiScheduleResults(response.data);
-      setError(null);
-      return { success: true, data: response.data };
-    } catch (err) {
-      const errorMessage = err.response?.data?.error || 'Failed to generate AI schedule';
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
-    } finally {
-      setAiScheduling(false);
-    }
-  };
-
-  // Apply AI schedule results
-  const applyAISchedule = async (scheduleData) => {
-    try {
-      setLoading(true);
-      
-      // Try API first, but fallback to local state if it fails
-      try {
-        // Create multiple schedule entries from AI results
-        const promises = scheduleData.map(entry => 
-          api.post('/schedule', { ...entry, child_id: childId })
-        );
-        
-        const responses = await Promise.all(promises);
-        const newEntries = responses.map(response => response.data);
-        
-        // Update local state with new entries
-        setScheduleEntries(prev => [...prev, ...newEntries]);
-        setAiScheduleResults(null); // Clear AI results
-        setError(null);
-        
-        return { success: true, data: newEntries };
-      } catch (apiError) {
-        
-        // Create local entries if API fails
-        const localEntries = scheduleData.map((entry, index) => ({
-          id: (Date.now() + index).toString(), // Simple ID generation with increment
-          child_id: childId,
-          material_id: entry.material_id || null,
-          subject_name: entry.subject_name || 'Study Time',
-          scheduled_date: entry.scheduled_date,
-          start_time: entry.start_time,
-          duration_minutes: entry.duration_minutes,
-          status: 'scheduled',
-          created_by: 'ai',
-          notes: entry.notes || '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
-        
-        // Add to local state
-        setScheduleEntries(prev => [...prev, ...localEntries]);
-        setAiScheduleResults(null); // Clear AI results
-        setError(null);
-        
-        return { success: true, data: localEntries };
-      }
-    } catch (err) {
-      const errorMessage = 'Failed to apply AI schedule';
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Batch create multiple schedule entries (prevents individual refreshes)
   const createScheduleEntriesBatch = async (entriesData) => {
@@ -348,20 +266,55 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
       // Extract material info from lesson container
       const lesson = entry.lesson;
       const materials = lesson?.materials || [];
-      const firstMaterial = materials[0]; // Take first material if multiple exist
       
-      // Determine the display title
+      // Sort materials consistently by title to ensure reproducible ordering
+      const sortedMaterials = [...materials].sort((a, b) => {
+        const titleA = a.title || '';
+        const titleB = b.title || '';
+        return titleA.localeCompare(titleB);
+      });
+      
+      // Try to get the specific material from metadata in notes
+      let specificMaterial = null;
       let displayTitle;
-      if (firstMaterial) {
-        // Show specific material title
-        displayTitle = `${entry.subject_name}: ${firstMaterial.title}`;
-      } else if (lesson) {
-        // Show lesson container title
-        displayTitle = `${entry.subject_name}: ${lesson.title}`;
-      } else {
-        // Fallback to general study
-        displayTitle = entry.subject_name || 'Study Time';
+      let materialMetadata = null;
+      
+      try {
+        if (entry.notes && typeof entry.notes === 'string' && entry.notes.startsWith('{')) {
+          materialMetadata = JSON.parse(entry.notes);
+          
+          if (materialMetadata.specific_material_id) {
+            // Find the specific material that was scheduled
+            specificMaterial = sortedMaterials.find(m => m.id === materialMetadata.specific_material_id);
+            
+            if (specificMaterial) {
+              displayTitle = `${entry.subject_name}: ${specificMaterial.title}`;
+            } else if (materialMetadata.material_title) {
+              // Fallback to the title stored in metadata
+              displayTitle = `${entry.subject_name}: ${materialMetadata.material_title}`;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse schedule entry metadata:', e);
       }
+      
+      // Fallback logic if no specific material found
+      if (!displayTitle) {
+        const firstMaterial = sortedMaterials[0]; // Take first material if multiple exist
+        if (firstMaterial) {
+          // Show specific material title
+          displayTitle = `${entry.subject_name}: ${firstMaterial.title}`;
+        } else if (lesson) {
+          // Show lesson container title
+          displayTitle = `${entry.subject_name}: ${lesson.title}`;
+        } else {
+          // Fallback to general study
+          displayTitle = entry.subject_name || 'Study Time';
+        }
+      }
+      
+      const displayMaterial = specificMaterial || sortedMaterials[0]; // Use specific material or fallback to first
       
       return {
         id: entry.id,
@@ -376,19 +329,21 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
         status: entry.status,
         notes: entry.notes,
         child_id: entry.child_id, // Add the child_id field
-        material: firstMaterial, // Include first material for backward compatibility
+        material: displayMaterial, // Include the correct material (specific or first)
         lesson: lesson, // Include lesson container info
-        materials: materials, // Include all materials in the lesson
-        content_type: firstMaterial?.content_type, // For styling/icons
+        materials: specificMaterial ? [specificMaterial] : materials, // Include only the scheduled material, or all if not specific
+        content_type: displayMaterial?.content_type, // For styling/icons
         // Also keep the original calendar format for compatibility
         start: new Date(`${entry.scheduled_date}T${entry.start_time}`),
         end: new Date(new Date(`${entry.scheduled_date}T${entry.start_time}`).getTime() + (entry.duration_minutes * 60000)),
         resource: {
           ...entry,
           subject: entry.subject_name,
-          type: entry.material?.content_type || 'study_time',
+          type: displayMaterial?.content_type || 'study_time',
           status: entry.status
-        }
+        },
+        // Add metadata for debugging
+        originalEntry: entry
       };
     });
   };
@@ -438,13 +393,73 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     setShowSettingsModal(false);
   };
 
-  const openAIModal = () => {
-    setShowAIModal(true);
+  // AI Schedule Modal helpers
+  const openAIScheduleModal = () => {
+    setShowAIScheduleModal(true);
   };
 
-  const closeAIModal = () => {
-    setShowAIModal(false);
-    setAiScheduleResults(null); // Clear any existing results
+  const closeAIScheduleModal = () => {
+    setShowAIScheduleModal(false);
+    setAiScheduleResult(null);
+  };
+
+  // Generate AI schedule
+  const generateAISchedule = async (options = {}) => {
+    try {
+      setAiScheduling(true);
+      setError(null);
+      
+      // Default options
+      const {
+        start_date = new Date().toISOString().split('T')[0],
+        end_date = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
+        scheduling_mode = 'balanced',
+        focus_subjects = [],
+        max_daily_sessions = 4,
+        session_duration = 45,
+        break_duration = 15
+      } = options;
+
+      console.log('🤖 Generating AI schedule for child:', childId);
+
+      const response = await api.post('/schedule/ai-generate', {
+        child_id: childId,
+        start_date,
+        end_date,
+        scheduling_mode,
+        focus_subjects,
+        max_daily_sessions,
+        session_duration,
+        break_duration
+      });
+
+      if (response.data.success) {
+        // Update schedule entries with the new AI-generated ones
+        await fetchScheduleEntries(childId);
+        
+        setAiScheduleResult(response.data);
+        setError(null);
+        
+        return {
+          success: true,
+          data: response.data,
+          summary: response.data.summary
+        };
+      } else {
+        throw new Error(response.data.error || 'Failed to generate AI schedule');
+      }
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to generate AI schedule';
+      setError(errorMessage);
+      console.error('AI scheduling error:', err);
+      
+      return {
+        success: false,
+        error: errorMessage
+      };
+    } finally {
+      setAiScheduling(false);
+    }
   };
 
   // Load data when childId changes
@@ -464,15 +479,17 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     // Loading states
     loading,
     error,
-    aiScheduling,
-    aiScheduleResults,
     
     // Modal states
     showCreateModal,
     showEditModal,
     showSettingsModal,
-    showAIModal,
+    showAIScheduleModal,
     editingEntry,
+
+    // AI Scheduling states
+    aiScheduling,
+    aiScheduleResult,
     
     // CRUD operations
     createScheduleEntry,
@@ -481,10 +498,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     updateEvent: updateScheduleEntry, // Alias for drag-and-drop compatibility
     deleteScheduleEntry,
     updateSchedulePreferences,
-    
-    // AI scheduling
-    generateAISchedule,
-    applyAISchedule,
     
     // Status updates
     markEntryCompleted,
@@ -497,8 +510,11 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     closeEditModal,
     openSettingsModal,
     closeSettingsModal,
-    openAIModal,
-    closeAIModal,
+    openAIScheduleModal,
+    closeAIScheduleModal,
+
+    // AI Scheduling functions
+    generateAISchedule,
     
     // Refresh - only if we have API connectivity, otherwise keep local state
     refresh: () => {

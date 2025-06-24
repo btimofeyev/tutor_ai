@@ -154,11 +154,13 @@ export default function AdvancedScheduleCalendar({
     const dayString = format(day, 'yyyy-MM-dd');
     const events = calendarEvents || [];
     
-    return events.filter(event => {
+    const dayEvents = events.filter(event => {
       if (event.date) return event.date === dayString;
       if (event.start) return isSameDay(new Date(event.start), day);
       return false;
     });
+    
+    return dayEvents;
   };
 
   // Navigation functions
@@ -497,6 +499,7 @@ function WeekView({
                 const height = Math.ceil(duration / 30);
                 const subject = eventStartingHere.subject_name || eventStartingHere.title || 'Study';
                 const displayTitle = eventStartingHere.title || subject;
+                
                 
                 // Get child name if multiple children are selected
                 const childName = selectedChildrenIds.length > 1 ? 

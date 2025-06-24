@@ -487,7 +487,8 @@ select {
   z-index: 13; /* Lesson dropdown */
 }
 
-button {
+/* Selective button reset - preserve Tailwind utility classes */
+button:not([class*="bg-"]):not([class*="btn-"]) {
   border: none;
   background: none;
   cursor: pointer;

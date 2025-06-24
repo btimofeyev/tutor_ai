@@ -1,529 +1,402 @@
-// app/schedule/components/AIScheduleModal.js
+// AI Schedule Modal - Simple interface for AI schedule generation
 "use client";
 import { useState, useEffect } from 'react';
-import { XMarkIcon, SparklesIcon, ClockIcon, CheckIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
-import { format, addDays, startOfWeek } from 'date-fns';
+import { 
+  XMarkIcon,
+  SparklesIcon,
+  CalendarDaysIcon,
+  ClockIcon,
+  AcademicCapIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon
+} from '@heroicons/react/24/outline';
 
-const formInputStyles = "block w-full border-[var(--border-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-input-focus)] focus:border-[var(--border-input-focus)] rounded-[var(--radius-md)] bg-background-card text-text-primary placeholder-text-tertiary shadow-sm text-sm px-3 py-2";
-const formLabelStyles = "block text-sm font-medium text-[var(--text-primary)] mb-1";
-
-export default function AIScheduleModal({ 
-  isOpen, 
-  onClose, 
-  onGenerateSchedule,
-  onApplySchedule,
-  childId,
+export default function AIScheduleModal({
+  isOpen,
+  onClose,
+  onGenerate,
   childName = 'Student',
-  childSubjects = [],
-  materials = [],
-  aiScheduleResults = null,
-  isGenerating = false,
-  isApplying = false,
   selectedChildrenIds = [],
-  allChildren = []
+  allChildren = [],
+  childSubjects = [],
+  schedulePreferences = {},
+  isGenerating = false,
+  generationResult = null
 }) {
-  // Form state for AI parameters
-  const [formData, setFormData] = useState({
-    start_date: '',
-    end_date: '',
-    focus_subjects: [],
-    weekly_hours: 15,
-    session_duration: 'mixed', // 'short', 'medium', 'long', 'mixed'
-    priority_mode: 'balanced', // 'difficult_first', 'easy_first', 'balanced'
-    selected_children: [] // For multi-child mode
-  });
+  // Form state
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [schedulingMode, setSchedulingMode] = useState('balanced');
+  const [focusSubjects, setFocusSubjects] = useState([]);
+  const [maxDailySessions, setMaxDailySessions] = useState(4);
+  const [sessionDuration, setSessionDuration] = useState(45);
 
-  const [errors, setErrors] = useState({});
-  const [currentStep, setCurrentStep] = useState('parameters'); // 'parameters', 'results'
-
-  // Initialize form when modal opens
+  // Initialize dates when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !startDate) {
       const today = new Date();
-      const startOfThisWeek = startOfWeek(today, { weekStartsOn: 1 });
-      const endOfWeek = addDays(startOfThisWeek, 6);
+      const twoWeeksFromNow = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
       
-      setFormData({
-        start_date: format(startOfThisWeek, 'yyyy-MM-dd'),
-        end_date: format(endOfWeek, 'yyyy-MM-dd'),
-        focus_subjects: [],
-        weekly_hours: 15,
-        session_duration: 'mixed',
-        priority_mode: 'balanced',
-        selected_children: selectedChildrenIds.length > 1 ? [...selectedChildrenIds] : [childId].filter(Boolean)
-      });
-      setErrors({});
-      setCurrentStep('parameters');
+      setStartDate(today.toISOString().split('T')[0]);
+      setEndDate(twoWeeksFromNow.toISOString().split('T')[0]);
     }
-  }, [isOpen, selectedChildrenIds, childId]);
+  }, [isOpen, startDate]);
 
-  // Reset to parameters step when AI results are cleared
+  // Reset form when modal closes
   useEffect(() => {
-    if (!aiScheduleResults) {
-      setCurrentStep('parameters');
-    } else {
-      setCurrentStep('results');
+    if (!isOpen) {
+      setFocusSubjects([]);
+      setSchedulingMode('balanced');
+      setMaxDailySessions(4);
+      setSessionDuration(45);
     }
-  }, [aiScheduleResults]);
+  }, [isOpen]);
 
-  // Handle input changes
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+  const handleGenerate = async () => {
+    // Different options for single child vs family scheduling
+    const options = selectedChildrenIds.length > 1 ? {
+      // Family coordination options
+      start_date: startDate,
+      end_date: endDate,
+      coordination_mode: schedulingMode,
+      daily_hours: { start: '09:00', end: '15:00' },
+      blocked_times: [{ start: '12:00', end: '13:00', reason: 'Lunch' }],
+      session_duration: sessionDuration
+    } : {
+      // Single child options
+      start_date: startDate,
+      end_date: endDate,
+      scheduling_mode: schedulingMode,
+      focus_subjects: focusSubjects,
+      max_daily_sessions: maxDailySessions,
+      session_duration: sessionDuration
+    };
+
+    const result = await onGenerate(options);
     
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number' ? parseInt(value) || 0 : value
-    }));
-
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+    // Keep modal open to show results
+    if (result.success) {
+      // Modal will show success state
     }
   };
 
-  // Handle subject focus changes
-  const handleSubjectChange = (subjectName) => {
-    setFormData(prev => ({
-      ...prev,
-      focus_subjects: prev.focus_subjects.includes(subjectName)
-        ? prev.focus_subjects.filter(s => s !== subjectName)
-        : [...prev.focus_subjects, subjectName]
-    }));
-  };
-
-  // Handle child selection changes
-  const handleChildSelectionChange = (childId) => {
-    setFormData(prev => ({
-      ...prev,
-      selected_children: prev.selected_children.includes(childId)
-        ? prev.selected_children.filter(id => id !== childId)
-        : [...prev.selected_children, childId]
-    }));
-  };
-
-  // Validate form
-  const validateForm = () => {
-    const newErrors = {};
-
-    // Validate child selection
-    if (formData.selected_children.length === 0) {
-      newErrors.selected_children = 'Please select at least one child';
-    }
-
-    if (!formData.start_date) {
-      newErrors.start_date = 'Start date is required';
-    }
-
-    if (!formData.end_date) {
-      newErrors.end_date = 'End date is required';
-    }
-
-    // Check that end date is after start date
-    if (formData.start_date && formData.end_date) {
-      const startDate = new Date(formData.start_date);
-      const endDate = new Date(formData.end_date);
-      
-      if (endDate <= startDate) {
-        newErrors.end_date = 'End date must be after start date';
-      }
-    }
-
-    if (formData.weekly_hours < 1 || formData.weekly_hours > 40) {
-      newErrors.weekly_hours = 'Weekly hours must be between 1 and 40';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Handle AI generation
-  const handleGenerate = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
-    try {
-      const isMultiChild = formData.selected_children.length > 1;
-      
-      if (isMultiChild) {
-        // Use multi-child AI generation
-        await onGenerateSchedule({
-          children_ids: formData.selected_children,
-          ...formData,
-          materials: materials // Pass materials data to backend
-        });
+  const handleSubjectToggle = (subjectId, subjectName) => {
+    setFocusSubjects(prev => {
+      const isSelected = prev.includes(subjectName);
+      if (isSelected) {
+        return prev.filter(s => s !== subjectName);
       } else {
-        // Use single-child AI generation
-        await onGenerateSchedule({
-          child_id: formData.selected_children[0] || childId,
-          ...formData,
-          materials: materials // Pass materials data to backend
-        });
+        return [...prev, subjectName];
       }
-    } catch (error) {
-      setErrors({ submit: 'Failed to generate AI schedule. Please try again.' });
-    }
+    });
   };
 
-  // Handle applying the AI schedule
-  const handleApply = async () => {
-    if (!aiScheduleResults?.suggestions) {
-      return;
-    }
-
-    try {
-      await onApplySchedule(aiScheduleResults.suggestions);
-      onClose(); // Close modal after successful application
-    } catch (error) {
-      setErrors({ submit: 'Failed to apply AI schedule. Please try again.' });
-    }
+  const getAvailableSubjects = () => {
+    return childSubjects.map(cs => ({
+      id: cs.id,
+      name: cs.custom_subject_name_override || cs.subject?.name || 'General Study'
+    }));
   };
-
-  // Session duration options
-  const sessionDurationOptions = [
-    { value: 'short', label: 'Short Sessions (15-30 min)', description: 'Better for younger children or difficult subjects' },
-    { value: 'medium', label: 'Medium Sessions (30-60 min)', description: 'Balanced approach for most subjects' },
-    { value: 'long', label: 'Long Sessions (60-90 min)', description: 'Deep focus for complex topics' },
-    { value: 'mixed', label: 'Mixed Durations', description: 'AI will choose optimal duration per subject' }
-  ];
-
-  // Priority mode options
-  const priorityModeOptions = [
-    { value: 'difficult_first', label: 'Difficult Subjects First', description: 'Schedule challenging topics when energy is highest' },
-    { value: 'easy_first', label: 'Easy Subjects First', description: 'Build momentum with simpler topics' },
-    { value: 'balanced', label: 'Balanced Mix', description: 'Alternate between easy and difficult subjects' }
-  ];
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-fade-in">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-border-subtle">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-[var(--border-subtle)] bg-[var(--background-card)]">
-          <h3 className="text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2">
-            <SparklesIcon className="h-5 w-5 text-[var(--accent-blue)]" />
-            {selectedChildrenIds.length > 1 ? 'AI Family Schedule Generator' : `AI Schedule Generator for ${childName}`}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors p-2 rounded-full hover:bg-[var(--accent-blue)]/10"
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </button>
+        <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-t-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white bg-opacity-20 rounded-lg">
+                <SparklesIcon className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold">AI Schedule Generator</h2>
+                <p className="text-blue-100 text-sm">
+                  {selectedChildrenIds.length > 1 
+                    ? `Generate coordinated schedules for ${selectedChildrenIds.length} children`
+                    : `Generate an optimized schedule for ${childName}`
+                  }
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto">
-          {currentStep === 'parameters' && (
-            <form onSubmit={handleGenerate} className="p-6 bg-white">
-              <div className="space-y-6">
-                {/* Child Selection */}
-                {selectedChildrenIds.length > 1 && (
-                  <div className="border border-[var(--border-subtle)] rounded-lg p-4 bg-[var(--background-main)]">
-                    <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
-                      Select Children for AI Scheduling
-                    </h4>
-                    <div className="space-y-2">
-                      {allChildren
-                        .filter(child => selectedChildrenIds.includes(child.id))
-                        .map(child => (
-                          <label key={child.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={formData.selected_children.includes(child.id)}
-                              onChange={() => handleChildSelectionChange(child.id)}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <div>
-                              <span className="font-medium text-gray-900">{child.name}</span>
-                              <span className="text-sm text-gray-500 ml-2">Grade {child.grade}</span>
-                            </div>
-                          </label>
-                        ))}
-                    </div>
-                    {errors.selected_children && (
-                      <p className="text-red-600 text-xs mt-2">{errors.selected_children}</p>
-                    )}
-                  </div>
-                )}
-
-                {/* Date Range */}
-                <div className="border border-[var(--border-subtle)] rounded-lg p-4 bg-[var(--background-main)]">
-                  <h4 className="text-md font-medium text-[var(--text-primary)] mb-3 flex items-center gap-2">
-                    <CalendarDaysIcon className="h-4 w-4" />
-                    Schedule Time Range
-                  </h4>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="start_date" className={formLabelStyles}>
-                        Start Date
-                      </label>
-                      <input
-                        type="date"
-                        id="start_date"
-                        name="start_date"
-                        value={formData.start_date}
-                        onChange={handleInputChange}
-                        className={formInputStyles}
-                        required
-                      />
-                      {errors.start_date && (
-                        <p className="text-red-600 text-xs mt-1">{errors.start_date}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label htmlFor="end_date" className={formLabelStyles}>
-                        End Date
-                      </label>
-                      <input
-                        type="date"
-                        id="end_date"
-                        name="end_date"
-                        value={formData.end_date}
-                        onChange={handleInputChange}
-                        className={formInputStyles}
-                        required
-                      />
-                      {errors.end_date && (
-                        <p className="text-red-600 text-xs mt-1">{errors.end_date}</p>
-                      )}
-                    </div>
+        <div className="p-6">
+          {/* Show results if generation was successful */}
+          {generationResult && generationResult.success ? (
+            <div className="space-y-6">
+              {/* Success Header */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <CheckCircleIcon className="h-6 w-6 text-green-600" />
+                  <div>
+                    <h3 className="font-semibold text-green-800">Schedule Generated Successfully!</h3>
+                    <p className="text-green-600 text-sm">Your AI-optimized schedule is ready.</p>
                   </div>
                 </div>
+              </div>
 
-                {/* Study Volume */}
-                <div className="border border-[var(--border-subtle)] rounded-lg p-4 bg-[var(--background-main)]">
-                  <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
-                    Study Volume
-                  </h4>
-                  
+              {/* Results Summary */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <CalendarDaysIcon className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium text-blue-800">Sessions Created</span>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-900 mt-1">
+                    {generationResult.summary?.total_sessions || 0}
+                  </p>
+                </div>
+                
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <AcademicCapIcon className="h-5 w-5 text-purple-600" />
+                    <span className="font-medium text-purple-800">Subjects Covered</span>
+                  </div>
+                  <p className="text-2xl font-bold text-purple-900 mt-1">
+                    {generationResult.summary?.subjects_covered?.length || 0}
+                  </p>
+                </div>
+              </div>
+
+              {/* Subjects Covered */}
+              {generationResult.summary?.subjects_covered && generationResult.summary.subjects_covered.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">Subjects Included:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {generationResult.summary.subjects_covered.map((subject, index) => (
+                      <span 
+                        key={index}
+                        className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+                      >
+                        {subject}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Date Range */}
+              <div>
+                <h4 className="font-medium text-gray-800 mb-2">Schedule Period:</h4>
+                <p className="text-gray-600">
+                  {new Date(generationResult.summary?.date_range?.start_date).toLocaleDateString()} - {' '}
+                  {new Date(generationResult.summary?.date_range?.end_date).toLocaleDateString()}
+                </p>
+              </div>
+
+              {/* AI Confidence */}
+              {generationResult.summary?.ai_confidence && (
+                <div>
+                  <h4 className="font-medium text-gray-800 mb-2">AI Optimization Score:</h4>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-green-500 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${(generationResult.summary.ai_confidence * 100)}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-medium text-gray-600">
+                      {Math.round(generationResult.summary.ai_confidence * 100)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  onClick={onClose}
+                  className="btn-primary"
+                >
+                  View Schedule
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Configuration Form */
+            <div className="space-y-6">
+              {/* Date Range */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <CalendarDaysIcon className="h-5 w-5 text-blue-600" />
+                  Schedule Period
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="weekly_hours" className={formLabelStyles}>
-                      Target Weekly Study Hours
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Start Date
                     </label>
                     <input
-                      type="range"
-                      id="weekly_hours"
-                      name="weekly_hours"
-                      min="5"
-                      max="40"
-                      value={formData.weekly_hours}
-                      onChange={handleInputChange}
-                      className="w-full"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
-                    <div className="flex justify-between text-xs text-[var(--text-secondary)] mt-1">
-                      <span>5 hours</span>
-                      <span className="font-medium text-[var(--text-primary)]">{formData.weekly_hours} hours</span>
-                      <span>40 hours</span>
-                    </div>
-                    {errors.weekly_hours && (
-                      <p className="text-red-600 text-xs mt-1">{errors.weekly_hours}</p>
-                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
                   </div>
                 </div>
+              </div>
 
-                {/* Focus Subjects */}
-                {childSubjects.length > 0 && (
-                  <div className="border border-[var(--border-subtle)] rounded-lg p-4 bg-[var(--background-main)]">
-                    <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
-                      Focus Subjects (Optional)
-                    </h4>
-                    
-                    <p className="text-sm text-[var(--text-secondary)] mb-3">
-                      Select subjects to prioritize in the schedule. If none selected, all subjects will be included equally.
-                    </p>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      {childSubjects.map(subject => (
-                        <label key={subject.child_subject_id} className="flex items-center gap-2 p-2 rounded hover:bg-[var(--background-card)] cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={formData.focus_subjects.includes(subject.name)}
-                            onChange={() => handleSubjectChange(subject.name)}
-                            className="rounded border-[var(--border-input)] text-[var(--accent-blue)] focus:ring-[var(--accent-blue)]"
-                          />
-                          <span className="text-sm text-[var(--text-primary)]">{subject.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              {/* Scheduling Mode */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <ClockIcon className="h-5 w-5 text-purple-600" />
+                  {selectedChildrenIds.length > 1 ? 'Coordination Mode' : 'Scheduling Mode'}
+                </h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {selectedChildrenIds.length > 1 ? [
+                    { id: 'balanced', name: 'Balanced', desc: 'Balance individual needs with family harmony' },
+                    { id: 'synchronized', name: 'Synchronized', desc: 'Align children for shared study time' },
+                    { id: 'staggered', name: 'Staggered', desc: 'Offset schedules to minimize conflicts' }
+                  ] : [
+                    { id: 'balanced', name: 'Balanced', desc: 'Even distribution across days' },
+                    { id: 'intensive', name: 'Intensive', desc: 'More sessions per day' },
+                    { id: 'relaxed', name: 'Relaxed', desc: 'Fewer sessions per day' }
+                  ].map((mode) => (
+                    <button
+                      key={mode.id}
+                      onClick={() => setSchedulingMode(mode.id)}
+                      className={`p-3 border-2 rounded-lg text-left transition-all ${
+                        schedulingMode === mode.id
+                          ? 'border-blue-500 bg-blue-50 text-blue-800'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="font-medium">{mode.name}</div>
+                      <div className="text-xs text-gray-500 mt-1">{mode.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-                {/* Session Duration Preference */}
-                <div className="border border-[var(--border-subtle)] rounded-lg p-4 bg-[var(--background-main)]">
-                  <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
-                    Session Duration Preference
-                  </h4>
-                  
-                  <div className="space-y-2">
-                    {sessionDurationOptions.map(option => (
-                      <label key={option.value} className="flex items-start gap-3 p-3 rounded border border-transparent hover:border-[var(--border-input)] cursor-pointer">
+              {/* Focus Subjects - only show for single child */}
+              {selectedChildrenIds.length <= 1 && getAvailableSubjects().length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <AcademicCapIcon className="h-5 w-5 text-green-600" />
+                    Focus Subjects
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Select subjects to prioritize (leave empty to include all subjects)
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {getAvailableSubjects().map((subject) => (
+                      <label key={subject.id} className="flex items-center gap-2 cursor-pointer">
                         <input
-                          type="radio"
-                          name="session_duration"
-                          value={option.value}
-                          checked={formData.session_duration === option.value}
-                          onChange={handleInputChange}
-                          className="mt-0.5 text-[var(--accent-blue)] focus:ring-[var(--accent-blue)]"
+                          type="checkbox"
+                          checked={focusSubjects.includes(subject.name)}
+                          onChange={() => handleSubjectToggle(subject.id, subject.name)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
-                        <div>
-                          <div className="text-sm font-medium text-[var(--text-primary)]">{option.label}</div>
-                          <div className="text-xs text-[var(--text-secondary)]">{option.description}</div>
-                        </div>
+                        <span className="text-sm text-gray-700">{subject.name}</span>
                       </label>
                     ))}
                   </div>
                 </div>
+              )}
 
-                {/* Priority Mode */}
-                <div className="border border-[var(--border-subtle)] rounded-lg p-4 bg-[var(--background-main)]">
-                  <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
-                    Priority Mode
-                  </h4>
-                  
-                  <div className="space-y-2">
-                    {priorityModeOptions.map(option => (
-                      <label key={option.value} className="flex items-start gap-3 p-3 rounded border border-transparent hover:border-[var(--border-input)] cursor-pointer">
-                        <input
-                          type="radio"
-                          name="priority_mode"
-                          value={option.value}
-                          checked={formData.priority_mode === option.value}
-                          onChange={handleInputChange}
-                          className="mt-0.5 text-[var(--accent-blue)] focus:ring-[var(--accent-blue)]"
-                        />
-                        <div>
-                          <div className="text-sm font-medium text-[var(--text-primary)]">{option.label}</div>
-                          <div className="text-xs text-[var(--text-secondary)]">{option.description}</div>
-                        </div>
+              {/* Session Settings */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Session Settings</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedChildrenIds.length <= 1 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Max Sessions Per Day
                       </label>
-                    ))}
+                      <select
+                        value={maxDailySessions}
+                        onChange={(e) => setMaxDailySessions(Number(e.target.value))}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value={2}>2 sessions</option>
+                        <option value={3}>3 sessions</option>
+                        <option value={4}>4 sessions</option>
+                        <option value={5}>5 sessions</option>
+                        <option value={6}>6 sessions</option>
+                      </select>
+                    </div>
+                  )}
+                  <div className={selectedChildrenIds.length > 1 ? 'col-span-2' : ''}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Session Duration
+                    </label>
+                    <select
+                      value={sessionDuration}
+                      onChange={(e) => setSessionDuration(Number(e.target.value))}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value={30}>30 minutes</option>
+                      <option value={45}>45 minutes</option>
+                      <option value={60}>60 minutes</option>
+                      <option value={90}>90 minutes</option>
+                    </select>
                   </div>
                 </div>
-
-                {/* Submit Error */}
-                {errors.submit && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-600 text-sm">{errors.submit}</p>
-                  </div>
-                )}
-              </div>
-            </form>
-          )}
-
-          {currentStep === 'results' && aiScheduleResults && (
-            <div className="p-6 bg-white">
-              {/* AI Reasoning */}
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h4 className="text-md font-medium text-blue-900 mb-2">AI Reasoning</h4>
-                <p className="text-sm text-blue-800">{aiScheduleResults.reasoning}</p>
-                <div className="mt-2">
-                  <span className="text-xs text-blue-600">
-                    Confidence: {Math.round((aiScheduleResults.confidence || 0) * 100)}%
-                  </span>
-                </div>
               </div>
 
-              {/* Schedule Preview */}
-              <div className="space-y-3">
-                <h4 className="text-md font-medium text-[var(--text-primary)]">
-                  Suggested Schedule ({aiScheduleResults.suggestions?.length || 0} sessions)
-                </h4>
-                
-                {aiScheduleResults.suggestions?.map((suggestion, index) => (
-                  <div key={index} className="border border-[var(--border-subtle)] rounded-lg p-4 hover:bg-[var(--background-main)] transition-colors">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h5 className="font-medium text-[var(--text-primary)]">
-                          {suggestion.subject_name}
-                        </h5>
-                        <p className="text-sm text-[var(--text-secondary)] mt-1">
-                          {suggestion.notes}
-                        </p>
-                      </div>
-                      <div className="text-right text-sm text-[var(--text-secondary)]">
-                        <div>{format(new Date(suggestion.scheduled_date), 'MMM d, yyyy')}</div>
-                        <div>{suggestion.start_time} • {suggestion.duration_minutes}min</div>
-                      </div>
+              {/* Error Display */}
+              {generationResult && !generationResult.success && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+                    <div>
+                      <h3 className="font-semibold text-red-800">Generation Failed</h3>
+                      <p className="text-red-600 text-sm">{generationResult.error}</p>
                     </div>
                   </div>
-                ))}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  onClick={onClose}
+                  className="btn-secondary"
+                  disabled={isGenerating}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleGenerate}
+                  disabled={isGenerating || !startDate || !endDate}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  {isGenerating ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <SparklesIcon className="h-4 w-4" />
+                      Generate AI Schedule
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-between items-center p-6 border-t border-[var(--border-subtle)] bg-[var(--background-card)]">
-          <div className="flex gap-3">
-            {currentStep === 'results' && (
-              <button
-                type="button"
-                onClick={() => setCurrentStep('parameters')}
-                className="btn-secondary"
-              >
-                ← Back to Parameters
-              </button>
-            )}
-          </div>
-          
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-secondary"
-              disabled={isGenerating || isApplying}
-            >
-              Close
-            </button>
-            
-            {currentStep === 'parameters' && (
-              <button
-                type="submit"
-                onClick={handleGenerate}
-                className="btn-primary flex items-center gap-2"
-                disabled={isGenerating}
-              >
-                {isGenerating ? (
-                  <>
-                    <ClockIcon className="h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <SparklesIcon className="h-4 w-4" />
-                    Generate AI Schedule
-                  </>
-                )}
-              </button>
-            )}
-            
-            {currentStep === 'results' && (
-              <button
-                type="button"
-                onClick={handleApply}
-                className="btn-primary flex items-center gap-2"
-                disabled={isApplying}
-              >
-                {isApplying ? (
-                  <>
-                    <ClockIcon className="h-4 w-4 animate-spin" />
-                    Applying...
-                  </>
-                ) : (
-                  <>
-                    <CheckIcon className="h-4 w-4" />
-                    Apply Schedule
-                  </>
-                )}
-              </button>
-            )}
-          </div>
         </div>
       </div>
     </div>

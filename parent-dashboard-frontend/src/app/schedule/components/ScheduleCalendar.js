@@ -332,14 +332,14 @@ export default function ScheduleCalendar({
                                   );
                                 }
                               }}
-                              className={`p-0.5 rounded-full transition-all duration-200 hover:scale-110 shadow-sm ${
+                              className={`p-1 rounded-full transition-all duration-200 hover:scale-110 shadow-lg border ${
                                 eventStartingHere.status === 'completed' 
-                                  ? 'bg-white text-green-600 shadow-md' 
-                                  : 'bg-white/90 hover:bg-white text-gray-500 hover:text-green-600 hover:shadow-md'
+                                  ? 'bg-green-50 text-green-700 border-green-300 shadow-green-200' 
+                                  : 'bg-white hover:bg-green-50 text-gray-600 hover:text-green-700 border-gray-300 hover:border-green-300'
                               }`}
                               title={eventStartingHere.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
                             >
-                              <CheckIcon className="h-3 w-3" />
+                              <CheckIcon className="h-4 w-4" />
                             </button>
                           </div>
                         ) : (
@@ -391,14 +391,14 @@ export default function ScheduleCalendar({
                                     );
                                   }
                                 }}
-                                className={`p-1 rounded-full transition-all duration-200 hover:scale-110 shadow-sm ${
+                                className={`p-1.5 rounded-full transition-all duration-200 hover:scale-110 shadow-lg border ${
                                   eventStartingHere.status === 'completed' 
-                                    ? 'bg-white text-green-600 shadow-md' 
-                                    : 'bg-white/90 hover:bg-white text-gray-500 hover:text-green-600 hover:shadow-md'
+                                    ? 'bg-green-50 text-green-700 border-green-300 shadow-green-200' 
+                                    : 'bg-white hover:bg-green-50 text-gray-600 hover:text-green-700 border-gray-300 hover:border-green-300'
                                 }`}
                                 title={eventStartingHere.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
                               >
-                                <CheckIcon className="h-3 w-3" />
+                                <CheckIcon className="h-4 w-4" />
                               </button>
                             </div>
                           </div>

@@ -6,12 +6,14 @@ import {
   Cog6ToothIcon,
   DocumentDuplicateIcon,
   ArrowsUpDownIcon,
-  PrinterIcon
+  PrinterIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 import AdvancedScheduleCalendar from './AdvancedScheduleCalendar';
 import DragDropScheduleCalendar from './DragDropScheduleCalendar';
 import ScheduleTemplatesManager from './ScheduleTemplatesManager';
 import PDFGenerator from './PDFGenerator';
+import AIScheduleModal from './AIScheduleModal';
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
 
 export default function EnhancedScheduleManager({
@@ -358,6 +360,18 @@ export default function EnhancedScheduleManager({
   // Render action buttons - enhanced styling
   const renderActionButtons = () => (
     <div className="flex items-center gap-3">
+      {/* AI Schedule Generator button - show in calendar views */}
+      {(activeView === 'advanced' || activeView === 'dragdrop') && (
+        <button
+          onClick={() => finalScheduleManagement.openAIScheduleModal()}
+          className="btn-primary bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+          title="Generate AI-optimized schedule"
+        >
+          <SparklesIcon className="h-4 w-4" />
+          AI Scheduler
+        </button>
+      )}
+
       {/* Quick Save as Template button - show in calendar views */}
       {(activeView === 'advanced' || activeView === 'dragdrop') && (
         <button
@@ -676,6 +690,20 @@ export default function EnhancedScheduleManager({
           isApplying={applyingTemplate}
         />
       )}
+
+      {/* AI Schedule Modal */}
+      <AIScheduleModal
+        isOpen={finalScheduleManagement.showAIScheduleModal}
+        onClose={finalScheduleManagement.closeAIScheduleModal}
+        onGenerate={finalScheduleManagement.generateAISchedule}
+        childName={allChildren.find(c => c.id === childId)?.name || 'Student'}
+        selectedChildrenIds={selectedChildrenIds}
+        allChildren={allChildren}
+        childSubjects={childSubjects}
+        schedulePreferences={schedulePreferences}
+        isGenerating={finalScheduleManagement.aiScheduling}
+        generationResult={finalScheduleManagement.aiScheduleResult}
+      />
 
     </div>
   );

@@ -16,10 +16,9 @@ import EnhancedScheduleManager from "./components/EnhancedScheduleManager";
 import ScheduleSettingsModal from "./components/ScheduleSettingsModal";
 import CreateScheduleEntryModal from "./components/CreateScheduleEntryModal";
 import EditScheduleEntryModal from "./components/EditScheduleEntryModal";
-import AIScheduleModal from "./components/AIScheduleModal";
 import { useScheduleManagement } from "../../hooks/useScheduleManagement";
 import { useMultiChildScheduleManagement } from "../../hooks/useMultiChildScheduleManagement";
-import { Cog6ToothIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { Cog6ToothIcon } from '@heroicons/react/24/outline';
 
 export default function SchedulePage() {
   const session = useSession();
@@ -149,35 +148,6 @@ export default function SchedulePage() {
     }
   };
 
-  // Handle rebuilding schedule with AI
-  const handleRebuildSchedule = async () => {
-    const isMultiChild = selectedChildrenIds.length >= 1;
-    const confirmMessage = isMultiChild
-      ? 'This will clear the current schedules for all selected children and generate new ones with AI. Continue?'
-      : 'This will clear your current schedule and generate a new one with AI. Continue?';
-    
-    if (window.confirm(confirmMessage)) {
-      if (isMultiChild) {
-        // Clear existing entries for all selected children first
-        const allEntries = multiChildScheduleManagement.allScheduleEntries || {};
-        for (const [childId, entries] of Object.entries(allEntries)) {
-          for (const entry of (entries || [])) {
-            await multiChildScheduleManagement.deleteScheduleEntry(entry.id, childId);
-          }
-        }
-        // Then open AI modal
-        multiChildScheduleManagement.openAIModal();
-      } else {
-        // Clear existing entries for single child
-        const entries = singleChildScheduleManagement.scheduleEntries || [];
-        for (const entry of entries) {
-          await singleChildScheduleManagement.deleteScheduleEntry(entry.id);
-        }
-        // Then open AI modal
-        singleChildScheduleManagement.openAIModal();
-      }
-    }
-  };
 
   // Get assigned subjects for the current child
   const assignedSubjectsForCurrentChild = childrenData.selectedChild 
@@ -241,29 +211,14 @@ export default function SchedulePage() {
                     </button>
                     
                     {getTotalEntriesCount() > 0 && (
-                      <div className="btn-group">
-                        <button 
-                          onClick={handleClearSchedule}
-                          className="btn-secondary"
-                        >
-                          Clear All
-                        </button>
-                        <button 
-                          onClick={handleRebuildSchedule}
-                          className="btn-secondary"
-                        >
-                          Rebuild
-                        </button>
-                      </div>
+                      <button 
+                        onClick={handleClearSchedule}
+                        className="btn-secondary"
+                      >
+                        Clear All
+                      </button>
                     )}
                     
-                    <button 
-                      onClick={scheduleManagement.openAIModal}
-                      className="btn-primary"
-                    >
-                      <SparklesIcon className="h-4 w-4" />
-                      AI Schedule
-                    </button>
                   </div>
                 </div>
 
@@ -370,26 +325,6 @@ export default function SchedulePage() {
         isSaving={scheduleManagement.loading}
       />
 
-      {/* AI Schedule Modal */}
-      <AIScheduleModal
-        isOpen={scheduleManagement.showAIModal}
-        onClose={scheduleManagement.closeAIModal}
-        onGenerateSchedule={
-          selectedChildrenIds.length >= 1 
-            ? multiChildScheduleManagement.generateMultiChildAISchedule 
-            : singleChildScheduleManagement.generateAISchedule
-        }
-        onApplySchedule={scheduleManagement.applyAISchedule}
-        childId={childrenData.selectedChild?.id}
-        childName={childrenData.selectedChild?.name}
-        childSubjects={assignedSubjectsForCurrentChild}
-        materials={materialsForCurrentChild}
-        aiScheduleResults={scheduleManagement.aiScheduleResults}
-        isGenerating={scheduleManagement.aiScheduling}
-        isApplying={scheduleManagement.loading}
-        selectedChildrenIds={selectedChildrenIds}
-        allChildren={childrenData.children}
-      />
     </div>
   );
 }

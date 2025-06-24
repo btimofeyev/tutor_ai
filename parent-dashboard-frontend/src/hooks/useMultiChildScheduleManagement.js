@@ -8,9 +8,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // State for AI scheduling
-  const [aiScheduling, setAiScheduling] = useState(false);
-  const [aiScheduleResults, setAiScheduleResults] = useState(null);
 
   // State for batch operations to prevent flickering
   const [batchMode, setBatchMode] = useState(false);
@@ -19,8 +16,12 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false);
+  const [showAIScheduleModal, setShowAIScheduleModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
+
+  // State for AI scheduling
+  const [aiScheduling, setAiScheduling] = useState(false);
+  const [aiScheduleResult, setAiScheduleResult] = useState(null);
 
   // Fetch schedule entries for multiple children
   const fetchMultipleChildrenSchedules = useCallback(async (childrenIds) => {
@@ -67,20 +68,55 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         // Extract material info from lesson container (matches single-child hook logic)
         const lesson = entry.lesson;
         const materials = lesson?.materials || [];
-        const firstMaterial = materials[0]; // Take first material if multiple exist
         
-        // Determine the display title (matches single-child hook logic)
+        // Sort materials consistently by title to ensure reproducible ordering
+        const sortedMaterials = [...materials].sort((a, b) => {
+          const titleA = a.title || '';
+          const titleB = b.title || '';
+          return titleA.localeCompare(titleB);
+        });
+        
+        // Try to get the specific material from metadata in notes (SAME AS SINGLE-CHILD HOOK)
+        let specificMaterial = null;
         let displayTitle;
-        if (firstMaterial) {
-          // Show specific material title
-          displayTitle = `${entry.subject_name}: ${firstMaterial.title}`;
-        } else if (lesson) {
-          // Show lesson container title
-          displayTitle = `${entry.subject_name}: ${lesson.title}`;
-        } else {
-          // Fallback to general study
-          displayTitle = entry.subject_name || 'Study Time';
+        let materialMetadata = null;
+        
+        try {
+          if (entry.notes && typeof entry.notes === 'string' && entry.notes.startsWith('{')) {
+            materialMetadata = JSON.parse(entry.notes);
+            
+            if (materialMetadata.specific_material_id) {
+              // Find the specific material that was scheduled
+              specificMaterial = sortedMaterials.find(m => m.id === materialMetadata.specific_material_id);
+              
+              if (specificMaterial) {
+                displayTitle = `${entry.subject_name}: ${specificMaterial.title}`;
+              } else if (materialMetadata.material_title) {
+                // Fallback to the title stored in metadata
+                displayTitle = `${entry.subject_name}: ${materialMetadata.material_title}`;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse schedule entry metadata:', e);
         }
+        
+        // Fallback logic if no specific material found (SAME AS SINGLE-CHILD HOOK)
+        if (!displayTitle) {
+          const firstMaterial = sortedMaterials[0]; // Take first material if multiple exist
+          if (firstMaterial) {
+            // Show specific material title
+            displayTitle = `${entry.subject_name}: ${firstMaterial.title}`;
+          } else if (lesson) {
+            // Show lesson container title
+            displayTitle = `${entry.subject_name}: ${lesson.title}`;
+          } else {
+            // Fallback to general study
+            displayTitle = entry.subject_name || 'Study Time';
+          }
+        }
+        
+        const displayMaterial = specificMaterial || sortedMaterials[0]; // Use specific material or fallback to first
         
         allEvents.push({
           id: `${childId}-${entry.id}`,
@@ -97,10 +133,10 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           duration_minutes: entry.duration_minutes,
           status: entry.status,
           notes: entry.notes,
-          material: firstMaterial, // Include first material for backward compatibility
+          material: displayMaterial, // Include the correct material (specific or first)
           lesson: lesson, // Include lesson container info
-          materials: materials, // Include all materials in the lesson
-          content_type: firstMaterial?.content_type, // For styling/icons
+          materials: sortedMaterials, // Include all materials in the lesson (sorted)
+          content_type: displayMaterial?.content_type, // For styling/icons
           originalEntry: entry, // Keep reference to original entry
           // Also keep the original calendar format for compatibility
           start: new Date(`${entry.scheduled_date}T${entry.start_time}`),
@@ -111,7 +147,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
             childId: childId,
             childName: childName,
             subject: entry.subject_name,
-            type: firstMaterial?.content_type || 'study_time',
+            type: displayMaterial?.content_type || 'study_time',
             status: entry.status
           }
         });
@@ -277,168 +313,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     }
   };
 
-  // Generate AI schedule for multiple children using existing single-child endpoint
-  const generateMultiChildAISchedule = async (parameters = {}) => {
-    if (!subscriptionPermissions?.hasAIAccess) {
-      setError('AI scheduling requires AI access - upgrade your plan or add Klio AI Pack');
-      return { success: false, error: 'AI scheduling requires AI access - upgrade your plan or add Klio AI Pack' };
-    }
-
-    try {
-      setAiScheduling(true);
-      
-      // Generate schedule for each child individually using existing endpoint
-      const allScheduleResults = {};
-      const combinedSuggestions = [];
-      
-      for (const childId of parameters.selected_children || selectedChildrenIds) {
-        try {
-          
-          const requestData = {
-            child_id: childId,
-            start_date: parameters.start_date,
-            end_date: parameters.end_date,
-            focus_subjects: parameters.focus_subjects,
-            weekly_hours: parameters.weekly_hours,
-            session_duration: parameters.session_duration,
-            priority_mode: parameters.priority_mode,
-            materials: parameters.materials
-          };
-          
-          const response = await api.post('/schedule/ai-generate', requestData);
-          
-          allScheduleResults[childId] = response.data;
-          
-          // Add child info to each suggestion
-          if (response.data?.suggestions) {
-            const childSuggestions = response.data.suggestions.map(suggestion => ({
-              ...suggestion,
-              child_id: childId,
-              childName: allChildren.find(c => c.id === childId)?.name || 'Unknown Child'
-            }));
-            combinedSuggestions.push(...childSuggestions);
-          }
-        } catch (childError) {
-          // Continue with other children even if one fails
-        }
-      }
-      
-      // Combine results into format expected by UI
-      const combinedResults = {
-        suggestions: combinedSuggestions,
-        metadata: {
-          total_children: parameters.selected_children?.length || selectedChildrenIds.length,
-          individual_results: allScheduleResults
-        }
-      };
-      
-      setAiScheduleResults(combinedResults);
-      setError(null);
-      return { success: true, data: combinedResults };
-    } catch (err) {
-      const errorMessage = err.response?.data?.error || 'Failed to generate AI schedule';
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
-    } finally {
-      setAiScheduling(false);
-    }
-  };
-
-  // Apply AI schedule results for multiple children
-  const applyAISchedule = async (scheduleData) => {
-    try {
-      setLoading(true);
-      
-      if (!scheduleData || !Array.isArray(scheduleData)) {
-        throw new Error('Invalid schedule data provided');
-      }
-      
-      // Group schedule data by child
-      const schedulesByChild = {};
-      scheduleData.forEach(entry => {
-        const childId = entry.child_id;
-        if (!schedulesByChild[childId]) {
-          schedulesByChild[childId] = [];
-        }
-        schedulesByChild[childId].push(entry);
-      });
-      
-      // Try API first, but fallback to local state if it fails
-      try {
-        // Create multiple schedule entries for each child
-        const allNewEntries = {};
-        
-        for (const [childId, childEntries] of Object.entries(schedulesByChild)) {
-          const promises = childEntries.map(entry => 
-            api.post('/schedule', { ...entry, child_id: childId })
-          );
-          
-          const responses = await Promise.all(promises);
-          const newEntries = responses.map(response => response.data);
-          
-          allNewEntries[childId] = newEntries;
-        }
-        
-        // Update local state with new entries for each child
-        setAllScheduleEntries(prev => {
-          const updated = { ...prev };
-          Object.entries(allNewEntries).forEach(([childId, entries]) => {
-            updated[childId] = [...(prev[childId] || []), ...entries];
-          });
-          return updated;
-        });
-        
-        setAiScheduleResults(null); // Clear AI results
-        setError(null);
-        
-        return { success: true, data: allNewEntries };
-      } catch (apiError) {
-        
-        // Create local entries if API fails
-        const allLocalEntries = {};
-        let idCounter = Date.now();
-        
-        Object.entries(schedulesByChild).forEach(([childId, childEntries]) => {
-          const localEntries = childEntries.map(entry => ({
-            id: (idCounter++).toString(),
-            child_id: childId,
-            material_id: entry.material_id || null,
-            subject_name: entry.subject_name || 'Study Time',
-            scheduled_date: entry.scheduled_date,
-            start_time: entry.start_time,
-            duration_minutes: entry.duration_minutes,
-            status: 'scheduled',
-            created_by: 'ai',
-            notes: entry.notes || '',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }));
-          
-          allLocalEntries[childId] = localEntries;
-        });
-        
-        // Add to local state for each child
-        setAllScheduleEntries(prev => {
-          const updated = { ...prev };
-          Object.entries(allLocalEntries).forEach(([childId, entries]) => {
-            updated[childId] = [...(prev[childId] || []), ...entries];
-          });
-          return updated;
-        });
-        
-        setAiScheduleResults(null); // Clear AI results
-        setError(null);
-        
-        return { success: true, data: allLocalEntries };
-      }
-    } catch (err) {
-      const errorMessage = 'Failed to apply AI schedule';
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Batch create multiple schedule entries for specific children (prevents individual refreshes)
   const createScheduleEntriesBatch = async (entriesWithChildIds) => {
@@ -535,13 +409,71 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     setShowSettingsModal(false);
   };
 
-  const openAIModal = () => {
-    setShowAIModal(true);
+  // AI Schedule Modal helpers
+  const openAIScheduleModal = () => {
+    setShowAIScheduleModal(true);
   };
 
-  const closeAIModal = () => {
-    setShowAIModal(false);
-    setAiScheduleResults(null);
+  const closeAIScheduleModal = () => {
+    setShowAIScheduleModal(false);
+    setAiScheduleResult(null);
+  };
+
+  // Generate AI schedule for multiple children (family coordination)
+  const generateAISchedule = async (options = {}) => {
+    try {
+      setAiScheduling(true);
+      setError(null);
+      
+      // Default options
+      const {
+        start_date = new Date().toISOString().split('T')[0],
+        end_date = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
+        coordination_mode = 'balanced',
+        daily_hours = { start: '09:00', end: '15:00' },
+        blocked_times = [{ start: '12:00', end: '13:00', reason: 'Lunch' }],
+        session_duration = 45
+      } = options;
+
+      console.log('🤖 Generating family AI schedule for children:', selectedChildrenIds);
+
+      const response = await api.post('/schedule/ai-generate-family', {
+        children_ids: selectedChildrenIds,
+        start_date,
+        end_date,
+        coordination_mode,
+        daily_hours,
+        blocked_times,
+        session_duration
+      });
+
+      if (response.data.success) {
+        // Refresh all children's schedules to show the new AI-generated ones
+        await fetchMultipleChildrenSchedules(selectedChildrenIds);
+        
+        setAiScheduleResult(response.data);
+        setError(null);
+        
+        return {
+          success: true,
+          data: response.data,
+          summary: response.data.summary
+        };
+      } else {
+        throw new Error(response.data.error || 'Failed to generate family AI schedule');
+      }
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to generate family AI schedule';
+      setError(errorMessage);
+      console.error('Family AI scheduling error:', err);
+      
+      return {
+        success: false,
+        error: errorMessage
+      };
+    } finally {
+      setAiScheduling(false);
+    }
   };
 
   // Load data when selected children change
@@ -562,25 +494,23 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     // Loading states
     loading,
     error,
-    aiScheduling,
-    aiScheduleResults,
     
     // Modal states
     showCreateModal,
     showEditModal,
     showSettingsModal,
-    showAIModal,
+    showAIScheduleModal,
     editingEntry,
+
+    // AI Scheduling states
+    aiScheduling,
+    aiScheduleResult,
     
     // CRUD operations
     createScheduleEntry,
     createScheduleEntriesBatch,
     updateScheduleEntry,
     deleteScheduleEntry,
-    
-    // AI scheduling
-    generateMultiChildAISchedule,
-    applyAISchedule,
     
     // Status updates
     markEntryCompleted,
@@ -592,8 +522,11 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     closeEditModal,
     openSettingsModal,
     closeSettingsModal,
-    openAIModal,
-    closeAIModal,
+    openAIScheduleModal,
+    closeAIScheduleModal,
+
+    // AI Scheduling functions
+    generateAISchedule,
     
     // Refresh
     refresh: () => {

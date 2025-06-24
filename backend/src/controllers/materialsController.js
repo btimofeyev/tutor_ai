@@ -14,6 +14,32 @@ const openai = new OpenAI({
 
 const MAX_TEXT_CHARS_FOR_PROMPT = 70000;
 
+// Helper function to extract lesson number from title
+function extractLessonNumber(title) {
+  if (!title || typeof title !== 'string') return null;
+  
+  // Match various lesson number patterns
+  const patterns = [
+    /lesson\s*(\d+)/i,           // "Lesson 1", "Lesson 12", "lesson 5"
+    /chapter\s*(\d+)/i,          // "Chapter 1", "chapter 3"
+    /unit\s*(\d+)/i,             // "Unit 1", "unit 4"
+    /\b(\d+)\b/,                 // Any standalone number
+    /(\d+)(?:st|nd|rd|th)/i      // "1st", "2nd", "3rd", "4th"
+  ];
+  
+  for (const pattern of patterns) {
+    const match = title.match(pattern);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > 0) {
+        return num;
+      }
+    }
+  }
+  
+  return null;
+}
+
 // Helper to get parent_id from request header
 function getParentId(req) {
   return req.header('x-parent-id');
@@ -342,11 +368,35 @@ exports.listMaterialsForLesson = async (req, res) => {
     const { data, error } = await supabase
       .from('materials')
       .select('*')
-      .eq('lesson_id', lesson_id)
-      .order('created_at', { ascending: false });
+      .eq('lesson_id', lesson_id);
 
     if (error) throw error;
-    res.json(data || []);
+    
+    // Sort materials by lesson number extracted from title
+    const sortedMaterials = (data || []).sort((a, b) => {
+      const lessonNumA = extractLessonNumber(a.title);
+      const lessonNumB = extractLessonNumber(b.title);
+      
+      // Primary sort: by lesson number (if both have numbers)
+      if (lessonNumA !== null && lessonNumB !== null) {
+        return lessonNumA - lessonNumB;
+      }
+      
+      // Secondary sort: materials with lesson numbers come before those without
+      if (lessonNumA !== null && lessonNumB === null) return -1;
+      if (lessonNumA === null && lessonNumB !== null) return 1;
+      
+      // Tertiary sort: alphabetical by title for materials without lesson numbers
+      const titleA = (a.title || '').toLowerCase();
+      const titleB = (b.title || '').toLowerCase();
+      if (titleA < titleB) return -1;
+      if (titleA > titleB) return 1;
+      
+      // Final fallback: by creation date (newer first)
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+    
+    res.json(sortedMaterials);
   } catch (error) {
     console.error('Error listing materials:', error);
     res.status(500).json({ error: 'Failed to list materials' });
@@ -392,18 +442,38 @@ exports.listMaterialsForChildSubject = async (req, res) => {
           )
         )
       `)
-      .eq('child_subject_id', child_subject_id)
-      .order('created_at', { ascending: false });
+      .eq('child_subject_id', child_subject_id);
 
     if (error) throw error;
     
-    // Process materials to include subject name
+    // Process materials to include subject name and sort by lesson number
     const processedMaterials = (data || []).map(material => ({
       ...material,
       subject_name: material.child_subject?.custom_subject_name_override || 
                    material.child_subject?.subject?.name || 
                    'General Studies'
-    }));
+    })).sort((a, b) => {
+      const lessonNumA = extractLessonNumber(a.title);
+      const lessonNumB = extractLessonNumber(b.title);
+      
+      // Primary sort: by lesson number (if both have numbers)
+      if (lessonNumA !== null && lessonNumB !== null) {
+        return lessonNumA - lessonNumB;
+      }
+      
+      // Secondary sort: materials with lesson numbers come before those without
+      if (lessonNumA !== null && lessonNumB === null) return -1;
+      if (lessonNumA === null && lessonNumB !== null) return 1;
+      
+      // Tertiary sort: alphabetical by title for materials without lesson numbers
+      const titleA = (a.title || '').toLowerCase();
+      const titleB = (b.title || '').toLowerCase();
+      if (titleA < titleB) return -1;
+      if (titleA > titleB) return 1;
+      
+      // Final fallback: by creation date (newer first)
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
     
     res.json(processedMaterials);
   } catch (error) {
@@ -508,67 +578,6 @@ exports.updateMaterialDetails = async (req, res) => {
   }
 };
 
-// --- Toggle Material Completion ---
-exports.toggleMaterialCompletion = async (req, res) => {
-  const parent_id = getParentId(req);
-  const { material_id } = req.params;
-  const { grade } = req.body; // Optional grade parameter
-
-  if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
-  if (!material_id) return res.status(400).json({ error: 'material_id is required' });
-
-  try {
-    // Get current material and verify ownership
-    const { data: material, error: materialError } = await supabase
-      .from('materials')
-      .select(`
-        id,
-        completed_at,
-        lesson:lesson_id (
-          id,
-          unit:unit_id (
-            id,
-            child_subject:child_subject_id (
-              id,
-              child:child_id (
-                id,
-                parent_id
-              )
-            )
-          )
-        )
-      `)
-      .eq('id', material_id)
-      .single();
-
-    if (materialError || !material || material.lesson.unit.child_subject.child.parent_id !== parent_id) {
-      return res.status(403).json({ error: 'Access denied to this material' });
-    }
-
-    const newCompletedAt = material.completed_at ? null : new Date().toISOString();
-    
-    // Prepare update object
-    const updateData = { completed_at: newCompletedAt };
-    
-    // If marking as complete and grade is provided, update the grade
-    if (newCompletedAt && grade !== undefined && grade !== null) {
-      updateData.grade_value = grade.toString().trim();
-    }
-    
-    const { data, error } = await supabase
-      .from('materials')
-      .update(updateData)
-      .eq('id', material_id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    res.json(data);
-  } catch (error) {
-    console.error('Error toggling material completion:', error);
-    res.status(500).json({ error: 'Failed to toggle completion' });
-  }
-};
 
 // --- Delete Material ---
 exports.deleteMaterial = async (req, res) => {
@@ -734,6 +743,7 @@ exports.toggleMaterialCompletion = async (req, res) => {
         completed_at,
         lesson:lesson_id (
           id,
+          title,
           unit:unit_id (
             id,
             child_subject:child_subject_id (
@@ -762,7 +772,7 @@ exports.toggleMaterialCompletion = async (req, res) => {
       .from('materials')
       .update({ 
         completed_at: newCompletedAt,
-        ...(grade && { grade_value: grade })
+        ...(grade && !isCurrentlyCompleted && { grade_value: grade })
       })
       .eq('id', material_id)
       .select('*')
@@ -770,35 +780,43 @@ exports.toggleMaterialCompletion = async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // Sync with schedule entries that reference this material
+    // Sync with schedule entries that reference this material's lesson container
     const childId = material.lesson.unit.child_subject.child.id;
+    const lessonContainerId = material.lesson.id;
     const newScheduleStatus = newCompletedAt ? 'completed' : 'scheduled';
 
-    // Find related schedule entries
-    const { data: relatedScheduleEntries, error: scheduleError } = await supabase
-      .from('schedule_entries')
-      .select('id, material_id, subject_name, notes')
-      .eq('child_id', childId)
-      .eq('material_id', material.lesson.id);
-
-    if (!scheduleError && relatedScheduleEntries?.length > 0) {
-      // Update all related schedule entries
-      const { error: syncError } = await supabase
+    let syncedScheduleEntries = 0;
+    try {
+      // Find related schedule entries (schedule entries reference lesson containers, not individual materials)
+      const { data: relatedScheduleEntries, error: scheduleError } = await supabase
         .from('schedule_entries')
-        .update({ status: newScheduleStatus })
+        .select('id, material_id, subject_name, scheduled_date, start_time')
         .eq('child_id', childId)
-        .eq('material_id', material.lesson.id);
+        .eq('material_id', lessonContainerId);
 
-      if (syncError) {
-        console.warn('Failed to sync schedule entries:', syncError);
+      if (!scheduleError && relatedScheduleEntries?.length > 0) {
+        // Update all related schedule entries status
+        const { error: syncError } = await supabase
+          .from('schedule_entries')
+          .update({ status: newScheduleStatus })
+          .eq('child_id', childId)
+          .eq('material_id', lessonContainerId);
+
+        if (!syncError) {
+          syncedScheduleEntries = relatedScheduleEntries.length;
+        } else {
+          console.warn('Failed to sync schedule entries:', syncError);
+        }
       }
+    } catch (syncErr) {
+      console.warn('Error during schedule sync:', syncErr);
     }
 
     res.json({
       success: true,
       material: updatedMaterial,
-      synced_schedule_entries: relatedScheduleEntries?.length || 0,
-      message: `Material ${newCompletedAt ? 'completed' : 'marked as incomplete'} and synced with schedule`
+      synced_schedule_entries: syncedScheduleEntries,
+      message: `Material ${newCompletedAt ? 'completed' : 'marked as incomplete'}${syncedScheduleEntries > 0 ? ` and synced with ${syncedScheduleEntries} schedule entries` : ''}`
     });
 
   } catch (error) {

@@ -7,9 +7,11 @@ import {
     PlusCircleIcon, 
     ListBulletIcon, 
     ClockIcon, 
-    AdjustmentsHorizontalIcon 
+    AdjustmentsHorizontalIcon,
+    PlusIcon
 } from '@heroicons/react/24/outline'; // For all other generic icons
 import MaterialListItem from './MaterialListItem';
+import LessonGroupedMaterials from './LessonGroupedMaterials';
 import CompletionPieChart from './charts/CompletionPieChart';
 
 // Modern Skeleton Loader Component
@@ -50,10 +52,13 @@ export default function SubjectCard({
     onOpenEditModal,
     onManageUnits,
     onToggleComplete,
-    onDeleteMaterial
+    onDeleteMaterial,
+    onCreateLessonGroup
 }) {
     const [expandedUnits, setExpandedUnits] = useState({});
     const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
+    const [creatingLessonGroupForUnit, setCreatingLessonGroupForUnit] = useState(null);
+    const [newLessonGroupTitle, setNewLessonGroupTitle] = useState("");
 
     const upcomingDueItems = useMemo(() => {
         if (!subject.child_subject_id) return [];
@@ -86,6 +91,16 @@ export default function SubjectCard({
     const toggleUnitExpansion = (unitId) => setExpandedUnits(prev => ({ ...prev, [unitId]: !prev[unitId] }));
     const toggleLessonContainerExpansion = (lcId) => setExpandedLessonContainers(prev => ({ ...prev, [lcId]: !prev[lcId] }));
     
+    const handleCreateLessonGroup = async (unitId) => {
+        if (!newLessonGroupTitle.trim()) return;
+        
+        const result = await onCreateLessonGroup(unitId, newLessonGroupTitle.trim());
+        if (result.success) {
+            setNewLessonGroupTitle("");
+            setCreatingLessonGroupForUnit(null);
+        }
+    };
+    
     const ChevronIcon = ({ isExpanded }) => (
         <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
              <ChevronDownIcon className="h-5 w-5 text-gray-400" />
@@ -93,41 +108,15 @@ export default function SubjectCard({
     );
     
     const renderLessonContainerMaterials = (lessonContainer, materials) => {
-        if (materials.length === 0) return null;
-        const isExpanded = !!expandedLessonContainers[lessonContainer.id];
-
+        // Use the new LessonGroupedMaterials component that fetches grouped data
         return (
-            <div key={lessonContainer.id} className="bg-gray-50/80 rounded-lg border border-gray-200 overflow-hidden">
-                <button
-                    className="w-full px-4 py-3 flex items-center text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
-                    onClick={() => toggleLessonContainerExpansion(lessonContainer.id)}
-                >
-                    <ListBulletIcon className="h-4 w-4 mr-3 sm:mr-4 text-gray-500 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                        <span className="text-sm font-semibold text-gray-700">{lessonContainer.title}</span>
-                        <span className="ml-2 text-xs text-gray-500 font-normal">({materials.length})</span>
-                    </div>
-                    <div className="flex-shrink-0 ml-3">
-                        <ChevronIcon isExpanded={isExpanded} />
-                    </div>
-                </button>
-
-                <div className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
-                    {isExpanded && (
-                        <div className="px-4 pb-3 space-y-1 border-t border-gray-200">
-                            {materials.map(material => (
-                                <MaterialListItem
-                                    key={material.id}
-                                    lesson={material}
-                                    onOpenEditModal={onOpenEditModal}
-                                    onToggleComplete={onToggleComplete}
-                                    onDeleteMaterial={onDeleteMaterial}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
+            <LessonGroupedMaterials
+                key={lessonContainer.id}
+                lessonContainer={lessonContainer}
+                onOpenEditModal={onOpenEditModal}
+                onToggleComplete={onToggleComplete}
+                onDeleteMaterial={onDeleteMaterial}
+            />
         );
     };
 
@@ -136,7 +125,7 @@ export default function SubjectCard({
         const isExpanded = !!expandedUnits[unit.id];
         const allUnitMaterialsCount = lessonContainersInUnit.reduce((acc, c) => acc + lessons.filter(l => l.lesson_id === c.id).length, 0);
 
-        if (lessonContainersInUnit.length === 0 && allUnitMaterialsCount === 0) return null;
+        // Always show units, even if they're empty - users need to see them to add lesson groups
 
         return (
             <div key={unit.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -148,7 +137,12 @@ export default function SubjectCard({
                     <Image src="/icons/folder_icon.png" alt="Folder" width={24} height={24} className="mr-4 sm:mr-5 flex-shrink-0 rounded-md" />
                     <div className="flex-1 min-w-0">
                         <h4 className="text-base font-semibold text-gray-900">{unit.name}</h4>
-                        <p className="text-sm text-gray-500">{lessonContainersInUnit.length} groups • {allUnitMaterialsCount} items</p>
+                        <p className="text-sm text-gray-500">
+                            {lessonContainersInUnit.length === 0 
+                                ? "Click to add lesson groups" 
+                                : `${lessonContainersInUnit.length} groups • ${allUnitMaterialsCount} items`
+                            }
+                        </p>
                     </div>
                     <div className="flex-shrink-0 ml-4">
                         <ChevronIcon isExpanded={isExpanded} />
@@ -158,13 +152,57 @@ export default function SubjectCard({
                 <div className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
                     {isExpanded && (
                         <div className="p-4 pt-2 space-y-3">
+                            {/* Add Lesson Group Section */}
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                                {creatingLessonGroupForUnit === unit.id ? (
+                                    <div>
+                                        <h5 className="text-sm font-semibold text-green-800 mb-2">Create New Lesson Group</h5>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={newLessonGroupTitle}
+                                                onChange={(e) => setNewLessonGroupTitle(e.target.value)}
+                                                placeholder="Lesson group title (e.g., Lesson 1, Chapter 1.1, etc.)"
+                                                className="flex-1 px-3 py-2 text-sm border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                                autoFocus
+                                                onKeyPress={(e) => e.key === 'Enter' && handleCreateLessonGroup(unit.id)}
+                                            />
+                                            <button
+                                                onClick={() => handleCreateLessonGroup(unit.id)}
+                                                className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                            >
+                                                Create
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setCreatingLessonGroupForUnit(null);
+                                                    setNewLessonGroupTitle("");
+                                                }}
+                                                className="px-4 py-2 bg-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-400 transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setCreatingLessonGroupForUnit(unit.id)}
+                                        className="w-full flex items-center justify-center gap-2 py-2 text-green-700 hover:text-green-800 transition-colors"
+                                    >
+                                        <PlusIcon className="h-4 w-4" />
+                                        <span className="text-sm font-medium">Add Lesson Groups to {unit.name}</span>
+                                    </button>
+                                )}
+                            </div>
+                            
+                            {/* Existing Lesson Groups */}
                             {lessonContainersInUnit.length === 0 ? (
                                 <div className="text-center py-4 text-gray-500 text-sm italic">
-                                    No lesson groups in this unit yet.
+                                    No lesson groups in this unit yet. Click above to add some!
                                 </div>
                             ) : (
                                 lessonContainersInUnit.map(container =>
-                                    renderLessonContainerMaterials(container, lessons.filter(l => l.lesson_id === container.id))
+                                    renderLessonContainerMaterials(container, []) // Pass empty array since component fetches its own data
                                 )
                             )}
                         </div>

@@ -41,7 +41,8 @@ import {
   PencilIcon,
   TrashIcon,
   PlusIcon,
-  XMarkIcon
+  XMarkIcon,
+  ListBulletIcon
 } from "@heroicons/react/24/outline";
 
 
@@ -77,6 +78,11 @@ export default function DashboardPage() {
   const [bulkUnitCount, setBulkUnitCount] = useState(1);
   const [editingUnit, setEditingUnit] = useState(null);
   const [isAddMaterialModalOpen, setIsAddMaterialModalOpen] = useState(false);
+  
+  // Lesson group management state
+  const [expandedUnitsInModal, setExpandedUnitsInModal] = useState({});
+  const [creatingLessonGroupForUnit, setCreatingLessonGroupForUnit] = useState(null);
+  const [newLessonGroupTitle, setNewLessonGroupTitle] = useState("");
 
   // Child credentials modal state
   const [isChildLoginSettingsModalOpen, setIsChildLoginSettingsModalOpen] = useState(false);
@@ -474,7 +480,7 @@ export default function DashboardPage() {
   };
 
 
-  const handleApproveNewLesson = async () => {
+  const handleApproveNewLesson = async (materialRelationshipData = {}) => {
     const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
     const subjectInfo = currentAssignedSubjects.find(
       (s) => s.child_subject_id === materialManagement.addLessonSubject
@@ -499,7 +505,7 @@ export default function DashboardPage() {
       return;
     }
     
-    const result = await materialManagement.handleSaveLesson(childrenData.selectedChild?.id);
+    const result = await materialManagement.handleSaveLesson(childrenData.selectedChild?.id, materialRelationshipData);
   
     if (result.success) {
       const fileInput = document.getElementById("lesson-file-input-main"); 
@@ -595,6 +601,65 @@ export default function DashboardPage() {
     } catch (error) {
  
       return { success: false, error: error.response?.data?.error || error.message };
+    }
+  };
+
+  // Function to create lesson group from units modal
+  const handleCreateLessonGroupInModal = async (unitId) => {
+    if (!newLessonGroupTitle.trim()) {
+      showError('Lesson group title cannot be empty.');
+      return;
+    }
+
+    try {
+      const response = await api.post('/lesson-containers', {
+        unit_id: unitId,
+        title: newLessonGroupTitle.trim()
+      });
+      
+      // Update the lesson containers for this unit
+      const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
+      const updatedLessonContainers = lessonsRes.data || [];
+      
+      childrenData.setLessonsByUnit(prev => ({
+        ...prev,
+        [unitId]: updatedLessonContainers
+      }));
+      
+      // Reset form
+      setNewLessonGroupTitle("");
+      setCreatingLessonGroupForUnit(null);
+      
+      showSuccess(`Lesson group "${newLessonGroupTitle.trim()}" created successfully!`);
+    } catch (error) {
+      console.error('Error creating lesson group:', error);
+      showError(error.response?.data?.error || 'Failed to create lesson group.');
+    }
+  };
+
+  // Handler for creating lesson groups from SubjectCard
+  const handleCreateLessonGroupFromCard = async (unitId, title) => {
+    try {
+      const response = await api.post('/lesson-containers', {
+        unit_id: unitId,
+        title: title
+      });
+      
+      // Update the lesson containers for this unit
+      const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
+      const updatedLessonContainers = lessonsRes.data || [];
+      
+      childrenData.setLessonsByUnit(prev => ({
+        ...prev,
+        [unitId]: updatedLessonContainers
+      }));
+      
+      showSuccess(`Lesson group "${title}" created successfully!`);
+      return { success: true };
+    } catch (error) {
+      console.error('Error creating lesson group:', error);
+      showError(error.response?.data?.error || 'Failed to create lesson group.');
+      return { success: false, error: error.response?.data?.error || 'Failed to create lesson group.' };
     }
   };
 
@@ -1111,6 +1176,7 @@ export default function DashboardPage() {
                         onManageUnits={() => openManageUnitsModal(subject)}
                         onToggleComplete={handleToggleLessonComplete}
                         onDeleteMaterial={handleDeleteMaterial}
+                        onCreateLessonGroup={handleCreateLessonGroupFromCard}
                       />
                     ))}
                   </div>
@@ -1123,14 +1189,14 @@ export default function DashboardPage() {
 
        {isAddMaterialModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 animate-fade-in" onClick={() => setIsAddMaterialModalOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl relative" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col relative" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setIsAddMaterialModalOpen(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <XMarkIcon className="h-6 w-6" />
             </button>
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto flex-1">
                <AddMaterialTabs
                   childSubjectsForSelectedChild={assignedSubjectsForCurrentChild}
                   onFormSubmit={handleAddLessonFormSubmit}
@@ -1395,6 +1461,16 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex gap-2 ml-4">
                               <button
+                                onClick={() => setExpandedUnitsInModal(prev => ({
+                                  ...prev,
+                                  [unit.id]: !prev[unit.id]
+                                }))}
+                                className="p-3 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                                title="Manage Lesson Groups"
+                              >
+                                <ListBulletIcon className="h-5 w-5" />
+                              </button>
+                              <button
                                 onClick={() =>
                                   setEditingUnit({
                                     ...unit,
@@ -1415,6 +1491,69 @@ export default function DashboardPage() {
                               </button>
                             </div>
                           </div>
+                          
+                          {/* Lesson Groups Section */}
+                          {expandedUnitsInModal[unit.id] && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                              <div className="flex items-center justify-between mb-3">
+                                <h5 className="text-md font-semibold text-gray-800">Lesson Groups</h5>
+                                <button
+                                  onClick={() => setCreatingLessonGroupForUnit(unit.id)}
+                                  className="inline-flex items-center px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                                >
+                                  <PlusIcon className="h-4 w-4 mr-1" />
+                                  Add Group
+                                </button>
+                              </div>
+                              
+                              {/* Add New Lesson Group Form */}
+                              {creatingLessonGroupForUnit === unit.id && (
+                                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      value={newLessonGroupTitle}
+                                      onChange={(e) => setNewLessonGroupTitle(e.target.value)}
+                                      placeholder="Lesson group title..."
+                                      className="flex-1 px-3 py-2 text-sm border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => handleCreateLessonGroupInModal(unit.id)}
+                                      className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                    >
+                                      Create
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setCreatingLessonGroupForUnit(null);
+                                        setNewLessonGroupTitle("");
+                                      }}
+                                      className="px-3 py-2 bg-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-400 transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Existing Lesson Groups */}
+                              <div className="space-y-2">
+                                {(childrenData.lessonsByUnit[unit.id] || []).length === 0 ? (
+                                  <p className="text-sm text-gray-500 italic">No lesson groups yet.</p>
+                                ) : (
+                                  (childrenData.lessonsByUnit[unit.id] || []).map(lessonGroup => (
+                                    <div key={lessonGroup.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                                      <span className="text-sm text-gray-700">{lessonGroup.title}</span>
+                                      <span className="text-xs text-gray-500">
+                                        {childrenData.lessonsBySubject[managingUnitsForSubject.id]?.filter(l => l.lesson_id === lessonGroup.id).length || 0} materials
+                                      </span>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

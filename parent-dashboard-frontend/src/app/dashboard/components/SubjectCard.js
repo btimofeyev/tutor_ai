@@ -59,6 +59,7 @@ export default function SubjectCard({
     const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
     const [creatingLessonGroupForUnit, setCreatingLessonGroupForUnit] = useState(null);
     const [newLessonGroupTitle, setNewLessonGroupTitle] = useState("");
+    const [bulkLessonGroupCount, setBulkLessonGroupCount] = useState(1);
 
     const upcomingDueItems = useMemo(() => {
         if (!subject.child_subject_id) return [];
@@ -94,10 +95,28 @@ export default function SubjectCard({
     const handleCreateLessonGroup = async (unitId) => {
         if (!newLessonGroupTitle.trim()) return;
         
-        const result = await onCreateLessonGroup(unitId, newLessonGroupTitle.trim());
-        if (result.success) {
-            setNewLessonGroupTitle("");
-            setCreatingLessonGroupForUnit(null);
+        if (bulkLessonGroupCount === 1) {
+            // Single lesson group creation
+            const result = await onCreateLessonGroup(unitId, newLessonGroupTitle.trim());
+            if (result.success) {
+                setNewLessonGroupTitle("");
+                setCreatingLessonGroupForUnit(null);
+                setBulkLessonGroupCount(1);
+            }
+        } else {
+            // Bulk lesson group creation
+            try {
+                const baseName = newLessonGroupTitle.trim();
+                for (let i = 1; i <= bulkLessonGroupCount; i++) {
+                    const title = `${baseName} ${i}`;
+                    await onCreateLessonGroup(unitId, title);
+                }
+                setNewLessonGroupTitle("");
+                setCreatingLessonGroupForUnit(null);
+                setBulkLessonGroupCount(1);
+            } catch (error) {
+                console.error('Error in bulk lesson group creation:', error);
+            }
         }
     };
     
@@ -156,32 +175,76 @@ export default function SubjectCard({
                             <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
                                 {creatingLessonGroupForUnit === unit.id ? (
                                     <div>
-                                        <h5 className="text-sm font-semibold text-green-800 mb-2">Create New Lesson Group</h5>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={newLessonGroupTitle}
-                                                onChange={(e) => setNewLessonGroupTitle(e.target.value)}
-                                                placeholder="Lesson group title (e.g., Lesson 1, Chapter 1.1, etc.)"
-                                                className="flex-1 px-3 py-2 text-sm border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                                                autoFocus
-                                                onKeyPress={(e) => e.key === 'Enter' && handleCreateLessonGroup(unit.id)}
-                                            />
-                                            <button
-                                                onClick={() => handleCreateLessonGroup(unit.id)}
-                                                className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
-                                            >
-                                                Create
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setCreatingLessonGroupForUnit(null);
-                                                    setNewLessonGroupTitle("");
-                                                }}
-                                                className="px-4 py-2 bg-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-400 transition-colors"
-                                            >
-                                                Cancel
-                                            </button>
+                                        <h5 className="text-sm font-semibold text-green-800 mb-3">Create Lesson Groups for {unit.name}</h5>
+                                        
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-green-700 mb-1">
+                                                        Base Name
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={newLessonGroupTitle}
+                                                        onChange={(e) => setNewLessonGroupTitle(e.target.value)}
+                                                        placeholder="Lesson, Section, Topic, etc."
+                                                        className="w-full px-3 py-2 text-sm border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                                        autoFocus
+                                                        onKeyPress={(e) => e.key === 'Enter' && handleCreateLessonGroup(unit.id)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-green-700 mb-1">
+                                                        How Many?
+                                                    </label>
+                                                    <select
+                                                        value={bulkLessonGroupCount}
+                                                        onChange={(e) => setBulkLessonGroupCount(parseInt(e.target.value))}
+                                                        className="w-full px-3 py-2 text-sm border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                                    >
+                                                        <option value={1}>1 (Single)</option>
+                                                        <option value={5}>5 Lesson Groups</option>
+                                                        <option value={10}>10 Lesson Groups</option>
+                                                        <option value={15}>15 Lesson Groups</option>
+                                                        <option value={20}>20 Lesson Groups</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            
+                                            {bulkLessonGroupCount > 1 && (
+                                                <div className="bg-green-100 border border-green-300 rounded-lg p-2">
+                                                    <p className="text-xs text-green-800 mb-1">
+                                                        <strong>Preview:</strong> This will create {bulkLessonGroupCount} lesson groups:
+                                                    </p>
+                                                    <div className="text-xs text-green-700 space-y-0.5 max-h-16 overflow-y-auto">
+                                                        {Array.from({ length: Math.min(bulkLessonGroupCount, 5) }, (_, i) => (
+                                                            <div key={i}>• {newLessonGroupTitle || 'Lesson'} {i + 1}</div>
+                                                        ))}
+                                                        {bulkLessonGroupCount > 5 && (
+                                                            <div className="text-green-600">... and {bulkLessonGroupCount - 5} more</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleCreateLessonGroup(unit.id)}
+                                                    className="flex-1 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                                >
+                                                    Create {bulkLessonGroupCount === 1 ? 'Lesson Group' : `${bulkLessonGroupCount} Groups`}
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setCreatingLessonGroupForUnit(null);
+                                                        setNewLessonGroupTitle("");
+                                                        setBulkLessonGroupCount(1);
+                                                    }}
+                                                    className="px-4 py-2 bg-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-400 transition-colors"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 ) : (

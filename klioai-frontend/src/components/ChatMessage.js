@@ -1,8 +1,22 @@
 // klioai-frontend/src/components/ChatMessage.js - ENHANCED VERSION
 import { motion } from 'framer-motion';
-import { FiAlertTriangle, FiStar, FiHeart, FiTrendingUp } from 'react-icons/fi';
-import { useState, useEffect } from 'react';
+import { FiAlertTriangle, FiStar, FiHeart, FiTrendingUp, FiCopy, FiCheck } from 'react-icons/fi';
+import { useState, useEffect, useMemo, memo } from 'react';
 import Image from 'next/image';
+
+// Format relative time (e.g., "just now", "2 min ago", "1:30 PM")
+const formatRelativeTime = (timestamp) => {
+  const now = new Date();
+  const messageTime = new Date(timestamp);
+  const diffInMinutes = Math.floor((now - messageTime) / (1000 * 60));
+  
+  if (diffInMinutes < 1) return 'just now';
+  if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
+  if (diffInMinutes < 1440) { // Less than 24 hours
+    return messageTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+  return messageTime.toLocaleDateString([], { month: 'short', day: 'numeric' });
+};
 
 // Enhanced Klio Avatar with dynamic expressions
 const KlioAvatar = ({ messageType = 'default' }) => {
@@ -23,7 +37,7 @@ const KlioAvatar = ({ messageType = 'default' }) => {
     <div className={`flex-shrink-0 w-8 h-8 rounded-full overflow-hidden mr-2 shadow-sm bg-[var(--background-card)] ${getAvatarStyle()}`}>
       <Image
         src="/klio_logo.png"
-        alt="Klio AI"
+        alt={`Klio AI tutor avatar - ${messageType === 'celebration' ? 'celebrating your success' : messageType === 'encouragement' ? 'encouraging you' : messageType === 'question' ? 'asking a question' : 'ready to help'}`}
         width={32}
         height={32}
         className="object-cover"
@@ -230,12 +244,24 @@ function formatKlioMessage(content) {
   return formattedContent;
 }
 
-export default function ChatMessage({ message, onSendToWorkspace, hasStructuredWorkspace = false }) {
+const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasStructuredWorkspace = false }) {
   const isKlio = message.role === 'klio';
   const [showCelebration, setShowCelebration] = useState(false);
+  const [copied, setCopied] = useState(false);
   
-  // Analyze message tone for dynamic styling
-  const messageAnalysis = analyzeMessageTone(message.content);
+  // Memoize message analysis to prevent recalculation
+  const messageAnalysis = useMemo(() => analyzeMessageTone(message.content), [message.content]);
+
+  // Copy message to clipboard
+  const handleCopyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy message:', err);
+    }
+  };
   
   // Trigger celebration effect for celebratory messages
   useEffect(() => {
@@ -246,19 +272,21 @@ export default function ChatMessage({ message, onSendToWorkspace, hasStructuredW
     }
   }, [isKlio, messageAnalysis.celebratory]);
 
-  const messageVariants = {
+  // Simplified animations for better performance
+  const messageVariants = useMemo(() => ({
     hidden: { opacity: 0, y: 10 },
     visible: { 
       opacity: 1, 
       y: 0, 
       transition: { 
-        type: "spring", 
-        stiffness: messageAnalysis.celebratory ? 400 : 200, 
-        damping: 20 
+        type: messageAnalysis.celebratory ? "spring" : "tween", 
+        stiffness: 300, 
+        damping: 25,
+        duration: messageAnalysis.celebratory ? undefined : 0.2
       } 
     },
-    exit: { opacity: 0, transition: { duration: 0.15 } }
-  };
+    exit: { opacity: 0, transition: { duration: 0.1 } }
+  }), [messageAnalysis.celebratory]);
 
   // Base bubble classes: white background, padding, shadow, default text
   let baseBubbleClasses = 'p-3 shadow-sm bg-[var(--background-card)] text-[var(--text-primary)]';
@@ -313,16 +341,23 @@ export default function ChatMessage({ message, onSendToWorkspace, hasStructuredW
   // Combine all bubble classes
   const finalBubbleClasses = `${baseBubbleClasses} ${borderBubbleClasses} ${roundedClasses}`;
 
-  // Format Klio's messages for better visual hierarchy
-  const displayContent = isKlio && !message.isError 
-    ? formatKlioMessage(message.content) 
-    : message.content;
+  // Memoize message content formatting
+  const { displayContent, shouldUseHTML } = useMemo(() => {
+    const formatted = isKlio && !message.isError 
+      ? formatKlioMessage(message.content) 
+      : message.content;
+    
+    return {
+      displayContent: formatted,
+      shouldUseHTML: isKlio && !message.isError && formatted !== message.content
+    };
+  }, [isKlio, message.isError, message.content, formatKlioMessage]);
 
-  // Determine if we should use HTML rendering or plain text
-  const shouldUseHTML = isKlio && !message.isError && displayContent !== message.content;
-
-  // Check if this message has structured content - ENHANCED detection
-  const hasStructured = hasStructuredWorkspace || hasStructuredContent(message.content);
+  // Memoize structured content detection
+  const hasStructured = useMemo(() => 
+    hasStructuredWorkspace || hasStructuredContent(message.content),
+    [hasStructuredWorkspace, message.content]
+  );
 
   // Handle the workspace button click
   const handleSendToWorkspace = () => {
@@ -348,11 +383,13 @@ export default function ChatMessage({ message, onSendToWorkspace, hasStructuredW
       exit="exit"
       layout
       className={`flex w-full ${!isKlio ? 'justify-end' : 'items-end'}`}
+      role="group"
+      aria-label={`Message from ${isKlio ? 'Klio AI assistant' : 'student'}`}
     >
       {isKlio && !message.isError && <KlioAvatar messageType={messageAnalysis.type} />}
       
       <div className={`flex flex-col max-w-[75%] sm:max-w-[70%] ${isKlio && message.isError ? 'ml-10' : ''}`}>
-        <div className={finalBubbleClasses}>
+        <div className={finalBubbleClasses} role={isKlio ? 'assistant' : 'user'}>
           {message.isError && (
             <FiAlertTriangle className="inline-block mr-1.5 mb-0.5" size={16} />
           )}
@@ -368,12 +405,28 @@ export default function ChatMessage({ message, onSendToWorkspace, hasStructuredW
             </div>
           )}
           
-          {/* ENHANCED: Send to Workspace Button - Shows for ANY structured content */}
-          {isKlio && hasStructured && onSendToWorkspace && (
-            <motion.button
-              onClick={handleSendToWorkspace}
-              className="mt-3 text-xs bg-[var(--accent-blue-10-opacity)] text-[var(--accent-blue)] px-3 py-1.5 rounded-full hover:bg-[var(--accent-blue-20-opacity)] transition-all duration-200 flex items-center space-x-1 border border-[var(--accent-blue-40-opacity-for-border)] hover:border-[var(--accent-blue)]"
+          {/* Message Action Buttons */}
+          <div className="flex items-center gap-2 mt-2">
+            {/* Copy Button - Only for Klio messages */}
+            {isKlio && !message.isError && (
+              <button
+                onClick={handleCopyMessage}
+                className="text-xs bg-[var(--accent-yellow)]/20 text-[var(--accent-yellow-darker-for-border)] px-2 py-1 rounded-full hover:bg-[var(--accent-yellow)]/30 transition-all duration-200 flex items-center space-x-1 border border-[var(--accent-yellow)]/40 hover:border-[var(--accent-yellow)]/60 focus-visible:ring-2 focus-visible:ring-[var(--accent-yellow)] focus-visible:ring-offset-1 touch-manipulation"
+                title="Copy message to clipboard"
+                aria-label="Copy message text"
+              >
+                {copied ? <FiCheck size={12} /> : <FiCopy size={12} />}
+                <span>{copied ? 'Copied!' : 'Copy'}</span>
+              </button>
+            )}
+            
+            {/* ENHANCED: Send to Workspace Button - Shows for ANY structured content */}
+            {isKlio && hasStructured && onSendToWorkspace && (
+              <motion.button
+                onClick={handleSendToWorkspace}
+                className="text-xs bg-[var(--accent-blue)]/20 text-[var(--accent-blue-darker-for-border)] px-2 py-1 rounded-full hover:bg-[var(--accent-blue)]/30 transition-all duration-200 flex items-center space-x-1 border border-[var(--accent-blue)]/40 hover:border-[var(--accent-blue)]/60 focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)] focus-visible:ring-offset-1 touch-manipulation"
               title="Send these problems to your workspace for practice"
+              aria-label="Send problems to workspace for interactive practice"
               whileHover={{ 
                 scale: 1.05,
                 boxShadow: "0 4px 12px rgba(59, 130, 246, 0.2)"
@@ -386,17 +439,21 @@ export default function ChatMessage({ message, onSendToWorkspace, hasStructuredW
               <motion.span
                 animate={{ rotate: [0, 5, -5, 0] }}
                 transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                aria-hidden="true"
               >
                 📋
               </motion.span>
               <span>Send to Workspace</span>
-            </motion.button>
-          )}
+              </motion.button>
+            )}
+          </div>
         </div>
-        <time className={timestampClasses}>
-          {new Date(message.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+        <time className={timestampClasses} title={new Date(message.timestamp).toLocaleString()}>
+          {formatRelativeTime(message.timestamp)}
         </time>
       </div>
     </motion.div>
   );
-}
+});
+
+export default ChatMessage;

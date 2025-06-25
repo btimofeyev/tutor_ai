@@ -57,13 +57,26 @@ export class WorkspaceActionProcessor {
 
   handleCreateWorkspace(action) {
     
-    // Handle both new subject workspaces and legacy math workspaces
+    // Handle creative writing toolkit, subject workspaces, and legacy math workspaces
     const workspace = action.workspace;
+    const isCreativeWritingToolkit = workspace.type === 'creative_writing_toolkit';
     const isSubjectWorkspace = workspace.subject && workspace.content;
     
     let workspaceContent;
     
-    if (isSubjectWorkspace) {
+    if (isCreativeWritingToolkit) {
+      // Creative Writing Toolkit
+      workspaceContent = {
+        type: 'creative_writing_toolkit',
+        prompt_type: workspace.prompt_type,
+        title: workspace.title,
+        sessionId: workspace.sessionId,
+        brainstorming_section: workspace.brainstorming_section,
+        planning_sections: workspace.planning_sections,
+        progress: workspace.progress,
+        createdAt: workspace.createdAt
+      };
+    } else if (isSubjectWorkspace) {
       // NEW: Subject-agnostic workspace
       workspaceContent = {
         type: 'function_calling_workspace',

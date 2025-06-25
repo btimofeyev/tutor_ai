@@ -59,10 +59,10 @@ export default function Sidebar({ childName, onLogout, onClearChat, onQuickActio
 
 
   return (
-    <aside className="w-56 md:w-60 bg-[var(--background-card)] border-r border-[var(--border-subtle)] flex flex-col p-3 space-y-4">
+    <aside className="w-56 md:w-60 bg-[var(--background-card)] border-r border-[var(--border-subtle)] flex flex-col p-3 space-y-4" role="navigation" aria-label="Main navigation">
       {/* Logo/Brand - Klio AI Themed */}
       <div className="pt-3 pb-3 mb-2 border-b border-[var(--border-subtle)]">
-        <Link href="/" className="flex items-center justify-center group transition-opacity hover:opacity-80" title="Klio Home">
+        <Link href="/" className="flex items-center justify-center group transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)] focus-visible:ring-offset-2 rounded-md" title="Klio Home" aria-label="Go to Klio AI homepage">
           <Image
             src="/klio_logo.png" // Assuming your logo is in /public/klio_logo.png
             alt="Klio AI Logo"
@@ -83,27 +83,32 @@ export default function Sidebar({ childName, onLogout, onClearChat, onQuickActio
           <button
             onClick={() => setQuickActionsExpanded(!quickActionsExpanded)}
             className={`${sidebarButtonDefaultStyles} justify-between`}
+            aria-expanded={quickActionsExpanded}
+            aria-controls="quick-actions-menu"
+            aria-label="Toggle quick actions menu"
           >
             <div className="flex items-center space-x-2.5">
-              <FiTarget size={16} className="text-[var(--text-tertiary)]" />
+              <FiTarget size={16} className="text-[var(--text-tertiary)]" aria-hidden="true" />
               <span>Quick Actions</span>
             </div>
             {quickActionsExpanded ? (
-              <FiChevronDown size={16} className="text-[var(--text-tertiary)]" />
+              <FiChevronDown size={16} className="text-[var(--text-tertiary)]" aria-hidden="true" />
             ) : (
-              <FiChevronRight size={16} className="text-[var(--text-tertiary)]" />
+              <FiChevronRight size={16} className="text-[var(--text-tertiary)]" aria-hidden="true" />
             )}
           </button>
           
           {quickActionsExpanded && (
-            <div className="mt-2 ml-4 space-y-1">
+            <div className="mt-2 ml-4 space-y-1" id="quick-actions-menu" role="menu">
               {QUICK_ACTIONS.map((action) => (
                 <button
                   key={action.id}
                   onClick={() => onQuickAction && onQuickAction(action.message)}
-                  className="w-full flex items-center space-x-2 px-2 py-1.5 rounded-[var(--radius-md)] text-sm text-[var(--text-secondary)] hover:bg-[var(--accent-blue)]/10 hover:text-[var(--text-primary)] transition-colors"
+                  className="w-full flex items-center space-x-2 px-2 py-1.5 rounded-[var(--radius-md)] text-sm text-[var(--text-secondary)] hover:bg-[var(--accent-blue)]/10 hover:text-[var(--text-primary)] transition-colors focus-visible:ring-1 focus-visible:ring-[var(--accent-blue)]"
+                  role="menuitem"
+                  aria-label={action.label}
                 >
-                  <action.icon size={14} className="text-[var(--text-tertiary)]" />
+                  <action.icon size={14} className="text-[var(--text-tertiary)]" aria-hidden="true" />
                   <span>{action.label}</span>
                 </button>
               ))}
@@ -115,38 +120,37 @@ export default function Sidebar({ childName, onLogout, onClearChat, onQuickActio
       {/* User Info & Actions */}
       <div>
         {childName && (
-          <div className="mb-3 p-2.5 bg-[var(--accent-yellow)]/20 border border-[var(--accent-yellow-darker-for-border)]/50 rounded-lg text-center">
+          <div className="mb-3 p-2.5 bg-[var(--accent-yellow)]/20 border border-[var(--accent-yellow-darker-for-border)]/50 rounded-lg text-center" role="status" aria-live="polite">
             <p className="text-xs text-[var(--text-secondary)] opacity-80">Signed in as</p>
             <p className="font-semibold text-sm text-[var(--text-primary)]">{childName}</p>
           </div>
         )}
-        <nav className="space-y-1">
+        <nav className="space-y-1" role="menu" aria-label="Account actions">
           <button
             onClick={onClearChat}
             className={sidebarButtonDefaultStyles}
+            role="menuitem"
+            aria-label="Start a new chat conversation"
           >
-            <FiRefreshCw size={16} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent-blue)]" /> {/* Icon color can also change on hover if desired */}
+            <FiRefreshCw size={16} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent-blue)]" aria-hidden="true" />
             <span>New Chat</span>
           </button>
-          {/* <button // Example if using the global Button component:
-            onClick={onClearChat}
-            className="w-full justify-start" // Adjust alignment for sidebar
-          >
-            <FiRefreshCw size={16} className="mr-2.5 text-[var(--text-tertiary)]" />
-            New Chat
-          </button> */}
           <button
             onClick={() => router.push('/settings')} // Assuming /settings is the correct path
             className={sidebarButtonDefaultStyles}
+            role="menuitem"
+            aria-label="Open settings page"
           >
-            <FiSettings size={16} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent-blue)]" />
+            <FiSettings size={16} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent-blue)]" aria-hidden="true" />
             <span>Settings</span>
           </button>
           <button
             onClick={onLogout}
             className={sidebarButtonDestructiveStyles}
+            role="menuitem"
+            aria-label="Sign out of your account"
           >
-            <FiLogOut size={16} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent-red)]" />
+            <FiLogOut size={16} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent-red)]" aria-hidden="true" />
             <span>Logout</span>
           </button>
         </nav>

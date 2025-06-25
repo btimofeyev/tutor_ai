@@ -1,5 +1,5 @@
 // Simple Workspace - Like a teacher's whiteboard
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle, memo, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiX, FiSend, FiEdit3, FiCheckCircle, FiRotateCcw, FiAward, FiStar, FiZap
@@ -257,8 +257,8 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
     }
   }, [workspaceContent]);
 
-  // Send work to chat for checking
-  const sendWorkToChat = (problemIndex, problemText, workNote) => {
+  // Send work to chat for checking - memoized for better performance
+  const sendWorkToChat = useCallback((problemIndex, problemText, workNote) => {
     if (!workNote.trim()) return;
     
     // Track interaction for auto-collapse timing
@@ -276,7 +276,7 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
     if (onSendToChat) {
       onSendToChat(message);
     }
-  };
+  }, [problems, onInteraction, onSendToChat]);
 
   // Mark problem as correct
   const markProblemCorrect = (problemId) => {
@@ -306,15 +306,15 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
     }));
   };
 
-  // Get status indicator with smooth transitions for multi-subject evaluation
-  const getStatusIndicator = (problemId) => {
+  // Get status indicator with optimized animations
+  const getStatusIndicator = useCallback((problemId) => {
     const state = problemStates[problemId];
     
     const StatusIcon = ({ children, color = "text-gray-400" }) => (
       <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
+        initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        transition={{ type: "tween", duration: 0.2 }}
         className={color}
       >
         {children}
@@ -325,61 +325,31 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
       case 'excellent':
         return (
           <StatusIcon color="text-green-600">
-            <motion.div 
-              animate={{ rotate: [0, 10, -10, 0] }}
-              transition={{ duration: 0.6 }}
-              className="text-2xl"
-            >
-              ⭐
-            </motion.div>
+            <div className="text-2xl">⭐</div>
           </StatusIcon>
         );
       case 'good':
         return (
           <StatusIcon color="text-green-500">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 400 }}
-            >
-              <FiCheckCircle size={20} />
-            </motion.div>
+            <FiCheckCircle size={20} />
           </StatusIcon>
         );
       case 'correct':
         return (
           <StatusIcon color="text-green-500">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 400 }}
-            >
-              <FiCheckCircle size={20} />
-            </motion.div>
+            <FiCheckCircle size={20} />
           </StatusIcon>
         );
       case 'needs_improvement':
         return (
           <StatusIcon color="text-yellow-500">
-            <motion.div
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-              className="text-xl font-bold"
-            >
-              ⚠
-            </motion.div>
+            <div className="text-xl font-bold">⚠</div>
           </StatusIcon>
         );
       case 'incorrect':
         return (
           <StatusIcon color="text-red-500">
-            <motion.div
-              initial={{ rotate: 0 }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 0.5 }}
-            >
-              <FiX size={20} />
-            </motion.div>
+            <FiX size={20} />
           </StatusIcon>
         );
       case 'incomplete':
@@ -403,7 +373,7 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
           </StatusIcon>
         );
     }
-  };
+  }, [problemStates]);
 
   // Handle creative writing toolkit separately
   if (workspaceContent?.type === 'creative_writing_toolkit') {
@@ -422,16 +392,17 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
           className="h-full flex flex-col bg-white border-l border-gray-200"
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 bg-purple-50 border-b flex-shrink-0">
-            <h2 className="text-lg font-semibold text-gray-800">
+          <div className="flex items-center justify-between p-3 sm:p-4 bg-purple-50 border-b flex-shrink-0">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-800 truncate mr-2">
               ✍️ {workspaceContent.title}
-              <span className="ml-2 text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+              <span className="ml-2 text-xs sm:text-sm bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
                 {workspaceContent.prompt_type}
               </span>
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 transition-colors"
+              className="text-gray-500 hover:text-gray-700 transition-colors p-1 touch-manipulation"
+              aria-label="Close workspace"
             >
               <FiX size={20} />
             </button>
@@ -468,25 +439,26 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
         className="h-full flex flex-col bg-white border-l border-gray-200"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 bg-blue-50 border-b flex-shrink-0">
-          <h2 className="text-lg font-semibold text-gray-800">
+        <div className="flex items-center justify-between p-3 sm:p-4 bg-blue-50 border-b flex-shrink-0">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-800 truncate mr-2">
             {getSubjectEmoji(workspaceContent.subject)} {workspaceContent.title || 'Practice Activities'}
             {workspaceContent.subject && (
-              <span className="ml-2 text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+              <span className="ml-2 text-xs sm:text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
                 {workspaceContent.subject}
               </span>
             )}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
+            className="text-gray-500 hover:text-gray-700 transition-colors p-1 touch-manipulation"
+            aria-label="Close workspace"
           >
             <FiX size={20} />
           </button>
         </div>
 
       {/* Problems */}
-      <div className="flex-1 p-4 overflow-y-auto">
+      <div className="flex-1 p-3 sm:p-4 overflow-y-auto overscroll-behavior-contain">
         {/* Creative Writing Tools for Language Arts */}
         {workspaceContent.subject === 'language arts' && (
           <CreativeWritingTools onSendToChat={onSendToChat} />
@@ -495,41 +467,39 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
         {problems.map((problem, index) => {
           const status = problemStates[problem.id];
           
+          // Memoize background colors and border classes for better performance
+          const { bgColor, borderClass } = useMemo(() => {
+            switch (status) {
+              case 'correct':
+              case 'excellent':
+              case 'good':
+                return { bgColor: 'rgba(34, 197, 94, 0.05)', borderClass: 'border-green-400 shadow-green-100' };
+              case 'incorrect':
+                return { bgColor: 'rgba(239, 68, 68, 0.05)', borderClass: 'border-red-400 shadow-red-100' };
+              case 'needs_improvement':
+                return { bgColor: 'rgba(245, 158, 11, 0.05)', borderClass: 'border-yellow-400 shadow-yellow-100' };
+              case 'checking':
+                return { bgColor: 'rgba(59, 130, 246, 0.05)', borderClass: 'border-blue-400 shadow-blue-100' };
+              default:
+                return { bgColor: 'rgba(255, 255, 255, 1)', borderClass: 'border-gray-200 hover:border-gray-300' };
+            }
+          }, [status]);
+          
           return (
             <motion.div
               key={problem.id}
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ 
                 opacity: 1, 
-                y: 0, 
-                scale: 1,
-                backgroundColor: status === 'correct' ? 'rgba(34, 197, 94, 0.05)' : 
-                                status === 'incorrect' ? 'rgba(239, 68, 68, 0.05)' :
-                                status === 'excellent' ? 'rgba(34, 197, 94, 0.1)' :
-                                status === 'needs_improvement' ? 'rgba(245, 158, 11, 0.05)' :
-                                'rgba(255, 255, 255, 1)'
+                y: 0,
+                backgroundColor: bgColor
               }}
               transition={{ 
-                delay: index * 0.1,
-                type: "spring",
-                stiffness: 300,
-                damping: 20
+                delay: index * 0.05, // Reduced delay for faster loading
+                type: "tween",
+                duration: 0.3 // Reduced duration for better performance
               }}
-              whileHover={{ 
-                scale: 1.01,
-                transition: { duration: 0.2 }
-              }}
-              className={`bg-white border-2 rounded-xl p-4 mb-4 transition-all duration-500 shadow-sm ${
-                status === 'correct' || status === 'excellent' || status === 'good' ? 
-                  'border-green-400 shadow-green-100' : 
-                status === 'incorrect' ? 
-                  'border-red-400 shadow-red-100' : 
-                status === 'needs_improvement' ? 
-                  'border-yellow-400 shadow-yellow-100' :
-                status === 'checking' ? 
-                  'border-blue-400 shadow-blue-100' :
-                'border-gray-200 hover:border-gray-300'
-              }`}
+              className={`bg-white border-2 rounded-xl p-3 sm:p-4 mb-3 sm:mb-4 transition-all duration-300 shadow-sm ${borderClass}`}
             >
               {/* Problem Header */}
               <div className="flex items-center justify-between mb-3">
@@ -573,7 +543,8 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
                     {workNotes[problem.id]?.trim() && status !== 'checking' && (
                       <button
                         onClick={() => sendWorkToChat(index, problem.text, workNotes[problem.id])}
-                        className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full hover:bg-green-200 transition-colors flex items-center space-x-1 border border-green-300"
+                        className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-full hover:bg-green-200 transition-colors flex items-center space-x-1 border border-green-300 touch-manipulation"
+                        aria-label="Submit work for checking"
                       >
                         <FiSend size={12} />
                         <span>Check My Work</span>
@@ -594,9 +565,12 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
                     }}
                     placeholder="Show your work here..."
                     disabled={status === 'checking'}
-                    className={`w-full h-24 p-3 border-2 rounded-lg bg-white font-mono text-gray-800 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+                    className={`w-full h-24 sm:h-28 p-3 border-2 rounded-lg bg-white font-mono text-sm sm:text-base text-gray-800 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors touch-manipulation ${
                       status === 'checking' ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
+                    aria-label={`Work area for ${getItemLabel(workspaceContent.subject, index + 1)}`}
+                    autoComplete="off"
+                    spellCheck="true"
                   />
                 </div>
               )}

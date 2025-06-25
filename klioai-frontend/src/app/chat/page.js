@@ -83,9 +83,21 @@ export default function ChatPage() {
       setCurrentLessonContext(null);
       setCurrentTopic("General Conversation");
       setShowSuggestions(true);
+      setIsWorkspaceExpanded(false);
     }
     currentChildIdRef.current = child?.id;
   }, [child?.id]);
+
+  // Auto-expand workspace when new content is created (desktop only)
+  useEffect(() => {
+    if (workspaceContent && !isWorkspaceExpanded) {
+      // On desktop, always show workspace. On mobile, let user toggle
+      const isDesktop = window.innerWidth >= 768;
+      if (isDesktop) {
+        setIsWorkspaceExpanded(true);
+      }
+    }
+  }, [workspaceContent]);
 
   // Load initial messages - FIXED: child-specific storage
   useEffect(() => {
@@ -443,17 +455,23 @@ export default function ChatPage() {
     <ProtectedRoute>
       <PaywallOverlay feature="AI Tutoring">
         <div className="flex h-screen overflow-hidden bg-[var(--background-main)]">
-        <Sidebar
-          childName={child?.name}
-          onLogout={handleLogoutConfirmed}
-          onClearChat={handleClearChat}
-          onQuickAction={handleSendMessage}
-        />
+        {/* Mobile: Hide sidebar when workspace is open */}
+        <div className={`${workspaceContent ? 'hidden md:block' : 'block'}`}>
+          <Sidebar
+            childName={child?.name}
+            onLogout={handleLogoutConfirmed}
+            onClearChat={handleClearChat}
+            onQuickAction={handleSendMessage}
+          />
+        </div>
 
-        <main className={`flex-1 flex flex-col bg-[var(--background-card)] overflow-hidden transition-all duration-300 ${chatWidth}`}>
+        <main className={`flex-1 flex flex-col bg-[var(--background-card)] overflow-hidden transition-all duration-300 ${workspaceContent ? 'md:' + chatWidth : 'w-full'}`}>
           <ChatHeader 
             learningStreak={learningStats.streak}
             todaysPracticeCount={learningStats.todaysPracticeCount}
+            hasWorkspace={!!workspaceContent}
+            isWorkspaceExpanded={isWorkspaceExpanded}
+            onToggleWorkspace={() => setIsWorkspaceExpanded(!isWorkspaceExpanded)}
           />
 
           {currentLessonContext && (
@@ -464,7 +482,14 @@ export default function ChatPage() {
             />
           )}
 
-          <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-[var(--background-main)]">
+          <div 
+            ref={chatContainerRef} 
+            className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 bg-[var(--background-main)]"
+            role="log"
+            aria-label="Chat conversation"
+            aria-live="polite"
+            aria-atomic="false"
+          >
             <AnimatePresence initial={false}>
               {messages.map((message) => (
                 <ChatMessage
@@ -485,32 +510,36 @@ export default function ChatPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 className="flex items-end py-1"
+                aria-label="Klio is typing"
+                role="status"
               >
                 <div className="p-3 rounded-lg rounded-bl-md bg-[var(--accent-blue)]/20 text-[var(--text-primary)] shadow-sm">
-                  <div className="loading-dots text-[var(--accent-blue)]">
+                  <div className="loading-dots text-[var(--accent-blue)]" aria-hidden="true">
                     <span></span><span></span><span></span>
                   </div>
+                  <span className="sr-only">Klio is typing a response</span>
                 </div>
               </motion.div>
             )}
-            <div ref={messagesEndRef} className="h-1"/>
+            <div ref={messagesEndRef} className="h-1" aria-hidden="true"/>
           </div>
           
           {showSuggestions && (suggestions.length > 0 || dynamicSuggestions.length > 0) && (
-             <div className="w-full flex justify-center px-4 sm:px-6 pb-2 pt-1 border-t border-[var(--border-subtle)] bg-[var(--background-card)]">
+             <div className="w-full flex justify-center px-3 sm:px-4 md:px-6 pb-2 pt-1 border-t border-[var(--border-subtle)] bg-[var(--background-card)]">
                 <div className="max-w-3xl w-full">
                     <SuggestionBubbles
                         suggestions={dynamicSuggestions.length > 0 ? dynamicSuggestions : suggestions}
                         onSuggestionClick={handleSuggestionClick}
                         isAdaptive={dynamicSuggestions.length > 0}
                         studentProfile={studentProfile}
+                        workspaceType={workspaceContent?.type || workspaceContent?.workspace_type}
                     />
                 </div>
             </div>
           )}
 
 
-          <div className="bg-[var(--background-card)] p-3 sm:p-4 border-t border-[var(--border-subtle)]">
+          <div className="bg-[var(--background-card)] p-3 sm:p-4 border-t border-[var(--border-subtle)] safe-area-inset-bottom">
             <div className="max-w-3xl mx-auto">
                 <ChatInput
                     onSendMessage={handleSendMessage}
@@ -529,9 +558,9 @@ export default function ChatPage() {
                 scale: 0.95
               }}
               animate={{ 
-                x: 0, 
-                opacity: 1,
-                scale: 1
+                x: isWorkspaceExpanded ? 0 : '100%', 
+                opacity: isWorkspaceExpanded ? 1 : 0,
+                scale: isWorkspaceExpanded ? 1 : 0.95
               }}
               exit={{ 
                 x: '100%', 
@@ -544,7 +573,7 @@ export default function ChatPage() {
                 damping: 25,
                 duration: 0.4
               }}
-              className={`${workspaceWidth} bg-[var(--background-card)] border-l-2 border-[var(--accent-blue)] transition-all duration-500 ease-in-out shadow-xl`}
+              className={`${workspaceContent ? 'w-full md:' + workspaceWidth : workspaceWidth} bg-[var(--background-card)] border-l-2 border-[var(--accent-blue)] transition-all duration-500 ease-in-out shadow-xl ${workspaceContent ? 'fixed inset-0 z-50 md:relative md:inset-auto md:z-auto md:!transform-none md:!x-0 md:!opacity-100 md:!scale-100' : ''}`}
             >
               <SimpleWorkspace 
                 workspaceContent={workspaceContent}

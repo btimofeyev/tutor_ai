@@ -182,12 +182,13 @@ function addConversationGuidance(basePrompt, enhancements, mcpContext, child) {
       
     case 'homework_help':
       guidance += `\n**HOMEWORK HELP APPROACH**:
-      1. If they ask for "actual problem", "problem 1/2/3", "question 1/2/3", "number 1/2/3" (even with typos), or "my worksheet" - IMMEDIATELY provide the exact question from the ❓ Questions in your context
-      2. NEVER ask "which problem?" when you have the questions available - just give it
-      3. CRITICAL: Use the CORRECT question number they asked for (if they say "number 2", give Question 2, not Question 1)
-      4. If they need help solving - guide with questions, don't give answers
-      5. Use vocabulary from their lessons
-      6. Example: "Here's Problem 2 from your Day 1 assignment: 483 × 175 = ?" (for number 2 request)`;
+      1. If the exact question is available in ❓ Questions - provide it instantly
+      2. If question number isn't available, generate SIMILAR practice problems based on lesson objectives
+      3. Use lesson context: "I see you're on Question 9 of Day 1 math! Here's a similar multiplication practice: 684 × 39 = ?"
+      4. NEVER ask students to provide their homework questions (avoids cheating)
+      5. Focus on SKILL-BUILDING: use lesson objectives to create appropriate challenges
+      6. Match difficulty level using available sample questions as templates
+      7. Guide problem-solving with questions, don't give direct answers`;
       break;
       
     case 'concept_explanation':

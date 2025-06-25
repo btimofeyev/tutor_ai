@@ -1,17 +1,32 @@
 // klioai-frontend/src/components/ChatHeader.js - Simplified Header
 import { motion } from 'framer-motion';
-import { FiTrendingUp, FiAward } from 'react-icons/fi';
+import { FiTrendingUp, FiAward, FiSidebar } from 'react-icons/fi';
 
 export default function ChatHeader({ 
   learningStreak = 0, 
-  todaysPracticeCount = 0 
+  todaysPracticeCount = 0,
+  hasWorkspace = false,
+  isWorkspaceExpanded = false,
+  onToggleWorkspace = null
 }) {
   return (
     <header className="bg-[var(--background-card)] border-b border-[var(--border-subtle)] sticky top-0 z-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-end h-12">
+        <div className="flex items-center justify-between h-12">
           
-          {/* Learning Stats Only */}
+          {/* Workspace Toggle Button - Mobile Only */}
+          {hasWorkspace && onToggleWorkspace && (
+            <button
+              onClick={onToggleWorkspace}
+              className="md:hidden flex items-center space-x-2 px-3 py-1.5 text-sm bg-[var(--accent-blue)]/20 text-[var(--accent-blue-darker-for-border)] rounded-full hover:bg-[var(--accent-blue)]/30 transition-colors border border-[var(--accent-blue)]/40"
+              aria-label={isWorkspaceExpanded ? "Hide workspace" : "Show workspace"}
+            >
+              <FiSidebar size={14} />
+              <span>{isWorkspaceExpanded ? 'Hide' : 'Show'} Workspace</span>
+            </button>
+          )}
+          
+          {/* Learning Stats */}
           <div className="flex items-center space-x-2">
             
             {/* Learning Streak */}

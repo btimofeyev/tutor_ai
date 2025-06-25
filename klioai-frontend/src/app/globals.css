@@ -19,12 +19,17 @@
   --accent-blue-hover: #a1d4ee; 
   --accent-blue-darker-for-border: #87b8d4;
   --accent-blue-text-on: var(--text-primary);
+  --accent-blue-10-opacity: rgba(179, 224, 248, 0.1);
+  --accent-blue-20-opacity: rgba(179, 224, 248, 0.2);
+  --accent-blue-40-opacity-for-border: rgba(179, 224, 248, 0.4);
 
   /* Accent Yellow */
   --accent-yellow: #FFE6A7;    
   --accent-yellow-hover: #fddc8a;  
   --accent-yellow-darker-for-border: #e6c67f; 
-  --accent-yellow-text-on: var(--text-primary); 
+  --accent-yellow-text-on: var(--text-primary);
+  --accent-yellow-15-opacity: rgba(255, 230, 167, 0.15);
+  --accent-yellow-20-opacity: rgba(255, 230, 167, 0.2); 
 
   /* Accent Green */
   --accent-green: #A7F3D0; 
@@ -50,9 +55,19 @@
   --border-input-focus: var(--accent-blue); 
 
   /* Border Radius */
+  --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 0.75rem;
+  --spacing-lg: 1rem;
+  --spacing-xl: 1.5rem;
+  --spacing-2xl: 2rem;
   
   /* Font */
   --font-main: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -506,6 +521,37 @@ body {
 .workspace-loading .loading-dot:nth-child(2) { animation-delay: 0.2s; }
 .workspace-loading .loading-dot:nth-child(3) { animation-delay: 0.4s; }
 
+/* Screen Reader Only Content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip to Main Content Link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--accent-blue);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  z-index: 1000;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
 /* Global Element Resets */
 input, button, textarea, select {
   font-family: var(--font-main);
@@ -518,6 +564,35 @@ button {
   padding: 0;
   text-align: inherit;
   color: inherit;
+}
+
+/* Focus Styles for Better Accessibility */
+.focus-visible:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 1px;
+}
+
+/* Touch Improvements */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Safe Area Support for iOS */
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Improve scrolling on mobile */
+.overscroll-behavior-contain {
+  overscroll-behavior: contain;
 }
 
 /* Responsive Adjustments */
@@ -545,5 +620,22 @@ button {
     padding-left: 8px;
     padding-right: 8px;
     font-size: 1em;
+  }
+  
+  /* Improve chat message spacing on mobile */
+  .chat-message-content {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  /* Better button sizing for touch */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Improve input sizing */
+  input, textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
   }
 }

@@ -605,12 +605,12 @@ exports.chat = async (req, res) => {
             materialContentForAI += `\n\n**WORKSPACE OPPORTUNITY:** This material contains ${workspaceData.content.length} interactive ${detectedSubject} activities that could be turned into a hands-on workspace for practice.`;
           }
         } else {
-          console.log('❌ Could not retrieve material content');
-          materialContentForAI = `\n⚠️ **MATERIAL ACCESS ISSUE**: Could not find a material containing question ${specificQuestionRequest.questionNumber}. 
+          console.log(`📚 Question ${specificQuestionRequest.questionNumber} not found in available context, will suggest similar practice problems`);
+          materialContentForAI = `\n🎯 **PRACTICE OPPORTUNITY**: Student is working on question ${specificQuestionRequest.questionNumber} from their assignment.
 
-**IMPORTANT**: When helping with specific numbered questions, you need to:
-1. Ask the student which assignment they're working on (e.g., "Which assignment is question ${specificQuestionRequest.questionNumber} from?")
-2. Or provide general guidance: "Without seeing the specific question, I can help you with general problem-solving strategies."`;
+**APPROACH**: Instead of asking for the homework question, generate a SIMILAR practice problem based on the lesson objectives and sample questions available in your context. Use the Day 1 lesson focus on multiplication, division, addition, subtraction, and order of operations to create an appropriate challenge.
+
+**Example response**: "I see you're working on Question ${specificQuestionRequest.questionNumber} of your Day 1 math! Let me give you a similar practice problem based on your lesson objectives: [generate appropriate problem]"`;
         }
       }
     }

@@ -193,8 +193,18 @@ Remember: Functions are tools to enhance learning across ALL subjects, creating 
 // 🔧 FIXED: Parse specific question requests
 function parseSpecificQuestionRequest(message) {
   // Look for patterns like "question 5", "number 5", "problem 5"
-  const questionMatch = message.match(/(?:question|number|problem)\s*(\d+)/i);
+  // Also handle spelled out numbers and common typos
+  const questionMatch = message.match(/(?:question|n[uo]*[mi]*[mb]*[bi]*e*r|problem)\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)/i);
   if (!questionMatch) return null;
+  
+  // Convert spelled numbers to digits
+  const numberMap = {
+    'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+    'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+  };
+  
+  const numberStr = questionMatch[1].toLowerCase();
+  const questionNumber = numberMap[numberStr] || parseInt(questionMatch[1], 10);
 
   // Look for material references like "Chapter 12", "Assessment", etc.
   const materialPatterns = [
@@ -220,7 +230,7 @@ function parseSpecificQuestionRequest(message) {
   }
 
   return {
-    questionNumber: questionMatch[1],
+    questionNumber: questionNumber,
     materialRef: materialRef ? materialRef.trim() : null,
     originalMessage: message
   };

@@ -182,11 +182,12 @@ function addConversationGuidance(basePrompt, enhancements, mcpContext, child) {
       
     case 'homework_help':
       guidance += `\n**HOMEWORK HELP APPROACH**:
-      1. If they ask for "actual problem", "problem 1", "question 1", or "my worksheet" - IMMEDIATELY provide the exact question from the ❓ Questions in your context
+      1. If they ask for "actual problem", "problem 1/2/3", "question 1/2/3", "number 1/2/3" (even with typos), or "my worksheet" - IMMEDIATELY provide the exact question from the ❓ Questions in your context
       2. NEVER ask "which problem?" when you have the questions available - just give it
-      3. If they need help solving - guide with questions, don't give answers
-      4. Use vocabulary from their lessons
-      5. Example: "Here's Problem 1 from your Day 1 assignment: 793 × 27 = ?"`;
+      3. CRITICAL: Use the CORRECT question number they asked for (if they say "number 2", give Question 2, not Question 1)
+      4. If they need help solving - guide with questions, don't give answers
+      5. Use vocabulary from their lessons
+      6. Example: "Here's Problem 2 from your Day 1 assignment: 483 × 175 = ?" (for number 2 request)`;
       break;
       
     case 'concept_explanation':

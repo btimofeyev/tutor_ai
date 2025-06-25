@@ -459,8 +459,9 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
 
       {/* Problems */}
       <div className="flex-1 p-3 sm:p-4 overflow-y-auto overscroll-behavior-contain">
-        {/* Creative Writing Tools for Language Arts */}
-        {workspaceContent.subject === 'language arts' && (
+        {/* Creative Writing Tools - Only for actual creative writing activities */}
+        {workspaceContent.subject === 'language arts' && 
+         problems.some(problem => ['creative_writing', 'story_elements', 'brainstorming', 'writing_prompt'].includes(problem.type)) && (
           <CreativeWritingTools onSendToChat={onSendToChat} />
         )}
         

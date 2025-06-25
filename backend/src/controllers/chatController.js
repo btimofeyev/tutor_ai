@@ -534,56 +534,74 @@ exports.chat = async (req, res) => {
     if (specificQuestionRequest) {
       console.log('🎯 Specific question request detected:', specificQuestionRequest);
       
-      let materialRef = specificQuestionRequest.materialRef;
-      
-      // Strategy 1: Use material ref from message
-      if (materialRef) {
-        console.log(`📖 Using material ref from message: "${materialRef}"`);
+      // Strategy 0: Check if questions are already available in MCP context
+      if (mcpContext?.fullContextText && mcpContext.fullContextText.includes('❓ Questions to practice:')) {
+        console.log('✅ Questions already available in MCP context, using those instead of fetching');
+        const questionsMatch = mcpContext.fullContextText.match(/❓ Questions to practice:([\s\S]*?)(?=\n- |$)/);
+        if (questionsMatch) {
+          const questionLines = questionsMatch[1].split('\n').filter(line => line.trim().startsWith('Question'));
+          const requestedQuestion = questionLines.find(line => 
+            line.includes(`Question ${specificQuestionRequest.questionNumber}:`)
+          );
+          if (requestedQuestion) {
+            materialContentForAI = `**Found Question ${specificQuestionRequest.questionNumber} from Day 1 assignment:**\n${requestedQuestion.trim()}`;
+            foundMaterialTitle = 'Day 1: Mixed Math Problems and Vocabulary Prefixes';
+            console.log(`✅ Found question in context: ${requestedQuestion.trim()}`);
+          }
+        }
       }
-      // Strategy 2: Use current focus as fallback
-      else if (mcpContext?.currentFocus?.title) {
-        materialRef = mcpContext.currentFocus.title;
-        console.log(`📖 Using current focus as material ref: "${materialRef}"`);
-      }
-      // Strategy 3: Search recent materials for the question
-      else {
-        console.log(`🔍 No material ref found, will search recent materials for question ${specificQuestionRequest.questionNumber}`);
-      }
       
-      // Get material content using enhanced method
-      console.log(`🔍 Getting material content for question ${specificQuestionRequest.questionNumber}...`);
-      const materialData = await getMaterialWithContent(
-        childId, 
-        materialRef, 
-        specificQuestionRequest.questionNumber
-      );
-      
-      if (materialData) {
-        foundMaterialTitle = materialData.material.title;
-        materialContentForAI = formatMaterialContentForAI(
-          materialData, 
+      // Fallback: Try to fetch material content if not found in context
+      if (!materialContentForAI) {
+        let materialRef = specificQuestionRequest.materialRef;
+        
+        // Strategy 1: Use material ref from message
+        if (materialRef) {
+          console.log(`📖 Using material ref from message: "${materialRef}"`);
+        }
+        // Strategy 2: Use current focus as fallback
+        else if (mcpContext?.currentFocus?.title) {
+          materialRef = mcpContext.currentFocus.title;
+          console.log(`📖 Using current focus as material ref: "${materialRef}"`);
+        }
+        // Strategy 3: Search recent materials for the question
+        else {
+          console.log(`🔍 No material ref found, will search recent materials for question ${specificQuestionRequest.questionNumber}`);
+        }
+        
+        // Get material content using enhanced method
+        console.log(`🔍 Getting material content for question ${specificQuestionRequest.questionNumber}...`);
+        const materialData = await getMaterialWithContent(
+          childId, 
+          materialRef, 
           specificQuestionRequest.questionNumber
         );
-        console.log(`✅ Added material content to AI context: "${foundMaterialTitle}"`);
-        console.log(`📝 Question ${specificQuestionRequest.questionNumber} context prepared`);
         
-        // Check if material has interactive content suitable for workspace
-        const detectedSubject = detectSubjectFromMaterial(materialData);
-        const workspaceData = generateWorkspaceFromMaterial(materialData, 3);
-        
-        if (workspaceData && workspaceData.content.length > 0) {
-          console.log(`🎯 Material "${foundMaterialTitle}" has ${workspaceData.content.length} interactive ${detectedSubject} activities`);
-          materialContentForAI += `\n\n**WORKSPACE OPPORTUNITY:** This material contains ${workspaceData.content.length} interactive ${detectedSubject} activities that could be turned into a hands-on workspace for practice.`;
-        }
-      } else {
-        console.log('❌ Could not retrieve material content');
-        materialContentForAI = `\n⚠️ **MATERIAL ACCESS ISSUE**: Could not find a material containing question ${specificQuestionRequest.questionNumber}. 
+        if (materialData) {
+          foundMaterialTitle = materialData.material.title;
+          materialContentForAI = formatMaterialContentForAI(
+            materialData, 
+            specificQuestionRequest.questionNumber
+          );
+          console.log(`✅ Added material content to AI context: "${foundMaterialTitle}"`);
+          console.log(`📝 Question ${specificQuestionRequest.questionNumber} context prepared`);
+          
+          // Check if material has interactive content suitable for workspace
+          const detectedSubject = detectSubjectFromMaterial(materialData);
+          const workspaceData = generateWorkspaceFromMaterial(materialData, 3);
+          
+          if (workspaceData && workspaceData.content.length > 0) {
+            console.log(`🎯 Material "${foundMaterialTitle}" has ${workspaceData.content.length} interactive ${detectedSubject} activities`);
+            materialContentForAI += `\n\n**WORKSPACE OPPORTUNITY:** This material contains ${workspaceData.content.length} interactive ${detectedSubject} activities that could be turned into a hands-on workspace for practice.`;
+          }
+        } else {
+          console.log('❌ Could not retrieve material content');
+          materialContentForAI = `\n⚠️ **MATERIAL ACCESS ISSUE**: Could not find a material containing question ${specificQuestionRequest.questionNumber}. 
 
 **IMPORTANT**: When helping with specific numbered questions, you need to:
 1. Ask the student which assignment they're working on (e.g., "Which assignment is question ${specificQuestionRequest.questionNumber} from?")
-2. Or provide general guidance: "Without seeing the specific question, I can help you with general problem-solving strategies."
-
-The student is asking about question ${specificQuestionRequest.questionNumber} but didn't specify which assignment.\n`;
+2. Or provide general guidance: "Without seeing the specific question, I can help you with general problem-solving strategies."`;
+        }
       }
     }
 
@@ -707,6 +725,7 @@ The student is asking about question ${specificQuestionRequest.questionNumber} b
 
     // Build the enhanced system prompt with conversation awareness
     const formattedLearningContext = formatEnhancedLearningContext(mcpContext, currentDate);
+    console.log('🎯 Enhanced Learning Context:', formattedLearningContext.substring(0, 300) + '...');
     const memoryContext = buildMemoryContext(recentMemories, learningProfile);
     
     // Enhance conversation context with lesson awareness

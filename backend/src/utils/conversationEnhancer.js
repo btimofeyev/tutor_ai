@@ -64,7 +64,11 @@ function isHomeworkHelpQuery(message) {
   const homeworkKeywords = [
     'help me with', 'help with', 'homework', 'assignment', 'worksheet',
     'problem', 'question', 'stuck on', 'dont understand', "don't understand",
-    'how do i', 'how to', 'can you help'
+    'how do i', 'how to', 'can you help', 'actual problem', 'actual assignment',
+    'actual question', 'problem number', 'question number', 'real problem',
+    'give me', 'show me', 'what is problem', 'what is question', 'whats problem',
+    'whats question', 'my worksheet', 'my assignment', 'from my', 'problem 1',
+    'question 1', 'number 1', 'first problem', 'first question'
   ];
   return homeworkKeywords.some(keyword => message.includes(keyword));
 }
@@ -178,10 +182,11 @@ function addConversationGuidance(basePrompt, enhancements, mcpContext, child) {
       
     case 'homework_help':
       guidance += `\n**HOMEWORK HELP APPROACH**:
-      1. Ask what specific problem/question they need help with
-      2. Connect to their current lesson objectives if relevant
-      3. Guide with questions, don't give answers
-      4. Use vocabulary from their lessons`;
+      1. If they ask for "actual problem", "problem 1", "question 1", or "my worksheet" - IMMEDIATELY provide the exact question from the ❓ Questions in your context
+      2. NEVER ask "which problem?" when you have the questions available - just give it
+      3. If they need help solving - guide with questions, don't give answers
+      4. Use vocabulary from their lessons
+      5. Example: "Here's Problem 1 from your Day 1 assignment: 793 × 27 = ?"`;
       break;
       
     case 'concept_explanation':

@@ -224,7 +224,9 @@ class MCPClientHttpService {
       // If it's a connection error, reset connection state
       if (error.message.includes('No active MCP session') || 
           error.message.includes('Network Error') ||
-          error.code === 'ECONNREFUSED') {
+          error.message.includes('Invalid session') ||
+          error.code === 'ECONNREFUSED' ||
+          (error.response && error.response.data && error.response.data.error === 'Invalid session')) {
         console.log('🔄 Connection lost, resetting...');
         this.isConnected = false;
         this.messagesUrl = null;
@@ -342,8 +344,8 @@ class MCPClientHttpService {
     }
   }
 
-  // 🚀 EXISTING SEARCH METHOD (enhanced)
-  async search(childId, query, searchType = 'all') {
+  // 🚀 EXISTING SEARCH METHOD (enhanced with auto-retry)
+  async search(childId, query, searchType = 'all', retryCount = 0) {
     try {
       console.log(
         `🔍 Searching: "${query}" (type: ${searchType}) for child: ${childId}`
@@ -392,6 +394,25 @@ class MCPClientHttpService {
       
     } catch (error) {
       console.error('❌ Search error:', error);
+      
+      // If it's an "Invalid session" error and we haven't retried, try once more
+      if ((error.message.includes('Invalid session') || 
+           (error.response && error.response.data && error.response.data.error === 'Invalid session')) && 
+          retryCount < 1) {
+        console.log('🔄 Invalid session detected, retrying search...');
+        // Reset connection and retry
+        this.isConnected = false;
+        this.messagesUrl = null;
+        if (this.eventSource) {
+          this.eventSource.close();
+          this.eventSource = null;
+        }
+        
+        // Wait a moment and retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return this.search(childId, query, searchType, retryCount + 1);
+      }
+      
       return {
         error: error.message,
         results: {},
@@ -686,11 +707,13 @@ class MCPClientHttpService {
           const lessonSection = response.match(/Educational Materials[\s\S]*?(?=\n\n📊|$)/);
           if (lessonSection) {
             context.lessons = this.parseLessonsFromText(lessonSection[0]);
+            console.log(`📚 Parsed ${context.lessons.length} lessons from Educational Materials`);
           }
         } else if (response.includes('Current Lessons')) {
           const lessonSection = response.match(/Current Lessons[\s\S]*?(?=\n\n|$)/);
           if (lessonSection) {
             context.lessons = this.parseLessonsFromText(lessonSection[0]);
+            console.log(`📚 Parsed ${context.lessons.length} lessons from Current Lessons`);
           }
         }
 
@@ -771,6 +794,15 @@ class MCPClientHttpService {
         recentWork: context.recentWork.length,
         hasFocus: !!context.currentFocus,
       });
+      
+      // Debug log first lesson to check due date parsing
+      if (context.lessons.length > 0) {
+        console.log('🔍 First lesson:', {
+          title: context.lessons[0].title,
+          due_date: context.lessons[0].due_date,
+          content_type: context.lessons[0].content_type
+        });
+      }
 
       return context;
     } catch (error) {

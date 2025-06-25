@@ -169,11 +169,10 @@ class MCPClientService {
     }
   }
 
-  // 🚀 EXISTING SEARCH METHOD (enhanced)
+  // 🚀 ENHANCED SEARCH METHOD with better completion status handling
   async search(childId, query, searchType = "all") {
     try {
       await this.connect();
-
 
       const result = await this.client.callTool({
         name: "search_database",
@@ -185,58 +184,123 @@ class MCPClientService {
       });
 
       if (!result?.content?.[0]?.text) {
-        return { results: {}, summary: "No results found" };
-      }
-
-      const searchData = JSON.parse(result.content[0].text);
-
-      // Ensure the response has the expected structure
-      if (!searchData || typeof searchData !== "object") {
-        return { results: {}, summary: "Invalid response structure" };
-      }
-
-      // Ensure results field exists
-      if (!searchData.results) {
-        return {
-          results: {},
-          summary: searchData.summary || "Missing results field",
+        return { 
+          fullContextText: "No educational data found.",
+          results: {}, 
+          summary: "No results found" 
         };
       }
 
-      return searchData;
+      const responseText = result.content[0].text;
+
+      // The new MCP server returns formatted text directly
+      // Check if it's the old JSON format or new text format
+      if (responseText.startsWith('{')) {
+        try {
+          const searchData = JSON.parse(responseText);
+          // Legacy format - convert to new format
+          return {
+            fullContextText: this.convertLegacyToText(searchData, searchType),
+            results: searchData.results || {},
+            summary: searchData.summary || "Legacy format response",
+          };
+        } catch (parseError) {
+          // If JSON parsing fails, treat as text
+          return {
+            fullContextText: responseText,
+            results: {},
+            summary: `Search results for ${searchType}`,
+          };
+        }
+      } else {
+        // New text format - return directly
+        return {
+          fullContextText: responseText,
+          results: {},
+          summary: `Search results for ${searchType}`,
+        };
+      }
     } catch (error) {
       console.error("❌ Search error:", error);
       return {
         error: error.message,
+        fullContextText: `Error: ${error.message}`,
         results: {},
         summary: "Search failed",
       };
     }
   }
 
+  // Helper to convert legacy JSON format to text format
+  convertLegacyToText(searchData, searchType) {
+    let text = `📚 **Educational Data (${searchType}):**\n\n`;
+    
+    if (searchData.results.assignments) {
+      text += `📝 **Assignments (${searchData.results.assignments.length}):**\n`;
+      searchData.results.assignments.forEach((assignment, index) => {
+        const completionStatus = assignment.completed_at ? '✅ COMPLETED' : '📝 CURRENT';
+        const dueInfo = assignment.due_date ? ` - Due: ${assignment.due_date}` : '';
+        text += `${index + 1}. ${completionStatus} **${assignment.title}**${dueInfo}\n`;
+      });
+      text += '\n';
+    }
+
+    if (searchData.results.grades) {
+      text += `📊 **Grades (${searchData.results.grades.length}):**\n`;
+      searchData.results.grades.forEach((grade, index) => {
+        const percentage = grade.grade_value && grade.grade_max_value ? 
+          Math.round((grade.grade_value / grade.grade_max_value) * 100) : 'N/A';
+        text += `${index + 1}. **${grade.title}** - ${percentage}%\n`;
+      });
+      text += '\n';
+    }
+
+    return text;
+  }
+
   // 🚀 ENHANCED CONTEXT METHODS
 
   async getLearningContext(childId) {
     try {
-
-      const [overdue, recent, assignments] = await Promise.all([
-        this.search(childId, "overdue due late", "overdue").catch(() => ({
+      // Use the new search types for better separation of completed vs incomplete
+      const [overdue, incompleteAssignments, completedAssignments] = await Promise.all([
+        this.search(childId, "", "overdue").catch(() => ({
+          fullContextText: "No overdue assignments found.",
           results: {},
         })),
-        this.search(childId, "recent today yesterday", "recent").catch(() => ({
+        this.search(childId, "", "incomplete_assignments").catch(() => ({
+          fullContextText: "No current assignments found.",
           results: {},
         })),
-        this.search(childId, "", "assignments").catch(() => ({ results: {} })),
+        this.search(childId, "", "completed_assignments").catch(() => ({
+          fullContextText: "No completed assignments found.",
+          results: {},
+        })),
       ]);
 
+      // Combine the formatted text from the new MCP server
+      let combinedContext = "";
+      
+      if (overdue.fullContextText && !overdue.fullContextText.includes("No overdue")) {
+        combinedContext += overdue.fullContextText + "\n\n";
+      }
+      
+      if (incompleteAssignments.fullContextText && !incompleteAssignments.fullContextText.includes("No current")) {
+        combinedContext += incompleteAssignments.fullContextText + "\n\n";
+      }
+      
+      if (completedAssignments.fullContextText && !completedAssignments.fullContextText.includes("No completed")) {
+        combinedContext += completedAssignments.fullContextText + "\n\n";
+      }
 
       const context = {
+        fullContextText: combinedContext.trim() || "No educational data available.",
         childSubjects: [],
-        currentMaterials: assignments?.results?.assignments || [],
-        allMaterials: assignments?.results?.assignments || [],
-        upcomingAssignments: [],
+        currentMaterials: incompleteAssignments?.results?.assignments || [],
+        allMaterials: [], // Legacy field
+        upcomingAssignments: incompleteAssignments?.results?.assignments || [],
         overdue: overdue?.results?.overdue || [],
-        recentWork: recent?.results?.recent || [],
+        recentWork: completedAssignments?.results?.completed || [],
         currentFocus: null,
         progress: null,
       };
@@ -256,11 +320,11 @@ class MCPClientService {
         }
       }
 
-
       return context;
     } catch (error) {
       console.error("❌ Error getting learning context:", error);
       return {
+        fullContextText: `Error loading educational data: ${error.message}`,
         childSubjects: [],
         currentMaterials: [],
         allMaterials: [],
@@ -276,19 +340,27 @@ class MCPClientService {
 
   async getEnhancedLearningContext(childId) {
     try {
-
       const [basicContext, gradesData] = await Promise.all([
         this.getLearningContext(childId),
-        this.search(childId, "grades scores percent", "grades").catch(() => ({
+        this.search(childId, "", "grades").catch(() => ({
+          fullContextText: "No grade data available.",
           results: {},
         })),
       ]);
+
+      // Combine basic context with grades
+      let enhancedContext = basicContext.fullContextText || "";
+      
+      if (gradesData.fullContextText && !gradesData.fullContextText.includes("No grade data")) {
+        enhancedContext += "\n\n" + gradesData.fullContextText;
+      }
 
       const grades = gradesData.results.grades || [];
       const gradeAnalysis = this.calculateGradeAnalysis(grades);
 
       return {
         ...basicContext,
+        fullContextText: enhancedContext.trim() || "No educational data available.",
         completedMaterials: grades.filter((g) => g.completed_at),
         gradeAnalysis,
         materialsForReview: this.findMaterialsForReview(grades),
@@ -299,8 +371,10 @@ class MCPClientService {
       };
     } catch (error) {
       console.error("❌ Error getting enhanced context:", error);
+      const fallbackContext = await this.getLearningContext(childId);
       return {
-        ...(await this.getLearningContext(childId)),
+        ...fallbackContext,
+        fullContextText: (fallbackContext.fullContextText || "") + `\n\nError loading grade data: ${error.message}`,
         gradeAnalysis: null,
         materialsForReview: [],
         hasLowGrades: false,
@@ -494,12 +568,12 @@ class MCPClientService {
   // 🔄 BACKWARD COMPATIBILITY (these methods now use search)
 
   async getCurrentMaterials(childId) {
-    const result = await this.search(childId, "", "assignments");
+    const result = await this.search(childId, "", "incomplete_assignments");
     return result?.results?.assignments || [];
   }
 
   async getUpcomingAssignments(childId, daysAhead = 7) {
-    const result = await this.search(childId, "due upcoming", "assignments");
+    const result = await this.search(childId, "", "incomplete_assignments");
     return result?.results?.assignments || [];
   }
 

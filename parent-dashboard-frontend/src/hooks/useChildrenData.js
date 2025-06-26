@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import { defaultWeightsForNewSubject } from '../utils/dashboardConstants';
+import { performDataCleanup, clearOrphanedCache } from '../utils/dataCleanup';
 
 export function useChildrenData(session) {
   // Children state
@@ -295,19 +296,50 @@ export function useChildrenData(session) {
       // Clear the child's cached data
       invalidateChildCache(childId);
       
+      // Clear all cached data to ensure no orphaned lessons
+      clearOrphanedCache();
+      
+      // Clear all state related to the deleted child
+      setChildSubjects(prev => {
+        const newState = { ...prev };
+        delete newState[childId];
+        return newState;
+      });
+      
+      setLessonsBySubject(prev => {
+        const newState = { ...prev };
+        // Remove any lessons that might be associated with deleted child's subjects
+        Object.keys(newState).forEach(subjectId => {
+          // We'll let the server cleanup handle this, but clear local state
+          delete newState[subjectId];
+        });
+        return {};
+      });
+      
+      setLessonsByUnit(prev => ({})); // Clear all lesson unit associations
+      setUnitsBySubject(prev => ({})); // Clear all unit associations
+      setGradeWeights(prev => ({})); // Clear all grade weights
+      
       // Refresh children list
       await fetchChildren();
       
+      // Get updated children list to perform cleanup
+      const remainingChildren = children.filter(child => child.id !== childId);
+      
+      // Perform comprehensive data cleanup
+      const cleanupResult = await performDataCleanup(remainingChildren);
+      console.log('Data cleanup completed:', cleanupResult);
+      
       // If the deleted child was selected, select the first remaining child or null
       if (selectedChild?.id === childId) {
-        const remainingChildren = children.filter(child => child.id !== childId);
         setSelectedChild(remainingChildren.length > 0 ? remainingChildren[0] : null);
       }
       
       return { 
         success: true, 
         message: response.data.message || 'Child deleted successfully',
-        deleted_child: response.data.deleted_child
+        deleted_child: response.data.deleted_child,
+        cleanup: cleanupResult
       };
     } catch (error) {
       console.error('Delete child error:', error.response?.data);

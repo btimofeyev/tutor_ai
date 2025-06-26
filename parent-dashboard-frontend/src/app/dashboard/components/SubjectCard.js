@@ -1,5 +1,6 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
+import PropTypes from 'prop-types';
 import Link from 'next/link';
 import Image from 'next/image'; // For the custom folder icon
 import { 
@@ -40,10 +41,7 @@ const Skeleton = () => (
     </div>
 );
 
-SubjectCard.Skeleton = ({ count = 1 }) => Array.from({ length: count }).map((_, i) => <Skeleton key={i} />);
-
-
-export default function SubjectCard({
+const SubjectCard = memo(function SubjectCard({
     subject,
     lessons = [],
     units = [],
@@ -427,4 +425,45 @@ export default function SubjectCard({
             </div>
         </div>
     );
-}
+});
+
+// Add the Skeleton component after the main component declaration
+SubjectCard.Skeleton = ({ count = 1 }) => Array.from({ length: count }).map((_, i) => <Skeleton key={i} />);
+
+SubjectCard.propTypes = {
+  subject: PropTypes.shape({
+    child_subject_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    name: PropTypes.string.isRequired
+  }).isRequired,
+  lessons: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    title: PropTypes.string.isRequired,
+    completed_at: PropTypes.string,
+    due_date: PropTypes.string,
+    lesson_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+  })),
+  units: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    name: PropTypes.string.isRequired,
+    sequence_order: PropTypes.number
+  })),
+  lessonsByUnit: PropTypes.object,
+  subjectStats: PropTypes.shape({
+    total: PropTypes.number.isRequired,
+    completed: PropTypes.number.isRequired,
+    avgGradePercent: PropTypes.number
+  }),
+  onOpenEditModal: PropTypes.func.isRequired,
+  onManageUnits: PropTypes.func.isRequired,
+  onToggleComplete: PropTypes.func.isRequired,
+  onDeleteMaterial: PropTypes.func.isRequired,
+  onCreateLessonGroup: PropTypes.func.isRequired
+};
+
+SubjectCard.defaultProps = {
+  lessons: [],
+  units: [],
+  lessonsByUnit: {}
+};
+
+export default SubjectCard;

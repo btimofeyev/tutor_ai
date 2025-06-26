@@ -52,7 +52,12 @@ class WorkspaceFunctionHandlers {
     };
 
     this.currentWorkspace = toolkit;
-    return toolkit;
+    
+    return {
+      action: 'create_workspace',
+      workspace: toolkit,
+      message: `Created "${args.title}" creative writing toolkit`
+    };
   }
 
   async handleCreateMathWorkspace(args, childId) {

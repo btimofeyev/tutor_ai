@@ -6,7 +6,6 @@ const memoryService = require('../services/learningMemoryService');
 const chatHistoryService = require('../services/chatHistoryService');
 const { formatLearningContextForAI, isLessonQuery } = require('../middleware/mcpContext');
 const { getCurrentDateInfo, getDueDateStatus } = require('../utils/dateUtils');
-const { KLIO_SYSTEM_PROMPT } = require('../utils/klioSystemPrompt');
 const { ENHANCED_KLIO_SYSTEM_PROMPT } = require('../utils/enhancedSystemPrompt');
 const { formatEnhancedLearningContext } = require('../utils/enhancedContextFormatter');
 const { enhanceConversationContext, addConversationGuidance, generatePersonalizedResponse } = require('../utils/conversationEnhancer');
@@ -137,6 +136,19 @@ title: "Reading Comprehension Practice",
 content: [
 {text: "What is the main idea of the passage?", type: "reading_comprehension", hint: "Look for the most important point the author is making"},
 {text: "What does the word 'resilient' mean in this context?", type: "vocabulary", hint: "Use context clues from surrounding sentences"}
+]
+})
+
+**Creative Writing Workspace:**
+Student: "I need writing practice activities" → "Story"
+→ create_subject_workspace({
+subject: "language arts",
+workspace_type: "language_practice",
+title: "Creative Story Writing Workshop", 
+content: [
+{text: "Describe your main character - what do they look like and what makes them special?", type: "creative_writing", hint: "Think about their personality, appearance, and unique traits"},
+{text: "Where does your story take place? Describe the setting in detail.", type: "story_elements", hint: "Consider time period, location, and atmosphere"},
+{text: "What problem or challenge will your character face in the story?", type: "brainstorming", hint: "Think about conflicts that would be interesting for your character"}
 ]
 })
 
@@ -605,12 +617,14 @@ exports.chat = async (req, res) => {
             materialContentForAI += `\n\n**WORKSPACE OPPORTUNITY:** This material contains ${workspaceData.content.length} interactive ${detectedSubject} activities that could be turned into a hands-on workspace for practice.`;
           }
         } else {
-          console.log(`📚 Question ${specificQuestionRequest.questionNumber} not found in available context, will suggest similar practice problems`);
-          materialContentForAI = `\n🎯 **PRACTICE OPPORTUNITY**: Student is working on question ${specificQuestionRequest.questionNumber} from their assignment.
+          console.log(`📚 Question ${specificQuestionRequest.questionNumber} not found in available context, will create practice workspace`);
+          materialContentForAI = `\n🎯 **WORKSPACE OPPORTUNITY**: Student is working on question ${specificQuestionRequest.questionNumber} from their assignment.
 
-**APPROACH**: Instead of asking for the homework question, generate a SIMILAR practice problem based on the lesson objectives and sample questions available in your context. Use the Day 1 lesson focus on multiplication, division, addition, subtraction, and order of operations to create an appropriate challenge.
+**APPROACH**: CREATE A PRACTICE WORKSPACE using the create_subject_workspace function. Use the lesson objectives and sample questions to populate the workspace with similar practice problems.
 
-**Example response**: "I see you're working on Question ${specificQuestionRequest.questionNumber} of your Day 1 math! Let me give you a similar practice problem based on your lesson objectives: [generate appropriate problem]"`;
+**REQUIRED ACTION**: Call create_subject_workspace function to send interactive practice problems to the workspace panel.
+
+**Example response**: "I see you're working on Question ${specificQuestionRequest.questionNumber} of your Day 1 math! Let me create a practice workspace for you with similar problems." + [call create_subject_workspace function]`;
         }
       }
     }

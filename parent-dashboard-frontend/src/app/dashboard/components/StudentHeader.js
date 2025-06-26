@@ -1,11 +1,37 @@
 // app/dashboard/components/StudentHeader.js
 "use client";
 
-import React from "react";
+import React, { memo } from "react";
+import PropTypes from "prop-types";
 import Link from "next/link";
 import { BookOpenIcon } from "@heroicons/react/24/outline";
+import { ariaLabels, colorA11y } from "../../../utils/accessibility";
 
-export default function StudentHeader({ selectedChild, dashboardStats }) {
+// Predefined color variants to ensure Tailwind includes them in the build
+const colorVariants = {
+  blue: {
+    bg: 'bg-blue-50',
+    text: 'text-blue-600', 
+    textBold: 'text-blue-700'
+  },
+  orange: {
+    bg: 'bg-orange-50',
+    text: 'text-orange-600',
+    textBold: 'text-orange-700'
+  },
+  red: {
+    bg: 'bg-red-50',
+    text: 'text-red-600',
+    textBold: 'text-red-700'
+  },
+  green: {
+    bg: 'bg-green-50',
+    text: 'text-green-600',
+    textBold: 'text-green-700'
+  }
+};
+
+const StudentHeader = memo(function StudentHeader({ selectedChild, dashboardStats }) {
   if (!selectedChild) {
     return (
       <div className="mb-6 p-6 bg-background-card rounded-lg shadow-sm border border-border-subtle animate-pulse">
@@ -24,13 +50,20 @@ export default function StudentHeader({ selectedChild, dashboardStats }) {
   }
 
   return (
-    <div className="mb-4 p-4 bg-background-card rounded-lg shadow-sm border border-border-subtle">
+    <header className="mb-4 p-4 bg-background-card rounded-lg shadow-sm border border-border-subtle">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between">
         <div className="mb-2 sm:mb-0">
           <h1 className="text-2xl font-bold text-text-primary">
             {selectedChild.name}
           </h1>
-          <div className="text-sm text-text-secondary">
+          <div 
+            className="text-sm text-text-secondary"
+            aria-label={ariaLabels.progress(
+              dashboardStats.completedItems,
+              dashboardStats.totalItems,
+              'assignments'
+            )}
+          >
             Grade{" "}
             {selectedChild.grade || (
               <span className="italic text-text-tertiary">N/A</span>
@@ -41,33 +74,67 @@ export default function StudentHeader({ selectedChild, dashboardStats }) {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="grid grid-cols-4 gap-2 text-center">
+          <div 
+            className="grid grid-cols-4 gap-2 text-center"
+            role="region"
+            aria-label="Dashboard statistics summary"
+          >
             {[
-              { label: "Total", value: dashboardStats.totalItems, color: "blue" },
-              { label: "Due Soon", value: dashboardStats.dueSoon, color: "orange" },
-              { label: "Overdue", value: dashboardStats.overdue, color: "red" },
-              { label: "Complete", value: `${dashboardStats.overallCompletionPercent}%`, color: "green" },
-            ].map(stat => (
-              <div key={stat.label} className={`p-2 rounded bg-${stat.color}-50`}>
-                <div className={`text-xs text-${stat.color}-600 font-medium`}>
-                  {stat.label}
+              { label: "Total", value: dashboardStats.totalItems, color: "blue", status: "total" },
+              { label: "Due Soon", value: dashboardStats.dueSoon, color: "orange", status: "dueSoon" },
+              { label: "Overdue", value: dashboardStats.overdue, color: "red", status: "overdue" },
+              { label: "Complete", value: `${dashboardStats.overallCompletionPercent}%`, color: "green", status: "complete" },
+            ].map(stat => {
+              const colors = colorVariants[stat.color] || colorVariants.blue; // fallback to blue
+              const statusIcon = colorA11y.statusIcon(stat.status);
+              const ariaLabel = `${stat.label}: ${stat.value}${stat.status !== 'total' ? ' items' : ''}`;
+              
+              return (
+                <div 
+                  key={stat.label} 
+                  className={`p-2 rounded ${colors.bg}`}
+                  role="status"
+                  aria-label={ariaLabel}
+                >
+                  <div className={`text-xs ${colors.text} font-medium`}>
+                    <span aria-hidden="true">{statusIcon}</span>
+                    <span className="ml-1">{stat.label}</span>
+                  </div>
+                  <div className={`text-lg font-bold ${colors.textBold}`}>
+                    {stat.value}
+                  </div>
                 </div>
-                <div className={`text-lg font-bold text-${stat.color}-700`}>
-                  {stat.value}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <Link
             href="/subject-management"
             className="flex items-center text-xs px-3 py-2 bg-gray-100 text-text-secondary hover:bg-gray-200 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue focus:ring-offset-2 focus:ring-offset-background-card"
+            aria-label={`Manage subjects for ${selectedChild.name}`}
           >
-            <BookOpenIcon className="h-4 w-4 mr-1.5" />
+            <BookOpenIcon className="h-4 w-4 mr-1.5" aria-hidden="true" />
             Manage Subjects
           </Link>
         </div>
       </div>
-    </div>
+    </header>
   );
-}
+});
+
+StudentHeader.propTypes = {
+  selectedChild: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    name: PropTypes.string.isRequired,
+    grade: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+  }),
+  dashboardStats: PropTypes.shape({
+    totalItems: PropTypes.number.isRequired,
+    completedItems: PropTypes.number.isRequired,
+    overallCompletionPercent: PropTypes.number.isRequired,
+    dueSoon: PropTypes.number.isRequired,
+    overdue: PropTypes.number.isRequired
+  }).isRequired
+};
+
+export default StudentHeader;

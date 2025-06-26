@@ -19,8 +19,8 @@ import {
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 import SubscriptionManager from '../../../components/SubscriptionManager';
-
-const formInputStyles = "block w-full border-[var(--border-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-input-focus)] focus:border-[var(--border-input-focus)] rounded-[var(--radius-md)] bg-background-card text-text-primary placeholder-text-tertiary shadow-sm text-sm px-3 py-2";
+import { formInputStyles } from '../../../utils/dashboardStyles';
+import { performDataCleanup, forceRefreshAllData } from '../../../utils/dataCleanup';
 
 export default function StudentSidebar({
   childrenList,
@@ -40,6 +40,7 @@ export default function StudentSidebar({
   onUpgradeNeeded,
 }) {
   const [showSubscriptionDetails, setShowSubscriptionDetails] = useState(false);
+  const [isCleaningData, setIsCleaningData] = useState(false);
 
   const hasActiveSubscription = subscription && subscription.status === 'active';
   const planType = subscription?.plan_type;
@@ -61,6 +62,27 @@ export default function StudentSidebar({
         targetPlan = 'academy';
       }
       onUpgradeNeeded(targetPlan);
+    }
+  };
+
+  const handleDataCleanup = async () => {
+    if (isCleaningData) return;
+    
+    setIsCleaningData(true);
+    try {
+      const result = await performDataCleanup(childrenList || []);
+      console.log('Manual cleanup completed:', result);
+      
+      // Show user feedback
+      alert(`Data cleanup completed!\nCleaned ${result.totalCleaned} orphaned items.\nPage will refresh to show clean data.`);
+      
+      // Force refresh to ensure clean state
+      forceRefreshAllData();
+    } catch (error) {
+      console.error('Cleanup failed:', error);
+      alert('Data cleanup failed. Please try refreshing the page.');
+    } finally {
+      setIsCleaningData(false);
     }
   };
 
@@ -275,7 +297,17 @@ export default function StudentSidebar({
         )}
       </div>
 
-      <div className="p-4 border-t border-border-subtle mt-auto">
+      <div className="p-4 border-t border-border-subtle mt-auto space-y-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleDataCleanup}
+          disabled={isCleaningData}
+          className="w-full text-xs !text-orange-600 hover:!bg-orange-50"
+          title="Clean up orphaned lessons and refresh data"
+        >
+          {isCleaningData ? '🔄 Cleaning...' : '🧹 Clean Data'}
+        </Button>
         <Button
           as="link"
           href="/logout"

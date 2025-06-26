@@ -842,32 +842,73 @@ exports.toggleMaterialCompletion = async (req, res) => {
   if (!material_id) return res.status(400).json({ error: 'material_id is required' });
 
   try {
-    // First get the material to verify ownership
+    // First get the material
     const { data: material, error: materialError } = await supabase
       .from('materials')
-      .select(`
-        id,
-        title,
-        completed_at,
-        lesson:lesson_id (
-          id,
-          title,
-          unit:unit_id (
-            id,
-            child_subject:child_subject_id (
-              id,
-              child:child_id (
-                id,
-                parent_id
-              )
-            )
-          )
-        )
-      `)
+      .select('*')
       .eq('id', material_id)
       .single();
 
-    if (materialError || !material || material.lesson.unit.child_subject.child.parent_id !== parent_id) {
+    if (materialError) {
+      console.error('Error fetching material:', materialError);
+      return res.status(500).json({ error: 'Database error fetching material' });
+    }
+
+    if (!material) {
+      return res.status(404).json({ error: 'Material not found' });
+    }
+
+    // Verify ownership based on whether the material has a lesson_id or not
+    let ownershipVerified = false;
+    let childId = null;
+
+    if (material.lesson_id) {
+      // Material belongs to a lesson - verify through lesson ownership
+      const isOwner = await verifyLessonOwnership(parent_id, material.lesson_id);
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Access denied to this material' });
+      }
+      ownershipVerified = true;
+      
+      // Get child ID from lesson
+      const { data: lessonData } = await supabase
+        .from('lessons')
+        .select(`
+          units (
+            child_subjects (
+              child_id
+            )
+          )
+        `)
+        .eq('id', material.lesson_id)
+        .single();
+        
+      if (lessonData?.units?.child_subjects?.child_id) {
+        childId = lessonData.units.child_subjects.child_id;
+      }
+    } else if (material.child_subject_id) {
+      // Material belongs directly to a child subject - verify through child subject
+      const { data: childSubject, error: csError } = await supabase
+        .from('child_subjects')
+        .select(`
+          id,
+          child_id,
+          children (
+            id,
+            parent_id
+          )
+        `)
+        .eq('id', material.child_subject_id)
+        .single();
+
+      if (csError || !childSubject || childSubject.children?.parent_id !== parent_id) {
+        return res.status(403).json({ error: 'Access denied to this material' });
+      }
+      ownershipVerified = true;
+      childId = childSubject.child_id;
+    }
+
+    if (!ownershipVerified) {
       return res.status(403).json({ error: 'Access denied to this material' });
     }
 
@@ -889,35 +930,38 @@ exports.toggleMaterialCompletion = async (req, res) => {
     if (updateError) throw updateError;
 
     // Sync with schedule entries that reference this material's lesson container
-    const childId = material.lesson.unit.child_subject.child.id;
-    const lessonContainerId = material.lesson.id;
     const newScheduleStatus = newCompletedAt ? 'completed' : 'scheduled';
-
     let syncedScheduleEntries = 0;
-    try {
-      // Find related schedule entries (schedule entries reference lesson containers, not individual materials)
-      const { data: relatedScheduleEntries, error: scheduleError } = await supabase
-        .from('schedule_entries')
-        .select('id, material_id, subject_name, scheduled_date, start_time')
-        .eq('child_id', childId)
-        .eq('material_id', lessonContainerId);
 
-      if (!scheduleError && relatedScheduleEntries?.length > 0) {
-        // Update all related schedule entries status
-        const { error: syncError } = await supabase
+    // Only sync if material belongs to a lesson container
+    if (material.lesson_id && childId) {
+      const lessonContainerId = material.lesson_id;
+      
+      try {
+        // Find related schedule entries (schedule entries reference lesson containers, not individual materials)
+        const { data: relatedScheduleEntries, error: scheduleError } = await supabase
           .from('schedule_entries')
-          .update({ status: newScheduleStatus })
+          .select('id, material_id, subject_name, scheduled_date, start_time')
           .eq('child_id', childId)
           .eq('material_id', lessonContainerId);
 
-        if (!syncError) {
-          syncedScheduleEntries = relatedScheduleEntries.length;
-        } else {
-          console.warn('Failed to sync schedule entries:', syncError);
+        if (!scheduleError && relatedScheduleEntries?.length > 0) {
+          // Update all related schedule entries status
+          const { error: syncError } = await supabase
+            .from('schedule_entries')
+            .update({ status: newScheduleStatus })
+            .eq('child_id', childId)
+            .eq('material_id', lessonContainerId);
+
+          if (!syncError) {
+            syncedScheduleEntries = relatedScheduleEntries.length;
+          } else {
+            console.warn('Failed to sync schedule entries:', syncError);
+          }
         }
+      } catch (syncErr) {
+        console.warn('Error during schedule sync:', syncErr);
       }
-    } catch (syncErr) {
-      console.warn('Error during schedule sync:', syncErr);
     }
 
     res.json({

@@ -3,6 +3,7 @@ import './globals.css';
 import SupabaseProvider from '../components/SupabaseProvider';
 import { ToastProvider } from '../hooks/useToast';
 import ToastContainer from '../components/Toast';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-main' });
 
@@ -15,12 +16,14 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable}`}>
       <body>
-        <SupabaseProvider>
-          <ToastProvider>
-            {children}
-            <ToastContainer />
-          </ToastProvider>
-        </SupabaseProvider>
+        <ErrorBoundary>
+          <SupabaseProvider>
+            <ToastProvider>
+              {children}
+              <ToastContainer />
+            </ToastProvider>
+          </SupabaseProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

@@ -30,7 +30,7 @@ class MCPClientService {
 
       const mcpServerPath =
         process.env.MCP_SERVER_PATH ||
-        path.resolve(__dirname, "../../../mcp-server/dist/server.js");
+        path.resolve(__dirname, "../../../../klio-mcpserver/dist/server.js");
 
       if (!fs.existsSync(mcpServerPath)) {
         throw new Error(

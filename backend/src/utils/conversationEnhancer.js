@@ -183,12 +183,13 @@ function addConversationGuidance(basePrompt, enhancements, mcpContext, child) {
     case 'homework_help':
       guidance += `\n**HOMEWORK HELP APPROACH**:
       1. If the exact question is available in ❓ Questions - provide it instantly
-      2. If question number isn't available, generate SIMILAR practice problems based on lesson objectives
-      3. Use lesson context: "I see you're on Question 9 of Day 1 math! Here's a similar multiplication practice: 684 × 39 = ?"
-      4. NEVER ask students to provide their homework questions (avoids cheating)
-      5. Focus on SKILL-BUILDING: use lesson objectives to create appropriate challenges
-      6. Match difficulty level using available sample questions as templates
-      7. Guide problem-solving with questions, don't give direct answers`;
+      2. If question number isn't available, CREATE A WORKSPACE with practice problems using create_subject_workspace function
+      3. ALWAYS send practice problems to workspace panel, not just in chat
+      4. Use lesson context: "I see you're on Question 9! Let me create a practice workspace for you."
+      5. NEVER ask students to provide their homework questions (avoids cheating)
+      6. Focus on INTERACTIVE SKILL-BUILDING: use workspace for hands-on practice
+      7. Let students work in workspace and use evaluate_content_item to check answers
+      8. Match difficulty level using lesson objectives and sample questions`;
       break;
       
     case 'concept_explanation':

@@ -16,6 +16,7 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
   const [filterStatus, setFilterStatus] = useState(FILTER_OPTIONS.STATUS.ALL);
   const [filterContentType, setFilterContentType] = useState(FILTER_OPTIONS.CONTENT_TYPE.ALL);
   const [sortBy, setSortBy] = useState(FILTER_OPTIONS.SORT.CREATED_DESC);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Compute dashboard statistics
   const dashboardStats = useMemo(() => {
@@ -55,6 +56,16 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
     for (const childSubjectId in lessonsBySubject) {
       let subjectLessons = [...(lessonsBySubject[childSubjectId] || [])];
       
+      // Apply search filter
+      if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        subjectLessons = subjectLessons.filter(lesson => 
+          lesson.title?.toLowerCase().includes(searchLower) ||
+          lesson.content_type?.toLowerCase().includes(searchLower) ||
+          lesson.description?.toLowerCase().includes(searchLower)
+        );
+      }
+      
       // Apply filters
       subjectLessons = filterLessonsByStatus(subjectLessons, filterStatus);
       subjectLessons = filterLessonsByContentType(subjectLessons, filterContentType);
@@ -66,7 +77,7 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
     }
     
     return result;
-  }, [lessonsBySubject, filterStatus, filterContentType, sortBy]);
+  }, [lessonsBySubject, filterStatus, filterContentType, sortBy, searchTerm]);
 
   // Get total counts across all subjects for current child
   const totalStats = useMemo(() => {
@@ -137,6 +148,7 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
     setFilterStatus(FILTER_OPTIONS.STATUS.ALL);
     setFilterContentType(FILTER_OPTIONS.CONTENT_TYPE.ALL);
     setSortBy(FILTER_OPTIONS.SORT.CREATED_DESC);
+    setSearchTerm('');
   };
 
   return {
@@ -147,6 +159,8 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
     setFilterContentType,
     sortBy,
     setSortBy,
+    searchTerm,
+    setSearchTerm,
     
     // Computed data
     dashboardStats,

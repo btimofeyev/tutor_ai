@@ -35,13 +35,13 @@ const StudentHeader = memo(function StudentHeader({ selectedChild, dashboardStat
   if (!selectedChild) {
     return (
       <div className="mb-6 p-6 bg-background-card rounded-lg shadow-sm border border-border-subtle animate-pulse">
-        <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
-        <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-border-subtle">
+        <div className="h-8 bg-gray-200 rounded w-3/4 mb-3"></div>
+        <div className="h-4 bg-gray-200 rounded w-1/2 mb-6"></div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-6 border-t border-border-subtle">
             {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-gray-100 p-3 rounded-md">
-                    <div className="h-3 bg-gray-200 rounded w-1/2 mx-auto mb-2"></div>
-                    <div className="h-6 bg-gray-200 rounded w-1/3 mx-auto"></div>
+                <div key={i} className="bg-gray-100 p-4 rounded-lg">
+                    <div className="h-3 bg-gray-200 rounded w-2/3 mb-3"></div>
+                    <div className="h-6 bg-gray-200 rounded w-1/2"></div>
                 </div>
             ))}
         </div>
@@ -49,73 +49,124 @@ const StudentHeader = memo(function StudentHeader({ selectedChild, dashboardStat
     );
   }
 
+  // Calculate progress bar width
+  const progressPercent = dashboardStats.totalItems > 0 ? dashboardStats.overallCompletionPercent : 0;
+
   return (
-    <header className="mb-4 p-4 bg-background-card rounded-lg shadow-sm border border-border-subtle">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-        <div className="mb-2 sm:mb-0">
-          <h1 className="text-2xl font-bold text-text-primary">
-            {selectedChild.name}
-          </h1>
-          <div 
-            className="text-sm text-text-secondary"
-            aria-label={ariaLabels.progress(
-              dashboardStats.completedItems,
-              dashboardStats.totalItems,
-              'assignments'
-            )}
-          >
-            Grade{" "}
-            {selectedChild.grade || (
-              <span className="italic text-text-tertiary">N/A</span>
-            )} • {dashboardStats.totalItems > 0
-              ? `${dashboardStats.completedItems}/${dashboardStats.totalItems} completed (${dashboardStats.overallCompletionPercent}%)`
-              : "No materials yet."}
+    <header className="mb-6 p-6 bg-background-card rounded-lg shadow-sm border border-border-subtle">
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+        {/* Student Info Section */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-3">
+            <h1 className="text-3xl font-bold text-text-primary truncate">
+              {selectedChild.name}
+            </h1>
+            <span className="px-3 py-1 bg-blue-50 text-blue-700 text-sm font-medium rounded-full border border-blue-200 flex-shrink-0">
+              Grade {selectedChild.grade || "N/A"}
+            </span>
+          </div>
+
+          {/* Progress Overview */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-text-secondary">Learning Progress</span>
+              <span className="font-bold text-text-primary">
+                {dashboardStats.completedItems} of {dashboardStats.totalItems} assignments completed
+              </span>
+            </div>
+            
+            {/* Progress Bar */}
+            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-500 ease-in-out"
+                style={{ width: `${progressPercent}%` }}
+                aria-label={`${progressPercent}% complete`}
+              />
+            </div>
+            
+            <div className="text-center">
+              <span className="text-2xl font-bold text-green-600">{progressPercent}%</span>
+              <span className="text-sm text-text-secondary ml-1">Complete</span>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div 
-            className="grid grid-cols-4 gap-2 text-center"
-            role="region"
-            aria-label="Dashboard statistics summary"
-          >
-            {[
-              { label: "Total", value: dashboardStats.totalItems, color: "blue", status: "total" },
-              { label: "Due Soon", value: dashboardStats.dueSoon, color: "orange", status: "dueSoon" },
-              { label: "Overdue", value: dashboardStats.overdue, color: "red", status: "overdue" },
-              { label: "Complete", value: `${dashboardStats.overallCompletionPercent}%`, color: "green", status: "complete" },
-            ].map(stat => {
-              const colors = colorVariants[stat.color] || colorVariants.blue; // fallback to blue
-              const statusIcon = colorA11y.statusIcon(stat.status);
-              const ariaLabel = `${stat.label}: ${stat.value}${stat.status !== 'total' ? ' items' : ''}`;
-              
-              return (
-                <div 
-                  key={stat.label} 
-                  className={`p-2 rounded ${colors.bg}`}
-                  role="status"
-                  aria-label={ariaLabel}
-                >
-                  <div className={`text-xs ${colors.text} font-medium`}>
-                    <span aria-hidden="true">{statusIcon}</span>
-                    <span className="ml-1">{stat.label}</span>
+        {/* Action Items & Quick Stats */}
+        <div className="flex flex-col gap-4">
+          {/* Action Items - Only show if there are items needing attention */}
+          {(dashboardStats.overdue > 0 || dashboardStats.dueSoon > 0) && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 min-w-0 lg:min-w-[280px]">
+              <h3 className="font-semibold text-amber-800 mb-3 flex items-center">
+                <span className="mr-2">⚠️</span>
+                Needs Attention
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {dashboardStats.overdue > 0 && (
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-red-600">{dashboardStats.overdue}</div>
+                    <div className="text-xs text-red-700 font-medium">Overdue</div>
                   </div>
-                  <div className={`text-lg font-bold ${colors.textBold}`}>
-                    {stat.value}
+                )}
+                {dashboardStats.dueSoon > 0 && (
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">{dashboardStats.dueSoon}</div>
+                    <div className="text-xs text-orange-700 font-medium">Due Soon</div>
                   </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 min-w-0 lg:min-w-[200px]">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-blue-600">{dashboardStats.totalItems}</div>
+              <div className="text-xs text-blue-700 font-medium">Total Assignments</div>
+            </div>
+            
+            {dashboardStats.totalGradableItems > 0 && (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-purple-600">
+                  {dashboardStats.overallGradePercent > 0 ? `${dashboardStats.overallGradePercent}%` : 'N/A'}
                 </div>
-              );
-            })}
+                <div className="text-xs text-purple-700 font-medium">Average Grade</div>
+              </div>
+            )}
           </div>
 
-          <Link
-            href="/subject-management"
-            className="flex items-center text-xs px-3 py-2 bg-gray-100 text-text-secondary hover:bg-gray-200 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue focus:ring-offset-2 focus:ring-offset-background-card"
-            aria-label={`Manage subjects for ${selectedChild.name}`}
-          >
-            <BookOpenIcon className="h-4 w-4 mr-1.5" aria-hidden="true" />
-            Manage Subjects
-          </Link>
+          {/* Quick Navigation */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Quick Actions</h4>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/subject-management"
+                className="flex items-center text-sm px-3 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                aria-label={`Manage subjects for ${selectedChild.name}`}
+              >
+                <BookOpenIcon className="h-4 w-4 mr-2" aria-hidden="true" />
+                <span className="hidden sm:inline">Add Subjects</span>
+                <span className="sm:hidden">Subjects</span>
+              </Link>
+              
+              <Link
+                href="/schedule"
+                className="flex items-center text-sm px-3 py-2 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+              >
+                <span className="mr-2">📅</span>
+                <span className="hidden sm:inline">View Schedule</span>
+                <span className="sm:hidden">Schedule</span>
+              </Link>
+              
+              <Link
+                href={`/dashboard/chat-insights`}
+                className="flex items-center text-sm px-3 py-2 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+              >
+                <span className="mr-2">💬</span>
+                <span className="hidden sm:inline">Chat Insights</span>
+                <span className="sm:hidden">Insights</span>
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </header>

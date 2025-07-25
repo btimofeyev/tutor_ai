@@ -398,7 +398,7 @@ export default function PricingPage() {
             <div>
               <h3 className="font-semibold text-text-primary mb-2">Can I change plans anytime?</h3>
               <p className="text-text-secondary text-sm">
-                Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate any billing differences.
+                Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we&apos;ll prorate any billing differences.
               </p>
             </div>
             <div>
@@ -416,7 +416,7 @@ export default function PricingPage() {
             <div>
               <h3 className="font-semibold text-text-primary mb-2">How does the AI tutoring work?</h3>
               <p className="text-text-secondary text-sm">
-                Klio AI provides personalized tutoring based on your child's curriculum. It can explain concepts, help with homework, and adapt to your child's learning style.
+                Klio AI provides personalized tutoring based on your child&apos;s curriculum. It can explain concepts, help with homework, and adapt to your child&apos;s learning style.
               </p>
             </div>
           </div>
@@ -430,7 +430,7 @@ export default function PricingPage() {
             Ready to Transform Your Homeschool?
           </h2>
           <p className="text-xl text-text-secondary mb-8">
-            Join thousands of families who've simplified their homeschool journey with Klio AI.
+            Join thousands of families who&apos;ve simplified their homeschool journey with Klio AI.
           </p>
           {!session ? (
             <Button as="link" href="/signup" variant="primary" size="lg">

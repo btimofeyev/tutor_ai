@@ -16,15 +16,21 @@ import {
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 
-const QUICK_CONTENT_TYPES = [
-  "lesson", "worksheet", "assignment", "test", "quiz", "notes", "reading_material", "other"
+const QUICK_ASSIGNMENT_TYPES = [
+  { value: "reading", label: "📚 Reading Assignment", icon: "📚" },
+  { value: "worksheet", label: "📝 Worksheet/Practice", icon: "📝" },
+  { value: "project", label: "🎨 Project/Activity", icon: "🎨" },
+  { value: "test", label: "📋 Test/Quiz", icon: "📋" },
+  { value: "lesson", label: "📖 Lesson/Study", icon: "📖" },
+  { value: "review", label: "🔄 Review/Practice", icon: "🔄" },
+  { value: "other", label: "📌 Other Assignment", icon: "📌" }
 ];
-const DIFFICULTY_LEVELS = ["beginner", "intermediate", "advanced", "review"];
-const TIME_ESTIMATES = [
-  { value: 15, label: "15 minutes" }, { value: 30, label: "30 minutes" },
-  { value: 45, label: "45 minutes" }, { value: 60, label: "1 hour" },
-  { value: 90, label: "1.5 hours" }, { value: 120, label: "2 hours" },
-  { value: 180, label: "3+ hours" }
+
+const TIME_QUICK_OPTIONS = [
+  { value: 15, label: "Quick (15 min)", icon: "⚡" },
+  { value: 30, label: "Short (30 min)", icon: "⏰" },
+  { value: 60, label: "Medium (1 hour)", icon: "🕐" },
+  { value: 120, label: "Long (2+ hours)", icon: "📚" }
 ];
 
 function formatContentTypeName(contentType) {
@@ -216,25 +222,32 @@ export default function ManualMaterialForm({
   const isGradableType = appGradableContentTypes.includes(formData.content_type);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <BookOpenIcon className="h-5 w-5 text-accent-blue mr-2" />
-          <h3 className="text-lg font-semibold text-text-primary">Quick Material Entry</h3>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center">
+        <div className="flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mx-auto mb-4">
+          <DocumentPlusIcon className="h-8 w-8 text-green-600" />
         </div>
+        <h3 className="text-lg font-semibold text-text-primary mb-2">Quick Assignment Entry</h3>
+        <p className="text-sm text-text-secondary">
+          Perfect for reading assignments, practice time, or activities without files
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="manual-subject" className={commonLabelStyles}>Subject *</label>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Subject Selection */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <label htmlFor="manual-subject" className="block text-sm font-medium text-gray-900 mb-3">
+            📚 Which subject is this for?
+          </label>
           <select 
             id="manual-subject" 
             value={currentSubject || ''} 
             onChange={onSubjectChange} 
-            className={commonSelectStyles} 
+            className="w-full p-3 border border-gray-300 rounded-lg text-lg"
             required
           >
-            <option value="">Select subject…</option>
+            <option value="">Choose a subject...</option>
             {(childSubjectsForSelectedChild || []).filter(s => s.child_subject_id).map(subject => (
               <option key={subject.child_subject_id} value={subject.child_subject_id}>
                 {subject.name}
@@ -243,36 +256,68 @@ export default function ManualMaterialForm({
           </select>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="manual-title" className={commonLabelStyles}>Title *</label>
-            <input 
-              type="text" 
-              id="manual-title" 
-              name="title" 
-              value={formData.title} 
-              onChange={handleInputChange} 
-              className={commonInputStyles} 
-              placeholder="e.g., Chapter 3 Review" 
-              required 
-            />
+        {/* Assignment Title */}
+        <div>
+          <label htmlFor="manual-title" className="block text-sm font-medium text-gray-900 mb-3">
+            ✏️ What&apos;s the assignment called?
+          </label>
+          <input 
+            type="text" 
+            id="manual-title" 
+            name="title" 
+            value={formData.title} 
+            onChange={handleInputChange} 
+            className="w-full p-3 border border-gray-300 rounded-lg text-lg"
+            placeholder="e.g., Read Chapter 5, Math Practice Problems" 
+            required 
+          />
+        </div>
+
+        {/* Assignment Type - Visual Grid */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 mb-3">
+            🎯 What type of assignment is this?
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {QUICK_ASSIGNMENT_TYPES.map(type => (
+              <button
+                key={type.value}
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, content_type: type.value }))}
+                className={`p-3 rounded-lg border-2 transition-all text-left ${
+                  formData.content_type === type.value
+                    ? 'border-blue-500 bg-blue-50 text-blue-900'
+                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                }`}
+              >
+                <div className="text-lg mb-1">{type.icon}</div>
+                <div className="text-sm font-medium">{type.label.replace(type.icon + ' ', '')}</div>
+              </button>
+            ))}
           </div>
-          <div>
-            <label htmlFor="manual-content-type" className={commonLabelStyles}>Content Type *</label>
-            <select 
-              id="manual-content-type" 
-              name="content_type" 
-              value={formData.content_type} 
-              onChange={handleInputChange} 
-              className={commonSelectStyles} 
-              required
-            >
-              {appContentTypes.map(type => (
-                <option key={type} value={type}>
-                  {formatContentTypeName(type)}
-                </option>
-              ))}
-            </select>
+        </div>
+
+        {/* Time Estimate - Visual Grid */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 mb-3">
+            ⏱️ How long should this take?
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {TIME_QUICK_OPTIONS.map(option => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, estimated_time_minutes: option.value }))}
+                className={`p-3 rounded-lg border-2 transition-all text-center ${
+                  formData.estimated_time_minutes === option.value
+                    ? 'border-blue-500 bg-blue-50 text-blue-900'
+                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                }`}
+              >
+                <div className="text-lg mb-1">{option.icon}</div>
+                <div className="text-sm font-medium">{option.label}</div>
+              </button>
+            ))}
           </div>
         </div>
 

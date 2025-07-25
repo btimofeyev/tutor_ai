@@ -884,9 +884,9 @@ ${contextualSuggestions.slice(0, 3).map(s => `- "${s}"`).join('\n')}`;
     let response;
     try {
       response = await openai.chat.completions.create({
-        model: "gpt-4.1-mini", // Function calling works better on gpt-4o
+        model: "gpt-4o-mini", // Function calling works better on gpt-4o
         messages: openaiMessages,
-        temperature: conversationStrategy.response_style === 'encouraging' ? 0.8 : 0.7, // More creative for encouraging responses
+        temperature: 0.3, // Lower temperature for more consistent function calling
         max_tokens: 1024,
         tools: WORKSPACE_TOOLS,
         tool_choice: "auto" // Let LLM decide when to use tools

@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import api from '../../utils/api'; // Adjust path if necessary
 import Link from 'next/link';
 import { ArrowLeftIcon, PlusIcon, MinusCircleIcon, DocumentPlusIcon } from '@heroicons/react/24/outline'; // Added DocumentPlusIcon
+import Breadcrumbs from '../../components/ui/Breadcrumbs';
+import { signalDashboardRefresh } from '../../utils/dashboardRefresh';
 
 export default function SubjectsPage() {
   const [children, setChildren] = useState([]);
@@ -73,6 +75,9 @@ export default function SubjectsPage() {
       // Refresh assigned subjects list
       const res = await api.get(`/child-subjects/child/${selectedChild}`);
       setAssignedChildSubjects(res.data || []);
+      
+      // Signal dashboard to refresh when user returns
+      signalDashboardRefresh();
     } catch (error) {
       alert(error.response?.data?.error || "Could not assign subject.");
     } finally {
@@ -97,6 +102,9 @@ export default function SubjectsPage() {
       // Refresh assigned subjects list
       const res = await api.get(`/child-subjects/child/${selectedChild}`);
       setAssignedChildSubjects(res.data || []);
+      
+      // Signal dashboard to refresh when user returns
+      signalDashboardRefresh();
     } catch (error) {
       alert(error.response?.data?.error || "Could not unassign subject.");
     } finally {
@@ -145,6 +153,15 @@ export default function SubjectsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
+        {/* Breadcrumbs */}
+        <Breadcrumbs 
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Subject Management" }
+          ]}
+          className="mb-6"
+        />
+        
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-800">Manage Subjects</h1>
           <Link href="/dashboard" className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium">

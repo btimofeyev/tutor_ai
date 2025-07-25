@@ -1,6 +1,7 @@
 // app/dashboard/components/MaterialListItem.js
 'use client';
 import React, { useState, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { CheckCircleIcon as CheckSolidIcon } from '@heroicons/react/24/solid';
 import { PencilSquareIcon, CalendarDaysIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { APP_GRADABLE_CONTENT_TYPES } from '../../../utils/dashboardConstants';
@@ -39,19 +40,20 @@ const formatDueDate = (dateString) => {
 const CompletionToggle = React.memo(({ isCompleted, isToggling, onClick, disabled }) => (
   <button
     onClick={disabled ? undefined : onClick}
-    className={`mr-3 sm:mr-4 p-2 sm:p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0
-      ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+    className={`mr-4 p-2.5 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0 transition-all duration-200
+      ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
+      ${isCompleted ? 'bg-green-100 hover:bg-green-200' : 'bg-gray-50 hover:bg-blue-50'}
     `}
-    title={isCompleted ? "Mark as Incomplete" : "Mark as Complete"}
+    title={isCompleted ? "Mark as incomplete" : "Mark as finished"}
     aria-pressed={isCompleted}
     disabled={isToggling || disabled}
   >
     {isToggling ? (
-      <div className="h-5 w-5 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+      <div className="h-6 w-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
     ) : isCompleted ? (
-      <CheckSolidIcon className="h-5 w-5 text-green-600" />
+      <CheckSolidIcon className="h-6 w-6 text-green-600" />
     ) : (
-      <div className="h-5 w-5 border-2 border-gray-300 rounded-full" />
+      <div className="h-6 w-6 border-2 border-gray-300 rounded-full hover:border-blue-400 transition-colors" />
     )}
   </button>
 ));
@@ -62,33 +64,36 @@ const StatusBadge = ({ lesson, materialInfo }) => {
   const hasGrade = lesson.grade_value !== null && lesson.grade_value !== undefined && lesson.grade_value !== '';
   if (hasGrade || (lesson.grade_value === 0 && materialInfo.hasMaxScore)) {
     return (
-      <div className="flex items-center bg-gradient-to-r from-blue-50 to-indigo-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-blue-200/60 shadow-sm">
-        <span className="font-bold text-blue-700 text-xs sm:text-sm" aria-label={`Grade: ${lesson.grade_value}${lesson.grade_max_value ? ` / ${lesson.grade_max_value}` : ''}`}>
+      <div className="flex items-center bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-1.5 rounded-full border border-blue-200 shadow-sm">
+        <span className="text-blue-500 mr-1.5">📊</span>
+        <span className="font-bold text-blue-700 text-sm" aria-label={`Grade: ${lesson.grade_value}${lesson.grade_max_value ? ` / ${lesson.grade_max_value}` : ''}`}>
           {String(lesson.grade_value)}{lesson.grade_max_value ? `/${String(lesson.grade_max_value)}` : ''}
         </span>
       </div>
     );
   }
-  // For gradable items that are completed but don't have grades, show "Needs Grade" 
+  // For gradable items that are completed but don't have grades, show "Ready to Grade" 
   if (materialInfo.isCompleted && materialInfo.isGradable && materialInfo.hasMaxScore) {
     return (
-      <span className="inline-flex items-center text-xs font-bold text-amber-700 bg-gradient-to-r from-amber-100 to-yellow-100 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-amber-200/60 shadow-sm">
-        <span className="hidden sm:inline">Needs Grade</span>
+      <span className="inline-flex items-center text-xs font-bold text-amber-700 bg-gradient-to-r from-amber-50 to-yellow-50 px-3 py-1.5 rounded-full border border-amber-200 shadow-sm">
+        <span className="mr-1.5">⭐</span>
+        <span className="hidden sm:inline">Ready to Grade</span>
         <span className="sm:hidden">Grade?</span>
       </span>
     );
   }
   
-  // Show "Needs Attention" for overdue or upcoming items
+  // Show priority status for overdue or upcoming items
   if (!materialInfo.isCompleted && (materialInfo.isOverdue || materialInfo.isDueSoon)) {
     const isOverdue = materialInfo.isOverdue;
     return (
-      <span className={`inline-flex items-center text-xs font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border shadow-sm ${
+      <span className={`inline-flex items-center text-xs font-bold px-3 py-1.5 rounded-full border shadow-sm ${
         isOverdue 
-          ? 'text-red-700 bg-gradient-to-r from-red-100 to-rose-100 border-red-200/60' 
-          : 'text-amber-700 bg-gradient-to-r from-amber-100 to-yellow-100 border-amber-200/60'
+          ? 'text-red-700 bg-gradient-to-r from-red-50 to-rose-50 border-red-200' 
+          : 'text-orange-700 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200'
       }`}>
-        <span className="hidden sm:inline">{isOverdue ? 'Needs Attention' : 'Due Soon'}</span>
+        <span className="mr-1.5">{isOverdue ? '🚨' : '⏰'}</span>
+        <span className="hidden sm:inline">{isOverdue ? 'Past Due' : 'Due This Week'}</span>
         <span className="sm:hidden">{isOverdue ? 'Overdue' : 'Soon'}</span>
       </span>
     );
@@ -96,8 +101,9 @@ const StatusBadge = ({ lesson, materialInfo }) => {
   // For non-gradable completed items, show "Completed"
   if (materialInfo.isCompleted) {
     return (
-      <span className="inline-flex items-center text-xs font-bold text-green-700 bg-gradient-to-r from-green-100 to-emerald-100 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-green-200/60 shadow-sm">
-        <span className="hidden sm:inline">Completed</span>
+      <span className="inline-flex items-center text-xs font-bold text-green-700 bg-gradient-to-r from-green-50 to-emerald-50 px-3 py-1.5 rounded-full border border-green-200 shadow-sm">
+        <span className="mr-1.5">✅</span>
+        <span className="hidden sm:inline">Finished</span>
         <span className="sm:hidden">Done</span>
       </span>
     );
@@ -135,7 +141,24 @@ const StatusBadge = ({ lesson, materialInfo }) => {
   return null;
 };
 
-export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComplete, onDeleteMaterial, isCompact = false }) {
+export default function MaterialListItem({ 
+  lesson, 
+  onOpenEditModal, 
+  onToggleComplete, 
+  onDeleteMaterial, 
+  isCompact = false,
+  isSelectable = false,
+  isSelected = false,
+  onSelectionChange
+}) {
+  // Add prop validation
+  if (typeof onOpenEditModal !== 'function') {
+    console.warn('MaterialListItem: onOpenEditModal prop is not a function', {
+      lesson: lesson?.title,
+      onOpenEditModal,
+      type: typeof onOpenEditModal
+    });
+  }
   const [isToggling, setIsToggling] = useState(false);
   const [error, setError] = useState('');
 
@@ -167,7 +190,11 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
 
   const handleEditClick = useCallback((e) => {
     e.stopPropagation();
-    onOpenEditModal(lesson);
+    if (typeof onOpenEditModal === 'function') {
+      onOpenEditModal(lesson);
+    } else {
+      console.error('onOpenEditModal is not a function', { onOpenEditModal, lesson });
+    }
   }, [lesson, onOpenEditModal]);
 
   const handleDeleteClick = useCallback((e) => {
@@ -175,14 +202,27 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
     onDeleteMaterial(lesson);
   }, [lesson, onDeleteMaterial]);
 
-  const itemBaseClasses = "flex items-center rounded-lg";
-  const itemPadding = isCompact ? "px-3 py-2" : "p-3";
+  const itemBaseClasses = "group flex items-center rounded-lg transition-all duration-200 hover:shadow-md";
+  const itemPadding = isCompact ? "px-3 py-2" : "p-4";
   const itemStateClasses = materialInfo.isCompleted 
     ? "bg-gradient-to-r from-green-50/80 to-emerald-50/50 border border-green-200/60" 
-    : "bg-white border border-gray-200/60";
+    : "bg-white border border-gray-200/60 hover:border-blue-200";
 
   return (
     <li className={`${itemBaseClasses} ${itemPadding} ${itemStateClasses}`}>
+      {/* Selection Checkbox */}
+      {isSelectable && (
+        <div className="mr-3">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => onSelectionChange && onSelectionChange(lesson, e.target.checked)}
+            className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+      
       <CompletionToggle
         isCompleted={materialInfo.isCompleted}
         isToggling={isToggling}
@@ -200,25 +240,38 @@ export default function MaterialListItem({ lesson, onOpenEditModal, onToggleComp
             </p>
           )}
         </div>
-        <div className="flex items-center space-x-2 ml-3 flex-shrink-0">
+        <div className="flex items-center gap-2 ml-3 flex-shrink-0">
           <StatusBadge lesson={lesson} materialInfo={materialInfo} />
-          <button 
-            onClick={handleEditClick} 
-            className="p-2 sm:p-2.5 text-gray-400 hover:text-blue-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" 
-            title="Edit Material"
-          >
-            <PencilSquareIcon className="h-4 w-4" />
-          </button>
-          <button 
-            onClick={handleDeleteClick} 
-            className="p-2 sm:p-2.5 text-gray-400 hover:text-red-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors" 
-            title="Delete Material"
-          >
-            <TrashIcon className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button 
+              onClick={handleEditClick} 
+              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" 
+              title="Edit assignment details"
+            >
+              <PencilSquareIcon className="h-4 w-4" />
+            </button>
+            <button 
+              onClick={handleDeleteClick} 
+              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" 
+              title="Remove assignment"
+            >
+              <TrashIcon className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
       {error && <p className="text-xs text-red-500 text-center w-full mt-2 px-2">{error}</p>}
     </li>
   );
 }
+
+MaterialListItem.propTypes = {
+  lesson: PropTypes.object.isRequired,
+  onOpenEditModal: PropTypes.func.isRequired,
+  onToggleComplete: PropTypes.func.isRequired,
+  onDeleteMaterial: PropTypes.func.isRequired,
+  isCompact: PropTypes.bool,
+  isSelectable: PropTypes.bool,
+  isSelected: PropTypes.bool,
+  onSelectionChange: PropTypes.func
+};

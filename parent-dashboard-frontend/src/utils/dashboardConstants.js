@@ -22,17 +22,8 @@ export const defaultWeightsForNewSubject = APP_CONTENT_TYPES.map((ct) => ({
   weight: APP_GRADABLE_CONTENT_TYPES.includes(ct) ? 0.1 : 0.0,
 }));
 
-// Form styling constants
-export const FORM_STYLES = {
-  inputBaseClass: "block w-full border-border-input focus:outline-none focus:ring-1 focus:ring-accent-blue focus:border-accent-blue rounded-lg bg-background-card text-text-primary placeholder-text-tertiary shadow-sm",
-  inputPaddingClass: "py-2 px-3", 
-  inputSizeClass: "text-sm",
-  labelClass: "block text-xs font-medium text-text-secondary mb-1"
-};
-
-// Computed form styles
-export const formInputStyles = `${FORM_STYLES.inputBaseClass} ${FORM_STYLES.inputPaddingClass} ${FORM_STYLES.inputSizeClass}`;
-export const formLabelStyles = FORM_STYLES.labelClass;
+// Form styles are now consolidated in dashboardStyles.js
+// Import them from there to avoid duplication
 
 // Filter and sort options
 export const FILTER_OPTIONS = {

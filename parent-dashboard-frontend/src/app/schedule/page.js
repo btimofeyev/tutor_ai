@@ -19,6 +19,7 @@ import EditScheduleEntryModal from "./components/EditScheduleEntryModal";
 import { useScheduleManagement } from "../../hooks/useScheduleManagement";
 import { useMultiChildScheduleManagement } from "../../hooks/useMultiChildScheduleManagement";
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
+import Breadcrumbs from "../../components/ui/Breadcrumbs";
 
 export default function SchedulePage() {
   const session = useSession();
@@ -69,7 +70,7 @@ export default function SchedulePage() {
       // Default to showing ALL children's schedules
       setSelectedChildrenIds(childrenData.children.map(child => child.id));
     }
-  }, [childrenData.children.length]);
+  }, [childrenData.children, selectedChildrenIds.length]);
 
   // Redirect to login if no session
   useEffect(() => {
@@ -214,11 +215,19 @@ export default function SchedulePage() {
             </div>
           ) : (
             <div className="space-y-6">
+              {/* Breadcrumbs */}
+              <Breadcrumbs 
+                items={[
+                  { label: "Dashboard", href: "/dashboard" },
+                  { label: "Schedule" }
+                ]}
+              />
+              
               {/* Clean Schedule Header */}
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                   <h1 className="text-xl font-semibold text-text-primary">
-                    Schedule
+                    {childrenData.selectedChild?.name}&apos;s Schedule
                   </h1>
                   <div className="flex items-center gap-2">
                     <button 

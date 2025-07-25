@@ -133,7 +133,7 @@ export default function SubjectSettingsPage() {
             <div className="max-w-2xl mx-auto bg-white shadow-xl rounded-lg p-6 sm:p-8">
                 <div className="mb-6">
                     <h1 className="text-2xl font-bold text-gray-800">Grade Weight Settings</h1>
-                    <p className="text-sm text-gray-600">For {childName}'s {subjectName}</p>
+                    <p className="text-sm text-gray-600">For {childName}&apos;s {subjectName}</p>
                 </div>
 
                 {error && <p className="text-red-500 bg-red-100 p-3 rounded-md mb-4">{error}</p>}

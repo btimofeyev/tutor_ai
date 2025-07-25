@@ -1,10 +1,17 @@
 // Shared styling constants and utilities for the dashboard
 // Extracted to eliminate code duplication across components
 
-// Form styling constants - used across multiple components
-export const formInputStyles = "block w-full border-[var(--border-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-input-focus)] focus:border-[var(--border-input-focus)] rounded-[var(--radius-md)] bg-background-card text-text-primary placeholder-text-tertiary shadow-sm text-sm px-3 py-2";
+// Form styling constants - consolidated from dashboardConstants.js
+export const FORM_STYLES = {
+  inputBaseClass: "block w-full border-border-input focus:outline-none focus:ring-1 focus:ring-accent-blue focus:border-accent-blue rounded-lg bg-background-card text-text-primary placeholder-text-tertiary shadow-sm",
+  inputPaddingClass: "py-2 px-3", 
+  inputSizeClass: "text-sm",
+  labelClass: "block text-xs font-medium text-text-secondary mb-1"
+};
 
-export const formLabelStyles = "block text-sm font-medium text-text-primary mb-1";
+// Computed form styles - unified version
+export const formInputStyles = `${FORM_STYLES.inputBaseClass} ${FORM_STYLES.inputPaddingClass} ${FORM_STYLES.inputSizeClass}`;
+export const formLabelStyles = FORM_STYLES.labelClass;
 
 export const formSelectStyles = "block w-full border-[var(--border-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-input-focus)] focus:border-[var(--border-input-focus)] rounded-[var(--radius-md)] bg-background-card text-text-primary shadow-sm text-sm px-3 py-2";
 

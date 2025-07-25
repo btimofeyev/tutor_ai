@@ -115,7 +115,7 @@ export default function AddMaterialForm({
       // Mark as synced to prevent re-running
       hasSyncedPreUploadSelections.current = true;
     }
-  }, [lessonJsonForApproval, preUploadSelectedUnit, preUploadSelectedLessonContainer]);
+  }, [lessonJsonForApproval, preUploadSelectedUnit, preUploadSelectedLessonContainer, onLessonContainerChange, onUpdateLessonJsonField]);
   
   // Note: Removed unit and lesson group creation logic since they're pre-selected before upload
 

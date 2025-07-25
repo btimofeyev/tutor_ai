@@ -1,3 +1,5 @@
+'use client';
+
 // Error Boundary Component for Better Error Handling
 import React from 'react';
 import { FiAlertTriangle, FiRefreshCw, FiHome } from 'react-icons/fi';

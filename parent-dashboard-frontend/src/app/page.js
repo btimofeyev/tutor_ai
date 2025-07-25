@@ -102,7 +102,7 @@ export default function LandingPage() {
             Craft Your Homeschool Journey with <span className="text-highlight-yellow"><span className="text-accent-primary-text">Klio AI.</span></span>
           </h1>
           <p className="text-lg sm:text-xl text-text-secondary mb-8 max-w-xl mx-auto">
-            The intelligent platform that <span className="text-highlight-blue">simplifies planning</span>, digitizes materials, and illuminates your child's learning path.
+            The intelligent platform that <span className="text-highlight-blue">simplifies planning</span>, digitizes materials, and illuminates your child&apos;s learning path.
           </p>
           <p className="text-md text-text-secondary mb-10 max-w-lg mx-auto">
             Stop juggling spreadsheets and scattered notes. Klio AI brings calm and clarity to your homeschool. Spend less time managing, <span className="font-medium text-text-primary">more time inspiring.</span>
@@ -167,7 +167,7 @@ export default function LandingPage() {
             Plans That Grow With Your Family
           </h2>
           <p className="text-lg text-text-secondary">
-            Start free and add AI tutoring when you're ready
+            Start free and add AI tutoring when you&apos;re ready
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
@@ -230,7 +230,7 @@ export default function LandingPage() {
       <section className="w-full py-16 md:py-20">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <p className="text-xl md:text-2xl text-text-primary italic leading-relaxed">
-            "Klio AI has transformed our homeschooling. Everything is organized, and the AI makes lesson planning a breeze! It feels like I have a <span className="text-highlight-blue">super-efficient assistant.</span>"
+            &quot;Klio AI has transformed our homeschooling. Everything is organized, and the AI makes lesson planning a breeze! It feels like I have a <span className="text-highlight-blue">super-efficient assistant.</span>&quot;
           </p>
           <p className="mt-4 text-sm text-text-tertiary">— Sarah L., Homeschool Parent</p>
         </div>
@@ -242,7 +242,7 @@ export default function LandingPage() {
         <div className="grid md:grid-cols-2 gap-x-10 gap-y-8">
           <div>
             <h4 className="font-medium text-lg text-text-primary mb-1.5">Do I need any technical skills?</h4>
-            <p className="text-sm text-text-secondary leading-relaxed">Not at all. Klio AI is designed for simplicity and intuitive use, even if you're not tech-savvy.</p>
+            <p className="text-sm text-text-secondary leading-relaxed">Not at all. Klio AI is designed for simplicity and intuitive use, even if you&apos;re not tech-savvy.</p>
           </div>
           <div>
             <h4 className="font-medium text-lg text-text-primary mb-1.5">Can I add multiple children?</h4>

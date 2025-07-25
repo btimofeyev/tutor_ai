@@ -158,7 +158,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
       }
     } catch (err) {
       const errorMessage = 'Failed to update schedule entry';
-      console.error('Update schedule entry error:', err);
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
@@ -292,7 +291,7 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
           }
         }
       } catch (e) {
-        console.warn('Failed to parse schedule entry metadata:', e);
+        // Failed to parse metadata, will use fallback logic
       }
       
       // Fallback logic if no specific material found

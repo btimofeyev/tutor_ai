@@ -13,7 +13,8 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (session) router.replace('/dashboard');
+    // Only redirect if we have a valid authenticated session
+    if (session?.user) router.replace('/dashboard');
   }, [session, router]);
 
   return (
@@ -82,7 +83,7 @@ export default function LoginPage() {
           redirectTo="/dashboard"
         />
         <div className="text-center text-sm mt-8">
-          <span className="text-text-secondary">Don't have an account? </span>
+          <span className="text-text-secondary">Don&apos;t have an account? </span>
           <Link href="/signup" className="font-medium text-accent-blue hover:underline hover:text-accent-blue-hover transition-colors">
             Sign Up
           </Link>

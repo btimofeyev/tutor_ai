@@ -34,14 +34,14 @@ const QuickAccessItem = ({ lesson, onToggleComplete, onEdit, onDelete, type }) =
     }
     if (isCompleted && isGradable && hasMaxScore) {
       return {
-        text: 'Needs Grade',
+        text: 'Ready to Grade',
         color: 'text-amber-600',
         bgColor: 'bg-amber-50'
       };
     }
     if (isCompleted) {
       return {
-        text: 'Completed',
+        text: 'Done ✓',
         color: 'text-green-600',
         bgColor: 'bg-green-50'
       };
@@ -121,18 +121,28 @@ export default function QuickAccessSection({
   }
 
   return (
-    <div className="mb-3">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+    <div className="mb-6">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+          <span className="text-xl">📋</span>
+          What Needs Attention Today
+        </h2>
+        <p className="text-sm text-text-secondary mt-1">
+          Important assignments and upcoming work for your child
+        </p>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Overdue Items */}
         {overdueItems.length > 0 && (
-          <div>
-            <div className="flex items-center gap-1 mb-2">
-              <ExclamationTriangleIcon className="h-4 w-4 text-red-500" />
-              <h3 className="text-sm font-semibold text-red-700">
-                Overdue ({overdueItems.length})
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />
+              <h3 className="font-semibold text-red-800">
+                Past Due ({overdueItems.length})
               </h3>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               {overdueItems.map(lesson => (
                 <QuickAccessItem
                   key={`overdue-${lesson.id}`}
@@ -149,14 +159,14 @@ export default function QuickAccessSection({
 
         {/* Upcoming Items */}
         {upcomingItems.length > 0 && (
-          <div>
-            <div className="flex items-center gap-1 mb-2">
-              <ClockIcon className="h-4 w-4 text-orange-500" />
-              <h3 className="text-sm font-semibold text-orange-700">
-                Due Soon ({upcomingItems.length})
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ClockIcon className="h-5 w-5 text-orange-500" />
+              <h3 className="font-semibold text-orange-800">
+                Due This Week ({upcomingItems.length})
               </h3>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               {upcomingItems.map(lesson => (
                 <QuickAccessItem
                   key={`upcoming-${lesson.id}`}

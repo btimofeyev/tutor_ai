@@ -2,7 +2,9 @@
 "use client";
 import { useSession } from "@supabase/auth-helpers-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import api from "../../utils/api";
 
 // Main subscription hook
@@ -13,12 +15,12 @@ import { useChildrenData } from "../../hooks/useChildrenData";
 import { useMaterialManagement } from "../../hooks/useMaterialManagement";
 import { useFiltersAndSorting } from "../../hooks/useFiltersAndSorting";
 import { useToast } from "../../hooks/useToast";
+import { useModalManagement } from "../../hooks/useModalManagement";
+import { useDashboardHandlers } from "../../hooks/useDashboardHandlers";
 import { PRICE_IDS } from "../../utils/subscriptionConstants";
 import { 
   APP_CONTENT_TYPES,
-  APP_GRADABLE_CONTENT_TYPES,
-  formInputStyles, 
-  formLabelStyles 
+  APP_GRADABLE_CONTENT_TYPES
 } from "../../utils/dashboardConstants";
 
 // Shared styles and utilities
@@ -26,28 +28,41 @@ import {
   modalBackdropStyles, 
   modalContainerStyles,
   modalCloseButtonStyles,
-  formInputStyles as sharedFormInputStyles,
-  formLabelStyles as sharedFormLabelStyles
+  formInputStyles,
+  formLabelStyles
 } from "../../utils/dashboardStyles";
 import { handleApiError, createSuccessResponse, validatePin, validateUsername } from "../../utils/commonHelpers";
+import { checkAndClearRefreshSignal, shouldRefreshBasedOnTime, isComingFromDataModifyingPage } from "../../utils/dashboardRefresh";
 
 // Components
 import StudentSidebar from "./components/StudentSidebar";
 import StudentHeader from "./components/StudentHeader";
 import SubjectCard from "./components/SubjectCard";
-import AddMaterialTabs from "./components/AddMaterialTabs";
-import EditMaterialModal from "./components/EditMaterialModal";
-import MaterialDeleteModal from "./components/MaterialDeleteModal";
-import ChildAccountDeleteModal from "./components/ChildAccountDeleteModal";
-import ChildLoginSettingsModal from "./components/ChildLoginSettingsModal";
-import GradeInputModal from "./components/GradeInputModal";
-import QuickAccessSection from "./components/QuickAccessSection";
-import UnitManagementModal from "./components/UnitManagementModal";
+import TodayOverview from "./components/TodayOverview";
 import DashboardFilters from "./components/DashboardFilters";
-import UpgradePrompt from "../../components/UpgradePrompt";
+import BatchActionsBar from "./components/BatchActionsBar";
 import Button from "../../components/ui/Button";
 import { CurriculumSkeletonLoader } from "../../components/ui/SkeletonLoader";
 import { DashboardErrorBoundary, ModalErrorBoundary } from "../../components/ErrorBoundary";
+import Breadcrumbs from "../../components/ui/Breadcrumbs";
+
+// Layout Components
+import DashboardHeader from "./components/DashboardHeader";
+import { LoadingStateCard, NoChildSelectedCard, NoSubjectsCard } from "./components/EmptyStateCard";
+import DashboardContentHeader from "./components/DashboardContentHeader";
+import SubjectsList from "./components/SubjectsList";
+import DashboardModals from "./components/DashboardModals";
+
+// Modal Components
+import AddMaterialTabs from "./components/AddMaterialTabs";
+import UnitManagementModal from "./components/UnitManagementModal";
+import EditMaterialModal from "./components/EditMaterialModal";
+import ChildLoginSettingsModal from "./components/ChildLoginSettingsModal";
+import GradeInputModal from "./components/GradeInputModal";
+import MaterialDeleteModal from "./components/MaterialDeleteModal";
+import ChildAccountDeleteModal from "./components/ChildAccountDeleteModal";
+import BatchEditModal from "./components/BatchEditModal";
+import UpgradePrompt from "../../components/UpgradePrompt";
 
 import {
   PlusCircleIcon,
@@ -59,7 +74,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 
-export default function DashboardPage() {
+function DashboardPageContent() {
   const session = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -82,50 +97,25 @@ export default function DashboardPage() {
     childrenData.selectedChild
   );
   const { showSuccess, showError, showWarning } = useToast();
+  const modalManagement = useModalManagement();
   
-  // State for modals
-  const [isManageUnitsModalOpen, setIsManageUnitsModalOpen] = useState(false);
-  const [managingUnitsForSubject, setManagingUnitsForSubject] = useState(null);
-  const [currentSubjectUnitsInModal, setCurrentSubjectUnitsInModal] = useState([]);
-  const [newUnitNameModalState, setNewUnitNameModalState] = useState("");
-  const [bulkUnitCount, setBulkUnitCount] = useState(1);
-  const [editingUnit, setEditingUnit] = useState(null);
-  const [isAddMaterialModalOpen, setIsAddMaterialModalOpen] = useState(false);
+  // Batch operations state (declare before hooks that need them)
+  const [batchSelectionMode, setBatchSelectionMode] = useState(false);
+  const [selectedMaterials, setSelectedMaterials] = useState(new Set());
   
-  // Lesson group management state
-  const [expandedUnitsInModal, setExpandedUnitsInModal] = useState({});
-  const [creatingLessonGroupForUnit, setCreatingLessonGroupForUnit] = useState(null);
-  const [newLessonGroupTitle, setNewLessonGroupTitle] = useState("");
-
-  // Child credentials modal state
-  const [isChildLoginSettingsModalOpen, setIsChildLoginSettingsModalOpen] = useState(false);
-  const [editingChildCredentials, setEditingChildCredentials] = useState(null);
-  const [childUsernameInput, setChildUsernameInput] = useState("");
-  const [childPinInput, setChildPinInput] = useState("");
-  const [childPinConfirmInput, setChildPinConfirmInput] = useState("");
-  const [credentialFormError, setCredentialFormError] = useState("");
-  const [credentialFormSuccess, setCredentialFormSuccess] = useState("");
-  const [isSavingCredentials, setIsSavingCredentials] = useState(false);
-
-  // Upgrade prompt state
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
-  const [upgradeFeature, setUpgradeFeature] = useState('');
-  const [upgrading, setUpgrading] = useState(false);
-
-  // Grade input modal state
-  const [showGradeModal, setShowGradeModal] = useState(false);
-  const [gradingLesson, setGradingLesson] = useState(null);
-  const [isSubmittingGrade, setIsSubmittingGrade] = useState(false);
-
-  // Material delete modal state
-  const [showDeleteMaterialModal, setShowDeleteMaterialModal] = useState(false);
-  const [deletingMaterial, setDeletingMaterial] = useState(null);
-  const [isDeletingMaterial, setIsDeletingMaterial] = useState(false);
-
-  // Child account delete modal state
-  const [showDeleteChildModal, setShowDeleteChildModal] = useState(false);
-  const [deletingChild, setDeletingChild] = useState(null);
-  const [isDeletingChild, setIsDeletingChild] = useState(false);
+  // Dashboard handlers hook
+  const dashboardHandlers = useDashboardHandlers({
+    childrenData,
+    materialManagement,
+    modalManagement,
+    showSuccess,
+    showError,
+    showWarning,
+    subscriptionPermissions,
+    selectedMaterials,
+    setSelectedMaterials,
+    setBatchSelectionMode
+  });
 
   const { assignedSubjectsForCurrentChild } = childrenData;
   const { totalStats } = filtersAndSorting;
@@ -172,7 +162,9 @@ export default function DashboardPage() {
   }, [materialManagement.editingLesson, materialManagement.editForm, childrenData.lessonsByUnit, childrenData.unitsBySubject]);
 
   useEffect(() => {
-    if (session === false) {
+    // Check if session is explicitly null/false (not just undefined which means loading)
+    // and no user is present
+    if (session !== undefined && !session?.user) {
       router.replace("/login");
     }
   }, [session, router]);
@@ -189,13 +181,28 @@ export default function DashboardPage() {
     }
   }, [searchParams, refetchSubscription]);
 
-  // Invalidate cache when returning from subject management page
+  // Only refresh data when returning from subject management or after long absence
   useEffect(() => {
+    let lastVisibleTime = Date.now();
+    
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && childrenData.selectedChild?.id) {
-        // Invalidate cache and force refresh when page becomes visible
-        childrenData.invalidateChildCache(childrenData.selectedChild.id);
-        childrenData.refreshChildSpecificData(true);
+        const timeSinceLastVisible = Date.now() - lastVisibleTime;
+        const REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+        
+        // Only refresh if user was away for more than 5 minutes or if coming from data-modifying pages
+        const needsTimeBasedRefresh = shouldRefreshBasedOnTime(lastVisibleTime, REFRESH_THRESHOLD);
+        const needsSignalBasedRefresh = checkAndClearRefreshSignal();
+        const comingFromDataModifyingPage = isComingFromDataModifyingPage();
+        
+        const shouldRefresh = needsTimeBasedRefresh || needsSignalBasedRefresh || comingFromDataModifyingPage;
+        
+        if (shouldRefresh) {
+          childrenData.invalidateChildCache(childrenData.selectedChild.id);
+          childrenData.refreshChildSpecificData(true);
+        }
+      } else if (document.visibilityState === 'hidden') {
+        lastVisibleTime = Date.now();
       }
     };
 
@@ -208,476 +215,55 @@ export default function DashboardPage() {
     materialManagement.setSelectedLessonContainer("");
   }, [materialManagement.lessonJsonForApproval?.unit_id, materialManagement.setSelectedLessonContainer]);
 
-  const handleAddLessonFormSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!materialManagement.addLessonSubject || !materialManagement.addLessonFile || materialManagement.addLessonFile.length === 0 || !materialManagement.addLessonUserContentType) {
-      showWarning("Please select subject, at least one file, and an initial content type.");
-      return;
-    }
+  // Extract handlers from the hook
+  const {
+    handleAddLessonFormSubmit,
+    handleManualMaterialSubmit,
+    handleApproveNewLesson,
+    handleToggleLessonCompleteEnhanced: handleToggleLessonComplete,
+    handleConfirmDeleteMaterialEnhanced: handleConfirmDeleteMaterial,
+    handleUpdateLessonJsonForApprovalField,
+    handleCreateNewUnit,
+    handleCreateNewLessonContainer,
+    handleUpdateUnit,
+    handleAddChildSubmit,
+    handleConfirmDeleteChild,
+    handleSetChildUsername,
+    handleSetChildPin,
+    handleOpenChildLoginSettingsModal,
+    handleCloseChildLoginSettingsModal,
+    handleGradeSubmit,
+    handleGradeModalClose,
+    handleMaterialSelection,
+    handleClearBatchSelection,
+    handleBatchComplete,
+    handleBatchDelete,
+    handleBatchEdit,
+    handleBatchSave,
+    handleGenericUpgrade,
+    handleCloseDeleteMaterialModal,
+    handleCloseDeleteChildModal,
+    clearCredentialMessages,
+    handleOpenEditModal,
+    handleSaveLessonEdit,
+    handleDeleteMaterial,
+    handleDeleteChild,
+    handleLessonContainerChange
+  } = dashboardHandlers;
 
-    const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
-    const subjectInfo = currentAssignedSubjects.find(
-      (s) => s.child_subject_id === materialManagement.addLessonSubject
+  // Keep some simplified handlers that need dashboard-specific logic
+  const handleAddUnit = dashboardHandlers.handleAddUnit;
+  const handleBulkAddUnits = dashboardHandlers.handleBulkAddUnits;
+  const handleDeleteUnit = dashboardHandlers.handleDeleteUnit;
+  const handleCreateLessonGroupInModal = dashboardHandlers.handleCreateLessonGroupInModal;
+  const handleCreateLessonGroupFromCard = dashboardHandlers.handleCreateLessonGroupFromCard;
+
+  // Simple handlers that call dashboard handler functions
+  const openManageUnitsModal = (subject) => {
+    modalManagement.openManageUnitsModal(subject);
+    modalManagement.setCurrentSubjectUnitsInModal(
+      childrenData.unitsBySubject[subject.child_subject_id] || []
     );
-
-    if (!subjectInfo || !subjectInfo.child_subject_id) {
-      showError("Selected subject is invalid.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("child_subject_id", subjectInfo.child_subject_id);
-    formData.append("user_content_type", materialManagement.addLessonUserContentType);
-
-    if (materialManagement.addLessonFile instanceof FileList && materialManagement.addLessonFile.length > 0) {
-      for (let i = 0; i < materialManagement.addLessonFile.length; i++) {
-        formData.append("files", materialManagement.addLessonFile[i], materialManagement.addLessonFile[i].name);
-      }
-    } else {
-      alert("File selection error.");
-      return;
-    }
-
-    const result = await materialManagement.handleLessonUpload(formData);
-    
-    if (!result.success) {
-      showError(`Upload Error: ${result.error}`);
-      materialManagement.setLessonJsonForApproval({ error: result.error, title: "Error" });
-      materialManagement.setLessonTitleForApproval("Error");
-      materialManagement.setLessonContentTypeForApproval(APP_CONTENT_TYPES[0]);
-      materialManagement.setLessonMaxPointsForApproval("");
-      materialManagement.setLessonDueDateForApproval("");
-      materialManagement.setLessonCompletedForApproval(false);
-    } else {
-      const receivedLessonJson = result.data.lesson_json || {};
-      
-      const firstFileName = materialManagement.addLessonFile[0]?.name?.split(".")[0];
-      materialManagement.setLessonTitleForApproval(
-        receivedLessonJson?.title || firstFileName || "Untitled Material"
-      );
-      
-      const llmContentType = receivedLessonJson?.content_type_suggestion;
-      const finalContentType =
-        llmContentType && APP_CONTENT_TYPES.includes(llmContentType)
-          ? llmContentType
-          : materialManagement.addLessonUserContentType &&
-            APP_CONTENT_TYPES.includes(materialManagement.addLessonUserContentType)
-          ? materialManagement.addLessonUserContentType
-          : APP_CONTENT_TYPES[0];
-      materialManagement.setLessonContentTypeForApproval(finalContentType);
-
-      if (
-        receivedLessonJson?.total_possible_points_suggestion !== null &&
-        receivedLessonJson?.total_possible_points_suggestion !== undefined
-      ) {
-        materialManagement.setLessonMaxPointsForApproval(
-          String(receivedLessonJson.total_possible_points_suggestion)
-        );
-      } else {
-        materialManagement.setLessonMaxPointsForApproval("");
-      }
-
-      materialManagement.setLessonDueDateForApproval("");
-      materialManagement.setLessonCompletedForApproval(false);
-    }
-  };
-
-  const handleManualMaterialSubmit = async (materialDataFromForm) => {
-    const result = await materialManagement.handleManualMaterialCreation(materialDataFromForm);
-    
-    if (result.success) {
-      showSuccess('Material added successfully!');
-      setIsAddMaterialModalOpen(false);
-      return { success: true };
-    } else {
-      showError(result.error || 'Failed to create material');
-      return { 
-        success: false, 
-        error: result.error || 'Failed to create material' 
-      };
-    }
-  };
-
-  const handleAddChildSubmit = async (e) => {
-    e.preventDefault();
-    const childData = {
-      name: childrenData.newChildName,
-      grade: childrenData.newChildGrade,
-    };
-    
-    const result = await childrenData.handleAddChild(childData);
-    
-    if (result.success) {
-      childrenData.setShowAddChild(false);
-    } else {
-      if (result.code === 'CHILD_LIMIT_EXCEEDED') {
-        setUpgradeFeature('children');
-        setShowUpgradePrompt(true);
-      } else {
-        alert(result.error);
-      }
-    }
-  };
-
-  const handleGenericUpgrade = async (targetPlanKey) => {
-    setUpgrading(true);
-    try {
-      if (!PRICE_IDS[targetPlanKey]) {
-        alert('Invalid plan selected for upgrade.');
-        setUpgrading(false);
-        return;
-      }
-
-      const response = await api.post('/stripe/create-checkout-session', {
-        price_id: PRICE_IDS[targetPlanKey],
-        success_url: `${window.location.origin}/dashboard?upgraded=true`,
-        cancel_url: window.location.href
-      });
-      
-      window.location.href = response.data.checkout_url;
-    } catch (error) {
-      alert('Failed to start upgrade process. Please try again.');
-      setUpgrading(false);
-    }
-  };
-
-  const handleUpdateLessonJsonForApprovalField = (fieldName, value) => {
-    materialManagement.updateLessonApprovalField(fieldName, value);
-  };
-
-  const handleToggleLessonComplete = async (lessonId, isCompleting = true) => {
-    // Find the lesson to check if it's gradable
-    const lesson = Object.values(childrenData.lessonsBySubject)
-      .flat()
-      .find(l => l.id === lessonId);
-
-    if (!lesson) {
-      alert("Could not find lesson.");
-      return;
-    }
-
-    // If marking as complete and it's a gradable assignment without a grade, show grade modal
-    const isGradable = APP_GRADABLE_CONTENT_TYPES.includes(lesson.content_type);
-    const hasMaxScore = lesson.grade_max_value && String(lesson.grade_max_value).trim() !== '';
-    const hasGrade = lesson.grade_value != null && lesson.grade_value !== '';
-
-    if (isCompleting && isGradable && hasMaxScore && !hasGrade) {
-      setGradingLesson(lesson);
-      setShowGradeModal(true);
-      return;
-    }
-
-    // For non-gradable items or items that already have grades, toggle directly
-    // Invalidate cache to ensure fresh data
-    if (childrenData.selectedChild?.id) {
-      childrenData.invalidateChildCache(childrenData.selectedChild.id);
-    }
-    
-    const result = await materialManagement.toggleLessonCompletion(lessonId, isCompleting);
-    if (!result.success) {
-      alert(result.error || "Could not update completion status.");
-    } else {
-      // Force refresh the child data to update the UI immediately
-      if (childrenData.selectedChild?.id) {
-        await childrenData.refreshChildSpecificData(true);
-      }
-      
-      if (result.syncedEntries > 0) {
-      }
-    }
-  };
-
-  const handleDeleteMaterial = (material) => {
-    setDeletingMaterial(material);
-    setShowDeleteMaterialModal(true);
-  };
-
-  const handleConfirmDeleteMaterial = async (materialId) => {
-    setIsDeletingMaterial(true);
-    try {
-      const result = await materialManagement.deleteLesson(materialId);
-      if (result.success) {
-        showSuccess(result.message || 'Material deleted successfully');
-        setShowDeleteMaterialModal(false);
-        setDeletingMaterial(null);
-        // Force refresh the child data to update the UI immediately
-        if (childrenData.selectedChild?.id) {
-          await childrenData.refreshChildSpecificData(true);
-        }
-      } else {
-        showError(result.error || 'Failed to delete material');
-      }
-    } catch (error) {
-      showError('Failed to delete material');
-    } finally {
-      setIsDeletingMaterial(false);
-    }
-  };
-
-  const handleCloseDeleteMaterialModal = () => {
-    setShowDeleteMaterialModal(false);
-    setDeletingMaterial(null);
-  };
-
-  const handleDeleteChild = (child) => {
-    setDeletingChild(child);
-    setShowDeleteChildModal(true);
-  };
-
-  const handleConfirmDeleteChild = async (childId) => {
-    setIsDeletingChild(true);
-    try {
-      const result = await childrenData.deleteChild(childId);
-      if (result.success) {
-        showSuccess(result.message || 'Child account deleted successfully');
-        setShowDeleteChildModal(false);
-        setDeletingChild(null);
-      } else {
-        showError(result.error || 'Failed to delete child account');
-      }
-    } catch (error) {
-      showError('Failed to delete child account');
-    } finally {
-      setIsDeletingChild(false);
-    }
-  };
-
-  const handleCloseDeleteChildModal = () => {
-    setShowDeleteChildModal(false);
-    setDeletingChild(null);
-  };
-
-  const handleGradeSubmit = async (gradeValue) => {
-    if (!gradingLesson) return;
-    
-    setIsSubmittingGrade(true);
-    try {
-      
-      // Invalidate cache before the API call to ensure fresh data
-      if (childrenData.selectedChild?.id) {
-        childrenData.invalidateChildCache(childrenData.selectedChild.id);
-      }
-      
-      const result = await materialManagement.toggleLessonCompletion(gradingLesson.id, true, gradeValue);
-      
-      if (result.success) {
-        
-        // Small delay to ensure backend processing is complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Force refresh the child data to update the UI immediately
-        if (childrenData.selectedChild?.id) {
-          await childrenData.refreshChildSpecificData(true);
-        }
-        
-        setShowGradeModal(false);
-        setGradingLesson(null);
-        if (result.syncedEntries > 0) {
-          }
-      } else {
-        alert(result.error || "Could not update grade and completion status.");
-      }
-    } catch (error) {
-      alert("Failed to save grade. Please try again.");
-    } finally {
-      setIsSubmittingGrade(false);
-    }
-  };
-
-  const handleGradeModalClose = () => {
-    if (!isSubmittingGrade) {
-      setShowGradeModal(false);
-      setGradingLesson(null);
-    }
-  };
-
-
-  const handleApproveNewLesson = async (materialRelationshipData = {}) => {
-    const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
-    const subjectInfo = currentAssignedSubjects.find(
-      (s) => s.child_subject_id === materialManagement.addLessonSubject
-    );
-  
-    if (!subjectInfo || !subjectInfo.child_subject_id) {
-      alert("Selected subject invalid.");
-      return;
-    }
-  
-    if (
-      !materialManagement.lessonJsonForApproval ||
-      !materialManagement.lessonTitleForApproval ||
-      !materialManagement.addLessonUserContentType
-    ) {
-      alert("Missing data for approval.");
-      return;
-    }
-
-    if (!materialManagement.selectedLessonContainer || materialManagement.selectedLessonContainer === '__create_new__') {
-      alert("Please select or create a lesson container.");
-      return;
-    }
-    
-    const result = await materialManagement.handleSaveLesson(childrenData.selectedChild?.id);
-  
-    if (result.success) {
-      const fileInput = document.getElementById("lesson-file-input-main"); 
-      if (fileInput) fileInput.value = "";
-      setIsAddMaterialModalOpen(false);
-    } else {
-      alert(result.error || "Lesson save failed.");
-    }
-  };
-
-  const handleLessonContainerChange = (e) => {
-    const value = e.target.value;
-    materialManagement.setSelectedLessonContainer(value);
-  };
-
-  const handleCreateNewUnit = async (newUnitName, childSubjectId) => {
-    if (!childSubjectId) {
-      alert('Error: A subject must be selected before creating a new unit.');
-      return { success: false }; 
-    }
-    if (!newUnitName || !newUnitName.trim()) {
-      alert('Error: New unit name cannot be empty.');
-      return { success: false }; 
-    }
-    
-    try {
-      const response = await api.post('/units', {
-        child_subject_id: childSubjectId,
-        name: newUnitName.trim()
-      });
-      
-      const updatedUnitsForSubject = [
-        ...(childrenData.unitsBySubject[childSubjectId] || []),
-        response.data,
-      ].sort(
-        (a, b) =>
-          (a.sequence_order || 0) - (b.sequence_order || 0) ||
-          a.name.localeCompare(b.name)
-      );
-
-      childrenData.setUnitsBySubject((prev) => ({
-        ...prev,
-        [childSubjectId]: updatedUnitsForSubject,
-      }));
-      
-      childrenData.setLessonsByUnit(prev => ({
-        ...prev,
-        [response.data.id]: []
-      }));
-      
-      if (materialManagement.lessonJsonForApproval) {
-        materialManagement.updateLessonApprovalField('unit_id', response.data.id);
-      }
-      
-      return { success: true, data: response.data };
-  
-    } catch (error) {
- 
-      return { success: false, error: error.response?.data?.error || error.message };
-    }
-  };
-
-  const handleCreateNewLessonContainer = async (newTitleFromForm, unitIdForCreation) => {
-    const unitId = unitIdForCreation;
-  
-    if (!unitId) {
-      alert('Error: A unit must be selected before creating a new lesson group.');
-      return { success: false }; 
-    }
-    if (!newTitleFromForm || !newTitleFromForm.trim()) {
-      alert('Error: New lesson group title cannot be empty.');
-      return { success: false }; 
-    }
-    
-    try {
-      const response = await api.post('/lesson-containers', {
-        unit_id: unitId,
-        title: newTitleFromForm.trim()
-      });
-      
-      const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
-      const updatedLessonContainersForUnit = lessonsRes.data || [];
-      
-      childrenData.setLessonsByUnit(prev => ({
-        ...prev,
-        [unitId]: updatedLessonContainersForUnit
-      }));
-      
-      materialManagement.setSelectedLessonContainer(response.data.id); 
-      
-      return { success: true, data: response.data };
-  
-    } catch (error) {
- 
-      return { success: false, error: error.response?.data?.error || error.message };
-    }
-  };
-
-  // Function to create lesson group from units modal
-  const handleCreateLessonGroupInModal = async (unitId) => {
-    if (!newLessonGroupTitle.trim()) {
-      showError('Lesson group title cannot be empty.');
-      return;
-    }
-
-    try {
-      const response = await api.post('/lesson-containers', {
-        unit_id: unitId,
-        title: newLessonGroupTitle.trim()
-      });
-      
-      // Update the lesson containers for this unit
-      const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
-      const updatedLessonContainers = lessonsRes.data || [];
-      
-      childrenData.setLessonsByUnit(prev => ({
-        ...prev,
-        [unitId]: updatedLessonContainers
-      }));
-      
-      // Reset form
-      setNewLessonGroupTitle("");
-      setCreatingLessonGroupForUnit(null);
-      
-      showSuccess(`Lesson group "${newLessonGroupTitle.trim()}" created successfully!`);
-    } catch (error) {
-      console.error('Error creating lesson group:', error);
-      showError(error.response?.data?.error || 'Failed to create lesson group.');
-    }
-  };
-
-  // Handler for creating lesson groups from SubjectCard
-  const handleCreateLessonGroupFromCard = async (unitId, title) => {
-    try {
-      const response = await api.post('/lesson-containers', {
-        unit_id: unitId,
-        title: title
-      });
-      
-      // Update the lesson containers for this unit
-      const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
-      const updatedLessonContainers = lessonsRes.data || [];
-      
-      childrenData.setLessonsByUnit(prev => ({
-        ...prev,
-        [unitId]: updatedLessonContainers
-      }));
-      
-      showSuccess(`Lesson group "${title}" created successfully!`);
-      return { success: true };
-    } catch (error) {
-      console.error('Error creating lesson group:', error);
-      showError(error.response?.data?.error || 'Failed to create lesson group.');
-      return { success: false, error: error.response?.data?.error || 'Failed to create lesson group.' };
-    }
-  };
-
-  const handleOpenEditModal = (lesson) => {
-    materialManagement.startEditingLesson(lesson);
   };
 
   const handleEditModalFormChange = (e) => {
@@ -690,325 +276,16 @@ export default function DashboardPage() {
     else materialManagement.setEditForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveLessonEdit = async () => {
-    if (!materialManagement.editingLesson) return;
-    
-    const result = await materialManagement.saveEditedLesson();
-    
-    if (!result.success) {
-      alert(result.error || "Failed to save changes.");
-    }
-  };
+  // Computed data for the add form
+  const currentUnitsForAddFormSubject = materialManagement.addLessonSubject && childrenData.selectedChild && childrenData.childSubjects[childrenData.selectedChild.id]
+    ? childrenData.unitsBySubject[materialManagement.addLessonSubject] || [] 
+    : [];
 
-  const openManageUnitsModal = (subject) => {
-    setManagingUnitsForSubject({
-      id: subject.child_subject_id,
-      name: subject.name,
-    });
-    setCurrentSubjectUnitsInModal(
-      childrenData.unitsBySubject[subject.child_subject_id] || []
-    );
-    setNewUnitNameModalState("");
-    setEditingUnit(null);
-    setIsManageUnitsModalOpen(true);
-  };
-
-  const handleAddUnit = async (e) => {
-    e.preventDefault();
-    if (!newUnitNameModalState.trim() || !managingUnitsForSubject) return;
-
-    try {
-      const payload = {
-        child_subject_id: managingUnitsForSubject.id,
-        name: newUnitNameModalState.trim(),
-      };
-      const res = await api.post("/units", payload);
-      const newUnit = res.data;
-
-      const updatedUnitsForSubject = [
-        ...(childrenData.unitsBySubject[managingUnitsForSubject.id] || []),
-        newUnit,
-      ].sort(
-        (a, b) =>
-          (a.sequence_order || 0) - (b.sequence_order || 0) ||
-          a.name.localeCompare(b.name)
-      );
-
-      childrenData.setUnitsBySubject((prev) => ({
-        ...prev,
-        [managingUnitsForSubject.id]: updatedUnitsForSubject,
-      }));
-      setCurrentSubjectUnitsInModal(updatedUnitsForSubject);
-      setNewUnitNameModalState("");
-    } catch (error) {
-      alert(error.response?.data?.error || "Could not add unit.");
-    }
-  };
-
-  const handleBulkAddUnits = async () => {
-    if (!newUnitNameModalState.trim() || !managingUnitsForSubject) return;
-
-    try {
-      const baseName = newUnitNameModalState.trim();
-      const existingUnits = childrenData.unitsBySubject[managingUnitsForSubject.id] || [];
-      const existingUnitNames = existingUnits.map(u => u.name.toLowerCase());
-      
-      // Parse the base name to extract existing number
-      const match = baseName.match(/^(.+?)\s+(\d+)$/);
-      let namePrefix, startingNumber;
-      
-      if (match) {
-        // Base name contains a number (e.g., "Section 1")
-        namePrefix = match[1]; // "Section"
-        startingNumber = parseInt(match[2]); // 1
-      } else {
-        // Base name doesn't contain a number (e.g., "Chapter")
-        namePrefix = baseName;
-        startingNumber = 1;
-      }
-      
-      // Find starting number that doesn't conflict
-      while (existingUnitNames.includes(`${namePrefix} ${startingNumber}`.toLowerCase())) {
-        startingNumber++;
-      }
-      
-      const newUnits = [];
-      let createdCount = 0;
-      
-      // Create units one by one to avoid race conditions
-      for (let i = 0; i < bulkUnitCount; i++) {
-        const unitName = `${namePrefix} ${startingNumber + i}`;
-        
-        // Double-check this name doesn't exist
-        if (existingUnitNames.includes(unitName.toLowerCase())) {
-          continue; // Skip if somehow already exists
-        }
-        
-        try {
-          const payload = {
-            child_subject_id: managingUnitsForSubject.id,
-            name: unitName,
-          };
-          const response = await api.post("/units", payload);
-          newUnits.push(response.data);
-          existingUnitNames.push(unitName.toLowerCase()); // Add to list to avoid duplicates in this batch
-          createdCount++;
-        } catch (unitError) {
-          // If individual unit creation fails, continue with others
-          console.warn(`Failed to create unit "${unitName}":`, unitError.response?.data?.error);
-        }
-      }
-
-      if (createdCount === 0) {
-        showError("No units were created. They may already exist.");
-        return;
-      }
-
-      // Update the state with all new units
-      const updatedUnitsForSubject = [
-        ...existingUnits,
-        ...newUnits,
-      ].sort(
-        (a, b) =>
-          (a.sequence_order || 0) - (b.sequence_order || 0) ||
-          a.name.localeCompare(b.name)
-      );
-
-      childrenData.setUnitsBySubject((prev) => ({
-        ...prev,
-        [managingUnitsForSubject.id]: updatedUnitsForSubject,
-      }));
-      setCurrentSubjectUnitsInModal(updatedUnitsForSubject);
-      setNewUnitNameModalState("");
-      setBulkUnitCount(1);
-      
-      if (createdCount === bulkUnitCount) {
-        showSuccess(`Created ${createdCount} units successfully!`);
-      } else {
-        showWarning(`Created ${createdCount} out of ${bulkUnitCount} units. Some may have already existed.`);
-      }
-    } catch (error) {
-      showError(error.response?.data?.error || "Could not create units.");
-    }
-  };
-
-  const handleUpdateUnit = async (e) => {
-    e.preventDefault();
-    if (!editingUnit || !editingUnit.name.trim() || !managingUnitsForSubject)
-      return;
-
-    try {
-      const payload = {
-        name: editingUnit.name.trim(),
-        description: editingUnit.description?.trim(),
-      };
-      const res = await api.put(`/units/${editingUnit.id}`, payload);
-      const updatedUnit = res.data;
-
-      const updatedUnitsList = (
-        childrenData.unitsBySubject[managingUnitsForSubject.id] || []
-      )
-        .map((u) => (u.id === editingUnit.id ? updatedUnit : u))
-        .sort(
-          (a, b) =>
-            (a.sequence_order || 0) - (b.sequence_order || 0) ||
-            a.name.localeCompare(b.name)
-        );
-
-      childrenData.setUnitsBySubject((prev) => ({
-        ...prev,
-        [managingUnitsForSubject.id]: updatedUnitsList,
-      }));
-      setCurrentSubjectUnitsInModal(updatedUnitsList);
-      setEditingUnit(null);
-    } catch (error) {
-      alert(error.response?.data?.error || "Could not update unit.");
-    }
-  };
-
-  const handleDeleteUnit = async (unitId) => {
-    if (
-      !managingUnitsForSubject ||
-      !confirm(
-        `Are you sure you want to delete unit? Lessons will become uncategorized.`
-      )
-    )
-      return;
-
-    try {
-      console.log('Attempting to delete unit:', unitId);
-      await api.delete(`/units/${unitId}`);
-      const updatedUnitsList = (
-        childrenData.unitsBySubject[managingUnitsForSubject.id] || []
-      ).filter((u) => u.id !== unitId);
-
-      childrenData.setUnitsBySubject((prev) => ({
-        ...prev,
-        [managingUnitsForSubject.id]: updatedUnitsList,
-      }));
-      setCurrentSubjectUnitsInModal(updatedUnitsList);
-
-      if (editingUnit?.id === unitId) setEditingUnit(null);
-      await childrenData.refreshChildSpecificData();
-      showSuccess("Unit deleted successfully.");
-    } catch (error) {
-      console.error("Error deleting unit:", error);
-      const errorMessage = error.response?.data?.error || error.message || "Could not delete unit.";
-      showError(`Failed to delete unit: ${errorMessage}`);
-    }
-  };
-
-  const handleOpenChildLoginSettingsModal = (child) => {
-    if (!subscriptionPermissions.hasChildLogin) {
-        setUpgradeFeature('childLogin');
-        setShowUpgradePrompt(true);
-        return;
-    }
-    setEditingChildCredentials(child);
-    setChildUsernameInput(child.child_username || "");
-    setChildPinInput("");
-    setChildPinConfirmInput("");
-    setCredentialFormError("");
-    setCredentialFormSuccess("");
-    setIsChildLoginSettingsModalOpen(true);
-  };
-  const handleCloseChildLoginSettingsModal = () => {
-    setIsChildLoginSettingsModalOpen(false);
-    setEditingChildCredentials(null);
-    setChildUsernameInput("");
-    setChildPinInput("");
-    setChildPinConfirmInput("");
-    setCredentialFormError("");
-    setCredentialFormSuccess("");
-  };
-  const clearCredentialMessages = () => {
-    setCredentialFormError("");
-    setCredentialFormSuccess("");
-  };
-  const handleSetChildUsername = async () => {
-    if (!editingChildCredentials || !childUsernameInput.trim()) {
-      setCredentialFormError("Username cannot be empty.");
-      return;
-    }
-    if (childUsernameInput.trim().length < 3) {
-      setCredentialFormError("Username must be at least 3 characters.");
-      return;
-    }
-    setIsSavingCredentials(true);
-    clearCredentialMessages();
-    try {
-      const res = await api.post(
-        `/children/${editingChildCredentials.id}/username`,
-        { username: childUsernameInput.trim() }
-      );
-      setCredentialFormSuccess(res.data.message || "Username updated!");
-      const updatedUsername = childUsernameInput.trim();
-      const updatedChildren = childrenData.children.map((c) =>
-        c.id === editingChildCredentials.id
-          ? { ...c, child_username: updatedUsername }
-          : c
-      );
-      childrenData.setChildren(updatedChildren);
-      if (childrenData.selectedChild?.id === editingChildCredentials.id)
-        childrenData.setSelectedChild((prev) => ({
-          ...prev,
-          child_username: updatedUsername,
-        }));
-      setEditingChildCredentials((prev) => ({
-        ...prev,
-        child_username: updatedUsername,
-      }));
-    } catch (error) {
-      setCredentialFormError(
-        error.response?.data?.error || "Failed to update username."
-      );
-    } finally {
-      setIsSavingCredentials(false);
-    }
-  };
-  const handleSetChildPin = async () => {
-    if (!editingChildCredentials || !childPinInput) {
-      setCredentialFormError("PIN cannot be empty.");
-      return;
-    }
-    if (!/^\d{4,6}$/.test(childPinInput)) {
-      setCredentialFormError("PIN must be 4 to 6 digits.");
-      return;
-    }
-    if (childPinInput !== childPinConfirmInput) {
-      setCredentialFormError("PINs do not match.");
-      return;
-    }
-    setIsSavingCredentials(true);
-    clearCredentialMessages();
-    try {
-      const res = await api.post(
-        `/children/${editingChildCredentials.id}/pin`,
-        { pin: childPinInput }
-      );
-      setCredentialFormSuccess(res.data.message || "PIN updated successfully!");
-      setChildPinInput("");
-      setChildPinConfirmInput("");
-      const updatedChildren = childrenData.children.map((c) =>
-        c.id === editingChildCredentials.id
-          ? { ...c, access_pin_hash: "set" }
-          : c
-      ); 
-      childrenData.setChildren(updatedChildren);
-      if (childrenData.selectedChild?.id === editingChildCredentials.id)
-        childrenData.setSelectedChild((prev) => ({ ...prev, access_pin_hash: "set" }));
-      setEditingChildCredentials((prev) => ({
-        ...prev,
-        access_pin_hash: "set",
-      }));
-    } catch (error) {
-      setCredentialFormError(
-        error.response?.data?.error || "Failed to update PIN."
-      );
-    } finally {
-      setIsSavingCredentials(false);
-    }
-  };
+  // Get selected materials data
+  const selectedMaterialsData = useMemo(() => {
+    const allLessons = Object.values(childrenData.lessonsBySubject).flat();
+    return allLessons.filter(lesson => selectedMaterials.has(lesson.id));
+  }, [selectedMaterials, childrenData.lessonsBySubject]);
 
   const isLoading = session === undefined || subscriptionLoading || (childrenData.loadingInitial && childrenData.children.length === 0);
 
@@ -1019,15 +296,14 @@ export default function DashboardPage() {
       </div>
     );
   }
-  if (!session) return null;
-
-  const currentUnitsForAddFormSubject = materialManagement.addLessonSubject && childrenData.selectedChild && childrenData.childSubjects[childrenData.selectedChild.id]
-    ? childrenData.unitsBySubject[materialManagement.addLessonSubject] || [] 
-    : [];
+  
+  // If no session user, don't render anything (redirect will happen in useEffect)
+  if (!session?.user) return null;
 
   return (
     <div className="flex h-screen bg-background-main overflow-hidden">
-      <div className="w-64 flex-shrink-0 bg-background-card border-r border-border-subtle shadow-lg">
+      {/* Mobile-responsive sidebar */}
+      <div className="hidden lg:block w-64 flex-shrink-0 bg-background-card border-r border-border-subtle shadow-lg">
         <StudentSidebar
           childrenList={childrenData.children}
           selectedChild={childrenData.selectedChild}
@@ -1044,17 +320,91 @@ export default function DashboardPage() {
           subscription={subscription}
           canAddChild={subscriptionPermissions.maxChildren > childrenData.children.length}
           onUpgradeNeeded={(targetPlan) => {
-            setUpgradeFeature('children');
-            setShowUpgradePrompt(true);
+            modalManagement.openUpgradePrompt('children');
           }}
         />
       </div>
 
-      <div className="flex-1 flex flex-col overflow-y-auto p-6 sm:p-8 lg:p-10">
+      <div className="flex-1 flex flex-col overflow-y-auto p-3 sm:p-6 lg:p-10">
+        {/* Mobile Header - only visible on mobile/tablet */}
+        <div className="lg:hidden mb-4">
+          <DashboardHeader 
+            selectedChild={childrenData.selectedChild}
+            childrenList={childrenData.children}
+            onChildSelect={childrenData.setSelectedChild}
+            showChildSelector={true}
+          />
+        </div>
+
+        {/* Rest of mobile header content for backward compatibility */}
+        <div className="lg:hidden mb-4 hidden">
+          <div className="bg-background-card rounded-lg shadow-sm border border-border-subtle p-4">
+            <div className="flex items-center justify-between mb-3">
+              <Link href="/" className="flex items-center">
+                <Image
+                  src="/klio_logo.png"
+                  alt="Klio AI"
+                  width={24}
+                  height={24}
+                  className="mr-2"
+                />
+                <span className="text-lg font-bold text-accent-blue">Klio AI</span>
+              </Link>
+              <div className="flex gap-2">
+                <Link
+                  href="/schedule"
+                  className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
+                >
+                  📅
+                </Link>
+                <Link
+                  href="/logout"
+                  className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
+                >
+                  ⬅️
+                </Link>
+              </div>
+            </div>
+            
+            {/* Mobile Child Selector */}
+            {childrenData.children.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Select Child
+                </label>
+                <select
+                  value={childrenData.selectedChild?.id || ''}
+                  onChange={(e) => {
+                    const child = childrenData.children.find(c => c.id === parseInt(e.target.value));
+                    childrenData.setSelectedChild(child);
+                  }}
+                  className="w-full p-3 border border-border-subtle rounded-lg bg-white text-text-primary"
+                >
+                  <option value="">Choose a child...</option>
+                  {childrenData.children.map(child => (
+                    <option key={child.id} value={child.id}>
+                      {child.name} (Grade {child.grade || 'N/A'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
         <StudentHeader
           selectedChild={childrenData.selectedChild}
           dashboardStats={totalStats}
         />
+        
+        {childrenData.selectedChild && (
+          <Breadcrumbs 
+            items={[
+              { label: "Dashboard", href: "/dashboard" },
+              { label: `${childrenData.selectedChild.name}'s Learning` }
+            ]}
+          />
+        )}
         {childrenData.loadingInitial && !childrenData.selectedChild && childrenData.children.length === 0 && !subscriptionLoading && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-xl text-text-secondary">Loading Student Data...</div>
@@ -1072,12 +422,13 @@ export default function DashboardPage() {
 
         {childrenData.selectedChild && (
           <DashboardErrorBoundary>
-            <QuickAccessSection
+            <TodayOverview
               lessonsBySubject={childrenData.lessonsBySubject}
+              selectedChild={childrenData.selectedChild}
               onToggleComplete={handleToggleLessonComplete}
               onEdit={handleOpenEditModal}
               onDelete={handleDeleteMaterial}
-              maxItems={5}
+              maxItems={6}
             />
             
             <DashboardFilters
@@ -1087,6 +438,8 @@ export default function DashboardPage() {
               setFilterContentType={filtersAndSorting.setFilterContentType}
               sortBy={filtersAndSorting.sortBy}
               setSortBy={filtersAndSorting.setSortBy}
+              searchTerm={filtersAndSorting.searchTerm}
+              setSearchTerm={filtersAndSorting.setSearchTerm}
             />
             {childrenData.loadingChildData ? (
               <div className="space-y-4">
@@ -1097,26 +450,49 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="mt-0">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-text-primary">
-                    Curriculum Overview
-                  </h2>
-                   <Button
-                    onClick={() => setIsAddMaterialModalOpen(true)}
-                    variant="primary"
-                  >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Add Material
-                  </Button>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-text-primary">
+                      {childrenData.selectedChild.name}&apos;s Learning Journey
+                    </h2>
+                    <p className="text-sm text-text-secondary mt-1">
+                      Track assignments, view progress, and manage schoolwork
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    {assignedSubjectsForCurrentChild.length > 0 && (
+                      <Button
+                        onClick={() => setBatchSelectionMode(!batchSelectionMode)}
+                        variant={batchSelectionMode ? "secondary" : "outline"}
+                        className="flex-shrink-0"
+                      >
+                        {batchSelectionMode ? '✓ Selecting' : '☐ Select Multiple'}
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() => modalManagement.openAddMaterialModal()}
+                      variant="primary"
+                      className="flex-shrink-0"
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      Add Assignment
+                    </Button>
+                  </div>
                 </div>
                 {assignedSubjectsForCurrentChild.length === 0 ? (
-                  <div className="italic text-text-secondary p-4 bg-background-card rounded-lg shadow border border-border-subtle">
-                    No subjects assigned to {childrenData.selectedChild.name}.
+                  <div className="text-center p-8 bg-background-card rounded-lg shadow border border-border-subtle">
+                    <div className="text-6xl mb-4">📚</div>
+                    <h3 className="text-lg font-semibold text-text-primary mb-2">
+                      Let&apos;s Set Up {childrenData.selectedChild.name}&apos;s Subjects
+                    </h3>
+                    <p className="text-text-secondary mb-4">
+                      Start by adding the subjects your child will be studying this year.
+                    </p>
                     <button
                       onClick={() => router.push("/subject-management")}
-                      className="ml-2 text-accent-blue hover:text-[var(--accent-blue-hover)] underline font-medium transition-colors"
+                      className="px-6 py-3 bg-accent-blue hover:bg-[var(--accent-blue-hover)] text-white rounded-lg font-medium transition-colors"
                     >
-                      Assign Subjects
+                      Add Subjects
                     </button>
                   </div>
                 ) : (
@@ -1158,12 +534,12 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {isAddMaterialModalOpen && (
+      {modalManagement.isAddMaterialModalOpen && (
         <ModalErrorBoundary>
-          <div className={modalBackdropStyles} onClick={() => setIsAddMaterialModalOpen(false)}>
+          <div className={modalBackdropStyles} onClick={() => modalManagement.closeAddMaterialModal()}>
             <div className={modalContainerStyles} onClick={(e) => e.stopPropagation()}>
             <button
-              onClick={() => setIsAddMaterialModalOpen(false)}
+              onClick={() => modalManagement.closeAddMaterialModal()}
               className={modalCloseButtonStyles}
             >
               <XMarkIcon className="h-6 w-6" />
@@ -1229,23 +605,23 @@ export default function DashboardPage() {
 
       <ModalErrorBoundary>
         <UnitManagementModal
-          isOpen={isManageUnitsModalOpen}
-          onClose={() => setIsManageUnitsModalOpen(false)}
-          managingUnitsForSubject={managingUnitsForSubject}
-          currentSubjectUnitsInModal={currentSubjectUnitsInModal}
-          setCurrentSubjectUnitsInModal={setCurrentSubjectUnitsInModal}
-          newUnitNameModalState={newUnitNameModalState}
-          setNewUnitNameModalState={setNewUnitNameModalState}
-          bulkUnitCount={bulkUnitCount}
-          setBulkUnitCount={setBulkUnitCount}
-          editingUnit={editingUnit}
-          setEditingUnit={setEditingUnit}
-          expandedUnitsInModal={expandedUnitsInModal}
-          setExpandedUnitsInModal={setExpandedUnitsInModal}
-          creatingLessonGroupForUnit={creatingLessonGroupForUnit}
-          setCreatingLessonGroupForUnit={setCreatingLessonGroupForUnit}
-          newLessonGroupTitle={newLessonGroupTitle}
-          setNewLessonGroupTitle={setNewLessonGroupTitle}
+          isOpen={modalManagement.isManageUnitsModalOpen}
+          onClose={modalManagement.closeManageUnitsModal}
+          managingUnitsForSubject={modalManagement.managingUnitsForSubject}
+          currentSubjectUnitsInModal={modalManagement.currentSubjectUnitsInModal}
+          setCurrentSubjectUnitsInModal={modalManagement.setCurrentSubjectUnitsInModal}
+          newUnitNameModalState={modalManagement.newUnitNameModalState}
+          setNewUnitNameModalState={modalManagement.setNewUnitNameModalState}
+          bulkUnitCount={modalManagement.bulkUnitCount}
+          setBulkUnitCount={modalManagement.setBulkUnitCount}
+          editingUnit={modalManagement.editingUnit}
+          setEditingUnit={modalManagement.setEditingUnit}
+          expandedUnitsInModal={modalManagement.expandedUnitsInModal}
+          setExpandedUnitsInModal={modalManagement.setExpandedUnitsInModal}
+          creatingLessonGroupForUnit={modalManagement.creatingLessonGroupForUnit}
+          setCreatingLessonGroupForUnit={modalManagement.setCreatingLessonGroupForUnit}
+          newLessonGroupTitle={modalManagement.newLessonGroupTitle}
+          setNewLessonGroupTitle={modalManagement.setNewLessonGroupTitle}
           onAddUnit={handleAddUnit}
           onBulkAddUnits={handleBulkAddUnits}
           onUpdateUnit={handleUpdateUnit}
@@ -1272,75 +648,101 @@ export default function DashboardPage() {
         />
       )}
 
-      {isChildLoginSettingsModalOpen && editingChildCredentials && (
+      {modalManagement.isChildLoginSettingsModalOpen && modalManagement.editingChildCredentials && (
         <ChildLoginSettingsModal
-          isOpen={isChildLoginSettingsModalOpen}
+          isOpen={modalManagement.isChildLoginSettingsModalOpen}
           onClose={handleCloseChildLoginSettingsModal}
-          child={editingChildCredentials}
-          usernameInput={childUsernameInput}
+          child={modalManagement.editingChildCredentials}
+          usernameInput={modalManagement.childUsernameInput}
           onUsernameInputChange={(e) => {
-            setChildUsernameInput(e.target.value);
+            modalManagement.setChildUsernameInput(e.target.value);
             clearCredentialMessages();
           }}
-          pinInput={childPinInput}
+          pinInput={modalManagement.childPinInput}
           onPinInputChange={(e) => {
-            setChildPinInput(e.target.value);
+            modalManagement.setChildPinInput(e.target.value);
             clearCredentialMessages();
           }}
-          pinConfirmInput={childPinConfirmInput}
+          pinConfirmInput={modalManagement.childPinConfirmInput}
           onPinConfirmInputChange={(e) => {
-            setChildPinConfirmInput(e.target.value);
+            modalManagement.setChildPinConfirmInput(e.target.value);
             clearCredentialMessages();
           }}
           onSetUsername={handleSetChildUsername}
           onSetPin={handleSetChildPin}
-          formError={credentialFormError}
-          formSuccess={credentialFormSuccess}
-          isSaving={isSavingCredentials}
+          formError={modalManagement.credentialFormError}
+          formSuccess={modalManagement.credentialFormSuccess}
+          isSaving={modalManagement.isSavingCredentials}
         />
       )}
       
-      {showUpgradePrompt && (
+      {modalManagement.showUpgradePrompt && (
         <UpgradePrompt
-          isOpen={showUpgradePrompt}
-          onClose={() => setShowUpgradePrompt(false)}
-          feature={upgradeFeature}
+          isOpen={modalManagement.showUpgradePrompt}
+          onClose={modalManagement.closeUpgradePrompt}
+          feature={modalManagement.upgradeFeature}
           currentPlan={subscription?.plan_type || 'free'}
           onUpgrade={handleGenericUpgrade}
-          isLoading={upgrading}
+          isLoading={modalManagement.upgrading}
         />
       )}
 
-      {showGradeModal && (
+      {modalManagement.showGradeModal && (
         <GradeInputModal
-          isOpen={showGradeModal}
+          isOpen={modalManagement.showGradeModal}
           onClose={handleGradeModalClose}
           onSubmit={handleGradeSubmit}
-          lesson={gradingLesson}
-          isLoading={isSubmittingGrade}
+          lesson={modalManagement.gradingLesson}
+          isLoading={modalManagement.isSubmittingGrade}
         />
       )}
 
       <MaterialDeleteModal
-        isOpen={showDeleteMaterialModal}
+        isOpen={modalManagement.showDeleteMaterialModal}
         onClose={handleCloseDeleteMaterialModal}
         onConfirm={handleConfirmDeleteMaterial}
-        material={deletingMaterial}
-        isDeleting={isDeletingMaterial}
+        material={modalManagement.deletingMaterial}
+        isDeleting={modalManagement.isDeletingMaterial}
       />
 
       <ChildAccountDeleteModal
-        isOpen={showDeleteChildModal}
+        isOpen={modalManagement.showDeleteChildModal}
         onClose={handleCloseDeleteChildModal}
         onConfirm={handleConfirmDeleteChild}
-        child={deletingChild}
-        childStats={deletingChild ? {
+        child={modalManagement.deletingChild}
+        childStats={modalManagement.deletingChild ? {
           totalMaterials: Object.values(childrenData.lessonsBySubject).flat().length,
           totalSubjects: childrenData.assignedSubjectsForCurrentChild.length,
           completedMaterials: Object.values(childrenData.lessonsBySubject).flat().filter(m => m.completed_at).length
         } : null}
-        isDeleting={isDeletingChild}
+        isDeleting={modalManagement.isDeletingChild}
+      />
+
+      {/* Batch Operations */}
+      <BatchActionsBar
+        selectedItems={selectedMaterialsData}
+        onClearSelection={handleClearBatchSelection}
+        onBatchComplete={handleBatchComplete}
+        onBatchDelete={handleBatchDelete}
+        onBatchEdit={handleBatchEdit}
+        isVisible={batchSelectionMode && selectedMaterials.size > 0}
+      />
+
+      <BatchEditModal
+        isOpen={modalManagement.showBatchEditModal}
+        onClose={modalManagement.closeBatchEditModal}
+        selectedItems={selectedMaterialsData}
+        onSave={handleBatchSave}
+        isLoading={modalManagement.isBatchProcessing}
       />
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen bg-background-main"><div className="text-xl text-text-secondary">Loading Dashboard...</div></div>}>
+      <DashboardPageContent />
+    </Suspense>
   );
 }

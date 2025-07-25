@@ -126,7 +126,7 @@ export default function ChatInsightsPage() {
                 <p>• <strong>Learning progress:</strong> Track problem-solving, topics mastered, and areas needing attention</p>
                 <p>• <strong>Privacy-first:</strong> Only learning insights are shared, not detailed conversation content</p>
                 <p>• <strong>Auto-cleanup:</strong> Summaries automatically delete after 7 days or when marked as read</p>
-                <p>• <strong>Action items:</strong> Get suggestions for supporting your child's learning at home</p>
+                <p>• <strong>Action items:</strong> Get suggestions for supporting your child&apos;s learning at home</p>
               </div>
             </div>
           </motion.div>

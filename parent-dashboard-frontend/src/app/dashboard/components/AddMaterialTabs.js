@@ -91,21 +91,51 @@ export default function AddMaterialTabs(props) {
   }, [onLessonContainerChange, setLessonsByUnit, manualFormSelectedUnitId, lessonsByUnit]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex border-b border-border-subtle">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center pb-4">
+        <h2 className="text-xl font-semibold text-text-primary mb-2">
+          Add New Assignment
+        </h2>
+        <p className="text-sm text-text-secondary">
+          Choose how you&apos;d like to add this assignment to your child&apos;s work
+        </p>
+      </div>
+
+      {/* Improved Tabs */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <button
           onClick={() => setActiveTab('upload')}
-          className={`${tabStyles} ${activeTab === 'upload' ? activeTabStyles : inactiveTabStyles}`}
+          className={`p-6 rounded-lg border-2 transition-all text-left hover:shadow-sm ${
+            activeTab === 'upload' 
+              ? 'border-blue-500 bg-blue-50' 
+              : 'border-gray-200 hover:border-blue-300'
+          }`}
         >
-          <PhotoIcon className="h-4 w-4 mr-2 inline-block" />
-          Upload Files
+          <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-lg mb-3">
+            <PhotoIcon className="h-6 w-6 text-blue-600" />
+          </div>
+          <h3 className="font-semibold text-gray-900 mb-1">Upload Files</h3>
+          <p className="text-sm text-gray-600">
+            Upload worksheets, PDFs, or documents. AI will help organize them.
+          </p>
         </button>
+        
         <button
           onClick={() => setActiveTab('manual')}
-          className={`${tabStyles} ${activeTab === 'manual' ? activeTabStyles : inactiveTabStyles}`}
+          className={`p-6 rounded-lg border-2 transition-all text-left hover:shadow-sm ${
+            activeTab === 'manual' 
+              ? 'border-blue-500 bg-blue-50' 
+              : 'border-gray-200 hover:border-blue-300'
+          }`}
         >
-          <DocumentPlusIcon className="h-4 w-4 mr-2 inline-block" />
-          Quick Entry
+          <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-lg mb-3">
+            <DocumentPlusIcon className="h-6 w-6 text-green-600" />
+          </div>
+          <h3 className="font-semibold text-gray-900 mb-1">Quick Entry</h3>
+          <p className="text-sm text-gray-600">
+            Manually enter assignment details like reading or practice time.
+          </p>
         </button>
       </div>
 

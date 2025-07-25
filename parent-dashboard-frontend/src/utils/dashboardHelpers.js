@@ -121,6 +121,13 @@ export const filterLessonsByStatus = (lessons, filterStatus) => {
   if (filterStatus === "all") return lessons;
   
   return lessons.filter((lesson) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const weekFromNow = new Date(today);
+    weekFromNow.setDate(today.getDate() + 7);
+    
     switch (filterStatus) {
       case "complete":
         return !!lesson.completed_at;
@@ -130,6 +137,30 @@ export const filterLessonsByStatus = (lessons, filterStatus) => {
         return !lesson.completed_at && isDateOverdue(lesson.due_date);
       case "dueSoon":
         return !lesson.completed_at && isDateDueSoon(lesson.due_date, 7) && !isDateOverdue(lesson.due_date);
+      
+      // New smart filters
+      case "needsAttention":
+        // Overdue items or completed items that need grading
+        return (!lesson.completed_at && isDateOverdue(lesson.due_date)) ||
+               (lesson.completed_at && lesson.grade_max_value && !lesson.grade_value);
+      
+      case "todaysWork":
+        // Due today or scheduled for today
+        if (!lesson.due_date) return false;
+        const dueDate = new Date(lesson.due_date + 'T00:00:00Z');
+        dueDate.setHours(0, 0, 0, 0);
+        return dueDate.getTime() === today.getTime() && !lesson.completed_at;
+      
+      case "thisWeek":
+        // Due within the next 7 days (including today)
+        if (!lesson.due_date) return false;
+        const dueDateThisWeek = new Date(lesson.due_date + 'T00:00:00Z');
+        return dueDateThisWeek >= today && dueDateThisWeek <= weekFromNow && !lesson.completed_at;
+      
+      case "readyToGrade":
+        // Completed assignments that have max points but no grade yet
+        return lesson.completed_at && lesson.grade_max_value && !lesson.grade_value;
+      
       default:
         return true;
     }

@@ -94,7 +94,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
             }
           }
         } catch (e) {
-          console.warn('Failed to parse schedule entry metadata:', e);
+          // Failed to parse metadata, will use fallback logic
         }
         
         // Fallback logic if no specific material found (SAME AS SINGLE-CHILD HOOK)
@@ -225,7 +225,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
       
       // Ensure we have a valid childId
       if (!childId) {
-        console.error('No childId provided for update');
         const errorMessage = 'Cannot update entry: missing child information';
         setError(errorMessage);
         return { success: false, error: errorMessage };
@@ -266,7 +265,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
       }
     } catch (err) {
       const errorMessage = 'Failed to update schedule entry';
-      console.error('Update schedule entry error in multi-child mode:', err);
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {

@@ -207,6 +207,255 @@ const getItemLabel = (subject, itemNumber) => {
   return labelMap[subject] || `Item ${itemNumber}`;
 };
 
+// ProblemItem Component - Separated to fix hooks issue
+const ProblemItem = memo(({ 
+  problem, 
+  index, 
+  status, 
+  workspaceContent,
+  workNotes,
+  feedbacks,
+  getStatusIndicator,
+  handleAnswerChange,
+  handleCheckAnswer,
+  handleReset,
+  selectedVoice,
+  isSpeaking,
+  currentSpeakingId,
+  handleSpeak,
+  handleStopSpeaking,
+  studentProfile,
+  sendWorkToChat,
+  setWorkNotes,
+  onInteraction,
+  setFeedback
+}) => {
+  // Now useMemo is called at the component level, not inside a map
+  const { bgColor, borderClass } = useMemo(() => {
+    switch (status) {
+      case 'correct':
+      case 'excellent':
+      case 'good':
+        return { bgColor: 'rgba(34, 197, 94, 0.05)', borderClass: 'border-green-400 shadow-green-100' };
+      case 'incorrect':
+        return { bgColor: 'rgba(239, 68, 68, 0.05)', borderClass: 'border-red-400 shadow-red-100' };
+      case 'needs_improvement':
+        return { bgColor: 'rgba(245, 158, 11, 0.05)', borderClass: 'border-yellow-400 shadow-yellow-100' };
+      case 'checking':
+        return { bgColor: 'rgba(59, 130, 246, 0.05)', borderClass: 'border-blue-400 shadow-blue-100' };
+      default:
+        return { bgColor: 'rgba(255, 255, 255, 1)', borderClass: 'border-gray-200 hover:border-gray-300' };
+    }
+  }, [status]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ 
+        opacity: 1, 
+        y: 0,
+        backgroundColor: bgColor
+      }}
+      transition={{ 
+        delay: index * 0.05,
+        type: "tween",
+        duration: 0.3
+      }}
+      className={`bg-white border-2 rounded-xl p-3 sm:p-4 mb-3 sm:mb-4 transition-all duration-300 shadow-sm ${borderClass}`}
+    >
+      {/* Problem Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-3">
+          {getStatusIndicator(problem.id)}
+          <span className="text-lg font-bold text-gray-800">
+            {getItemLabel(workspaceContent.subject, index + 1)}
+          </span>
+        </div>
+      </div>
+
+      {/* Reading Passage - show for reading comprehension */}
+      {problem.reading_passage && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-center mb-2">
+            <span className="text-sm font-semibold text-amber-700 bg-amber-200 px-2 py-1 rounded-full">
+              📖 Reading Passage
+            </span>
+          </div>
+          <div className="text-gray-800 leading-relaxed">
+            {problem.reading_passage}
+          </div>
+        </div>
+      )}
+
+      {/* Problem Text */}
+      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="text-xl font-bold text-gray-800">
+          {problem.text}
+        </div>
+      </div>
+
+      {/* Work Area - show if not successfully completed */}
+      {status !== 'correct' && status !== 'excellent' && status !== 'good' && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium text-gray-600 flex items-center">
+              <FiEdit3 size={14} className="mr-2" />
+              Your Work:
+            </h4>
+            {workNotes[problem.id]?.trim() && status !== 'checking' && (
+              <button
+                onClick={() => sendWorkToChat(index, problem.text, workNotes[problem.id])}
+                className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-full hover:bg-green-200 transition-colors flex items-center space-x-1 border border-green-300 touch-manipulation"
+                aria-label="Submit work for checking"
+              >
+                <FiSend size={12} />
+                <span>Check My Work</span>
+              </button>
+            )}
+          </div>
+
+          <textarea
+            value={workNotes[problem.id] || ''}
+            onChange={(e) => handleAnswerChange(problem.id, e.target.value)}
+            className="w-full p-3 border-2 border-gray-300 rounded-lg resize-none min-h-[120px] sm:min-h-[150px] focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-colors font-medium text-gray-800"
+            placeholder="Show your work here, step by step..."
+            disabled={status === 'checking'}
+          />
+
+          {/* Speaking controls */}
+          <div className="mt-2 flex justify-end">
+            <button
+              onClick={() => isSpeaking && currentSpeakingId === problem.id ? handleStopSpeaking() : handleSpeak(problem.text, problem.id)}
+              className="text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded-full hover:bg-purple-200 transition-colors flex items-center space-x-1 border border-purple-300"
+              disabled={isSpeaking && currentSpeakingId !== problem.id}
+            >
+              {isSpeaking && currentSpeakingId === problem.id ? (
+                <>
+                  <span className="animate-pulse">🔊</span>
+                  <span>Stop</span>
+                </>
+              ) : (
+                <>
+                  <span>🔊</span>
+                  <span>Read to me</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Display */}
+      {status === 'excellent' && (
+        <div className="p-3 bg-purple-100 border border-purple-300 rounded-lg text-purple-800">
+          <FiAward className="inline-block mr-2" />
+          <strong>Excellent work! Outstanding! 🌟</strong>
+          {feedbacks[problem.id] && <div className="mt-2 text-sm">{feedbacks[problem.id]}</div>}
+        </div>
+      )}
+      
+      {status === 'good' && (
+        <div className="p-3 bg-blue-100 border border-blue-300 rounded-lg text-blue-800">
+          <FiStar className="inline-block mr-2" />
+          <strong>Good job! Well done! ⭐</strong>
+          {feedbacks[problem.id] && <div className="mt-2 text-sm">{feedbacks[problem.id]}</div>}
+        </div>
+      )}
+      
+      {status === 'correct' && (
+        <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-green-800">
+          <FiCheckCircle className="inline-block mr-2" />
+          <strong>Correct! Great job! 🎉</strong>
+          {feedbacks[problem.id] && <div className="mt-2 text-sm">{feedbacks[problem.id]}</div>}
+        </div>
+      )}
+      
+      {status === 'needs_improvement' && (
+        <div className="p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="text-yellow-500 inline-block mr-2 font-bold">⚠</div>
+              <strong>Good effort! Let&apos;s work on this together. 💪</strong>
+              {feedbacks[problem.id] && <div className="mt-2 text-sm">{feedbacks[problem.id]}</div>}
+            </div>
+            <button
+              onClick={() => handleReset(problem.id)}
+              className="ml-3 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center space-x-1 border border-blue-300"
+            >
+              <FiRotateCcw size={12} />
+              <span>Try Again</span>
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {status === 'incorrect' && (
+        <div className="p-3 bg-red-100 border border-red-300 rounded-lg text-red-800">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <FiX className="inline-block mr-2" />
+              <strong>Not quite right. Think it through again! 💪</strong>
+              {feedbacks[problem.id] && <div className="mt-2 text-sm">{feedbacks[problem.id]}</div>}
+            </div>
+            <button
+              onClick={() => handleReset(problem.id)}
+              className="ml-3 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center space-x-1 border border-blue-300"
+            >
+              <FiRotateCcw size={12} />
+              <span>Try Again</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {status === 'incomplete' && (
+        <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-800">
+          <div className="text-gray-500 inline-block mr-2 font-bold">○</div>
+          <strong>Keep working on this! 📝</strong>
+          {feedbacks[problem.id] && <div className="mt-2 text-sm">{feedbacks[problem.id]}</div>}
+        </div>
+      )}
+
+      {/* Adaptive Hint System */}
+      {problem.hint && status !== 'correct' && status !== 'excellent' && status !== 'good' && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          transition={{ duration: 0.3 }}
+          className="text-sm p-3 bg-blue-50 border-l-4 border-blue-400 rounded-lg mt-3"
+        >
+          <strong className="text-blue-600">💡 Hint:</strong> {problem.hint}
+        </motion.div>
+      )}
+      
+      {/* Adaptive Encouragement based on student profile */}
+      {studentProfile?.response_patterns?.tends_to_give_up && 
+       status === 'pending' && 
+       workNotes[problem.id]?.length > 10 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-sm p-3 bg-green-50 border-l-4 border-green-400 rounded-lg mt-3"
+        >
+          <strong className="text-green-600">🌟 You&apos;re doing great!</strong> Keep working through it step by step!
+        </motion.div>
+      )}
+      
+      {/* Challenge encouragement for confident students */}
+      {studentProfile?.confidence_level === 'high' && 
+       status === 'correct' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-sm p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg mt-3"
+        >
+          <strong className="text-yellow-600">🚀 Ready for more?</strong> Ask for a harder challenge!
+        </motion.div>
+      )}
+    </motion.div>
+  );
+});
+
 const SimpleWorkspace = forwardRef(function SimpleWorkspace({ 
   workspaceContent, 
   isExpanded, 
@@ -219,8 +468,12 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
   const [problems, setProblems] = useState([]);
   const [workNotes, setWorkNotes] = useState({});
   const [problemStates, setProblemStates] = useState({}); // 'pending', 'correct', 'incorrect'
+  const [feedbacks, setFeedbacks] = useState({}); // Store feedback for each problem
   const [currentAchievement, setCurrentAchievement] = useState(null);
   const [showAchievement, setShowAchievement] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState('en-US-Standard-A');
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [currentSpeakingId, setCurrentSpeakingId] = useState(null);
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
@@ -235,6 +488,7 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
       setProblems([]); // Clear problems for creative writing
       setWorkNotes({});
       setProblemStates({});
+      setFeedbacks({});
       return;
     }
     
@@ -252,8 +506,9 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
       });
       setProblemStates(initialStates);
       
-      // Clear work notes
+      // Clear work notes and feedbacks
       setWorkNotes({});
+      setFeedbacks({});
     }
   }, [workspaceContent]);
 
@@ -294,6 +549,14 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
     }));
   };
 
+  // Set feedback for a problem
+  const setFeedback = (problemId, feedback) => {
+    setFeedbacks(prev => ({
+      ...prev,
+      [problemId]: feedback
+    }));
+  };
+
   // Reset problem to try again
   const resetProblemState = (problemId) => {
     setProblemStates(prev => ({
@@ -304,6 +567,65 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
       ...prev,
       [problemId]: ''
     }));
+    setFeedbacks(prev => ({
+      ...prev,
+      [problemId]: ''
+    }));
+  };
+
+  // Handle answer change
+  const handleAnswerChange = (problemId, value) => {
+    setWorkNotes(prev => ({
+      ...prev,
+      [problemId]: value
+    }));
+    // Track interaction for auto-collapse timing
+    if (onInteraction) onInteraction();
+  };
+
+  // Handle check answer (currently not used but needed for prop)
+  const handleCheckAnswer = (problemId) => {
+    // This function is passed to ProblemItem but not currently used
+    // It's here to prevent errors
+  };
+
+  // Handle text-to-speech
+  const handleSpeak = (text, id) => {
+    if ('speechSynthesis' in window) {
+      // Stop any ongoing speech
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.voice = window.speechSynthesis.getVoices().find(voice => voice.name === selectedVoice) || null;
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      
+      utterance.onstart = () => {
+        setIsSpeaking(true);
+        setCurrentSpeakingId(id);
+      };
+      
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        setCurrentSpeakingId(null);
+      };
+      
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        setCurrentSpeakingId(null);
+      };
+      
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Stop speaking
+  const handleStopSpeaking = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      setCurrentSpeakingId(null);
+    }
   };
 
   // Get status indicator with optimized animations
@@ -468,222 +790,30 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
         {problems.map((problem, index) => {
           const status = problemStates[problem.id];
           
-          // Memoize background colors and border classes for better performance
-          const { bgColor, borderClass } = useMemo(() => {
-            switch (status) {
-              case 'correct':
-              case 'excellent':
-              case 'good':
-                return { bgColor: 'rgba(34, 197, 94, 0.05)', borderClass: 'border-green-400 shadow-green-100' };
-              case 'incorrect':
-                return { bgColor: 'rgba(239, 68, 68, 0.05)', borderClass: 'border-red-400 shadow-red-100' };
-              case 'needs_improvement':
-                return { bgColor: 'rgba(245, 158, 11, 0.05)', borderClass: 'border-yellow-400 shadow-yellow-100' };
-              case 'checking':
-                return { bgColor: 'rgba(59, 130, 246, 0.05)', borderClass: 'border-blue-400 shadow-blue-100' };
-              default:
-                return { bgColor: 'rgba(255, 255, 255, 1)', borderClass: 'border-gray-200 hover:border-gray-300' };
-            }
-          }, [status]);
-          
           return (
-            <motion.div
+            <ProblemItem
               key={problem.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ 
-                opacity: 1, 
-                y: 0,
-                backgroundColor: bgColor
-              }}
-              transition={{ 
-                delay: index * 0.05, // Reduced delay for faster loading
-                type: "tween",
-                duration: 0.3 // Reduced duration for better performance
-              }}
-              className={`bg-white border-2 rounded-xl p-3 sm:p-4 mb-3 sm:mb-4 transition-all duration-300 shadow-sm ${borderClass}`}
-            >
-              {/* Problem Header */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  {getStatusIndicator(problem.id)}
-                  <span className="text-lg font-bold text-gray-800">
-                    {getItemLabel(workspaceContent.subject, index + 1)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Reading Passage - show for reading comprehension */}
-              {problem.reading_passage && (
-                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    <span className="text-sm font-semibold text-amber-700 bg-amber-200 px-2 py-1 rounded-full">
-                      📖 Reading Passage
-                    </span>
-                  </div>
-                  <div className="text-gray-800 leading-relaxed">
-                    {problem.reading_passage}
-                  </div>
-                </div>
-              )}
-
-              {/* Problem Text */}
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="text-xl font-bold text-gray-800">
-                  {problem.text}
-                </div>
-              </div>
-
-              {/* Work Area - show if not successfully completed */}
-              {status !== 'correct' && status !== 'excellent' && status !== 'good' && (
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-medium text-gray-600 flex items-center">
-                      <FiEdit3 size={14} className="mr-2" />
-                      Your Work:
-                    </h4>
-                    {workNotes[problem.id]?.trim() && status !== 'checking' && (
-                      <button
-                        onClick={() => sendWorkToChat(index, problem.text, workNotes[problem.id])}
-                        className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-full hover:bg-green-200 transition-colors flex items-center space-x-1 border border-green-300 touch-manipulation"
-                        aria-label="Submit work for checking"
-                      >
-                        <FiSend size={12} />
-                        <span>Check My Work</span>
-                      </button>
-                    )}
-                  </div>
-
-                  <textarea
-                    value={workNotes[problem.id] || ''}
-                    onChange={(e) => {
-                      setWorkNotes(prev => ({ ...prev, [problem.id]: e.target.value }));
-                      // Track workspace interaction on typing
-                      if (onInteraction) onInteraction();
-                    }}
-                    onFocus={() => {
-                      // Track when student focuses on workspace
-                      if (onInteraction) onInteraction();
-                    }}
-                    placeholder="Show your work here..."
-                    disabled={status === 'checking'}
-                    className={`w-full h-24 sm:h-28 p-3 border-2 rounded-lg bg-white font-mono text-sm sm:text-base text-gray-800 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors touch-manipulation ${
-                      status === 'checking' ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                    aria-label={`Work area for ${getItemLabel(workspaceContent.subject, index + 1)}`}
-                    autoComplete="off"
-                    spellCheck="true"
-                  />
-                </div>
-              )}
-
-              {/* Multi-Subject Feedback Areas */}
-              {status === 'excellent' && (
-                <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-green-800">
-                  <div className="text-green-600 inline-block mr-2 font-bold">⭐</div>
-                  <strong>Excellent work! Outstanding! 🌟</strong>
-                  {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
-                </div>
-              )}
-              
-              {status === 'good' && (
-                <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-green-800">
-                  <FiCheckCircle className="inline-block mr-2" />
-                  <strong>Good job! Well done! 👍</strong>
-                  {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
-                </div>
-              )}
-              
-              {status === 'correct' && (
-                <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-green-800">
-                  <FiCheckCircle className="inline-block mr-2" />
-                  <strong>Correct! Great job! 🎉</strong>
-                  {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
-                </div>
-              )}
-              
-              {status === 'needs_improvement' && (
-                <div className="p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="text-yellow-500 inline-block mr-2 font-bold">⚠</div>
-                      <strong>Good effort! Let&apos;s work on this together. 💪</strong>
-                      {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
-                    </div>
-                    <button
-                      onClick={() => resetProblemState(problem.id)}
-                      className="ml-3 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center space-x-1 border border-blue-300"
-                    >
-                      <FiRotateCcw size={12} />
-                      <span>Try Again</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              {status === 'incorrect' && (
-                <div className="p-3 bg-red-100 border border-red-300 rounded-lg text-red-800">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <FiX className="inline-block mr-2" />
-                      <strong>Not quite right. Think it through again! 💪</strong>
-                      {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
-                    </div>
-                    <button
-                      onClick={() => resetProblemState(problem.id)}
-                      className="ml-3 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center space-x-1 border border-blue-300"
-                    >
-                      <FiRotateCcw size={12} />
-                      <span>Try Again</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {status === 'incomplete' && (
-                <div className="p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-800">
-                  <div className="text-gray-500 inline-block mr-2 font-bold">○</div>
-                  <strong>Keep working on this! 📝</strong>
-                  {problem.feedback && <div className="mt-2 text-sm">{problem.feedback}</div>}
-                </div>
-              )}
-
-              {/* Adaptive Hint System */}
-              {problem.hint && status !== 'correct' && status !== 'excellent' && status !== 'good' && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  transition={{ duration: 0.3 }}
-                  className="text-sm p-3 bg-blue-50 border-l-4 border-blue-400 rounded-lg mt-3"
-                >
-                  <strong className="text-blue-600">💡 Hint:</strong> {problem.hint}
-                </motion.div>
-              )}
-              
-              {/* Adaptive Encouragement based on student profile */}
-              {studentProfile?.response_patterns?.tends_to_give_up && 
-               status === 'pending' && 
-               workNotes[problem.id]?.length > 10 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-sm p-3 bg-green-50 border-l-4 border-green-400 rounded-lg mt-3"
-                >
-                  <strong className="text-green-600">🌟 You&apos;re doing great!</strong> Keep working through it step by step!
-                </motion.div>
-              )}
-              
-              {/* Challenge encouragement for confident students */}
-              {studentProfile?.confidence_level === 'high' && 
-               status === 'correct' && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-sm p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg mt-3"
-                >
-                  <strong className="text-yellow-600">🚀 Ready for more?</strong> Ask for a harder challenge!
-                </motion.div>
-              )}
-            </motion.div>
+              problem={problem}
+              index={index}
+              status={status}
+              workspaceContent={workspaceContent}
+              workNotes={workNotes}
+              feedbacks={feedbacks}
+              getStatusIndicator={getStatusIndicator}
+              handleAnswerChange={handleAnswerChange}
+              handleCheckAnswer={handleCheckAnswer}
+              handleReset={resetProblemState}
+              selectedVoice={selectedVoice}
+              isSpeaking={isSpeaking}
+              currentSpeakingId={currentSpeakingId}
+              handleSpeak={handleSpeak}
+              handleStopSpeaking={handleStopSpeaking}
+              studentProfile={studentProfile}
+              sendWorkToChat={sendWorkToChat}
+              setWorkNotes={setWorkNotes}
+              onInteraction={onInteraction}
+              setFeedback={setFeedback}
+            />
           );
         })}
       </div>

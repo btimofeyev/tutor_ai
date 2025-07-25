@@ -423,30 +423,15 @@ export default function ChatPage() {
 
   // 🧠 Adaptive workspace sizing based on student confidence and needs
   const getAdaptiveWorkspaceSize = () => {
-    if (!workspaceContent) return { chat: 'w-full', workspace: 'w-1/3' };
+    if (!workspaceContent) return { chat: 'w-full', workspace: 'w-1/2' };
     
-    // Base size on manual expansion first
+    // Always use half-and-half layout when workspace is expanded
     if (isWorkspaceExpanded) {
       return { chat: 'w-1/2', workspace: 'w-1/2' };
     }
     
-    // Adapt based on student profile
-    if (studentProfile) {
-      const { confidence_level, response_patterns } = studentProfile;
-      
-      // Low confidence students get more chat guidance, smaller workspace
-      if (confidence_level === 'low' || response_patterns?.tends_to_give_up) {
-        return { chat: 'w-3/4', workspace: 'w-1/4' };
-      }
-      
-      // High confidence students get more workspace independence
-      if (confidence_level === 'high' && !response_patterns?.asks_for_help) {
-        return { chat: 'w-1/2', workspace: 'w-1/2' };
-      }
-    }
-    
-    // Default balanced layout
-    return { chat: 'w-2/3', workspace: 'w-1/3' };
+    // When workspace is collapsed, give full width to chat
+    return { chat: 'w-full', workspace: 'w-1/2' };
   };
 
   const { chat: chatWidth, workspace: workspaceWidth } = getAdaptiveWorkspaceSize();
@@ -465,7 +450,7 @@ export default function ChatPage() {
           />
         </div>
 
-        <main className={`flex-1 flex flex-col bg-[var(--background-card)] overflow-hidden transition-all duration-300 ${workspaceContent ? 'md:' + chatWidth : 'w-full'}`}>
+        <main className={`flex-1 flex flex-col bg-[var(--background-card)] overflow-hidden transition-all duration-300 ${workspaceContent && isWorkspaceExpanded ? chatWidth : 'w-full'}`}>
           <ChatHeader 
             learningStreak={learningStats.streak}
             todaysPracticeCount={learningStats.todaysPracticeCount}
@@ -573,7 +558,7 @@ export default function ChatPage() {
                 damping: 25,
                 duration: 0.4
               }}
-              className={`${workspaceContent ? 'w-full md:' + workspaceWidth : workspaceWidth} bg-[var(--background-card)] border-l-2 border-[var(--accent-blue)] transition-all duration-500 ease-in-out shadow-xl ${workspaceContent ? 'fixed inset-0 z-50 md:relative md:inset-auto md:z-auto md:!transform-none md:!x-0 md:!opacity-100 md:!scale-100' : ''}`}
+              className={`${workspaceWidth} bg-[var(--background-card)] border-l-2 border-[var(--accent-blue)] transition-all duration-500 ease-in-out shadow-xl`}
             >
               <SimpleWorkspace 
                 workspaceContent={workspaceContent}

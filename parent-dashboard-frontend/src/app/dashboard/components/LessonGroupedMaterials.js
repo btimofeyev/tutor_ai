@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { 
     BookOpenIcon,
     DocumentIcon,
@@ -50,6 +51,15 @@ export default function LessonGroupedMaterials({
     onToggleComplete,
     onDeleteMaterial
 }) {
+    // Debug props
+    if (typeof onOpenEditModal !== 'function') {
+        console.warn('LessonGroupedMaterials: onOpenEditModal is not a function', {
+            lessonContainer: lessonContainer?.title,
+            onOpenEditModal,
+            type: typeof onOpenEditModal
+        });
+    }
+    
     const [groupedMaterials, setGroupedMaterials] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -204,3 +214,10 @@ export default function LessonGroupedMaterials({
         </div>
     );
 }
+
+LessonGroupedMaterials.propTypes = {
+    lessonContainer: PropTypes.object.isRequired,
+    onOpenEditModal: PropTypes.func.isRequired,
+    onToggleComplete: PropTypes.func.isRequired,
+    onDeleteMaterial: PropTypes.func.isRequired
+};

@@ -39,22 +39,14 @@ const getScheduleEntries = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // First, check if schedule_entries table exists
-    // Note: schedule_entries.material_id references lessons (lesson containers), not materials
-    // We need to join through lessons to get the actual materials
+    // Fetch schedule entries with proper PostgREST join syntax
     const { data: scheduleEntries, error } = await supabase
       .from('schedule_entries')
       .select(`
         *,
-        lesson:lessons(
+        lessons!material_id(
           id,
-          title,
-          materials(
-            id,
-            title,
-            content_type,
-            lesson_json
-          )
+          title
         )
       `)
       .eq('child_id', child_id)
@@ -65,8 +57,32 @@ const getScheduleEntries = async (req, res) => {
       console.error('Error fetching schedule entries:', error);
       
       // If table doesn't exist, return empty array instead of error
-      if (error.code === '42P01') { // Table doesn't exist
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.log('Schedule entries table does not exist. Returning empty array.');
         return res.json([]);
+      }
+      
+      // If join fails, try simpler query without joins
+      if (error.message?.includes('foreign key') || error.message?.includes('relation')) {
+        console.log('Join failed, trying simple query...');
+        try {
+          const { data: simpleEntries, error: simpleError } = await supabase
+            .from('schedule_entries')
+            .select('*')
+            .eq('child_id', child_id)
+            .order('scheduled_date', { ascending: true })
+            .order('start_time', { ascending: true });
+            
+          if (simpleError) {
+            console.error('Simple query also failed:', simpleError);
+            return res.json([]);
+          }
+          
+          return res.json(simpleEntries || []);
+        } catch (fallbackError) {
+          console.error('Fallback query failed:', fallbackError);
+          return res.json([]);
+        }
       }
       
       return res.status(500).json({ error: 'Failed to fetch schedule entries' });
@@ -423,6 +439,22 @@ const getSchedulePreferences = async (req, res) => {
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
       console.error('Error fetching schedule preferences:', error);
+      
+      // If table doesn't exist, return default preferences
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.log('Schedule preferences table does not exist. Returning default preferences.');
+        const defaultPreferences = {
+          child_id,
+          preferred_start_time: '09:00',
+          preferred_end_time: '15:00',
+          break_duration_minutes: 15,
+          max_subjects_per_day: 6,
+          preferred_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+          auto_schedule_enabled: false
+        };
+        return res.json(defaultPreferences);
+      }
+      
       return res.status(500).json({ error: 'Failed to fetch schedule preferences' });
     }
 

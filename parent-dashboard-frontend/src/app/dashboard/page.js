@@ -17,6 +17,7 @@ import { useFiltersAndSorting } from "../../hooks/useFiltersAndSorting";
 import { useToast } from "../../hooks/useToast";
 import { useModalManagement } from "../../hooks/useModalManagement";
 import { useDashboardHandlers } from "../../hooks/useDashboardHandlers";
+import { useQuickUpload } from "../../hooks/useQuickUpload";
 import { PRICE_IDS } from "../../utils/subscriptionConstants";
 import { 
   APP_CONTENT_TYPES,
@@ -45,6 +46,7 @@ import Button from "../../components/ui/Button";
 import { CurriculumSkeletonLoader } from "../../components/ui/SkeletonLoader";
 import { DashboardErrorBoundary, ModalErrorBoundary } from "../../components/ErrorBoundary";
 import Breadcrumbs from "../../components/ui/Breadcrumbs";
+import QuickUpload from "./components/QuickUpload";
 
 // Layout Components
 import DashboardHeader from "./components/DashboardHeader";
@@ -102,6 +104,13 @@ function DashboardPageContent() {
   // Batch operations state (declare before hooks that need them)
   const [batchSelectionMode, setBatchSelectionMode] = useState(false);
   const [selectedMaterials, setSelectedMaterials] = useState(new Set());
+  const [showQuickUpload, setShowQuickUpload] = useState(false);
+  
+  // Quick upload hook
+  const { processQuickUpload, isProcessing: isQuickUploading } = useQuickUpload(
+    childrenData.selectedChild?.id,
+    childrenData.refreshChildSpecificData
+  );
   
   // Dashboard handlers hook
   const dashboardHandlers = useDashboardHandlers({
@@ -422,6 +431,52 @@ function DashboardPageContent() {
 
         {childrenData.selectedChild && (
           <DashboardErrorBoundary>
+            {/* Quick Upload Section */}
+            {showQuickUpload && (
+              <div className="mb-8">
+                <div className="bg-white rounded-lg shadow-sm border border-border-subtle p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold text-text-primary">Quick Add Assignments</h2>
+                    <button
+                      onClick={() => setShowQuickUpload(false)}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  {assignedSubjectsForCurrentChild.length > 0 ? (
+                    <QuickUpload
+                      childSubjects={assignedSubjectsForCurrentChild}
+                      selectedChild={childrenData.selectedChild}
+                      onComplete={async (files) => {
+                        const success = await processQuickUpload(files);
+                        if (success) {
+                          setShowQuickUpload(false);
+                        }
+                      }}
+                      subscriptionPermissions={subscriptionPermissions}
+                    />
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="text-6xl mb-4">📚</div>
+                      <h3 className="text-lg font-semibold text-text-primary mb-2">
+                        No Subjects Set Up Yet
+                      </h3>
+                      <p className="text-text-secondary mb-4">
+                        You need to add subjects for {childrenData.selectedChild.name} before uploading materials.
+                      </p>
+                      <button
+                        onClick={() => router.push("/subject-management")}
+                        className="px-6 py-3 bg-accent-blue hover:bg-[var(--accent-blue-hover)] text-white rounded-lg font-medium transition-colors"
+                      >
+                        Add Subjects
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <TodayOverview
               lessonsBySubject={childrenData.lessonsBySubject}
               selectedChild={childrenData.selectedChild}
@@ -460,6 +515,13 @@ function DashboardPageContent() {
                     </p>
                   </div>
                   <div className="flex gap-3">
+                    <Button
+                      onClick={() => setShowQuickUpload(!showQuickUpload)}
+                      variant={showQuickUpload ? "secondary" : "outline"}
+                      className="flex-shrink-0"
+                    >
+                      📚 Quick Add
+                    </Button>
                     {assignedSubjectsForCurrentChild.length > 0 && (
                       <Button
                         onClick={() => setBatchSelectionMode(!batchSelectionMode)}

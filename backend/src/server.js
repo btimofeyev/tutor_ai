@@ -23,6 +23,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const progressRoutes = require('./routes/progressRoutes');
 const scheduleRoutes = require('./routes/scheduleRoutes');
 const chatInsightsRoutes = require('./routes/chatInsightsRoutes');
+const quickUploadRoutes = require('./routes/quickUploadRoutes');
 
 
 // Import Stripe routes
@@ -57,6 +58,7 @@ app.use('/api/progress', progressRoutes); // Fixed: removed 'Routes' suffix
 app.use('/api/schedule', scheduleRoutes); // Add Schedule routes
 app.use('/api/parent/chat-insights', chatInsightsRoutes); // Add Chat Insights routes
 app.use('/api/stripe', stripeRoutes); // Add Stripe routes
+app.use('/api/materials', quickUploadRoutes); // Add Quick Upload routes
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

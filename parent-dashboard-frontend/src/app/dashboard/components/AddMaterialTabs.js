@@ -5,12 +5,15 @@ import {
   PhotoIcon,
   DocumentPlusIcon
 } from '@heroicons/react/24/outline';
-import AddMaterialForm from './AddMaterialForm';
+import AddMaterialFormSimplified from './AddMaterialFormSimplified';
 import ManualMaterialForm from './ManualMaterialForm';
 
 export default function AddMaterialTabs(props) {
   const {
     childSubjectsForSelectedChild,
+    selectedChild,
+    onMaterialsAdded,
+    onClose,
     currentAddLessonSubject, 
     onAddLessonSubjectChange, 
     unitsForSelectedSubject,  
@@ -140,42 +143,11 @@ export default function AddMaterialTabs(props) {
       </div>
 
       {activeTab === 'upload' && (
-        <AddMaterialForm 
-          childSubjectsForSelectedChild={childSubjectsForSelectedChild}
-          currentAddLessonSubject={currentAddLessonSubject}
-          onAddLessonSubjectChange={onAddLessonSubjectChange}
-          unitsForSelectedSubject={unitsForSelectedSubject} 
-          onCreateNewUnit={onCreateNewUnit}
-          selectedLessonContainer={selectedLessonContainer}
-          onLessonContainerChange={onLessonContainerChange}
-          onCreateNewLessonContainer={(newTitle) => 
-            onCreateNewLessonContainer(newTitle, lessonJsonForApproval?.unit_id)
-          }
-          appContentTypes={appContentTypes}
-          appGradableContentTypes={appGradableContentTypes}
-          onFormSubmit={onFormSubmit}
-          onApprove={onApprove}
-          uploading={uploading}
-          savingLesson={savingLesson}
-          lessonJsonForApproval={lessonJsonForApproval}
-          onUpdateLessonJsonField={onUpdateLessonJsonField}
-          lessonTitleForApproval={lessonTitleForApproval}
-          onLessonTitleForApprovalChange={onLessonTitleForApprovalChange}
-          lessonContentTypeForApproval={lessonContentTypeForApproval}
-          onLessonContentTypeForApprovalChange={onLessonContentTypeForApprovalChange}
-          lessonMaxPointsForApproval={lessonMaxPointsForApproval}
-          onLessonMaxPointsForApprovalChange={onLessonMaxPointsForApprovalChange}
-          lessonDueDateForApproval={lessonDueDateForApproval}
-          onLessonDueDateForApprovalChange={onLessonDueDateForApprovalChange}
-          lessonCompletedForApproval={lessonCompletedForApproval}
-          onLessonCompletedForApprovalChange={onLessonCompletedForApprovalChange}
-          currentAddLessonUserContentType={currentAddLessonUserContentType}
-          onAddLessonUserContentTypeChange={onAddLessonUserContentTypeChange}
-          onAddLessonFileChange={onAddLessonFileChange}
-          currentAddLessonFile={currentAddLessonFile}
-          lessonContainersForSelectedUnit={lessonContainersForApprovalForm}
-          lessonsByUnit={lessonsByUnit}
-          setLessonsByUnit={setLessonsByUnit} 
+        <AddMaterialFormSimplified
+          childSubjects={childSubjectsForSelectedChild}
+          selectedChild={selectedChild}
+          onComplete={onMaterialsAdded}
+          onClose={onClose}
         />
       )}
       

@@ -46,7 +46,7 @@ import Button from "../../components/ui/Button";
 import { CurriculumSkeletonLoader } from "../../components/ui/SkeletonLoader";
 import { DashboardErrorBoundary, ModalErrorBoundary } from "../../components/ErrorBoundary";
 import Breadcrumbs from "../../components/ui/Breadcrumbs";
-import QuickUpload from "./components/QuickUpload";
+import QuickUploadImproved from "./components/QuickUploadImproved";
 
 // Layout Components
 import DashboardHeader from "./components/DashboardHeader";
@@ -218,6 +218,17 @@ function DashboardPageContent() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [childrenData.selectedChild?.id, childrenData.invalidateChildCache, childrenData.refreshChildSpecificData]);
+
+  // Check for refresh signal on mount and when selected child changes
+  useEffect(() => {
+    if (childrenData.selectedChild?.id) {
+      const needsRefresh = checkAndClearRefreshSignal();
+      if (needsRefresh) {
+        childrenData.invalidateChildCache(childrenData.selectedChild.id);
+        childrenData.refreshChildSpecificData(true);
+      }
+    }
+  }, [childrenData.selectedChild?.id]);
 
 
   useEffect(() => {
@@ -445,7 +456,7 @@ function DashboardPageContent() {
                     </button>
                   </div>
                   {assignedSubjectsForCurrentChild.length > 0 ? (
-                    <QuickUpload
+                    <QuickUploadImproved
                       childSubjects={assignedSubjectsForCurrentChild}
                       selectedChild={childrenData.selectedChild}
                       onComplete={async (files) => {
@@ -609,6 +620,13 @@ function DashboardPageContent() {
             <div className="p-6 overflow-y-auto flex-1">
                <AddMaterialTabs
                   childSubjectsForSelectedChild={assignedSubjectsForCurrentChild}
+                  selectedChild={childrenData.selectedChild}
+                  onMaterialsAdded={async () => {
+                    // Refresh child data to show new materials
+                    childrenData.invalidateChildCache(childrenData.selectedChild.id);
+                    await childrenData.refreshChildSpecificData(true);
+                  }}
+                  onClose={() => modalManagement.closeAddMaterialModal()}
                   onFormSubmit={handleAddLessonFormSubmit}
                   onApprove={handleApproveNewLesson}
                   onManualSubmit={handleManualMaterialSubmit}

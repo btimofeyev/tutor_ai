@@ -75,6 +75,53 @@ exports.assignSubjectToChild = async (req, res) => {
       .single();
 
     if (error) return res.status(400).json({ error: error.message });
+
+    // Auto-create "Chapter 1" unit for the new subject assignment
+    try {
+      const { data: unitData, error: unitError } = await supabase
+        .from('units')
+        .insert([{
+          child_subject_id: data.id,
+          name: 'Chapter 1',
+          description: 'Auto-created starter chapter',
+          sequence_order: 1
+        }])
+        .select()
+        .single();
+
+      if (unitError) {
+        console.warn('Failed to auto-create Chapter 1:', unitError);
+        // Don't fail the whole operation if unit creation fails
+      } else {
+        console.log('Auto-created Chapter 1 for subject assignment:', data.id);
+        
+        // Auto-create "Lesson 1" within Chapter 1
+        try {
+          const { data: lessonData, error: lessonError } = await supabase
+            .from('lessons')
+            .insert([{
+              unit_id: unitData.id,
+              title: 'Lesson 1',
+              description: 'Auto-created starter lesson',
+              sequence_order: 1
+            }])
+            .select()
+            .single();
+
+          if (lessonError) {
+            console.warn('Failed to auto-create Lesson 1:', lessonError);
+          } else {
+            console.log('Auto-created Lesson 1 for Chapter 1:', unitData.id);
+          }
+        } catch (lessonCreationError) {
+          console.warn('Error auto-creating Lesson 1:', lessonCreationError);
+        }
+      }
+    } catch (unitCreationError) {
+      console.warn('Error auto-creating Chapter 1:', unitCreationError);
+      // Continue with the main operation
+    }
+
     res.status(201).json(data);
   } catch (error) {
     console.error('Error assigning subject:', error);

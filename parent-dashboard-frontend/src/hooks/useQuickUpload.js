@@ -22,10 +22,12 @@ export function useQuickUpload(childId, refreshChildData) {
       // Add metadata for each file
       formData.append(`metadata_${index}`, JSON.stringify({
         subject: fileData.subject,
-        chapter: fileData.chapter,
+        subjectId: fileData.subjectId,
+        unit: fileData.unit,
         materialType: fileData.materialType,
-        dueDate: convertDueDateToISO(fileData.dueDate),
-        originalName: fileData.name
+        dueDate: fileData.dueDate, // Already in ISO format from date input
+        originalName: fileData.name,
+        lessonContainer: fileData.lessonContainer
       }));
     });
 
@@ -68,35 +70,6 @@ export function useQuickUpload(childId, refreshChildData) {
       setIsProcessing(false);
     }
   }, [childId, showSuccess, showError, refreshChildData]);
-
-  // Helper function to convert friendly due dates to ISO format
-  const convertDueDateToISO = (friendlyDate) => {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    const friday = new Date(today);
-    const daysUntilFriday = (5 - today.getDay() + 7) % 7 || 7;
-    friday.setDate(today.getDate() + daysUntilFriday);
-    
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
-
-    switch (friendlyDate) {
-      case 'Today':
-        return today.toISOString().split('T')[0];
-      case 'Tomorrow':
-        return tomorrow.toISOString().split('T')[0];
-      case 'Friday':
-        return friday.toISOString().split('T')[0];
-      case 'This Week':
-        return friday.toISOString().split('T')[0]; // Default to Friday
-      case 'Next Week':
-        return nextWeek.toISOString().split('T')[0];
-      default:
-        return tomorrow.toISOString().split('T')[0]; // Default to tomorrow
-    }
-  };
 
   return {
     processQuickUpload,

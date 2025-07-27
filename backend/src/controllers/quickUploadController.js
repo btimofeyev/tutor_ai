@@ -216,10 +216,13 @@ exports.quickUpload = async (req, res) => {
         continue;
       }
 
-      // Find matching subject
-      const childSubject = childSubjects.find(cs => 
-        cs.subjects && cs.subjects.name === metadata.subject
-      );
+      // Find matching subject by name or ID
+      const childSubject = childSubjects.find(cs => {
+        if (metadata.subjectId) {
+          return cs.id === parseInt(metadata.subjectId, 10);
+        }
+        return cs.subjects && cs.subjects.name === metadata.subject;
+      });
 
       if (subjectError || !childSubject) {
         results.failed++;
@@ -232,26 +235,35 @@ exports.quickUpload = async (req, res) => {
       // Quick AI analysis
       const analysis = await quickAnalyzeContent(textContent, metadata, isImage);
       
-      // Get or create unit
-      const unit = await getOrCreateDefaultUnit(
-        childSubject.id, 
-        parentId,
-        metadata.chapter || 'General Materials'
-      );
+      // Use the specific lesson ID from metadata if provided, otherwise create default
+      let lessonId;
       
-      // Get or create lesson container
-      const lessonId = await getOrCreateLessonContainer(
-        unit.id,
-        metadata.chapter || 'General Materials',
-        parentId
-      );
+      // Check if lesson ID is provided and valid (not empty string, null, undefined)
+      if (metadata.lesson && String(metadata.lesson).trim() !== '' && metadata.lesson !== 'undefined') {
+        lessonId = parseInt(metadata.lesson, 10);
+      } else {
+        // Fallback: Get or create unit and lesson container
+        const unit = await getOrCreateDefaultUnit(
+          childSubject.id, 
+          parentId,
+          metadata.chapter || 'General Materials'
+        );
+        
+        lessonId = await getOrCreateLessonContainer(
+          unit.id,
+          metadata.chapter || 'General Materials',
+          parentId
+        );
+      }
 
-      // Map material type to content type
+      // Map material type to content type - keys match frontend MATERIAL_TYPES
       const contentTypeMap = {
-        'Lesson': 'lesson',
-        'Practice': 'worksheet', 
-        'Test': 'quiz',
-        'Reading': 'reading'
+        'lesson': 'lesson',
+        'worksheet': 'worksheet', 
+        'quiz': 'quiz',
+        'test': 'test',
+        'reading_material': 'reading_material',
+        'other': 'other'
       };
 
       // Create material

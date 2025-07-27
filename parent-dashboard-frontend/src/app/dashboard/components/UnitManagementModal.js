@@ -86,10 +86,10 @@ export default function UnitManagementModal({
                 id="modal-title"
                 className="text-xl font-bold text-gray-900"
               >
-                📚 Organize Your Curriculum
+                📚 Organize {managingUnitsForSubject.name} Chapters
               </h2>
               <p className="text-sm text-gray-600 mt-1">
-                Create units for <span className="font-semibold text-blue-700">{managingUnitsForSubject.name}</span>
+                Create and manage chapters for <span className="font-semibold text-blue-700">{managingUnitsForSubject.name}</span>
               </p>
             </div>
             <button
@@ -110,7 +110,7 @@ export default function UnitManagementModal({
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 mb-6 border border-blue-200">
               <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                 <PlusCircleIcon className="h-5 w-5 text-blue-600 mr-2" />
-                Add New Units
+                Add New Chapters
               </h3>
               
               {/* Bulk Creation Form */}
@@ -125,7 +125,7 @@ export default function UnitManagementModal({
                       value={newUnitNameModalState}
                       onChange={(e) => setNewUnitNameModalState(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      placeholder="Chapter, Unit, Module, etc."
+                      placeholder="Chapter, Unit, etc."
                       required
                     />
                   </div>
@@ -138,12 +138,12 @@ export default function UnitManagementModal({
                       onChange={(e) => setBulkUnitCount(parseInt(e.target.value))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                     >
-                      <option value={1}>1 (Single Unit)</option>
-                      <option value={5}>5 Units</option>
-                      <option value={10}>10 Units</option>
-                      <option value={15}>15 Units</option>
-                      <option value={20}>20 Units</option>
-                      <option value={25}>25 Units</option>
+                      <option value={1}>1 (Single Chapter)</option>
+                      <option value={5}>5 Chapters</option>
+                      <option value={10}>10 Chapters</option>
+                      <option value={15}>15 Chapters</option>
+                      <option value={20}>20 Chapters</option>
+                      <option value={25}>25 Chapters</option>
                     </select>
                   </div>
                 </div>
@@ -151,11 +151,11 @@ export default function UnitManagementModal({
                 {bulkUnitCount > 1 && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <p className="text-sm text-blue-800 mb-2">
-                      <strong>Preview:</strong> This will create {bulkUnitCount} units:
+                      <strong>Preview:</strong> This will create {bulkUnitCount} chapters:
                     </p>
                     <div className="text-xs text-blue-700 space-y-1 max-h-24 overflow-y-auto">
                       {Array.from({ length: Math.min(bulkUnitCount, 5) }, (_, i) => (
-                        <div key={i}>• {newUnitNameModalState || 'Unit'} {i + 1}</div>
+                        <div key={i}>• {newUnitNameModalState || 'Chapter'} {i + 1}</div>
                       ))}
                       {bulkUnitCount > 5 && (
                         <div className="text-blue-600">... and {bulkUnitCount - 5} more</div>
@@ -181,7 +181,7 @@ export default function UnitManagementModal({
                   onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-yellow-hover)'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--accent-yellow)'}
                 >
-                  Create {bulkUnitCount} Unit{bulkUnitCount !== 1 ? 's' : ''}
+                  Create {bulkUnitCount} Chapter{bulkUnitCount !== 1 ? 's' : ''}
                 </button>
               </div>
             </div>
@@ -191,14 +191,14 @@ export default function UnitManagementModal({
           <div className="space-y-3">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <span className="mr-2">📋</span>
-              Current Units ({currentSubjectUnitsInModal.length})
+              Current Chapters ({currentSubjectUnitsInModal.length})
             </h3>
             
             {currentSubjectUnitsInModal.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-gray-400 text-6xl mb-4">📚</div>
-                <p className="text-gray-500 text-lg mb-2">No units yet!</p>
-                <p className="text-gray-400 text-sm">Create your first unit above to get started organizing content.</p>
+                <p className="text-gray-500 text-lg mb-2">No chapters yet!</p>
+                <p className="text-gray-400 text-sm">Create your first chapter above to get started organizing content.</p>
               </div>
             ) : (
               currentSubjectUnitsInModal.map((unit, index) => (
@@ -215,7 +215,7 @@ export default function UnitManagementModal({
                       <form onSubmit={onUpdateUnit} className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Unit Name
+                            Chapter Name
                           </label>
                           <input
                             type="text"
@@ -245,7 +245,7 @@ export default function UnitManagementModal({
                             }
                             rows="3"
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                            placeholder="Add a brief description of what this unit covers..."
+                            placeholder="Add a brief description of what this chapter covers..."
                           />
                         </div>
                         <div className="flex gap-3 pt-2">
@@ -302,14 +302,14 @@ export default function UnitManagementModal({
                               })
                             }
                             className="p-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Edit Unit"
+                            title="Edit Chapter"
                           >
                             <PencilIcon className="h-5 w-5" />
                           </button>
                           <button
                             onClick={() => onDeleteUnit(unit.id)}
                             className="p-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete Unit"
+                            title="Delete Chapter"
                           >
                             <TrashIcon className="h-5 w-5" />
                           </button>
@@ -370,7 +370,7 @@ export default function UnitManagementModal({
                                 <div key={lessonGroup.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
                                   <span className="text-sm text-gray-700">{lessonGroup.title}</span>
                                   <span className="text-xs text-gray-500">
-                                    {childrenData.lessonsBySubject[managingUnitsForSubject.id]?.filter(l => l.lesson_id === lessonGroup.id).length || 0} materials
+                                    {childrenData.lessonsBySubject[managingUnitsForSubject.child_subject_id]?.filter(l => l.lesson_id === lessonGroup.id).length || 0} materials
                                   </span>
                                 </div>
                               ))

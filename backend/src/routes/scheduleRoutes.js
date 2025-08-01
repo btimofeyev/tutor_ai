@@ -16,4 +16,7 @@ router.get('/unscheduled/:child_id', scheduleController.getUnscheduledMaterials)
 router.get('/preferences/:child_id', scheduleController.getSchedulePreferences);
 router.post('/preferences/:child_id', scheduleController.updateSchedulePreferences);
 
+// AI scheduling route
+router.post('/ai-generate', scheduleController.generateAISchedule);
+
 module.exports = router;

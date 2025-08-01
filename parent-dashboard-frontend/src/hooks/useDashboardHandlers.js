@@ -137,13 +137,15 @@ export function useDashboardHandlers({
   const handleDeleteUnit = useCallback(async (unitId) => {
     if (
       !confirm(
-        "Are you sure you want to delete this unit? This will delete ALL lessons and materials within it."
+        "Are you sure you want to delete this unit? This will delete ALL lesson groups and materials within it."
       )
     )
       return;
 
     try {
-      await api.delete(`/units/${unitId}`);
+      // Use the new cascade delete endpoint that handles everything on the server
+      await api.delete(`/units/${unitId}/cascade`);
+      
       const updatedUnitsList = (
         childrenData.unitsBySubject[modalManagement.managingUnitsForSubject.id] || []
       ).filter((u) => u.id !== unitId);
@@ -221,11 +223,7 @@ export function useDashboardHandlers({
 
   // Material management handlers
   const handleOpenEditModal = useCallback((lesson) => {
-    if (materialManagement.startEditingLesson) {
-      materialManagement.startEditingLesson(lesson);
-    } else {
-      console.error('startEditingLesson is not available');
-    }
+    materialManagement.startEditingLesson(lesson);
   }, [materialManagement]);
 
   const handleSaveLessonEdit = useCallback(async () => {

@@ -7,7 +7,8 @@ export const isDateOverdue = (dateString) => {
   if (!dateString) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dueDate = new Date(dateString + "T00:00:00Z");
+  // Parse as local date, not UTC
+  const dueDate = new Date(dateString + "T00:00:00");
   return dueDate < today;
 };
 
@@ -15,7 +16,8 @@ export const isDateDueSoon = (dateString, days = 7) => {
   if (!dateString) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dueDate = new Date(dateString + "T00:00:00Z");
+  // Parse as local date, not UTC
+  const dueDate = new Date(dateString + "T00:00:00");
   const soonCutoff = new Date(today);
   soonCutoff.setDate(today.getDate() + days);
   return dueDate >= today && dueDate <= soonCutoff;
@@ -147,14 +149,14 @@ export const filterLessonsByStatus = (lessons, filterStatus) => {
       case "todaysWork":
         // Due today or scheduled for today
         if (!lesson.due_date) return false;
-        const dueDate = new Date(lesson.due_date + 'T00:00:00Z');
+        const dueDate = new Date(lesson.due_date + 'T00:00:00');
         dueDate.setHours(0, 0, 0, 0);
         return dueDate.getTime() === today.getTime() && !lesson.completed_at;
       
       case "thisWeek":
         // Due within the next 7 days (including today)
         if (!lesson.due_date) return false;
-        const dueDateThisWeek = new Date(lesson.due_date + 'T00:00:00Z');
+        const dueDateThisWeek = new Date(lesson.due_date + 'T00:00:00');
         return dueDateThisWeek >= today && dueDateThisWeek <= weekFromNow && !lesson.completed_at;
       
       case "readyToGrade":

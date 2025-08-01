@@ -4,6 +4,7 @@ import SupabaseProvider from '../components/SupabaseProvider';
 import { ToastProvider } from '../hooks/useToast';
 import ToastContainer from '../components/Toast';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { ProcessingNotificationProvider } from '../components/ProcessingNotificationProvider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-main' });
 
@@ -19,8 +20,10 @@ export default function RootLayout({ children }) {
         <ErrorBoundary>
           <SupabaseProvider>
             <ToastProvider>
-              {children}
-              <ToastContainer />
+              <ProcessingNotificationProvider>
+                {children}
+                <ToastContainer />
+              </ProcessingNotificationProvider>
             </ToastProvider>
           </SupabaseProvider>
         </ErrorBoundary>

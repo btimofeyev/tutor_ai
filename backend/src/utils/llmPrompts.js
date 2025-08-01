@@ -34,9 +34,20 @@ const GET_UNIVERSAL_SYSTEM_PROMPT = (userHintContentType, inputDescription = "th
 ]
 `;
 
-    if (['worksheet', 'assignment', 'test', 'quiz'].includes(hintLower)) {
+    if (['worksheet', 'review', 'assignment', 'test', 'quiz'].includes(hintLower)) {
       mainSummaryInstruction = `If there is any introductory text or instructions NOT part of the questions themselves for this ${hint}, summarize them briefly (max 150 words). Otherwise, this can be null or a short phrase about the overall question set (e.g., "Multiplication and word problems").`;
-      // tasksInstruction already covers worksheet logic.
+      // Enhanced tasks instruction for worksheets and reviews
+      if (hintLower === 'worksheet' || hintLower === 'review') {
+        tasksInstruction = `For ${hintLower}s, extract EVERY question, problem, or exercise exactly as it appears. Include:
+- All numbered questions/problems (e.g., "1. What is 5 + 3?", "2. Solve for x: 2x + 4 = 10")
+- Any instructions that appear with groups of questions
+- Fill-in-the-blank items
+- Multiple choice questions with all options
+- Word problems with complete text
+- Any "Apply and Write" or similar sections
+
+CRITICAL: Extract questions in the EXACT order they appear. Each question should be a separate string in the array.`;
+      }
     } else if (['lesson', 'notes', 'reading_material'].includes(hintLower)) {
       mainSummaryInstruction = "Provide a DETAILED summary or significant extracts of the main instructional content, topics, or notes (max 1000 words). If the material is long, focus on key learning points, major ideas, and unique aspects.";
       tasksInstruction = "List any embedded questions, discussion prompts, comprehension checks, or reflective activities LITERALLY as they appear, maintaining their context and grouping. If there are none, use null or an empty array.";
@@ -47,10 +58,12 @@ const GET_UNIVERSAL_SYSTEM_PROMPT = (userHintContentType, inputDescription = "th
 You are an expert educational document extractor. Your task is to **extract and structure** ${inputDescription} into a detailed, machine-readable JSON object for a learning management system. The user suggests this is a '${hint}', but YOU MUST analyze the actual content and override the hint if appropriate.
 
 # Key Requirements for Worksheets/Assessments
+- **EXTRACT EVERY PROBLEM**: For worksheets/tests/quizzes, you MUST extract every single math problem, question, or exercise into the problems_with_context array.
 - **NEVER flatten or lose the structure**: Always keep directions linked to the exact questions they govern, in order.
 - **Maintain precise order**: Output must match the visual and logical sequence from the original.
 - **Literal, not inferred**: Only include information actually present on the page.
 - **Every direction, every question**: All must be included, even repeated or similar ones.
+- **Problem Numbering**: For worksheets with numbered problems, extract each as a separate entry with its number.
 - **Ambiguity Handling**: When a group of questions does not have a repeated direction, apply the last seen direction or instruction until a new one appears.
 
 # Instructions
@@ -58,6 +71,15 @@ You are an expert educational document extractor. Your task is to **extract and 
 - Use the user's hint for content type, but base your extraction/labeling on the ACTUAL content.
 - For assessments (worksheet, test, quiz, assignment): **List EVERY instruction and question/problem maintaining their logical relationship and exact text**. Literal and exhaustive extraction is mandatory.
 - For lessons/notes/reading: **Summarize or extract high-value instructional information, and list any embedded prompts.**
+- **Extract detailed problem context**: For each problem, identify type, difficulty, concepts tested, and any visual elements.
+- **Math Worksheet Specific**: For math worksheets, extract each arithmetic problem (like "2 + 2 = ___" or "6 + 3 = ___") as a separate problem in problems_with_context.
+- **Identify teaching methodology**: Determine the pedagogical approach (step-by-step, discovery-based, etc.).
+- **Extract answer keys**: If solutions or answers are provided, capture them completely.
+- **Describe visual content**: Provide detailed descriptions of all diagrams, images, or visual aids.
+- **WORKSHEET SPECIFIC REQUIREMENTS**: 
+  - ALWAYS fill out assignment_metadata for worksheets with clear title, objectives, key terms, time estimate, difficulty, and total points
+  - ALWAYS extract ALL questions into worksheet_questions array with number, full text, type, and points if specified
+  - assignment_metadata and worksheet_questions are REQUIRED for worksheets, null for other content types
 - If a required field cannot be found, use null or empty array.
 - NEVER hallucinate or invent content.
 - If the content type classification is ambiguous or does not match the user hint, SET content_type_suggestion according to your best analysis and note that it differs from the user.
@@ -77,7 +99,7 @@ Return a **single valid JSON object** in the following schema. If a field is mis
 \`\`\`json
 {
   "title": "string (If the material has a visible title or heading, use it. Else, generate a concise, descriptive title, max 100 chars)",
-  "content_type_suggestion": "string (ONE OF: 'lesson', 'worksheet', 'assignment', 'test', 'quiz', 'notes', 'reading_material', 'other'. Suggest according to ACTUAL content, note if different than user hint.)",
+  "content_type_suggestion": "string (ONE OF: 'lesson', 'worksheet', 'review', 'assignment', 'test', 'quiz', 'notes', 'reading_material', 'other'. Suggest according to ACTUAL content, note if different than user hint.)",
   "grade_level_suggestion": "string (e.g., 'Grade 3', 'Middle School', 'High School', 'All Ages', or null if you can't infer)",
   "subject_keywords_or_subtopics": ["string", "array of key subject keywords and topics covered (comprehensive!)"],
   "learning_objectives": ["string", "array of explicit or strongly implied objectives. (null or [] if none)"],
@@ -86,7 +108,39 @@ Return a **single valid JSON object** in the following schema. If a field is mis
   "estimated_completion_time_minutes": "integer (best estimate; null if not possible)",
   "page_count_or_length_indicator": "string or integer (e.g., total pages if multiple docs/images, or 'short' if unclear, or null)",
   "lesson_number_if_applicable": "string or number (e.g., 'Lesson 4', 'Unit 2', or null)",
-  "total_possible_points_suggestion": "integer (If a total/max score is EXPLICITLY stated, extract it; else null)"
+  "total_possible_points_suggestion": "integer (If a total/max score is EXPLICITLY stated, extract it; else null)",
+  "assignment_metadata": {
+    "assignment_title": "string (Clear, descriptive title for the assignment/worksheet)",
+    "learning_objectives": ["array of what the student will learn from this worksheet"],
+    "key_terms": ["array of important vocabulary or concepts"],
+    "estimated_time_minutes": "integer (how long to complete)",
+    "difficulty_level": "string (easy, medium, or hard)",
+    "total_points": "integer (total points possible, default 100 if not specified)"
+  },
+  "worksheet_questions": [
+    {
+      "question_number": "string (e.g., '1', '2a', '3')",
+      "question_text": "string (complete question or problem text)",
+      "question_type": "string (e.g., 'multiple_choice', 'short_answer', 'calculation', 'word_problem', 'fill_in_blank')",
+      "points": "integer (points for this question if specified)"
+    }
+  ],
+  "problems_with_context": [
+    {
+      "problem_number": "string (e.g., '1', '2a', '3')",
+      "problem_text": "string (complete problem statement, e.g., '2 + 2 = ___' or '6 + 3')",
+      "problem_type": "string (e.g., 'addition', 'subtraction', 'multiplication', 'division', 'multiple_choice', 'short_answer', 'calculation', 'word_problem')",
+      "difficulty": "string (easy, medium, hard)",
+      "concepts": ["array of concepts tested, e.g., ['basic addition', 'single digit numbers']"],
+      "solution_hint": "string (any hints or solution steps if visible, null if not)",
+      "visual_elements": "string (description of any diagrams, images, or visual aids for this problem)"
+    }
+  ],
+  "teaching_methodology": "string (approach used: 'step-by-step', 'discovery-based', 'practice-oriented', etc.)",
+  "prerequisites": ["array of prerequisite knowledge or skills"],
+  "common_mistakes": ["array of common mistakes or misconceptions this material addresses"],
+  "answer_key": "object or string (if answers are provided in the material, extract them; null if not)",
+  "visual_content_descriptions": ["array of descriptions for all visual elements not tied to specific problems"]
 }
 \`\`\`
 

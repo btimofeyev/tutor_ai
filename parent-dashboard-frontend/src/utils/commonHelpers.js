@@ -41,7 +41,7 @@ export const formatDate = (dateString, options = {}) => {
   };
   
   try {
-    const date = new Date(dateString + 'T00:00:00Z');
+    const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString(undefined, { ...defaultOptions, ...options });
   } catch (error) {
     return dateString;
@@ -52,7 +52,7 @@ export const formatDueDate = (dueDateString) => {
   if (!dueDateString) return '';
   
   try {
-    const dueDate = new Date(dueDateString + 'T00:00:00Z');
+    const dueDate = new Date(dueDateString + 'T00:00:00');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -74,7 +74,7 @@ export const isOverdue = (dueDateString) => {
   if (!dueDateString) return false;
   
   try {
-    const dueDate = new Date(dueDateString + 'T00:00:00Z');
+    const dueDate = new Date(dueDateString + 'T00:00:00');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return dueDate < today;
@@ -87,7 +87,7 @@ export const isDueSoon = (dueDateString, daysThreshold = 7) => {
   if (!dueDateString) return false;
   
   try {
-    const dueDate = new Date(dueDateString + 'T00:00:00Z');
+    const dueDate = new Date(dueDateString + 'T00:00:00');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     

@@ -34,6 +34,9 @@ export default function EditScheduleEntryModal({
 
   const [errors, setErrors] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  // Material type filter state
+  const [showAllMaterialTypes, setShowAllMaterialTypes] = useState(false);
 
   // Initialize form when modal opens or entry changes
   useEffect(() => {
@@ -50,8 +53,26 @@ export default function EditScheduleEntryModal({
       });
       setErrors({});
       setShowDeleteConfirm(false);
+      setShowAllMaterialTypes(false);
     }
   }, [isOpen, scheduleEntry]);
+
+  // Filter materials by content type
+  const getFilteredMaterials = () => {
+    if (!materials || materials.length === 0) return [];
+    
+    if (showAllMaterialTypes) {
+      return materials;
+    }
+    
+    // Only show lessons, readings, and videos by default
+    return materials.filter(material => {
+      const isLesson = material.content_type === 'lesson' || 
+                      material.content_type === 'reading' || 
+                      material.content_type === 'video';
+      return isLesson;
+    });
+  };
 
   // Handle input changes
   const handleInputChange = (e) => {
@@ -304,20 +325,34 @@ export default function EditScheduleEntryModal({
               </div>
 
               {formData.is_material_based ? (
-                // Hierarchical Material Selection
+                // Material Selection
                 <div className="space-y-3">
-                  <label className={formLabelStyles}>
-                    Select Lesson/Assignment
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className={formLabelStyles}>
+                      Select Material to Schedule
+                    </label>
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={showAllMaterialTypes}
+                        onChange={(e) => setShowAllMaterialTypes(e.target.checked)}
+                        className="rounded border-[var(--border-input)] text-[var(--accent-blue)] focus:ring-[var(--accent-blue)] h-3 w-3"
+                      />
+                      <span className="text-[var(--text-secondary)]">Show assignments & reviews</span>
+                    </label>
+                  </div>
                   
-                  {materials.length === 0 ? (
+                  {getFilteredMaterials().length === 0 ? (
                     <div className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded border">
-                      No lessons uploaded yet. Add lessons to your curriculum first, or uncheck the box above to schedule general study time.
+                      {materials.length === 0 ? 
+                        'No materials uploaded yet. Add materials to your curriculum first, or uncheck the box above to schedule general study time.' :
+                        'No lessons found. Try enabling "Show assignments & reviews" above.'
+                      }
                     </div>
                   ) : (
                     <div>
                       <label htmlFor="material_id" className="text-xs text-gray-600 mb-1 block">
-                        Choose from {materials.length} available lessons:
+                        Choose from {getFilteredMaterials().length} available {showAllMaterialTypes ? 'materials' : 'lessons'}:
                       </label>
                       <select
                         id="material_id"
@@ -326,14 +361,53 @@ export default function EditScheduleEntryModal({
                         onChange={handleMaterialChange}
                         className={formInputStyles}
                       >
-                        <option value="">Select a specific lesson...</option>
-                        {materials
-                          .sort((a, b) => (a.subject_name || '').localeCompare(b.subject_name || ''))
-                          .map(material => (
-                            <option key={material.id} value={material.id}>
-                              {material.subject_name ? `[${material.subject_name}] ` : ''}{material.title?.replace(/\(\)$/, '') || 'Untitled Lesson'}
-                            </option>
-                          ))}
+                        <option value="">Select a material...</option>
+                        {getFilteredMaterials()
+                          .sort((a, b) => {
+                            // Sort by content type first, then by subject, then by creation date/title
+                            const typeOrder = { lesson: 1, reading: 2, video: 3, worksheet: 4, assignment: 5, quiz: 6, test: 7, review: 8 };
+                            const typeA = typeOrder[a.content_type] || 99;
+                            const typeB = typeOrder[b.content_type] || 99;
+                            if (typeA !== typeB) return typeA - typeB;
+                            
+                            const subjectA = a.subject_name || '';
+                            const subjectB = b.subject_name || '';
+                            if (subjectA !== subjectB) return subjectA.localeCompare(subjectB);
+                            
+                            // Sort by created_at if available, otherwise by title
+                            if (a.created_at && b.created_at) {
+                              return new Date(a.created_at) - new Date(b.created_at);
+                            }
+                            
+                            const titleA = a.title || '';
+                            const titleB = b.title || '';
+                            return titleA.localeCompare(titleB);
+                          })
+                          .map((material, index) => {
+                            const typeLabel = material.content_type ? 
+                              material.content_type.charAt(0).toUpperCase() + material.content_type.slice(1).replace(/_/g, ' ') : 
+                              'Unknown';
+                            
+                            // Show actual lesson title with number for clarity
+                            const subjectPrefix = material.subject_name ? `[${material.subject_name}] ` : '';
+                            const lessonNumber = index + 1;
+                            let displayTitle = material.title || 'Untitled';
+                            
+                            // Clean up the title and truncate if too long
+                            displayTitle = displayTitle.replace(/\(\)$/, '');
+                            const maxLength = 30 - subjectPrefix.length;
+                            if (displayTitle.length > maxLength) {
+                              displayTitle = displayTitle.substring(0, maxLength - 3) + '...';
+                            }
+                            
+                            const fullDisplayTitle = `${lessonNumber}. ${displayTitle}`;
+                            
+                            return (
+                              <option key={material.id} value={material.id}>
+                                {subjectPrefix}{fullDisplayTitle} • {typeLabel}
+                              </option>
+                            );
+                          })}
                       </select>
                     </div>
                   )}

@@ -14,7 +14,7 @@ const QuickAccessItem = ({ lesson, onToggleComplete, onEdit, onDelete, type }) =
 
   const formatDueDate = (dateString) => {
     try {
-      return new Date(dateString + 'T00:00:00Z').toLocaleDateString(undefined, { 
+      return new Date(dateString + 'T00:00:00').toLocaleDateString(undefined, { 
         month: 'short', 
         day: 'numeric',
         weekday: 'short'

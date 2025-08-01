@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import api from '../../utils/api'; // Adjust path if necessary
 import Link from 'next/link';
-import { ArrowLeftIcon, PlusIcon, MinusCircleIcon, DocumentPlusIcon } from '@heroicons/react/24/outline'; // Added DocumentPlusIcon
+import { ArrowLeftIcon, PlusIcon, MinusCircleIcon, DocumentPlusIcon, ExclamationTriangleIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Breadcrumbs from '../../components/ui/Breadcrumbs';
 import { signalDashboardRefresh } from '../../utils/dashboardRefresh';
 
@@ -24,6 +24,12 @@ export default function SubjectsPage() {
   const [showAddSubjectForm, setShowAddSubjectForm] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState('');
   const [creatingSubject, setCreatingSubject] = useState(false);
+  
+  // State for deletion modal
+  const [deletingSubject, setDeletingSubject] = useState(null);
+  const [subjectStats, setSubjectStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [deleteMode, setDeleteMode] = useState('check'); // 'check' or 'confirm'
 
   const fetchAllSubjects = () => {
     setLoadingAllSubjects(true);
@@ -85,17 +91,77 @@ export default function SubjectsPage() {
     }
   };
 
-  // FIXED: Use new child-subjects unassign endpoint
-  const handleUnassign = async (subjectId) => {
+  const checkSubjectStats = async (childSubjectId) => {
+    setLoadingStats(true);
+    try {
+      const [unitsRes, allMaterialsRes] = await Promise.all([
+        api.get(`/units/subject/${childSubjectId}`),
+        api.get(`/materials/subject/${childSubjectId}`)
+      ]);
+      
+      // Count lesson containers and materials more accurately
+      let lessonContainerCount = 0;
+      let materialsByLessonCount = 0;
+      const units = unitsRes.data || [];
+      
+      for (const unit of units) {
+        try {
+          const lessonsRes = await api.get(`/lesson-containers/unit/${unit.id}`);
+          const lessonContainers = lessonsRes.data || [];
+          lessonContainerCount += lessonContainers.length;
+          
+          // Count materials in each lesson container
+          for (const lessonContainer of lessonContainers) {
+            try {
+              const materialsRes = await api.get(`/materials/lesson/${lessonContainer.id}`);
+              materialsByLessonCount += (materialsRes.data || []).length;
+            } catch (error) {
+              console.error('Error fetching materials for lesson:', lessonContainer.id, error);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching lesson containers for unit:', unit.id, error);
+        }
+      }
+      
+      // Use the total from the direct subject query as it includes all materials
+      const totalMaterialCount = (allMaterialsRes.data || []).length;
+      
+      return {
+        units: units,
+        materials: allMaterialsRes.data || [],
+        unitCount: units.length,
+        materialCount: totalMaterialCount,
+        lessonContainerCount: lessonContainerCount
+      };
+    } catch (error) {
+      console.error('Error fetching subject stats:', error);
+      return { units: [], materials: [], unitCount: 0, materialCount: 0, lessonContainerCount: 0 };
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  const handleUnassign = async (subject) => {
     if (!selectedChild) return;
-    if (!confirm("Are you sure you want to unassign this subject?")) return;
+    
+    // First check if subject has units/materials
+    const stats = await checkSubjectStats(subject.child_subject_id);
+    setSubjectStats(stats);
+    setDeletingSubject(subject);
+    setDeleteMode('check');
+  };
+  
+  const handleConfirmDelete = async () => {
+    if (!deletingSubject || !selectedChild) return;
+    
     setProcessingAction(true);
     try {
-      // FIXED: Use new child-subjects unassign endpoint
+      // Only allow unassigning if the subject is empty
       await api.delete('/child-subjects/unassign', { 
         data: { 
           child_id: selectedChild, 
-          subject_id: subjectId 
+          subject_id: deletingSubject.id 
         } 
       });
       
@@ -105,6 +171,10 @@ export default function SubjectsPage() {
       
       // Signal dashboard to refresh when user returns
       signalDashboardRefresh();
+      
+      // Close modal
+      setDeletingSubject(null);
+      setSubjectStats(null);
     } catch (error) {
       alert(error.response?.data?.error || "Could not unassign subject.");
     } finally {
@@ -196,7 +266,7 @@ export default function SubjectsPage() {
                           <span className="text-xs text-blue-600 italic">Custom name for: {subject.original_name}</span>
                         )}
                       </div>
-                      <button onClick={() => handleUnassign(subject.id)} disabled={processingAction}
+                      <button onClick={() => handleUnassign(subject)} disabled={processingAction}
                         className="flex items-center text-xs text-red-600 hover:text-red-800 font-medium p-1.5 rounded-md hover:bg-red-100 disabled:opacity-50 transition-colors" title="Unassign subject">
                         <MinusCircleIcon className="h-4 w-4 mr-1 sm:mr-1.5" /> <span className="hidden sm:inline">Unassign</span>
                       </button>
@@ -269,6 +339,117 @@ export default function SubjectsPage() {
             </div>
         )}
       </div>
+      
+      {/* Delete Subject Modal */}
+      {deletingSubject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-2xl">
+            {loadingStats ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-2 text-gray-600">Checking subject data...</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center mb-4">
+                  <ExclamationTriangleIcon className="h-6 w-6 text-yellow-500 mr-2" />
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Unassign {deletingSubject.name}?
+                  </h3>
+                </div>
+                
+                {subjectStats && (subjectStats.unitCount > 0 || subjectStats.materialCount > 0) ? (
+                  <>
+                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800 mb-2">
+                        This subject contains:
+                      </p>
+                      <ul className="text-sm text-yellow-700 space-y-1">
+                        {subjectStats.unitCount > 0 && (
+                          <li>• {subjectStats.unitCount} unit{subjectStats.unitCount !== 1 ? 's' : ''}</li>
+                        )}
+                        {subjectStats.lessonContainerCount > 0 && (
+                          <li>• {subjectStats.lessonContainerCount} lesson group{subjectStats.lessonContainerCount !== 1 ? 's' : ''}</li>
+                        )}
+                        {subjectStats.materialCount > 0 && (
+                          <li>• {subjectStats.materialCount} material{subjectStats.materialCount !== 1 ? 's' : ''}</li>
+                        )}
+                      </ul>
+                    </div>
+                    
+                    <p className="text-sm text-gray-600 mb-4">
+                      To unassign this subject, you need to first delete all its content from the dashboard.
+                    </p>
+                    
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                      <p className="text-sm text-blue-800 font-semibold mb-2">
+                        How to delete content:
+                      </p>
+                      <div className="text-sm text-blue-700 space-y-2">
+                        <div>
+                          <p className="font-medium">To delete units:</p>
+                          <p className="ml-2">• Go to Dashboard → Find this subject → Click "Units" button → Use trash icon to delete units</p>
+                        </div>
+                        <div>
+                          <p className="font-medium">To delete materials:</p>
+                          <p className="ml-2">• Go to Dashboard → Find this subject → Click trash icon next to each material</p>
+                        </div>
+                        <div>
+                          <p className="font-medium">Then:</p>
+                          <p className="ml-2">• Return here to unassign the empty subject</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col space-y-2">
+                      <Link
+                        href="/dashboard"
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm text-center"
+                      >
+                        Go to Dashboard
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setDeletingSubject(null);
+                          setSubjectStats(null);
+                        }}
+                        className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-600 mb-4">
+                      This subject has no units or materials. You can safely unassign it.
+                    </p>
+                    
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={handleConfirmDelete}
+                        disabled={processingAction}
+                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm disabled:opacity-50"
+                      >
+                        {processingAction ? 'Unassigning...' : 'Unassign Subject'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDeletingSubject(null);
+                          setSubjectStats(null);
+                        }}
+                        className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -401,3 +401,118 @@ exports.reorderUnits = async (req, res) => {
     res.status(500).json({ error: error.message || 'Failed to reorder units' });
   }
 };
+
+// Cascade delete a unit (deletes all lesson containers and materials first)
+exports.cascadeDeleteUnit = async (req, res) => {
+  const parent_id = getParentId(req);
+  const { unit_id } = req.params;
+  
+  console.log('Cascade deleting unit:', { parent_id, unit_id });
+  
+  if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
+  if (!unit_id) return res.status(400).json({ error: 'unit_id is required' });
+
+  try {
+    // Get unit info to verify ownership
+    const { data: unitData, error: fetchError } = await supabase
+      .from('units')
+      .select(`
+        *,
+        child_subject:child_subject_id (
+          id,
+          child:child_id (
+            id,
+            parent_id
+          )
+        )
+      `)
+      .eq('id', unit_id)
+      .maybeSingle();
+
+    console.log('Unit query result:', { unitData, fetchError });
+    
+    if (fetchError) throw fetchError;
+    if (!unitData) return res.status(404).json({ error: 'Unit not found' });
+
+    // Verify ownership
+    if (unitData.child_subject.child.parent_id !== parent_id) {
+      return res.status(403).json({ error: 'Access denied to this unit' });
+    }
+
+    console.log('Starting cascade deletion process...');
+
+    // Step 1: Get all lesson containers in this unit
+    const { data: lessonContainers, error: lessonsError } = await supabase
+      .from('lessons')
+      .select('id')
+      .eq('unit_id', unit_id);
+
+    if (lessonsError) {
+      console.error('Error fetching lesson containers:', lessonsError);
+      throw lessonsError;
+    }
+
+    console.log(`Found ${lessonContainers?.length || 0} lesson containers to delete`);
+
+    // Step 2: For each lesson container, delete all its materials first
+    for (const lessonContainer of lessonContainers || []) {
+      try {
+        // Delete all materials in this lesson container
+        const { error: materialsDeleteError } = await supabase
+          .from('materials')
+          .delete()
+          .eq('lesson_id', lessonContainer.id);
+
+        if (materialsDeleteError) {
+          console.error(`Error deleting materials for lesson ${lessonContainer.id}:`, materialsDeleteError);
+          // Continue with other lesson containers
+        } else {
+          console.log(`Deleted materials for lesson container ${lessonContainer.id}`);
+        }
+      } catch (error) {
+        console.error(`Error processing materials for lesson container ${lessonContainer.id}:`, error);
+        // Continue with other lesson containers
+      }
+    }
+
+    // Step 3: Delete all lesson containers
+    if (lessonContainers && lessonContainers.length > 0) {
+      const { error: lessonsDeleteError } = await supabase
+        .from('lessons')
+        .delete()
+        .eq('unit_id', unit_id);
+
+      if (lessonsDeleteError) {
+        console.error('Error deleting lesson containers:', lessonsDeleteError);
+        throw lessonsDeleteError;
+      } else {
+        console.log(`Deleted ${lessonContainers.length} lesson containers`);
+      }
+    }
+
+    // Step 4: Finally delete the unit itself
+    const { error: deleteError } = await supabase
+      .from('units')
+      .delete()
+      .eq('id', unit_id);
+
+    if (deleteError) {
+      console.error('Error deleting unit:', deleteError);
+      throw deleteError;
+    }
+
+    console.log('Unit cascade deletion completed successfully');
+
+    res.json({ 
+      message: 'Unit and all its contents deleted successfully',
+      deletedItems: {
+        unit: 1,
+        lessonContainers: lessonContainers?.length || 0,
+        materialsDeleted: true
+      }
+    });
+  } catch (error) {
+    console.error('Error in cascade delete unit:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete unit and its contents' });
+  }
+};

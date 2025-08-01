@@ -17,7 +17,6 @@ import { useFiltersAndSorting } from "../../hooks/useFiltersAndSorting";
 import { useToast } from "../../hooks/useToast";
 import { useModalManagement } from "../../hooks/useModalManagement";
 import { useDashboardHandlers } from "../../hooks/useDashboardHandlers";
-import { useQuickUpload } from "../../hooks/useQuickUpload";
 import { PRICE_IDS } from "../../utils/subscriptionConstants";
 import { 
   APP_CONTENT_TYPES,
@@ -38,6 +37,7 @@ import { checkAndClearRefreshSignal, shouldRefreshBasedOnTime, isComingFromDataM
 // Components
 import StudentSidebar from "./components/StudentSidebar";
 import StudentHeader from "./components/StudentHeader";
+import ParentNotesSection from "./components/ParentNotesSection";
 import SubjectCard from "./components/SubjectCard";
 import TodayOverview from "./components/TodayOverview";
 import DashboardFilters from "./components/DashboardFilters";
@@ -46,7 +46,7 @@ import Button from "../../components/ui/Button";
 import { CurriculumSkeletonLoader } from "../../components/ui/SkeletonLoader";
 import { DashboardErrorBoundary, ModalErrorBoundary } from "../../components/ErrorBoundary";
 import Breadcrumbs from "../../components/ui/Breadcrumbs";
-import QuickUploadImproved from "./components/QuickUploadImproved";
+import StreamlinedAddAssignment from "./components/StreamlinedAddAssignment";
 
 // Layout Components
 import DashboardHeader from "./components/DashboardHeader";
@@ -56,7 +56,6 @@ import SubjectsList from "./components/SubjectsList";
 import DashboardModals from "./components/DashboardModals";
 
 // Modal Components
-import AddMaterialTabs from "./components/AddMaterialTabs";
 import UnitManagementModal from "./components/UnitManagementModal";
 import EditMaterialModal from "./components/EditMaterialModal";
 import ChildLoginSettingsModal from "./components/ChildLoginSettingsModal";
@@ -102,15 +101,8 @@ function DashboardPageContent() {
   const modalManagement = useModalManagement();
   
   // Batch operations state (declare before hooks that need them)
-  const [batchSelectionMode, setBatchSelectionMode] = useState(false);
   const [selectedMaterials, setSelectedMaterials] = useState(new Set());
-  const [showQuickUpload, setShowQuickUpload] = useState(false);
   
-  // Quick upload hook
-  const { processQuickUpload, isProcessing: isQuickUploading } = useQuickUpload(
-    childrenData.selectedChild?.id,
-    childrenData.refreshChildSpecificData
-  );
   
   // Dashboard handlers hook
   const dashboardHandlers = useDashboardHandlers({
@@ -123,7 +115,7 @@ function DashboardPageContent() {
     subscriptionPermissions,
     selectedMaterials,
     setSelectedMaterials,
-    setBatchSelectionMode
+    setBatchSelectionMode: () => {} // No-op function since we removed batch selection
   });
 
   const { assignedSubjectsForCurrentChild } = childrenData;
@@ -234,6 +226,26 @@ function DashboardPageContent() {
   useEffect(() => {
     materialManagement.setSelectedLessonContainer("");
   }, [materialManagement.lessonJsonForApproval?.unit_id, materialManagement.setSelectedLessonContainer]);
+
+  // Listen for AI processing completion to refresh materials
+  useEffect(() => {
+    const handleProcessingComplete = (event) => {
+      const { materialId, materialInfo } = event.detail;
+      console.log(`Material processing completed: ${materialId}`, materialInfo);
+      
+      // Refresh child data to update materials list with new title
+      if (childrenData.selectedChild?.id) {
+        childrenData.invalidateChildCache(childrenData.selectedChild.id);
+        childrenData.refreshChildSpecificData(true);
+      }
+    };
+
+    window.addEventListener('materialProcessingComplete', handleProcessingComplete);
+    
+    return () => {
+      window.removeEventListener('materialProcessingComplete', handleProcessingComplete);
+    };
+  }, [childrenData]);
 
   // Extract handlers from the hook
   const {
@@ -415,6 +427,7 @@ function DashboardPageContent() {
         <StudentHeader
           selectedChild={childrenData.selectedChild}
           dashboardStats={totalStats}
+          onAddMaterial={() => modalManagement.openAddMaterialModal()}
         />
         
         {childrenData.selectedChild && (
@@ -442,71 +455,30 @@ function DashboardPageContent() {
 
         {childrenData.selectedChild && (
           <DashboardErrorBoundary>
-            {/* Quick Upload Section */}
-            {showQuickUpload && (
-              <div className="mb-8">
-                <div className="bg-white rounded-lg shadow-sm border border-border-subtle p-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-semibold text-text-primary">Quick Add Assignments</h2>
-                    <button
-                      onClick={() => setShowQuickUpload(false)}
-                      className="text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      Close
-                    </button>
-                  </div>
-                  {assignedSubjectsForCurrentChild.length > 0 ? (
-                    <QuickUploadImproved
-                      childSubjects={assignedSubjectsForCurrentChild}
-                      selectedChild={childrenData.selectedChild}
-                      onComplete={async (files) => {
-                        const success = await processQuickUpload(files);
-                        if (success) {
-                          setShowQuickUpload(false);
-                        }
-                      }}
-                      subscriptionPermissions={subscriptionPermissions}
-                    />
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className="text-6xl mb-4">📚</div>
-                      <h3 className="text-lg font-semibold text-text-primary mb-2">
-                        No Subjects Set Up Yet
-                      </h3>
-                      <p className="text-text-secondary mb-4">
-                        You need to add subjects for {childrenData.selectedChild.name} before uploading materials.
-                      </p>
-                      <button
-                        onClick={() => router.push("/subject-management")}
-                        className="px-6 py-3 bg-accent-blue hover:bg-[var(--accent-blue-hover)] text-white rounded-lg font-medium transition-colors"
-                      >
-                        Add Subjects
-                      </button>
-                    </div>
-                  )}
-                </div>
+            
+            {/* Combined Today's Focus and Quick Notes Section */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+              {/* Today's Focus - Takes up 2/3 on large screens */}
+              <div className="xl:col-span-2">
+                <TodayOverview
+                  lessonsBySubject={childrenData.lessonsBySubject}
+                  selectedChild={childrenData.selectedChild}
+                  onToggleComplete={handleToggleLessonComplete}
+                  onEdit={handleOpenEditModal}
+                  onDelete={handleDeleteMaterial}
+                  maxItems={6}
+                />
               </div>
-            )}
+              
+              {/* Quick Notes - Takes up 1/3 on large screens */}
+              <div className="xl:col-span-1">
+                <ParentNotesSection 
+                  selectedChild={childrenData.selectedChild}
+                />
+              </div>
+            </div>
             
-            <TodayOverview
-              lessonsBySubject={childrenData.lessonsBySubject}
-              selectedChild={childrenData.selectedChild}
-              onToggleComplete={handleToggleLessonComplete}
-              onEdit={handleOpenEditModal}
-              onDelete={handleDeleteMaterial}
-              maxItems={6}
-            />
-            
-            <DashboardFilters
-              filterStatus={filtersAndSorting.filterStatus}
-              setFilterStatus={filtersAndSorting.setFilterStatus}
-              filterContentType={filtersAndSorting.filterContentType}
-              setFilterContentType={filtersAndSorting.setFilterContentType}
-              sortBy={filtersAndSorting.sortBy}
-              setSortBy={filtersAndSorting.setSortBy}
-              searchTerm={filtersAndSorting.searchTerm}
-              setSearchTerm={filtersAndSorting.setSearchTerm}
-            />
+            {/* DashboardFilters removed for now */}
             {childrenData.loadingChildData ? (
               <div className="space-y-4">
                 <div className="text-center py-4 text-text-secondary">
@@ -516,42 +488,9 @@ function DashboardPageContent() {
               </div>
             ) : (
               <div className="mt-0">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
-                  <div>
-                    <h2 className="text-xl font-semibold text-text-primary">
-                      {childrenData.selectedChild.name}&apos;s Learning Journey
-                    </h2>
-                    <p className="text-sm text-text-secondary mt-1">
-                      Track assignments, view progress, and manage schoolwork
-                    </p>
-                  </div>
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={() => setShowQuickUpload(!showQuickUpload)}
-                      variant={showQuickUpload ? "secondary" : "outline"}
-                      className="flex-shrink-0"
-                    >
-                      📚 Quick Add
-                    </Button>
-                    {assignedSubjectsForCurrentChild.length > 0 && (
-                      <Button
-                        onClick={() => setBatchSelectionMode(!batchSelectionMode)}
-                        variant={batchSelectionMode ? "secondary" : "outline"}
-                        className="flex-shrink-0"
-                      >
-                        {batchSelectionMode ? '✓ Selecting' : '☐ Select Multiple'}
-                      </Button>
-                    )}
-                    <Button
-                      onClick={() => modalManagement.openAddMaterialModal()}
-                      variant="primary"
-                      className="flex-shrink-0"
-                    >
-                      <PlusIcon className="h-4 w-4 mr-2" />
-                      Add Assignment
-                    </Button>
-                  </div>
-                </div>
+                <DashboardContentHeader 
+                  childName={childrenData.selectedChild.name}
+                />
                 {assignedSubjectsForCurrentChild.length === 0 ? (
                   <div className="text-center p-8 bg-background-card rounded-lg shadow border border-border-subtle">
                     <div className="text-6xl mb-4">📚</div>
@@ -563,7 +502,7 @@ function DashboardPageContent() {
                     </p>
                     <button
                       onClick={() => router.push("/subject-management")}
-                      className="px-6 py-3 bg-accent-blue hover:bg-[var(--accent-blue-hover)] text-white rounded-lg font-medium transition-colors"
+                      className="px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium transition-colors shadow-md"
                     >
                       Add Subjects
                     </button>
@@ -597,6 +536,7 @@ function DashboardPageContent() {
                         onToggleComplete={handleToggleLessonComplete}
                         onDeleteMaterial={handleDeleteMaterial}
                         onCreateLessonGroup={handleCreateLessonGroupFromCard}
+                        onAddMaterial={() => modalManagement.openAddMaterialModal()}
                       />
                     ))}
                   </div>
@@ -610,75 +550,26 @@ function DashboardPageContent() {
       {modalManagement.isAddMaterialModalOpen && (
         <ModalErrorBoundary>
           <div className={modalBackdropStyles} onClick={() => modalManagement.closeAddMaterialModal()}>
-            <div className={modalContainerStyles} onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => modalManagement.closeAddMaterialModal()}
-              className={modalCloseButtonStyles}
-            >
-              <XMarkIcon className="h-6 w-6" />
-            </button>
-            <div className="p-6 overflow-y-auto flex-1">
-               <AddMaterialTabs
-                  childSubjectsForSelectedChild={assignedSubjectsForCurrentChild}
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col relative animate-fade-in" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => modalManagement.closeAddMaterialModal()}
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg p-2 transition-all duration-200"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+              <div className="p-6 overflow-y-auto flex-1">
+                <StreamlinedAddAssignment
+                  childSubjects={assignedSubjectsForCurrentChild}
                   selectedChild={childrenData.selectedChild}
-                  onMaterialsAdded={async () => {
+                  onComplete={async () => {
                     // Refresh child data to show new materials
                     childrenData.invalidateChildCache(childrenData.selectedChild.id);
                     await childrenData.refreshChildSpecificData(true);
                   }}
                   onClose={() => modalManagement.closeAddMaterialModal()}
-                  onFormSubmit={handleAddLessonFormSubmit}
-                  onApprove={handleApproveNewLesson}
-                  onManualSubmit={handleManualMaterialSubmit}
-                  
-                  uploading={materialManagement.uploading}
-                  savingLesson={materialManagement.savingLesson}
-                  
-                  lessonJsonForApproval={materialManagement.lessonJsonForApproval}
-                  onUpdateLessonJsonField={handleUpdateLessonJsonForApprovalField}
-                  
-                  lessonTitleForApproval={materialManagement.lessonTitleForApproval}
-                  onLessonTitleForApprovalChange={(e) =>
-                    materialManagement.setLessonTitleForApproval(e.target.value)
-                  }
-                  lessonMaxPointsForApproval={materialManagement.lessonMaxPointsForApproval}
-                  onLessonMaxPointsForApprovalChange={(e) =>
-                    materialManagement.setLessonMaxPointsForApproval(e.target.value)
-                  }
-                  lessonDueDateForApproval={materialManagement.lessonDueDateForApproval}
-                  onLessonDueDateForApprovalChange={(e) =>
-                    materialManagement.setLessonDueDateForApproval(e.target.value)
-                  }
-                  lessonCompletedForApproval={materialManagement.lessonCompletedForApproval}
-                  onLessonCompletedForApprovalChange={(e) =>
-                    materialManagement.setLessonCompletedForApproval(e.target.checked)
-                  }
-                  
-                  currentAddLessonSubject={materialManagement.addLessonSubject}
-                  onAddLessonSubjectChange={(e) =>
-                    materialManagement.setAddLessonSubject(e.target.value)
-                  }
-                  currentAddLessonUserContentType={materialManagement.addLessonUserContentType}
-                  onAddLessonUserContentTypeChange={(e) =>
-                    materialManagement.setAddLessonUserContentType(e.target.value)
-                  }
-                  onAddLessonFileChange={(e) => materialManagement.setAddLessonFile(e.target.files)}
-                  currentAddLessonFile={materialManagement.addLessonFile}
-                  
-                  appContentTypes={APP_CONTENT_TYPES}
-                  appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
-                  unitsForSelectedSubject={currentUnitsForAddFormSubject}
-                  onCreateNewUnit={handleCreateNewUnit}
-                  lessonContainersForSelectedUnit={currentLessonContainersForUnit}
-                  lessonsByUnit={childrenData.lessonsByUnit}
-                  setLessonsByUnit={childrenData.setLessonsByUnit}
-                  selectedLessonContainer={materialManagement.selectedLessonContainer}
-                  onLessonContainerChange={handleLessonContainerChange}
-                  onCreateNewLessonContainer={handleCreateNewLessonContainer}
-                  subscriptionPermissions={subscriptionPermissions}
                 />
+              </div>
             </div>
-          </div>
           </div>
         </ModalErrorBoundary>
       )}
@@ -798,14 +689,14 @@ function DashboardPageContent() {
         isDeleting={modalManagement.isDeletingChild}
       />
 
-      {/* Batch Operations */}
+      {/* Batch Operations - Hidden since we removed Select Multiple */}
       <BatchActionsBar
         selectedItems={selectedMaterialsData}
         onClearSelection={handleClearBatchSelection}
         onBatchComplete={handleBatchComplete}
         onBatchDelete={handleBatchDelete}
         onBatchEdit={handleBatchEdit}
-        isVisible={batchSelectionMode && selectedMaterials.size > 0}
+        isVisible={false}
       />
 
       <BatchEditModal

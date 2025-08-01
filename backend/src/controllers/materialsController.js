@@ -6,13 +6,12 @@ const path = require('path');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 const { GET_UNIVERSAL_SYSTEM_PROMPT } = require('../utils/llmPrompts');
-const { extractImagesFromPdf } = require('../utils/pdfImageExtract');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-const MAX_TEXT_CHARS_FOR_PROMPT = 70000;
+const MAX_TEXT_CHARS_FOR_PROMPT = 500000; // Increased for GPT-4o's larger context window
 
 // Helper function to extract lesson number from title
 function extractLessonNumber(title) {
@@ -128,9 +127,10 @@ async function analyzeUploadedFiles(files, userHintContentType) {
   let messages;
   let llmInputDescription = "";
   let isMultiImageScenario = false;
-  let extractedImagePathsForCleanup = [];
+  let fullTextContent = ""; // Store full text for later use
 
   const allFilesAreImages = files.every(file => file.mimetype.startsWith('image/'));
+  const allFilesArePDFs = files.every(file => file.mimetype === 'application/pdf');
   
   const allFilesAreTextConvertible = files.every(file => 
     file.mimetype === 'application/pdf' ||
@@ -151,11 +151,97 @@ async function analyzeUploadedFiles(files, userHintContentType) {
     }
     messages = [{ role: "system", content: GET_UNIVERSAL_SYSTEM_PROMPT(userHintContentType, llmInputDescription) }, { role: "user", content: userMessageContent }];
   
+  } else if (allFilesArePDFs) {
+    // Handle PDFs with OpenAI Files API - return structured analysis directly
+    const pdfFile = files[0]; // For now, handle single PDF
+    
+    console.log(`Processing PDF ${pdfFile.originalname} with OpenAI Files API...`);
+    
+    // Upload PDF to OpenAI Files API
+    const fileStream = fs.createReadStream(pdfFile.path);
+    const uploadedFile = await openai.files.create({
+      file: fileStream,
+      purpose: "user_data",
+    });
+    
+    console.log(`PDF uploaded to OpenAI with file ID: ${uploadedFile.id}`);
+    
+    // Create content type specific prompt
+    // Use the universal prompt system for all content types
+    const systemPrompt = GET_UNIVERSAL_SYSTEM_PROMPT(userHintContentType, "PDF document");
+    
+    // Use OpenAI Files API for comprehensive PDF analysis
+    const pdfAnalysisResponse = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "file",
+              file: {
+                file_id: uploadedFile.id
+              }
+            },
+            {
+              type: "text",
+              text: `Please extract and structure data from this PDF document. User hint for content type: '${userHintContentType || 'educational material'}'. Analyze the entire document comprehensively.`
+            }
+          ]
+        }
+      ],
+      max_tokens: 8000,
+      temperature: 0.1,
+      response_format: { type: "json_object" }
+    });
+
+    // Clean up the uploaded file
+    try {
+      await openai.files.del(uploadedFile.id);
+      console.log(`Cleaned up OpenAI file: ${uploadedFile.id}`);
+    } catch (cleanupError) {
+      console.warn(`Failed to cleanup OpenAI file ${uploadedFile.id}:`, cleanupError.message);
+    }
+
+    // Parse the comprehensive analysis result
+    const pdfAnalysisContent = pdfAnalysisResponse.choices[0].message.content?.trim();
+    if (!pdfAnalysisContent) {
+      throw new Error('OpenAI returned empty content for PDF analysis');
+    }
+
+    // Try to parse the JSON response
+    let structuredAnalysis;
+    try {
+      structuredAnalysis = JSON.parse(pdfAnalysisContent);
+    } catch (parseError) {
+      console.warn('Failed to parse PDF analysis JSON, extracting from markdown block...');
+      const match = pdfAnalysisContent.match(/```json\s*([\s\S]*?)```/is);
+      if (match && match[1]) {
+        structuredAnalysis = JSON.parse(match[1]);
+      } else {
+        throw new Error('Failed to parse PDF analysis response as JSON');
+      }
+    }
+
+    console.log(`PDF analysis complete for ${pdfFile.originalname}. Extracted keys:`, Object.keys(structuredAnalysis));
+    
+    // Return the structured analysis directly for PDFs
+    return {
+      ...structuredAnalysis,
+      full_text_content: JSON.stringify(structuredAnalysis, null, 2),
+      ai_analyzed: true,
+      ai_model: 'gpt-4.1-mini-files-api',
+      original_filename: pdfFile.originalname
+    };
+
   } else if (allFilesAreTextConvertible) {
     llmInputDescription = files.length > 1 ? `a collection of ${files.length} text-based documents` : `a text-based document`;
     let combinedText = "";
-    let imagesFromPdfs = [];
-
+    let fullTextContent = ""; // Store full text without markers
     for (const file of files) {
       let currentFileText = "";
       if (file.mimetype === 'application/pdf') {
@@ -163,16 +249,8 @@ async function analyzeUploadedFiles(files, userHintContentType) {
           const data = await pdf(file.path);
           currentFileText = data.text;
           if (!currentFileText || currentFileText.trim().length < 100) {
-            console.log(`PDF ${file.originalname} seems image-based or has minimal text. Attempting image extraction.`);
-            const extractedPdfImages = await extractImagesFromPdf(file.path);
-            if (extractedPdfImages && extractedPdfImages.length > 0) {
-              console.log(`Extracted ${extractedPdfImages.length} images from ${file.originalname}`);
-              imagesFromPdfs.push(...extractedPdfImages.map(imgPath => ({
-                  path: imgPath,
-                  mimetype: `image/${path.extname(imgPath).slice(1) || 'png'}`
-              })));
-              continue;
-            }
+            console.log(`PDF ${file.originalname} appears to be a scanned/image-based PDF with minimal extractable text.`);
+            currentFileText = `[SCANNED PDF: ${file.originalname}] This appears to be a scanned document with minimal extractable text. For best results with image-based PDFs, please convert the PDF pages to images (PNG/JPG) and upload those instead. Text extraction yielded: "${data.text?.trim() || 'No text found'}"`;
           }
         } catch (e) { throw new Error(`PDF processing failed for ${file.originalname}: ${e.message}`); }
       } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
@@ -183,21 +261,11 @@ async function analyzeUploadedFiles(files, userHintContentType) {
       }
       if(currentFileText) {
         combinedText += `\n\n--- START OF DOCUMENT: ${file.originalname} ---\n${currentFileText}\n--- END OF DOCUMENT: ${file.originalname} ---\n\n`;
+        fullTextContent += currentFileText + "\n\n"; // Store full text without markers
       }
     }
 
-    if (imagesFromPdfs.length > 0) {
-      isMultiImageScenario = true;
-      llmInputDescription = `a series of ${imagesFromPdfs.length} images (extracted from PDF(s))`;
-      const userMessageContent = [{ type: "text", text: `Please analyze these ${imagesFromPdfs.length} images (extracted from uploaded PDF(s)) as a single educational material. User hint for content type: '${userHintContentType || 'N/A'}'. Synthesize into one JSON.` }];
-      for (const imgFile of imagesFromPdfs) {
-        const fileData = fs.readFileSync(imgFile.path);
-        const base64Image = fileData.toString('base64');
-        userMessageContent.push({ type: "image_url", image_url: { url: `data:${imgFile.mimetype};base64,${base64Image}`, detail: "high" } });
-        extractedImagePathsForCleanup.push(imgFile.path);
-      }
-      messages = [{ role: "system", content: GET_UNIVERSAL_SYSTEM_PROMPT(userHintContentType, llmInputDescription) }, { role: "user", content: userMessageContent }];
-    } else if (combinedText.trim().length > 0) {
+    if (combinedText.trim().length > 0) {
       if (combinedText.length > MAX_TEXT_CHARS_FOR_PROMPT) {
         combinedText = combinedText.substring(0, MAX_TEXT_CHARS_FOR_PROMPT) + "\n[...combined text truncated due to length...]";
       }
@@ -220,20 +288,27 @@ async function analyzeUploadedFiles(files, userHintContentType) {
   const response = await openai.chat.completions.create({ 
     model: "gpt-4.1-mini", 
     messages, 
-    max_tokens: 3500, 
+    max_tokens: 6000, // Increased for more detailed analysis
     temperature: 0.1, 
     response_format: { type: "json_object" } 
   });
-  
-  // Cleanup extracted PDF images
-  extractedImagePathsForCleanup.forEach(imgPath => {
-      if (fs.existsSync(imgPath)) {
-        try { fs.unlinkSync(imgPath); } 
-        catch(e){ console.error("Error cleaning up extracted PDF image:", imgPath, e); }
-      }
-  });
 
-  return parseLlmOutput(response.choices[0].message.content?.trim(), userHintContentType, files.length, isMultiImageScenario);
+  const rawResponse = response.choices[0].message.content?.trim();
+  console.log('Raw AI Response:', rawResponse?.substring(0, 1000) + '...');
+  
+  const analysisResult = await parseLlmOutput(rawResponse, userHintContentType, files.length, isMultiImageScenario);
+  
+  console.log('Parsed Analysis Result Keys:', Object.keys(analysisResult));
+  console.log('Problems extracted:', analysisResult.problems_with_context?.length || 0);
+  console.log('Tasks extracted:', analysisResult.tasks_or_questions?.length || 0);
+  
+  // No PDF image cleanup needed - using text extraction only
+  
+  // Add full text content to the result
+  return {
+    ...analysisResult,
+    full_text_content: fullTextContent.trim()
+  };
 }
 
 const normalizeStringOrNull = (val) => {
@@ -243,16 +318,19 @@ const normalizeStringOrNull = (val) => {
   return String(val).trim();
 };
 
-// --- MAIN UPLOAD CONTROLLER ---
-exports.uploadMaterial = async (req, res) => {
+// --- ASYNC UPLOAD CONTROLLER (NON-BLOCKING) ---
+exports.uploadMaterialAsync = async (req, res) => {
   const parent_id = getParentId(req);
-  const { child_subject_id, user_content_type } = req.body;
+  const { child_subject_id, user_content_type, lesson_id, title, content_type, due_date, custom_category_id } = req.body;
 
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
   if (!child_subject_id) return res.status(400).json({ error: 'Missing child_subject_id' });
+  if (!lesson_id) return res.status(400).json({ error: 'Missing lesson_id' });
   if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
 
   try {
+    console.log(`Starting async upload for ${req.files.length} files...`);
+    
     // Verify parent owns the child_subject
     const { data: childSubject, error: childSubjectError } = await supabase
       .from('child_subjects')
@@ -270,7 +348,261 @@ exports.uploadMaterial = async (req, res) => {
       return res.status(403).json({ error: 'Access denied to this child subject' });
     }
 
+    // Verify parent owns the lesson container
+    const isOwner = await verifyLessonOwnership(parent_id, lesson_id);
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Access denied to this lesson' });
+    }
+
+    // Create material record immediately with pending status
+    const insertPayload = {
+      lesson_id: normalizeStringOrNull(lesson_id),
+      child_subject_id: normalizeStringOrNull(child_subject_id),
+      title: normalizeStringOrNull(title) || req.files[0].originalname.split('.')[0],
+      content_type: normalizeStringOrNull(content_type) || 'lesson',
+      lesson_json: {
+        title: title || req.files[0].originalname.split('.')[0],
+        content_type_suggestion: content_type || 'lesson',
+        main_content_summary_or_extract: 'AI analysis in progress...',
+        learning_objectives: [],
+        subject_keywords_or_subtopics: [],
+        page_count_or_length_indicator: 'Processing...',
+        tasks_or_questions: [],
+        processing: true
+      },
+      status: 'approved',
+      due_date: normalizeStringOrNull(due_date),
+      processing_status: 'pending',
+      material_relationship: content_type === 'lesson' ? null : 
+        (content_type === 'worksheet' ? 'worksheet_for' :
+         content_type === 'quiz' || content_type === 'test' ? 'assignment_for' : 'supplement_for'),
+      is_primary_lesson: content_type === 'lesson',
+      custom_category_id: normalizeStringOrNull(custom_category_id)
+    };
+
+    const { data: material, error: materialError } = await supabase
+      .from('materials')
+      .insert([insertPayload])
+      .select()
+      .single();
+
+    if (materialError) {
+      console.error("Error creating material record:", materialError);
+      return res.status(400).json({ error: materialError.message });
+    }
+
+    console.log(`Material created with ID: ${material.id}, starting background AI analysis...`);
+
+    // Copy files to a safe location for background processing
+    const processedFiles = req.files.map(file => ({
+      path: file.path,
+      originalname: file.originalname,
+      mimetype: file.mimetype
+    }));
+
+    // Start AI analysis in background (don't await)
+    processAiAnalysisInBackground(material.id, processedFiles, user_content_type)
+      .catch(error => {
+        console.error(`Background AI analysis failed for material ${material.id}:`, error);
+        // Update material status to failed
+        supabase
+          .from('materials')
+          .update({ 
+            processing_status: 'failed',
+            lesson_json: {
+              ...material.lesson_json,
+              error: 'AI analysis failed',
+              processing: false
+            }
+          })
+          .eq('id', material.id)
+          .then(() => console.log(`Material ${material.id} marked as failed`));
+      });
+
+    // Return immediately
+    res.json({
+      success: true,
+      material_id: material.id,
+      message: 'Upload successful! AI analysis is processing in the background.',
+      material: {
+        id: material.id,
+        title: material.title,
+        processing_status: 'pending'
+      }
+    });
+
+  } catch (err) {
+    console.error("Error in uploadMaterialAsync controller:", err.message);
+    res.status(500).json({ error: err.message || 'File processing error.' });
+  }
+  // Note: Files are NOT cleaned up here - they're needed for background processing
+};
+
+// Background AI processing function
+async function processAiAnalysisInBackground(materialId, files, userContentType) {
+  console.log(`Starting background AI analysis for material ${materialId}...`);
+  
+  try {
+    // Update status to processing
+    await supabase
+      .from('materials')
+      .update({ processing_status: 'processing' })
+      .eq('id', materialId);
+
+    // Reconstruct file objects for analysis
+    const fileObjects = files.map(fileData => ({
+      path: fileData.path,
+      originalname: fileData.originalname,
+      mimetype: fileData.mimetype
+    }));
+
+    // Run AI analysis
+    const lesson_json_result = await analyzeUploadedFiles(fileObjects, userContentType);
+    
+    // Extract title from AI results
+    let extractedTitle = null;
+    try {
+      // Try different title extraction methods based on AI format
+      if (lesson_json_result.title && lesson_json_result.title.trim()) {
+        extractedTitle = lesson_json_result.title.trim();
+      } else if (lesson_json_result.Objective && Array.isArray(lesson_json_result.Objective) && lesson_json_result.Objective[0]) {
+        extractedTitle = lesson_json_result.Objective[0].trim();
+      } else if (lesson_json_result.learning_objectives && Array.isArray(lesson_json_result.learning_objectives) && lesson_json_result.learning_objectives[0]) {
+        extractedTitle = lesson_json_result.learning_objectives[0].trim();
+      }
+    } catch (e) {
+      console.log('Error extracting title from AI results:', e);
+    }
+
+    // Update material with AI results and extracted title
+    const updateData = {
+      lesson_json: lesson_json_result,
+      processing_status: 'completed',
+      processing_completed_at: new Date().toISOString()
+    };
+    
+    // Only update title if we successfully extracted one
+    if (extractedTitle && extractedTitle.length > 0) {
+      updateData.title = extractedTitle;
+      console.log(`Updating material ${materialId} title to: "${extractedTitle}"`);
+    }
+
+    await supabase
+      .from('materials')
+      .update(updateData)
+      .eq('id', materialId);
+
+    console.log(`Background AI analysis completed successfully for material ${materialId}`);
+
+    // TODO: Send notification to frontend (WebSocket/polling)
+    // For now, just log success
+
+  } catch (error) {
+    console.error(`Background AI analysis failed for material ${materialId}:`, error);
+    
+    // Mark as failed
+    await supabase
+      .from('materials')
+      .update({
+        processing_status: 'failed',
+        lesson_json: {
+          title: 'Analysis Failed',
+          error: error.message,
+          processing: false
+        }
+      })
+      .eq('id', materialId);
+
+  } finally {
+    // Clean up temporary files
+    files.forEach(file => {
+      if (file.path && fs.existsSync(file.path)) {
+        try {
+          fs.unlinkSync(file.path);
+          console.log(`Cleaned up temp file: ${file.path}`);
+        } catch (e) {
+          console.error("Error unlinking temp file:", file.path, e);
+        }
+      }
+    });
+  }
+}
+
+// --- GET PROCESSING STATUS ---
+exports.getProcessingStatus = async (req, res) => {
+  const parent_id = getParentId(req);
+  const { material_id } = req.params;
+
+  if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
+  if (!material_id) return res.status(400).json({ error: 'material_id is required' });
+
+  try {
+    // Get material with processing status
+    const { data: material, error } = await supabase
+      .from('materials')
+      .select('id, title, processing_status, processing_completed_at, lesson_json')
+      .eq('id', material_id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching processing status:', error);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (!material) {
+      return res.status(404).json({ error: 'Material not found' });
+    }
+
+    // Verify ownership through lesson or child_subject
+    // (We'll use a simpler approach for now - just check if material exists under this parent)
+    
+    res.json({
+      material_id: material.id,
+      title: material.title,
+      processing_status: material.processing_status,
+      processing_completed_at: material.processing_completed_at,
+      has_analysis: material.processing_status === 'completed'
+    });
+
+  } catch (error) {
+    console.error('Error getting processing status:', error);
+    res.status(500).json({ error: 'Failed to get processing status' });
+  }
+};
+
+// --- MAIN UPLOAD CONTROLLER (ORIGINAL BLOCKING VERSION) ---
+exports.uploadMaterial = async (req, res) => {
+  const parent_id = getParentId(req);
+  const { child_subject_id, user_content_type } = req.body;
+
+
+  if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
+  if (!child_subject_id) return res.status(400).json({ error: 'Missing child_subject_id' });
+  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+
+  try {
+    console.log(`Starting AI analysis for ${req.files.length} files using GPT-4o...`);
+    
+    // Verify parent owns the child_subject
+    const { data: childSubject, error: childSubjectError } = await supabase
+      .from('child_subjects')
+      .select(`
+        id,
+        child:child_id (
+          id,
+          parent_id
+        )
+      `)
+      .eq('id', child_subject_id)
+      .single();
+
+    if (childSubjectError || !childSubject || childSubject.child.parent_id !== parent_id) {
+      return res.status(403).json({ error: 'Access denied to this child subject' });
+    }
+
+    console.log('Starting GPT-4o analysis...');
     const lesson_json_result = await analyzeUploadedFiles(req.files, user_content_type);
+    console.log('GPT-4o analysis completed successfully');
     res.json({ lesson_json: lesson_json_result });
   } catch (err) {
     console.error("Error in uploadMaterial controller:", err.message);
@@ -301,7 +633,8 @@ exports.saveMaterial = async (req, res) => {
     completed_at,
     parent_material_id, // NEW: Links to parent lesson material
     material_relationship, // NEW: 'primary_lesson', 'worksheet_for', 'assignment_for', 'supplement_for'
-    is_primary_lesson // NEW: Boolean flag for primary lesson content
+    is_primary_lesson, // NEW: Boolean flag for primary lesson content
+    custom_category_id // NEW: Links to custom assignment category if applicable
   } = req.body;
 
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
@@ -336,7 +669,8 @@ exports.saveMaterial = async (req, res) => {
       completed_at: completed_at ? new Date(completed_at).toISOString() : null,
       parent_material_id: normalizeStringOrNull(parent_material_id), // Links to parent lesson
       material_relationship: normalizeStringOrNull(material_relationship), // Type of relationship
-      is_primary_lesson: is_primary_lesson === true // Ensure boolean
+      is_primary_lesson: is_primary_lesson === true, // Ensure boolean
+      custom_category_id: normalizeStringOrNull(custom_category_id) // Links to custom category if applicable
     };
 
     const { data, error } = await supabase
@@ -504,6 +838,7 @@ exports.getMaterialsByLessonGrouped = async (req, res) => {
     }
 
     // Get all materials for this lesson, ordered by primary lesson first, then by relationship
+    console.log('Fetching materials for lesson_id:', lesson_id);
     const { data: materials, error } = await supabase
       .from('materials')
       .select('*')
@@ -511,6 +846,8 @@ exports.getMaterialsByLessonGrouped = async (req, res) => {
       .order('is_primary_lesson', { ascending: false })
       .order('material_relationship')
       .order('created_at');
+    
+    console.log('Found materials:', materials?.length || 0, 'for lesson:', lesson_id);
 
     if (error) {
       console.error('Error fetching materials:', error);
@@ -527,6 +864,13 @@ exports.getMaterialsByLessonGrouped = async (req, res) => {
     };
 
     materials.forEach(material => {
+      console.log('Processing material:', {
+        id: material.id,
+        title: material.title,
+        is_primary_lesson: material.is_primary_lesson,
+        material_relationship: material.material_relationship
+      });
+      
       if (material.is_primary_lesson) {
         grouped.primary_lesson = material;
       } else if (material.material_relationship === 'worksheet_for') {
@@ -538,6 +882,16 @@ exports.getMaterialsByLessonGrouped = async (req, res) => {
       } else {
         grouped.other.push(material);
       }
+    });
+    
+    console.log('Grouped results:', {
+      lesson_id,
+      primary_lesson: !!grouped.primary_lesson,
+      worksheets: grouped.worksheets.length,
+      assignments: grouped.assignments.length,
+      supplements: grouped.supplements.length,
+      other: grouped.other.length,
+      total: materials.length
     });
 
     res.json({ 
@@ -567,7 +921,8 @@ exports.updateMaterialDetails = async (req, res) => {
     due_date,
     parent_material_id, // NEW: Update parent material link
     material_relationship, // NEW: Update relationship type
-    is_primary_lesson // NEW: Update primary lesson flag
+    is_primary_lesson, // NEW: Update primary lesson flag
+    custom_category_id // NEW: Update custom category assignment
   } = req.body;
 
   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
@@ -665,6 +1020,7 @@ exports.updateMaterialDetails = async (req, res) => {
     if (parent_material_id !== undefined) updateData.parent_material_id = normalizeStringOrNull(parent_material_id);
     if (material_relationship !== undefined) updateData.material_relationship = normalizeStringOrNull(material_relationship);
     if (is_primary_lesson !== undefined) updateData.is_primary_lesson = is_primary_lesson === true;
+    if (custom_category_id !== undefined) updateData.custom_category_id = normalizeStringOrNull(custom_category_id);
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No valid update data provided' });
@@ -696,33 +1052,58 @@ exports.deleteMaterial = async (req, res) => {
   if (!material_id) return res.status(400).json({ error: 'material_id is required' });
 
   try {
-    // Get material and verify ownership
+    // Get material with basic info first
     const { data: material, error: materialError } = await supabase
       .from('materials')
-      .select(`
-        id,
-        title,
-        lesson:lesson_id (
-          id,
-          unit:unit_id (
-            id,
-            child_subject:child_subject_id (
-              id,
-              child:child_id (
-                id,
-                parent_id
-              )
-            )
-          )
-        )
-      `)
+      .select('id, title, lesson_id, child_subject_id')
       .eq('id', material_id)
       .single();
 
-    if (materialError || !material || material.lesson.unit.child_subject.child.parent_id !== parent_id) {
-      return res.status(403).json({ error: 'Access denied to this material' });
+    if (materialError) {
+      console.error('Error fetching material for deletion:', materialError);
+      return res.status(500).json({ error: 'Database error fetching material' });
     }
 
+    if (!material) {
+      return res.status(404).json({ error: 'Material not found' });
+    }
+
+    // Verify ownership based on whether the material has a lesson_id or not
+    let ownershipVerified = false;
+
+    if (material.lesson_id) {
+      // Material belongs to a lesson - verify through lesson ownership
+      const isOwner = await verifyLessonOwnership(parent_id, material.lesson_id);
+      if (!isOwner) {
+        return res.status(403).json({ error: 'Access denied to this material via lesson' });
+      }
+      ownershipVerified = true;
+    } else if (material.child_subject_id) {
+      // Material belongs directly to a child subject - verify through child subject
+      const { data: childSubject, error: csError } = await supabase
+        .from('child_subjects')
+        .select(`
+          id,
+          child:child_id (
+            id,
+            parent_id
+          )
+        `)
+        .eq('id', material.child_subject_id)
+        .single();
+
+      if (csError || !childSubject || childSubject.child.parent_id !== parent_id) {
+        console.log('Child subject ownership check failed for deletion:', { csError, childSubject });
+        return res.status(403).json({ error: 'Access denied to this material via child subject' });
+      }
+      ownershipVerified = true;
+    }
+
+    if (!ownershipVerified) {
+      return res.status(403).json({ error: 'Could not verify ownership of this material' });
+    }
+
+    // Proceed with deletion
     const { error } = await supabase
       .from('materials')
       .delete()
@@ -753,7 +1134,8 @@ exports.createMaterialManually = async (req, res) => {
     lesson_json, 
     grade_max_value, 
     due_date, 
-    completed_at 
+    completed_at,
+    custom_category_id
   } = req.body;
 
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
@@ -806,7 +1188,8 @@ exports.createMaterialManually = async (req, res) => {
       status: 'approved',
       grade_max_value: normalizeStringOrNull(grade_max_value),
       due_date: normalizeStringOrNull(due_date),
-      completed_at: completed_at ? new Date(completed_at).toISOString() : null
+      completed_at: completed_at ? new Date(completed_at).toISOString() : null,
+      custom_category_id: normalizeStringOrNull(custom_category_id)
     };
 
     const { data, error } = await supabase

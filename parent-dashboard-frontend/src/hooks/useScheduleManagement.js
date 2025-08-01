@@ -1,6 +1,6 @@
 // hooks/useScheduleManagement.js
 import { useState, useEffect, useCallback } from 'react';
-import api from '../utils/api';
+import api, { uploadApi } from '../utils/api';
 
 export function useScheduleManagement(childId, subscriptionPermissions) {
   // State for schedule entries
@@ -204,6 +204,112 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
       return { success: true, data: response.data };
     } catch (err) {
       const errorMessage = err.response?.data?.error || 'Failed to update preferences';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate AI-powered schedule
+  const generateAISchedule = async (options = {}) => {
+    try {
+      setLoading(true);
+      
+      const {
+        start_date = new Date().toISOString().split('T')[0], // Default to today
+        days_to_schedule = 7,
+        preferences = {}
+      } = options;
+
+      // Deep clean preferences to ensure they're JSON-serializable
+      const safeSchedulePreferences = schedulePreferences ? {
+        preferred_start_time: schedulePreferences.preferred_start_time,
+        preferred_end_time: schedulePreferences.preferred_end_time,
+        max_daily_study_minutes: schedulePreferences.max_daily_study_minutes,
+        break_duration_minutes: schedulePreferences.break_duration_minutes,
+        difficult_subjects_morning: schedulePreferences.difficult_subjects_morning,
+        study_days: schedulePreferences.study_days,
+        subject_frequencies: schedulePreferences.subject_frequencies
+      } : {};
+
+      // Deep clean incoming preferences too
+      const deepClean = (obj, path = 'root') => {
+        if (obj === null || obj === undefined) return obj;
+        if (typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean') return obj;
+        if (obj instanceof Date) return obj.toISOString();
+        if (Array.isArray(obj)) {
+          return obj.map((item, index) => deepClean(item, `${path}[${index}]`));
+        }
+        if (typeof obj === 'object') {
+          // Check if it's a DOM element or has circular references
+          if (obj.nodeType || obj.window || obj.ownerDocument || obj.constructor?.name?.includes('HTML')) {
+            console.warn(`Removing DOM element found at path: ${path}`, obj.constructor?.name);
+            return undefined;
+          }
+          if (obj.target && obj.preventDefault && obj.stopPropagation) {
+            console.warn(`Removing event object found at path: ${path}`);
+            return undefined;
+          }
+          const cleaned = {};
+          for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+              const cleanedValue = deepClean(obj[key], `${path}.${key}`);
+              if (cleanedValue !== undefined) {
+                cleaned[key] = cleanedValue;
+              }
+            }
+          }
+          return cleaned;
+        }
+        if (typeof obj === 'function') {
+          console.warn(`Removing function found at path: ${path}`);
+          return undefined;
+        }
+        return undefined; // Other non-serializable types
+      };
+
+      const cleanIncomingPreferences = deepClean(preferences, 'incomingPreferences') || {};
+
+      const cleanPreferences = {
+        ...safeSchedulePreferences,
+        ...cleanIncomingPreferences
+      };
+
+      // Ensure child_ids is an array of strings
+      const safeChildIds = [childId].filter(id => id && typeof id === 'string');
+
+      const requestPayload = {
+        child_ids: safeChildIds,
+        start_date: String(start_date),
+        days_to_schedule: Number(days_to_schedule),
+        preferences: cleanPreferences
+      };
+
+      // Add debug logging to catch any circular reference issues before they happen
+      try {
+        const testStringify = JSON.stringify(requestPayload);
+        console.log('AI Schedule Request Payload:', testStringify);
+      } catch (circularError) {
+        console.error('Circular reference detected before API call:', circularError);
+        console.log('Request payload object:', requestPayload);
+        throw new Error(`Cannot serialize request data: ${circularError.message}`);
+      }
+
+      const response = await uploadApi.post('/schedule/ai-generate', requestPayload);
+
+      // Refresh the schedule entries to show the new AI-generated ones
+      await fetchScheduleEntries(childId);
+      
+      setError(null);
+      return { 
+        success: true, 
+        data: response.data,
+        message: response.data.message,
+        entriesCreated: response.data.entries_created
+      };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || 'Failed to generate AI schedule';
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
@@ -421,6 +527,7 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     updateEvent: updateScheduleEntry, // Alias for drag-and-drop compatibility
     deleteScheduleEntry,
     updateSchedulePreferences,
+    generateAISchedule,
     
     // Status updates
     markEntryCompleted,

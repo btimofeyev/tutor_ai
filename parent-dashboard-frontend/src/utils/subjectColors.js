@@ -36,7 +36,22 @@ const GENERIC_SUBJECT_COLORS = {
  * @returns {Object} Color object with bg, text, border classes
  */
 export function getSubjectColor(subjectName, childSubjects) {
-  const subjectIndex = childSubjects.findIndex(s => s.name === subjectName);
+  // Handle the case where subjectName might be like "Bible: Lesson 3"
+  // Extract just the subject part before the colon
+  const baseSubjectName = subjectName?.split(':')[0]?.trim() || subjectName;
+  
+  // Try to find subject by matching various name formats
+  const subjectIndex = childSubjects.findIndex(s => {
+    const displayName = s.custom_subject_name_override || s.subject?.name || s.name;
+    const baseName = s.subject?.name || s.name;
+    
+    // Check multiple matching strategies
+    return displayName === baseSubjectName || 
+           baseName === baseSubjectName ||
+           displayName === subjectName ||
+           baseName === subjectName;
+  });
+  
   if (subjectIndex !== -1) {
     return SUBJECT_COLORS[subjectIndex % SUBJECT_COLORS.length];
   }

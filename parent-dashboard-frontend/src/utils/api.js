@@ -20,7 +20,7 @@ const getApiBaseUrl = () => {
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
-  timeout: 30000, // 30 second timeout
+  timeout: 30000, // 30 second timeout (default)
 });
 
 // Log the API configuration for debugging
@@ -76,6 +76,19 @@ api.interceptors.response.use(
     
     return Promise.reject(error);
   }
+);
+
+// Export both the default api instance and a specialized upload api
+export const uploadApi = axios.create({
+  baseURL: getApiBaseUrl(),
+  timeout: 120000, // 2 minute timeout for AI processing
+});
+
+// Apply same interceptors to upload API
+uploadApi.interceptors.request.use(api.interceptors.request.handlers[0].fulfilled);
+uploadApi.interceptors.response.use(
+  api.interceptors.response.handlers[0].fulfilled,
+  api.interceptors.response.handlers[0].rejected
 );
 
 export default api;

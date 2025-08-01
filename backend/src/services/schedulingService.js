@@ -76,6 +76,21 @@ class AdvancedSchedulingService {
         try {
             // Stage 1: Comprehensive Context Analysis
             const context = await this.analyzeSchedulingContext(scheduleRequest);
+            
+            // Early return if no materials to schedule
+            if (context.materialAnalysis?.isEmpty) {
+                console.log('ℹ️ No materials found for scheduling - returning empty schedule');
+                return {
+                    success: true,
+                    children: scheduleRequest.children?.map(child => ({
+                        child_id: child.child_id,
+                        child_name: child.child_name,
+                        sessions: []
+                    })) || [],
+                    summary: 'No materials available for scheduling. Please upload learning materials first.',
+                    total_sessions: 0
+                };
+            }
 
             // Stage 2: Generate Optimal Time Slots
             const timeSlots = await this.generateOptimalTimeSlots(context);
@@ -112,21 +127,72 @@ class AdvancedSchedulingService {
             subject_config,
             priority_mode,
             default_session_length,
-            schedule_days
+            schedule_days,
+            children_schedules,
+            scheduling_context,
+            coordination_mode
         } = request;
 
         console.log('📊 Analyzing scheduling context...');
 
-        // Analyze materials and extract key insights
+        // Handle multi-child scheduling with context
+        if (children_schedules && scheduling_context) {
+            console.log('🔍 Detected family scheduling with conflict context');
+            
+            // Merge all children's materials
+            const allMaterialsBySubject = {};
+            const allMaterialsFlat = [];
+            
+            children_schedules.forEach(child => {
+                Object.entries(child.materials || {}).forEach(([subject, mats]) => {
+                    if (!allMaterialsBySubject[subject]) allMaterialsBySubject[subject] = [];
+                    const materialsWithChild = mats.map(m => ({...m, child_id: child.child_id, child_name: child.child_name}));
+                    allMaterialsBySubject[subject].push(...materialsWithChild);
+                    allMaterialsFlat.push(...materialsWithChild);
+                });
+            });
+
+            // Extract preferences
+            const mergedPreferences = {
+                ...preferences,
+                existing_schedule: scheduling_context.existingSchedule,
+                family_conflicts: scheduling_context.conflicts,
+                completed_lessons: scheduling_context.completedLessons,
+                child_preferences: scheduling_context.childPreferences
+            };
+
+            return {
+                child_id: children_schedules[0]?.child_id, // For compatibility
+                children_ids: children_schedules.map(c => c.child_id),
+                start_date: preferences?.start_date || start_date,
+                end_date: preferences?.end_date || end_date,
+                weekdays: scheduling_context.dateRange?.weekdays || [],
+                materials: allMaterialsBySubject,
+                allMaterialsFlat: allMaterialsFlat,
+                materialAnalysis: this.analyzeMaterials(allMaterialsFlat),
+                childProfiles: children_schedules.map(c => ({
+                    child_id: c.child_id,
+                    child_name: c.child_name,
+                    grade: c.child_grade,
+                    preferences: c.preferences
+                })),
+                timeConstraints: this.calculateTimeConstraintsForMultiChild(
+                    preferences?.start_date || start_date, 
+                    scheduling_context.dateRange?.end || end_date, 
+                    children_schedules
+                ),
+                scheduling_context: scheduling_context,
+                coordination_mode: coordination_mode || 'family',
+                conflicts_to_resolve: scheduling_context.conflicts || [],
+                subject_config: subject_config || {},
+                aiInsights: await this.generateConflictAwareInsights(scheduling_context, allMaterialsBySubject)
+            };
+        }
+
+        // Original single-child logic
         const materialAnalysis = this.analyzeMaterials(materials);
-
-        // Process child preferences and constraints
         const childProfile = await this.buildChildProfile(child_id, preferences);
-
-        // Calculate time availability and constraints
         const timeConstraints = this.calculateTimeConstraints(start_date, end_date, childProfile);
-
-        // Generate AI insights about optimal scheduling approach
         const aiInsights = await this.generateContextualInsights(materialAnalysis, childProfile, timeConstraints);
 
         return {
@@ -150,13 +216,27 @@ class AdvancedSchedulingService {
      * Analyze materials to extract scheduling insights
      */
     analyzeMaterials(materials) {
+        // Handle null, undefined, or empty materials
+        if (!materials || !Array.isArray(materials) || materials.length === 0) {
+            return {
+                totalMaterials: 0,
+                byContentType: {},
+                bySubject: {},
+                urgencyLevels: [],
+                estimatedDurations: [],
+                complexity: {},
+                isEmpty: true
+            };
+        }
+
         const analysis = {
             totalMaterials: materials.length,
             byContentType: {},
             bySubject: {},
             urgencyLevels: [],
             estimatedDurations: [],
-            complexity: {}
+            complexity: {},
+            isEmpty: false
         };
 
         materials.forEach(material => {
@@ -241,9 +321,22 @@ class AdvancedSchedulingService {
     }
 
     /**
-     * Calculate comprehensive time constraints
+     * Calculate comprehensive time constraints for single child
      */
     calculateTimeConstraints(start_date, end_date, childProfile) {
+        if (!childProfile || !childProfile.preferences) {
+            console.warn('⚠️ No childProfile provided, using default preferences');
+            const defaultPreferences = {
+                study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+                max_daily_study_minutes: 240,
+                break_duration_minutes: 15,
+                preferred_start_time: '09:00',
+                preferred_end_time: '15:00',
+                difficult_subjects_morning: true
+            };
+            return this.calculateTimeConstraints(start_date, end_date, { preferences: defaultPreferences });
+        }
+
         const startDate = new Date(start_date);
         const endDate = new Date(end_date);
         const { preferences } = childProfile;
@@ -251,33 +344,226 @@ class AdvancedSchedulingService {
         const availableDays = [];
         const currentDate = new Date(startDate);
 
+        console.log('🔍 Debug time constraints calculation:');
+        console.log('   Start date:', start_date);
+        console.log('   End date:', end_date);
+        console.log('   Child preferences:', preferences);
+        console.log('   Study days:', preferences.study_days);
+
         while (currentDate <= endDate) {
             const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-            if (preferences.study_days.includes(dayName)) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            
+            console.log(`   🗓️ Checking ${dateStr} (${dayName})`);
+            
+            if (preferences.study_days && preferences.study_days.includes(dayName)) {
+                console.log(`   ✅ Added ${dateStr} (${dayName}) to available days`);
                 availableDays.push({
                     date: new Date(currentDate),
                     dayName,
-                    availableMinutes: preferences.max_daily_study_minutes,
-                    startTime: preferences.preferred_start_time,
-                    endTime: preferences.preferred_end_time
+                    availableMinutes: preferences.max_daily_study_minutes || 240,
+                    startTime: preferences.preferred_start_time || '09:00',
+                    endTime: preferences.preferred_end_time || '15:00'
                 });
+            } else {
+                console.log(`   ❌ Skipped ${dateStr} (${dayName}) - not in study_days or no study_days defined`);
             }
             currentDate.setDate(currentDate.getDate() + 1);
         }
+        
+        console.log(`🔍 Final available days: ${availableDays.map(d => d.date.toISOString().split('T')[0]).join(', ')}`);
 
         return {
             totalDays: availableDays.length,
             totalAvailableMinutes: availableDays.reduce((sum, day) => sum + day.availableMinutes, 0),
             availableDays,
             dailyConstraints: {
-                maxMinutes: preferences.max_daily_study_minutes,
-                breakDuration: preferences.break_duration_minutes,
+                maxMinutes: preferences.max_daily_study_minutes || 240,
+                breakDuration: preferences.break_duration_minutes || 15,
                 timeWindow: {
-                    start: preferences.preferred_start_time,
-                    end: preferences.preferred_end_time
+                    start: preferences.preferred_start_time || '09:00',
+                    end: preferences.preferred_end_time || '15:00'
                 }
             }
         };
+    }
+
+    /**
+     * Calculate time constraints for multiple children
+     */
+    calculateTimeConstraintsForMultiChild(start_date, end_date, children_schedules) {
+        const startDate = new Date(start_date);
+        const endDate = new Date(end_date + 'T12:00:00.000Z'); // Fix timezone issue for end date too
+        
+        // Get preferences from all children, use defaults if none provided
+        const allPreferences = children_schedules.map(child => {
+            return child.preferences || {
+                study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+                max_daily_study_minutes: 240,
+                break_duration_minutes: 15,
+                preferred_start_time: '09:00',
+                preferred_end_time: '15:00',
+                difficult_subjects_morning: true
+            };
+        });
+
+        // Find common study days across all children
+        const commonStudyDays = allPreferences.reduce((common, prefs) => {
+            const studyDays = prefs.study_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+            if (common.length === 0) return studyDays;
+            return common.filter(day => studyDays.includes(day));
+        }, []);
+
+        // Calculate family-wide constraints
+        const familyConstraints = {
+            earliestStart: allPreferences.reduce((earliest, prefs) => {
+                const start = prefs.preferred_start_time || '09:00';
+                return start < earliest ? start : earliest;
+            }, '09:00'),
+            latestEnd: allPreferences.reduce((latest, prefs) => {
+                const end = prefs.preferred_end_time || '15:00';
+                return end > latest ? end : latest;
+            }, '15:00'),
+            maxFamilyMinutes: Math.max(...allPreferences.map(prefs => prefs.max_daily_study_minutes || 240)),
+            averageBreakTime: Math.round(allPreferences.reduce((sum, prefs) => sum + (prefs.break_duration_minutes || 15), 0) / allPreferences.length)
+        };
+        
+        console.log('🔍 Debug MULTI-CHILD time constraints calculation:');
+        console.log('   Start date:', start_date);
+        console.log('   End date:', end_date);
+        console.log('   Children count:', children_schedules.length);
+        console.log('   All preferences:', allPreferences);
+        console.log('   Common study days:', commonStudyDays);
+        console.log('   Family constraints:', familyConstraints);
+
+        const availableDays = [];
+        // Fix timezone issue by properly parsing the date string
+        const currentDate = new Date(start_date + 'T12:00:00.000Z'); // Use start_date string, not Date object
+
+        while (currentDate <= endDate) {
+            const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            const dateStr = currentDate.toISOString().split('T')[0];
+            
+            // Debug date parsing issue
+            console.log(`   🗓️ Checking ${dateStr} (${dayName})`);
+            console.log(`      Raw date object: ${currentDate}`);
+            console.log(`      Day of week (getDay): ${currentDate.getDay()} (0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat)`);
+            console.log(`      Timezone offset: ${currentDate.getTimezoneOffset()} minutes`);
+            
+            // Alternative day name calculation to verify
+            const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+            const altDayName = dayNames[currentDate.getDay()];
+            console.log(`      Alternative day name: ${altDayName}`);
+            
+            if (dayName !== altDayName) {
+                console.log(`      ⚠️ MISMATCH: toLocaleDateString says ${dayName}, getDay says ${altDayName}`);
+            }
+            
+            if (commonStudyDays.includes(dayName)) {
+                console.log(`   ✅ Added ${dateStr} (${dayName}) to available days`);
+                availableDays.push({
+                    date: new Date(currentDate),
+                    dayName,
+                    availableMinutes: familyConstraints.maxFamilyMinutes,
+                    startTime: familyConstraints.earliestStart,
+                    endTime: familyConstraints.latestEnd,
+                    childrenCount: children_schedules.length
+                });
+            } else {
+                console.log(`   ❌ Skipped ${dateStr} (${dayName}) - not in common study days`);
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
+        console.log(`🔍 Final available days (multi-child): ${availableDays.map(d => d.date.toISOString().split('T')[0]).join(', ')}`);
+
+        return {
+            totalDays: availableDays.length,
+            totalAvailableMinutes: availableDays.reduce((sum, day) => sum + day.availableMinutes, 0),
+            availableDays,
+            familyConstraints,
+            dailyConstraints: {
+                maxMinutes: familyConstraints.maxFamilyMinutes,
+                breakDuration: familyConstraints.averageBreakTime,
+                timeWindow: {
+                    start: familyConstraints.earliestStart,
+                    end: familyConstraints.latestEnd
+                }
+            }
+        };
+    }
+
+    /**
+     * Generate conflict-aware AI insights for family scheduling
+     */
+    async generateConflictAwareInsights(schedulingContext, materials) {
+        console.log('🤖 Generating conflict-aware scheduling insights...');
+        
+        const prompt = `As an expert educational scheduler, analyze this family's scheduling context and provide strategic insights for conflict-free scheduling.
+
+EXISTING SCHEDULE:
+${JSON.stringify(schedulingContext.existingSchedule.map(e => ({
+    date: e.scheduled_date,
+    time: e.start_time,
+    child: e.child_id,
+    subject: e.subject_name
+})), null, 2)}
+
+DETECTED CONFLICTS:
+${JSON.stringify(schedulingContext.conflicts, null, 2)}
+
+AVAILABLE MATERIALS TO SCHEDULE:
+${Object.entries(materials).map(([subject, mats]) => 
+    `${subject}: ${mats.length} lessons (due dates: ${mats.map(m => m.due_date || 'none').join(', ')})`
+).join('\n')}
+
+COMPLETED LESSONS (for progress tracking):
+${schedulingContext.completedLessons.length} lessons completed
+
+Provide strategic insights for:
+1. How to resolve time conflicts between children
+2. Optimal subject sequencing based on existing schedule
+3. Priority order based on due dates
+4. Cognitive load distribution across the week
+5. Recommendations for parallel vs sequential teaching
+
+Format as JSON with structure:
+{
+    "conflict_resolution_strategy": "...",
+    "priority_subjects": ["subject1", "subject2"],
+    "recommended_time_slots": {
+        "subject": "preferred_time"
+    },
+    "parallel_teaching_opportunities": ["subjects that can be taught together"],
+    "energy_optimization": "recommendations for maintaining focus"
+}`;
+
+        try {
+            const response = await openai.chat.completions.create({
+                model: "gpt-4-1106-preview",
+                messages: [
+                    { role: "system", content: "You are an expert educational scheduler specializing in homeschool optimization and conflict resolution." },
+                    { role: "user", content: prompt }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.3
+            });
+
+            return JSON.parse(response.choices[0].message.content);
+        } catch (error) {
+            console.error('Failed to generate conflict-aware insights:', error);
+            return {
+                conflict_resolution_strategy: "Stagger start times by 15-30 minutes between children",
+                priority_subjects: ["Mathematics", "English Language Arts"],
+                recommended_time_slots: {
+                    "Mathematics": "09:00",
+                    "English": "10:30",
+                    "Science": "14:00"
+                },
+                parallel_teaching_opportunities: [],
+                energy_optimization: "Schedule high-cognitive subjects in morning, creative subjects after lunch"
+            };
+        }
     }
 
     /**
@@ -381,11 +667,21 @@ Provide strategic insights in this JSON format:
     async generateOptimalTimeSlots(context) {
         console.log('⏰ Generating optimal time slots...');
 
-        const { timeConstraints, childProfile, aiInsights } = context;
+        const { timeConstraints, childProfile, childProfiles, aiInsights } = context;
         const slots = [];
 
+        // Handle both single-child and multi-child contexts
+        const profileToUse = childProfile || (childProfiles && childProfiles[0]) || {
+            preferences: {
+                preferred_start_time: '09:00',
+                preferred_end_time: '15:00',
+                break_duration_minutes: 15,
+                difficult_subjects_morning: true
+            }
+        };
+
         for (const day of timeConstraints.availableDays) {
-            const dailySlots = this.generateDailyTimeSlots(day, childProfile, aiInsights);
+            const dailySlots = this.generateDailyTimeSlots(day, profileToUse, aiInsights);
             slots.push(...dailySlots);
         }
 
@@ -446,23 +742,26 @@ Provide strategic insights in this JSON format:
     async performAISubjectAssignment(context, timeSlots) {
         console.log('🎯 Performing AI-powered subject assignment...');
 
-        const { materials, aiInsights, childProfile } = context;
+        const { materials, allMaterialsFlat, aiInsights, childProfile } = context;
 
-        // Group materials by subject for better assignment
-        const materialsBySubject = this.groupMaterialsBySubject(materials);
+        // Use already grouped materials if available, otherwise group them
+        const materialsBySubject = typeof materials === 'object' && !Array.isArray(materials) 
+            ? materials 
+            : this.groupMaterialsBySubject(allMaterialsFlat || materials || []);
 
         // Use AI to create optimal material-to-slot assignments
         const assignments = await this.generateAIAssignments(
             materialsBySubject,
             timeSlots,
             aiInsights,
-            childProfile
+            childProfile,
+            context
         );
 
         // Extract assignments from AI response and create preliminary schedule
         const assignmentsArray = assignments.assignments || assignments || [];
         console.log(`📊 AI returned ${Array.isArray(assignmentsArray) ? assignmentsArray.length : 'non-array'} assignments`);
-        const schedule = this.buildPreliminarySchedule(assignmentsArray, timeSlots, materials);
+        const schedule = this.buildPreliminarySchedule(assignmentsArray, timeSlots, context.allMaterialsFlat || materials);
 
         console.log(`📚 Assigned ${assignmentsArray.length} materials to time slots`);
         console.log(`📋 Built ${schedule.length} schedule entries from assignments`);
@@ -480,23 +779,43 @@ Provide strategic insights in this JSON format:
     /**
      * Generate AI-powered material assignments
      */
-    async generateAIAssignments(materialsBySubject, timeSlots, aiInsights, childProfile) {
-            const prompt = `As an expert educational scheduler, create optimal material assignments for time slots based on cognitive science and learning efficiency.
+    async generateAIAssignments(materialsBySubject, timeSlots, aiInsights, childProfile, context) {
+            // Check if we have conflict context
+            const hasConflictContext = context?.scheduling_context?.conflicts?.length > 0;
+            const existingSchedule = context?.scheduling_context?.existingSchedule || [];
+            
+            const prompt = `As an expert educational scheduler, create optimal material assignments for time slots while resolving scheduling conflicts.
 
 TIME SLOTS AVAILABLE:
 ${timeSlots.map(slot => 
   `ID: ${slot.id} | ${slot.date} ${slot.startTime}-${slot.endTime} (${slot.cognitiveWindow}, efficiency: ${slot.efficiency})`
 ).join('\n')}
 
-MATERIALS BY SUBJECT:
-${Object.entries(materialsBySubject).map(([subject, materials]) => 
-  `${subject}: ${materials.map(m => `ID:${m.id} "${m.title}"`).join(', ')}`
+${hasConflictContext ? `EXISTING SCHEDULE (DO NOT DOUBLE-BOOK):
+${existingSchedule.map(e => 
+  `${e.scheduled_date} ${e.start_time}: ${e.subject_name} (Child: ${e.child_id})`
 ).join('\n')}
 
+DETECTED CONFLICTS TO AVOID:
+${context.scheduling_context.conflicts.map(c => 
+  `${c.type}: ${JSON.stringify(c.entries)}`
+).join('\n')}` : ''}
+
+MATERIALS BY SUBJECT:
+${Object.entries(materialsBySubject).map(([subject, materials]) => {
+  // Include child info if available
+  const materialsWithChild = materials.map(m => {
+    const childInfo = m.child_name ? ` [${m.child_name}]` : '';
+    const dueInfo = m.due_date ? ` DUE:${m.due_date}` : '';
+    return `ID:${m.id} "${m.title}"${childInfo}${dueInfo}`;
+  }).join(', ');
+  return `${subject}: ${materialsWithChild}`;
+}).join('\n')}
+
 STUDENT PREFERENCES:
-- Difficult subjects in morning: ${childProfile.preferences.difficult_subjects_morning}
-- AI Strategy: ${aiInsights.schedulingStrategy}
-- Prioritization: ${aiInsights.prioritizationApproach}
+- Difficult subjects in morning: ${childProfile?.preferences?.difficult_subjects_morning || true}
+- AI Strategy: ${aiInsights.schedulingStrategy || aiInsights.conflict_resolution_strategy}
+- Prioritization: ${aiInsights.prioritizationApproach || 'due_date_first'}
 
 COGNITIVE LOAD WEIGHTS (higher = more difficult):
 ${Object.entries(this.COGNITIVE_LOAD_WEIGHTS).map(([subject, weight]) => 
@@ -504,11 +823,13 @@ ${Object.entries(this.COGNITIVE_LOAD_WEIGHTS).map(([subject, weight]) =>
 ).slice(0, 10).join('\n')}
 
 Create assignments following these rules:
-1. Match high cognitive load subjects to high efficiency time slots
-2. Respect student preference for difficult subjects timing
-3. Balance subjects across days for variety
-4. Consider material urgency (due dates)
-5. Ensure logical subject progression
+1. NEVER schedule during existing schedule times (avoid conflicts)
+2. Prioritize materials by DUE DATE (urgent first)
+3. Match high cognitive load subjects to high efficiency time slots
+4. Respect student preference for difficult subjects timing
+5. Balance subjects across days for variety
+6. For multiple children, avoid scheduling same subject at same time
+7. Ensure logical subject progression (don't skip prerequisites)
 
 Provide assignments in this JSON format:
 {
@@ -517,17 +838,22 @@ Provide assignments in this JSON format:
       "slot_id": "use_exact_slot_id_from_list_above",
       "subject": "subject_name", 
       "material_ids": ["material1", "material2"],
+      "child_id": "child_id_if_multiple_children",
       "reasoning": "why this assignment is optimal",
-      "cognitive_match": 0.85
+      "cognitive_match": 0.85,
+      "conflicts_avoided": ["list any conflicts this avoids"]
     }
   ],
   "overall_strategy": "description of overall approach",
+  "conflicts_resolved": ["how conflicts were resolved"],
   "confidence": 0.90
 }
 
 IMPORTANT: 
-- Use the exact slot_id values provided in the TIME SLOTS list above (e.g., "2025-06-17_slot_0")
-- Use the exact material IDs provided in the MATERIALS BY SUBJECT list above (e.g., "mat-1")`;
+- Use the exact slot_id values provided in the TIME SLOTS list above
+- Use the exact material IDs provided in the MATERIALS BY SUBJECT list above
+- RESPECT EXISTING SCHEDULE - do not double-book time slots
+- PRIORITIZE BY DUE DATE - schedule urgent materials first`;
 
     // Try AI assignment first, fallback to rule-based if it fails
     console.log('🤖 Attempting AI-powered material assignment...');
@@ -614,21 +940,27 @@ IMPORTANT:
     
     try {
       const context = await this.analyzeSchedulingContext(request);
-      const { materials, timeConstraints, childProfile } = context;
+      const { materials, allMaterialsFlat, timeConstraints, childProfile, childProfiles } = context;
       
       // Generate time slots using mathematical optimization
       const timeSlots = this.generateOptimalTimeSlots(context);
       
+      // Use already grouped materials if available, otherwise group them
+      const materialsBySubject = typeof materials === 'object' && !Array.isArray(materials) 
+        ? materials 
+        : this.groupMaterialsBySubject(allMaterialsFlat || materials || []);
+      
       // Apply rule-based assignment with cognitive science
+      const profileToUse = childProfile || (childProfiles && childProfiles[0]);
       const assignments = this.generateRuleBasedAssignments(
-        this.groupMaterialsBySubject(materials),
+        materialsBySubject,
         timeSlots,
-        childProfile,
+        profileToUse,
         context
       );
       
       // Build schedule with enhanced logic
-      const schedule = this.buildPreliminarySchedule(assignments, timeSlots, materials);
+      const schedule = this.buildPreliminarySchedule(assignments, timeSlots, allMaterialsFlat || materials);
       
       // Apply basic optimizations
       const optimizedSchedule = this.basicCognitiveOptimization(schedule);
@@ -673,11 +1005,21 @@ IMPORTANT:
       if (!['saturday', 'sunday'].includes(dayName)) {
         const material = materials[materialIndex];
         
+        // Create display title with lesson name for emergency fallback too
+        let actualSubjectName = material.lesson?.unit?.child_subject?.custom_subject_name_override || 
+                               material.lesson?.unit?.child_subject?.subject?.name || 
+                               'Study';
+        let displayTitle = actualSubjectName;
+        if (material.title && material.title !== actualSubjectName) {
+          displayTitle = `${actualSubjectName}: ${material.title}`;
+        }
+        
         schedule.push({
           id: `emergency_${sessionId}`,
           child_id,
           material_id: material.id,
-          subject_name: material.lesson?.unit?.child_subject?.custom_subject_name_override || 'Study',
+          subject_name: displayTitle, // Now includes lesson title
+          base_subject_name: actualSubjectName, // Keep original subject name for color coding
           scheduled_date: currentDate.toISOString().split('T')[0],
           start_time: '09:00',
           duration_minutes: 45,
@@ -953,9 +1295,11 @@ IMPORTANT:
     // Bonus for optimal learning times
     if (slot.isOptimal) score += 0.2;
     
-    // Adjust based on student preferences
-    if (context.childProfile.preferences.difficult_subjects_morning && 
-        slot.cognitiveWindow === 'HIGH_COGNITIVE') {
+    // Adjust based on student preferences - handle both single and multi-child contexts
+    const childProfile = context.childProfile || (context.childProfiles && context.childProfiles[0]);
+    const preferences = childProfile?.preferences || {};
+    
+    if (preferences.difficult_subjects_morning && slot.cognitiveWindow === 'HIGH_COGNITIVE') {
       score += 0.3;
     }
     
@@ -977,15 +1321,30 @@ IMPORTANT:
    * Generate rule-based assignments as fallback
    */
   generateRuleBasedAssignments(materialsBySubject, timeSlots, childProfile, context = {}) {
-    const assignments = [];
-    const { preferences } = childProfile;
+    console.log('🎯 Starting day-first subject distribution to prevent same-subject-per-day conflicts...');
+    
+    // Handle both single-child and multi-child contexts
+    const profileToUse = childProfile || (context.childProfiles && context.childProfiles[0]) || {};
+    const preferences = profileToUse.preferences || {
+      difficult_subjects_morning: true,
+      preferred_start_time: '09:00',
+      preferred_end_time: '15:00'
+    };
+    
+    console.log('🔍 Debug context in generateRuleBasedAssignments:');
+    console.log('   Context keys:', Object.keys(context));
+    console.log('   Context subject_config:', context.subject_config);
+    console.log('   Context type of subject_config:', typeof context.subject_config);
+    
     const { subject_config = {}, schedule_days = [] } = context;
-    
-    // Sort time slots by date first, then by optimality within each day
     const timeSlotsArray = Array.isArray(timeSlots) ? timeSlots : [];
-    const slotsByDate = new Map();
     
-    // Group slots by date
+    console.log('🔍 After destructuring:');
+    console.log('   subject_config:', subject_config);
+    console.log('   subject_config keys:', Object.keys(subject_config));
+    
+    // Group slots by date and sort by efficiency within each day
+    const slotsByDate = new Map();
     timeSlotsArray.forEach(slot => {
       const date = slot.date;
       if (!slotsByDate.has(date)) {
@@ -994,101 +1353,289 @@ IMPORTANT:
       slotsByDate.get(date).push(slot);
     });
     
-    // Sort slots within each day by efficiency
+    // Sort slots within each day by efficiency (best slots first)
     slotsByDate.forEach((slots) => {
       slots.sort((a, b) => b.efficiency - a.efficiency);
     });
     
-    // Sort subjects by cognitive load
-    const sortedSubjects = Object.entries(materialsBySubject).sort((a, b) => {
-      const loadA = this.COGNITIVE_LOAD_WEIGHTS[a[0]] || 0.5;
-      const loadB = this.COGNITIVE_LOAD_WEIGHTS[b[0]] || 0.5;
-      return preferences.difficult_subjects_morning ? loadB - loadA : loadA - loadB;
-    });
+    const dates = Array.from(slotsByDate.keys()).sort();
+    console.log(`📅 Scheduling across ${dates.length} days: ${dates.join(', ')}`);
     
-    // Create frequency-aware material distribution
-    const allMaterials = [];
-    const weekDays = schedule_days.length || 5; // Default to 5 days if not specified
+    // Create weekly subject plan with frequency constraints
+    const weeklySubjectPlan = this.createWeeklySubjectPlan(materialsBySubject, subject_config, dates, preferences);
+    console.log('📊 Weekly subject plan:', weeklySubjectPlan);
     
-    // Calculate how many times each subject should appear per week based on frequency
-    for (const [subject, materials] of sortedSubjects) {
-      // Find subject config by matching subject name or child_subject_id
-      const subjectConfigEntry = Object.entries(subject_config).find(([configSubjectId, config]) => {
-        // Try to match by subject name or child_subject_id
-        return materials.some(material => {
-          const materialSubjectId = material.lesson?.unit?.child_subject?.id || material.child_subject_id;
-          return materialSubjectId === configSubjectId || 
-                 material.subject_name === subject ||
-                 config.subject_name === subject;
-        });
+    // Initialize tracking for each day
+    const dailySchedule = new Map();
+    const subjectProgress = new Map(); // Track which material to use next for each subject
+    const assignments = [];
+    
+    // Initialize progress tracking for each subject
+    Object.keys(materialsBySubject).forEach(subject => {
+      const materials = materialsBySubject[subject];
+      // Sort materials by progression order (due date, lesson sequence, creation date)
+      const sortedMaterials = materials.sort((a, b) => {
+        // First priority: due date urgency
+        const urgencyA = this.calculateDaysUntilDue(a.due_date);
+        const urgencyB = this.calculateDaysUntilDue(b.due_date);
+        if (urgencyA !== urgencyB) {
+          return urgencyA - urgencyB; // Sooner due dates first
+        }
+        
+        // Second priority: lesson sequence
+        const lessonNumA = this.extractLessonNumber(a.title);
+        const lessonNumB = this.extractLessonNumber(b.title);
+        if (lessonNumA !== lessonNumB) {
+          return lessonNumA - lessonNumB; // Lower lesson numbers first
+        }
+        
+        // Third priority: creation date
+        return new Date(a.created_at || 0) - new Date(b.created_at || 0);
       });
       
-      const frequency = subjectConfigEntry?.[1]?.frequency || 2; // Default frequency
-      const timesPerWeek = Math.min(frequency, weekDays); // Can't exceed available days
+      subjectProgress.set(subject, {
+        materials: sortedMaterials,
+        currentIndex: 0,
+        scheduledThisWeek: 0
+      });
+    });
+    
+    // Process each day individually with subject distribution limits
+    for (const date of dates) {
+      const availableSlots = slotsByDate.get(date) || [];
+      const dailySubjects = weeklySubjectPlan.get(date) || [];
       
-      console.log(`📚 Subject: ${subject}, Frequency: ${frequency}, Times per week: ${timesPerWeek}`);
+      console.log(`🗓️ Processing ${date}: ${dailySubjects.length} subjects planned, ${availableSlots.length} slots available`);
       
-      // Distribute materials for this subject across the week
-      for (let i = 0; i < materials.length && allMaterials.length < timeSlotsArray.length; i++) {
-        // Repeat this material according to its subject frequency
-        for (let freq = 0; freq < timesPerWeek && allMaterials.length < timeSlotsArray.length; freq++) {
-          allMaterials.push({ 
-            subject, 
-            material: materials[i],
-            frequencyIndex: freq,
-            subjectFrequency: timesPerWeek
-          });
+      // Initialize daily schedule tracking
+      dailySchedule.set(date, {
+        scheduledSubjects: new Set(),
+        usedSlots: 0,
+        assignments: []
+      });
+      
+      const dayInfo = dailySchedule.get(date);
+      
+      // Schedule subjects for this day (max 1 per subject per day)
+      // First, filter out subjects that can't be scheduled
+      const validSubjects = [];
+      const skippedSubjects = [];
+      
+      for (const subject of dailySubjects) {
+        // Check if this subject is already scheduled today
+        if (dayInfo.scheduledSubjects.has(subject)) {
+          skippedSubjects.push({ subject, reason: 'already scheduled today' });
+          continue;
         }
+        
+        // Get next material for this subject
+        const subjectData = subjectProgress.get(subject);
+        if (!subjectData || subjectData.currentIndex >= subjectData.materials.length) {
+          skippedSubjects.push({ subject, reason: 'no more materials available' });
+          continue;
+        }
+        
+        validSubjects.push(subject);
       }
+      
+      // Log any subjects that couldn't be scheduled as planned
+      if (skippedSubjects.length > 0) {
+        console.log(`⚠️ Skipped subjects for ${date}:`, skippedSubjects.map(s => `${s.subject} (${s.reason})`).join(', '));
+      }
+      
+      // Schedule the valid subjects
+      const slotsToUse = Math.min(validSubjects.length, availableSlots.length);
+      console.log(`📝 Scheduling ${slotsToUse} subjects for ${date}: ${validSubjects.slice(0, slotsToUse).join(', ')}`);
+      
+      for (let i = 0; i < slotsToUse; i++) {
+        const subject = validSubjects[i];
+        const slot = availableSlots[i];
+        const subjectData = subjectProgress.get(subject);
+        const material = subjectData.materials[subjectData.currentIndex];
+        
+        // Create assignment
+        const assignment = {
+          slot_id: slot.id,
+          subject,
+          material_ids: [material.id],
+          child_id: material.child_id || profileToUse.child_id,
+          reasoning: `Day-first scheduling: ${subject} on ${date} (material ${subjectData.currentIndex + 1}/${subjectData.materials.length}, due: ${material.due_date || 'no due date'})`,
+          cognitive_match: this.calculateCognitiveMatch(subject, slot),
+          scheduled_date: date,
+          start_time: slot.startTime,
+          duration_minutes: slot.duration || 45
+        };
+        
+        assignments.push(assignment);
+        dayInfo.assignments.push(assignment);
+        dayInfo.scheduledSubjects.add(subject);
+        dayInfo.usedSlots++;
+        
+        // Advance material progress for this subject
+        subjectData.currentIndex++;
+        subjectData.scheduledThisWeek++;
+        
+        console.log(`✅ Scheduled ${subject}: ${material.title} on ${date} at ${slot.startTime} (due: ${material.due_date || 'no due date'})`);
+      }
+      
+      console.log(`📋 Day ${date} complete: ${dayInfo.usedSlots} assignments, subjects: ${Array.from(dayInfo.scheduledSubjects).join(', ')}`);
     }
     
-    // Distribute materials across days in round-robin fashion
-    const dates = Array.from(slotsByDate.keys()).sort();
-    let currentDateIndex = 0;
-    let slotIndexPerDay = new Map();
+    // Summary logging
+    const totalAssignments = assignments.length;
+    const subjectDistribution = {};
+    assignments.forEach(assignment => {
+      subjectDistribution[assignment.subject] = (subjectDistribution[assignment.subject] || 0) + 1;
+    });
     
-    // Initialize slot index tracker for each day
-    dates.forEach(date => slotIndexPerDay.set(date, 0));
+    console.log(`🎉 Day-first scheduling complete:`);
+    console.log(`   📊 Total assignments: ${totalAssignments}`);
+    console.log(`   📚 Subject distribution:`, subjectDistribution);
+    console.log(`   ✅ No subject scheduled more than once per day`);
     
-    for (const { subject, material } of allMaterials) {
-      // Find next available slot, cycling through days
-      let assigned = false;
-      let attempts = 0;
+    return assignments;
+  }
+
+  /**
+   * Create a simplified weekly subject distribution plan focused on due dates
+   * and ensures no subject appears more than once per day
+   */
+  createWeeklySubjectPlan(materialsBySubject, subjectConfig, dates, preferences) {
+    console.log('📋 Creating simplified due-date-focused weekly plan...');
+    
+    const weeklyPlan = new Map();
+    dates.forEach(date => weeklyPlan.set(date, []));
+    
+    // Create a list of all materials across subjects with their urgency and subject info
+    const allMaterialsWithSubjects = [];
+    
+    Object.entries(materialsBySubject).forEach(([subject, materials]) => {
+      // Find subject config for frequency
+      console.log(`🔍 Looking for subject config for "${subject}"`);
+      console.log(`   Available subject configs:`, Object.keys(subjectConfig));
       
-      while (!assigned && attempts < dates.length) {
-        const currentDate = dates[currentDateIndex];
-        const availableSlots = slotsByDate.get(currentDate);
-        const slotIndex = slotIndexPerDay.get(currentDate);
-        
-        if (slotIndex < availableSlots.length) {
-          const slot = availableSlots[slotIndex];
-          assignments.push({
-            slot_id: slot.id,
-            subject,
-            material_ids: [material.id],
-            child_id: material.child_id || childProfile.child_id,
-            reasoning: `Distributed assignment: ${subject} scheduled on ${currentDate} for balanced daily distribution`,
-            cognitive_match: this.calculateCognitiveMatch(subject, slot)
-          });
-          
-          // Update slot index for this day
-          slotIndexPerDay.set(currentDate, slotIndex + 1);
-          assigned = true;
+      const subjectConfigEntry = Object.entries(subjectConfig).find(([configSubjectId, config]) => {
+        // Primary match: direct subject name comparison
+        if (config.subject_name === subject) {
+          console.log(`   ✅ Direct match found: "${subject}" === "${config.subject_name}"`);
+          return true;
         }
         
-        // Move to next day (round-robin)
+        // Secondary match: check if any materials in this subject group match the config
+        const hasMatch = materials.some(material => {
+          const materialSubjectId = material.lesson?.unit?.child_subject?.id || material.child_subject_id;
+          const materialSubjectName = material.lesson?.unit?.child_subject?.custom_subject_name_override || 
+                                     material.lesson?.unit?.child_subject?.subject?.name;
+          
+          const match1 = materialSubjectId === configSubjectId;
+          const match2 = materialSubjectName === config.subject_name;
+          const match3 = subject === config.subject_name;
+          
+          return match1 || match2 || match3;
+        });
+        
+        console.log(`   Config "${configSubjectId}" (${config.subject_name}) matches "${subject}": ${hasMatch}`);
+        return hasMatch;
+      });
+      
+      const frequency = subjectConfigEntry?.[1]?.frequency || 2;
+      const maxFrequency = Math.min(frequency, dates.length);
+      
+      console.log(`📚 Subject "${subject}": ${materials.length} materials, frequency ${frequency} → capped at ${maxFrequency}`);
+      console.log(`   Found config entry:`, subjectConfigEntry ? `${subjectConfigEntry[0]} = ${JSON.stringify(subjectConfigEntry[1])}` : 'NONE - using default frequency 2');
+      
+      // Add each material with its subject and urgency info
+      materials.forEach((material, index) => {
+        const daysUntilDue = this.calculateDaysUntilDue(material.due_date);
+        allMaterialsWithSubjects.push({
+          subject,
+          material,
+          urgency: daysUntilDue,
+          frequency: maxFrequency,
+          materialIndex: index,
+          dueDateStr: material.due_date || 'no due date'
+        });
+      });
+    });
+    
+    // Sort all materials by due date urgency (most urgent first)
+    allMaterialsWithSubjects.sort((a, b) => {
+      // First: due date urgency (lower days = more urgent)
+      if (a.urgency !== b.urgency) {
+        return a.urgency - b.urgency;
+      }
+      
+      // Second: subject priority based on cognitive load if preferences set
+      if (preferences.difficult_subjects_morning) {
+        const loadA = this.COGNITIVE_LOAD_WEIGHTS[a.subject] || 0.5;
+        const loadB = this.COGNITIVE_LOAD_WEIGHTS[b.subject] || 0.5;
+        return loadB - loadA; // Higher cognitive load first
+      }
+      
+      // Third: material index (earlier lessons first)
+      return a.materialIndex - b.materialIndex;
+    });
+    
+    console.log('📊 Most urgent materials:', allMaterialsWithSubjects.slice(0, 5).map(m => 
+      `${m.subject}: ${m.material.title?.substring(0, 30)}... (due: ${m.dueDateStr}, urgency: ${m.urgency} days)`
+    ));
+    
+    // Track subject appearances per day and per week
+    const subjectCountByDay = new Map();
+    const subjectCountThisWeek = new Map();
+    
+    dates.forEach(date => subjectCountByDay.set(date, new Map()));
+    Object.keys(materialsBySubject).forEach(subject => subjectCountThisWeek.set(subject, 0));
+    
+    // Assign subjects to days based on urgency and frequency constraints
+    let currentDateIndex = 0;
+    
+    for (const item of allMaterialsWithSubjects) {
+      const { subject, frequency } = item;
+      
+      // Skip if this subject has reached its weekly frequency
+      if (subjectCountThisWeek.get(subject) >= frequency) {
+        console.log(`⏭️ Skipping ${subject} - already scheduled ${frequency} times this week`);
+        continue;
+      }
+      
+      // Find next available day for this subject (round-robin starting from currentDateIndex)
+      let placed = false;
+      let attempts = 0;
+      
+      while (!placed && attempts < dates.length) {
+        const currentDate = dates[currentDateIndex];
+        const daySubjectCount = subjectCountByDay.get(currentDate);
+        
+        // Check if this subject is not already scheduled for this day
+        if (!daySubjectCount.has(subject)) {
+          // Add this subject to the day
+          weeklyPlan.get(currentDate).push(subject);
+          daySubjectCount.set(subject, 1);
+          subjectCountThisWeek.set(subject, subjectCountThisWeek.get(subject) + 1);
+          placed = true;
+          
+          console.log(`📅 Assigned ${subject} to ${currentDate} (${subjectCountThisWeek.get(subject)}/${frequency}) - material: ${item.material.title?.substring(0, 40)}... (due: ${item.dueDateStr})`);
+        }
+        
+        // Move to next day
         currentDateIndex = (currentDateIndex + 1) % dates.length;
         attempts++;
       }
       
-      // If we couldn't assign to any day, we're out of slots
-      if (!assigned) {
-        console.log(`⚠️ No available slots for material: ${material.title || material.id}`);
-        break;
+      if (!placed) {
+        console.log(`⚠️ Could not place ${subject} - all days already have this subject scheduled`);
       }
     }
     
-    return assignments;
+    // Summary logging
+    console.log('\n📋 Final weekly plan:');
+    dates.forEach(date => {
+      const daySubjects = weeklyPlan.get(date);
+      console.log(`   ${date}: [${daySubjects.join(', ')}] (${daySubjects.length} subjects)`);
+    });
+    
+    return weeklyPlan;
   }
 
   /**
@@ -1103,12 +1650,79 @@ IMPORTANT:
   }
 
   /**
+   * Calculate average urgency for a subject's materials
+   */
+  calculateSubjectUrgency(materials) {
+    if (!materials || materials.length === 0) return 0;
+    
+    let totalUrgency = 0;
+    let urgentCount = 0;
+    
+    materials.forEach(material => {
+      const daysUntilDue = this.calculateDaysUntilDue(material.due_date);
+      if (daysUntilDue <= 3) { // Consider anything due within 3 days as urgent
+        urgentCount++;
+        if (daysUntilDue <= 1) {
+          totalUrgency += 3; // Very urgent
+        } else if (daysUntilDue <= 2) {
+          totalUrgency += 2; // Moderately urgent
+        } else {
+          totalUrgency += 1; // Slightly urgent
+        }
+      }
+    });
+    
+    // Return average urgency for this subject
+    return materials.length > 0 ? (totalUrgency / materials.length) : 0;
+  }
+
+  /**
+   * Extract lesson number from title for proper sequencing
+   */
+  extractLessonNumber(title) {
+    if (!title) return 999; // Put untitled lessons at the end
+    
+    // Look for patterns like "Lesson 1", "Chapter 2", "Unit 3", etc.
+    const patterns = [
+      /lesson\s*(\d+)/i,
+      /chapter\s*(\d+)/i,
+      /unit\s*(\d+)/i,
+      /part\s*(\d+)/i,
+      /section\s*(\d+)/i,
+      /^(\d+)\./,  // "1. Something"
+      /^(\d+)\s/   // "1 Something"
+    ];
+    
+    for (const pattern of patterns) {
+      const match = title.match(pattern);
+      if (match && match[1]) {
+        return parseInt(match[1], 10);
+      }
+    }
+    
+    return 999; // If no lesson number found, put at end
+  }
+
+  /**
    * Build preliminary schedule from assignments
    */
   buildPreliminarySchedule(assignments, timeSlots, materials) {
     const schedule = [];
-    const slotMap = new Map(timeSlots.map(slot => [slot.id, slot]));
-    const materialMap = new Map(materials.map(material => [material.id, material]));
+    
+    // Ensure timeSlots is an array
+    const timeSlotsArray = Array.isArray(timeSlots) ? timeSlots : [];
+    const slotMap = new Map(timeSlotsArray.map(slot => [slot.id, slot]));
+    
+    // Handle materials - could be array or grouped object
+    let materialsArray = [];
+    if (Array.isArray(materials)) {
+      materialsArray = materials;
+    } else if (materials && typeof materials === 'object') {
+      // Flatten grouped materials
+      materialsArray = Object.values(materials).flat();
+    }
+    
+    const materialMap = new Map(materialsArray.map(material => [material.id, material]));
     const usedMaterials = new Set(); // Track used materials to prevent duplicates
     
     assignments.forEach((assignment, index) => {
@@ -1132,28 +1746,35 @@ IMPORTANT:
                         assignment.child_id ||
                         'unknown';
         
-        // Get the actual subject name from the material data
-        
-        // Enhanced subject name detection with consistent fallback chain
-        let actualSubjectName = material.lesson?.unit?.child_subject?.custom_subject_name_override || 
+        // Use the subject name from the assignment (from weekly planning) to maintain consistency
+        // This ensures the subject names match what was planned in the weekly schedule
+        let actualSubjectName = assignment.subject || 
+                                material.lesson?.unit?.child_subject?.custom_subject_name_override || 
                                 material.lesson?.unit?.child_subject?.subject?.name ||
                                 this.inferSubjectFromTitle(material.title) ||
-                                assignment.subject ||
                                 'Study';
+        
+        // Create display title with lesson name for better user experience
+        let displayTitle = actualSubjectName;
+        if (material.title && material.title !== actualSubjectName) {
+          displayTitle = `${actualSubjectName}: ${material.title}`;
+        }
         
         schedule.push({
           id: `session_${index + 1}`,
           child_id: child_id,
-          material_id: material.lesson_id, // Use lesson_id to reference the lesson container
-          subject_name: actualSubjectName,
+          material_id: material.id, // Now this IS the lesson container ID
+          subject_name: displayTitle, // Now includes lesson title
+          base_subject_name: actualSubjectName, // Keep original subject name for color coding
           scheduled_date: slot.date,
           start_time: slot.startTime,
           duration_minutes: slot.durationMinutes,
           status: 'scheduled',
           created_by: 'ai_suggestion',
           notes: JSON.stringify({
-            specific_material_id: material.id,
-            material_title: material.title,
+            lesson_container_id: material.id,
+            lesson_title: material.title,
+            base_subject_name: actualSubjectName, // Also store in notes for compatibility
             ai_reasoning: assignment.reasoning
           }),
           reasoning: assignment.reasoning,
@@ -1204,8 +1825,11 @@ IMPORTANT:
       reasoning += `. Lower cognitive load subject suitable for this time period`;
     }
     
-    if (context.childProfile.preferences.difficult_subjects_morning && 
-        this.parseTime(time) < this.parseTime('12:00')) {
+    // Handle both single-child and multi-child contexts
+    const childProfile = context.childProfile || (context.childProfiles && context.childProfiles[0]);
+    const preferences = childProfile?.preferences || {};
+    
+    if (preferences.difficult_subjects_morning && this.parseTime(time) < this.parseTime('12:00')) {
       reasoning += `. Morning scheduling aligns with student preference for difficult subjects`;
     }
     
@@ -2267,9 +2891,13 @@ ${timeSlots.map(slot =>
   `ID: ${slot.id} | ${slot.date} ${slot.startTime}-${slot.endTime} (${slot.cognitiveWindow}, efficiency: ${slot.efficiency})`
 ).join('\n')}
 
-MATERIALS BY SUBJECT:
+MATERIALS BY SUBJECT (with due dates and urgency):
 ${Object.entries(materialsBySubject).map(([subject, materials]) => 
-  `${subject}:\n${materials.map(m => `  - MATERIAL_ID: ${m.id} | Title: "${m.title}"`).join('\n')}`
+  `${subject}:\n${materials.map(m => {
+    const daysUntilDue = this.calculateDaysUntilDue(m.due_date);
+    const urgencyLevel = daysUntilDue <= 1 ? 'URGENT' : daysUntilDue <= 3 ? 'HIGH' : 'NORMAL';
+    return `  - MATERIAL_ID: ${m.id} | Title: "${m.title}" | Due: ${m.due_date || 'No due date'} | Urgency: ${urgencyLevel}`;
+  }).join('\n')}`
 ).join('\n\n')}
 
 STUDENT PREFERENCES:
@@ -2277,16 +2905,16 @@ STUDENT PREFERENCES:
 - AI Strategy: ${aiInsights.schedulingStrategy}
 - Prioritization: ${aiInsights.prioritizationApproach}
 
-Create assignments following these CRITICAL rules:
-1. ONLY create assignments for the EXACT materials listed above - do NOT invent new materials
-2. NEVER assign the same material_id to multiple time slots - each material can only be used ONCE
-3. FOLLOW NUMERICAL LESSON ORDER: Schedule "Lesson 1" before "Lesson 2" before "Lesson 3", etc. within each subject
-4. Match high cognitive load subjects to high efficiency time slots
-5. Respect student preference for difficult subjects timing
-6. Balance subjects across days for variety
-7. Consider material urgency (due dates)
-8. Ensure each assignment uses exactly ONE unique material_id from the provided list
-9. SEQUENCE PRIORITY: Within each subject, prioritize lessons by their number (1, 2, 3, 4...)
+Create assignments following these CRITICAL rules (in priority order):
+1. DUE DATE PRIORITY: Schedule materials with due dates within 3 days FIRST, regardless of subject
+2. LESSON SEQUENCE: Schedule "Lesson 1" before "Lesson 2" before "Lesson 3", etc. within each subject
+3. PARENT FREQUENCY PREFERENCES: Respect subject frequency settings (e.g., English 4x/week, Math 5x/week)
+4. COGNITIVE LOAD OPTIMIZATION: Match high cognitive load subjects to high efficiency time slots
+5. ONLY create assignments for the EXACT materials listed above - do NOT invent new materials
+6. NEVER assign the same material_id to multiple time slots - each material can only be used ONCE
+7. Respect student preference for difficult subjects timing
+8. Balance subjects across days for variety
+9. Ensure each assignment uses exactly ONE unique material_id from the provided list
 
 Provide assignments in this JSON format:
 {

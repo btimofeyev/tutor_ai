@@ -16,6 +16,7 @@ import EnhancedScheduleManager from "./components/EnhancedScheduleManager";
 import ScheduleSettingsModal from "./components/ScheduleSettingsModal";
 import CreateScheduleEntryModal from "./components/CreateScheduleEntryModal";
 import EditScheduleEntryModal from "./components/EditScheduleEntryModal";
+import AIScheduleConfigModal from "./components/AIScheduleConfigModal";
 import { useScheduleManagement } from "../../hooks/useScheduleManagement";
 import { useMultiChildScheduleManagement } from "../../hooks/useMultiChildScheduleManagement";
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
@@ -27,6 +28,9 @@ export default function SchedulePage() {
 
   // Multi-child selection state
   const [selectedChildrenIds, setSelectedChildrenIds] = useState([]);
+  
+  // AI Schedule Modal state
+  const [showAIScheduleModal, setShowAIScheduleModal] = useState(false);
 
   // Use existing hooks for consistency
   const {
@@ -119,8 +123,18 @@ export default function SchedulePage() {
 
   // Handle saving schedule preferences
   const handleSavePreferences = async (preferencesData) => {
-    const result = await scheduleManagement.updateSchedulePreferences(preferencesData);
-    return result;
+    const isMultiChild = selectedChildrenIds.length >= 1;
+    
+    if (isMultiChild) {
+      // For multi-child, we need to determine which child to save preferences for
+      // For now, we'll save to the first selected child or the currently selected child
+      const targetChildId = childrenData.selectedChild?.id || selectedChildrenIds[0];
+      const result = await multiChildScheduleManagement.updateSchedulePreferences(preferencesData, targetChildId);
+      return result;
+    } else {
+      const result = await singleChildScheduleManagement.updateSchedulePreferences(preferencesData);
+      return result;
+    }
   };
 
   // Handle clearing entire schedule
@@ -147,6 +161,88 @@ export default function SchedulePage() {
         }
       }
     }
+  };
+
+  // Get a default start date (current Monday or today if it's a weekday)
+  const getDefaultStartDate = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    
+    // If it's a weekday, use today; otherwise use next Monday
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      return today.toISOString().split('T')[0];
+    } else {
+      // Calculate next Monday
+      const nextMonday = new Date(today);
+      const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+      nextMonday.setDate(today.getDate() + daysUntilMonday);
+      return nextMonday.toISOString().split('T')[0];
+    }
+  };
+
+  // Handle opening AI Schedule configuration modal
+  const handleOpenAIScheduleModal = () => {
+    setShowAIScheduleModal(true);
+  };
+
+  // Handle AI schedule generation with configuration
+  const handleGenerateAIScheduleWithConfig = async (schedulingConfig) => {
+    const isMultiChild = selectedChildrenIds.length >= 1;
+    
+    // Get current preferences to pass to AI - ensure it's serializable
+    const rawPreferences = isMultiChild 
+      ? (multiChildScheduleManagement.schedulePreferences[childrenData.selectedChild?.id] || multiChildScheduleManagement.schedulePreferences[selectedChildrenIds[0]] || {})
+      : singleChildScheduleManagement.schedulePreferences;
+    
+    // Merge configuration with existing preferences
+    const enhancedPreferences = {
+      // Base preferences
+      preferred_start_time: rawPreferences?.preferred_start_time || '09:00',
+      preferred_end_time: rawPreferences?.preferred_end_time || '15:00',
+      max_daily_study_minutes: rawPreferences?.max_daily_study_minutes || 240,
+      break_duration_minutes: rawPreferences?.break_duration_minutes || 15,
+      difficult_subjects_morning: rawPreferences?.difficult_subjects_morning !== false,
+      study_days: rawPreferences?.study_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+      
+      // AI Configuration from modal
+      subject_frequencies: schedulingConfig.subjectFrequencies,
+      study_intensity: schedulingConfig.studyIntensity,
+      prioritize_urgent: schedulingConfig.prioritizeUrgent,
+      difficulty_distribution: schedulingConfig.difficultyDistribution,
+      session_length_preference: schedulingConfig.sessionLength,
+      coordination_mode: schedulingConfig.coordination,
+      ai_reasoning_enabled: true
+    };
+
+    try {
+      setShowAIScheduleModal(false); // Close modal
+      
+      const result = isMultiChild 
+        ? await multiChildScheduleManagement.generateAISchedule({
+            start_date: schedulingConfig.startDate,
+            days_to_schedule: schedulingConfig.totalDaysToSchedule,
+            preferences: enhancedPreferences
+          })
+        : await singleChildScheduleManagement.generateAISchedule({
+            start_date: schedulingConfig.startDate,
+            days_to_schedule: schedulingConfig.totalDaysToSchedule,
+            preferences: enhancedPreferences
+          });
+
+      if (result.success) {
+        alert(result.message || `Successfully created ${result.entriesCreated} AI-generated schedule entries!`);
+      } else {
+        alert(result.error || 'Failed to generate AI schedule. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error generating AI schedule:', error.message || error);
+      alert(`Failed to generate AI schedule: ${error.message || 'Please check your materials and preferences.'}`);
+    }
+  };
+
+  // Legacy function for compatibility (now opens modal)
+  const handleGenerateAISchedule = async (customStartDate = null) => {
+    handleOpenAIScheduleModal();
   };
 
 
@@ -231,6 +327,21 @@ export default function SchedulePage() {
                   </h1>
                   <div className="flex items-center gap-2">
                     <button 
+                      onClick={() => handleOpenAIScheduleModal()}
+                      className="btn-primary"
+                      disabled={scheduleManagement.loading}
+                    >
+                      {scheduleManagement.loading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Generating...
+                        </>
+                      ) : (
+                        <>🧠 Configure AI Schedule</>
+                      )}
+                    </button>
+                    
+                    <button 
                       onClick={scheduleManagement.openSettingsModal}
                       className="btn-secondary"
                     >
@@ -304,6 +415,7 @@ export default function SchedulePage() {
                   childSubjects={allSubjectsForSelectedChildren}
                   schedulePreferences={scheduleManagement.schedulePreferences}
                   scheduleManagement={scheduleManagement}
+                  onGenerateAISchedule={handleGenerateAISchedule}
                 />
               </div>
             </div>
@@ -348,9 +460,25 @@ export default function SchedulePage() {
         isOpen={scheduleManagement.showSettingsModal}
         onClose={scheduleManagement.closeSettingsModal}
         onSave={handleSavePreferences}
-        schedulePreferences={scheduleManagement.schedulePreferences}
+        schedulePreferences={
+          selectedChildrenIds.length >= 1 
+            ? (multiChildScheduleManagement.schedulePreferences[childrenData.selectedChild?.id] || multiChildScheduleManagement.schedulePreferences[selectedChildrenIds[0]] || {})
+            : singleChildScheduleManagement.schedulePreferences
+        }
         childName={childrenData.selectedChild?.name}
+        childSubjects={allSubjectsForSelectedChildren}
         isSaving={scheduleManagement.loading}
+      />
+
+      {/* AI Schedule Configuration Modal */}
+      <AIScheduleConfigModal
+        isOpen={showAIScheduleModal}
+        onClose={() => setShowAIScheduleModal(false)}
+        onGenerate={handleGenerateAIScheduleWithConfig}
+        childSubjects={allSubjectsForSelectedChildren}
+        selectedChildrenIds={selectedChildrenIds}
+        allChildren={childrenData.children}
+        isGenerating={scheduleManagement.loading}
       />
 
     </div>

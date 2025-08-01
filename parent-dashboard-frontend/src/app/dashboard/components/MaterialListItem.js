@@ -5,13 +5,14 @@ import PropTypes from 'prop-types';
 import { CheckCircleIcon as CheckSolidIcon } from '@heroicons/react/24/solid';
 import { PencilSquareIcon, CalendarDaysIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { APP_GRADABLE_CONTENT_TYPES } from '../../../utils/dashboardConstants';
+import { useProcessingContext } from '../../../components/ProcessingNotificationProvider';
 
 // Utility functions
 const isDateOverdue = (dateString, completed) => {
   if (completed || !dateString) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dueDate = new Date(dateString + 'T00:00:00Z');
+  const dueDate = new Date(dateString + 'T00:00:00');
   return dueDate < today;
 };
 
@@ -19,7 +20,7 @@ const isDateDueSoon = (dateString, completed, days = 7) => {
   if (completed || !dateString) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dueDate = new Date(dateString + 'T00:00:00Z');
+  const dueDate = new Date(dateString + 'T00:00:00');
   const soonCutoff = new Date(today);
   soonCutoff.setDate(today.getDate() + days);
   return dueDate >= today && dueDate <= soonCutoff;
@@ -31,7 +32,7 @@ const formatContentType = (contentType) => {
 
 const formatDueDate = (dateString) => {
   try {
-    return new Date(dateString + 'T00:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return new Date(dateString + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   } catch {
     return 'N/A';
   }
@@ -59,7 +60,47 @@ const CompletionToggle = React.memo(({ isCompleted, isToggling, onClick, disable
 ));
 CompletionToggle.displayName = 'CompletionToggle';
 
-const StatusBadge = ({ lesson, materialInfo }) => {
+const StatusBadge = React.memo(({ lesson, materialInfo }) => {
+  const { processingMaterials } = useProcessingContext();
+  
+  // Check if this material is currently being processed
+  const isProcessing = processingMaterials.includes(String(lesson.id));
+  
+  // Check if this material was recently processed (within last 24 hours)
+  const isRecentlyProcessed = useMemo(() => {
+    if (!lesson.processing_completed_at) return false;
+    const completedTime = new Date(lesson.processing_completed_at);
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    return completedTime > twentyFourHoursAgo;
+  }, [lesson.processing_completed_at]);
+  
+  // Show processing indicator if this material is being processed
+  if (isProcessing) {
+    return (
+      <div className="flex items-center bg-gradient-to-r from-blue-50 to-indigo-50 px-3 py-1.5 rounded-full border border-blue-200 shadow-sm">
+        <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2" />
+        <span className="font-medium text-blue-700 text-sm">
+          <span className="hidden sm:inline">AI Processing</span>
+          <span className="sm:hidden">Processing</span>
+        </span>
+      </div>
+    );
+  }
+  
+  // Show NEW badge for recently processed materials (24 hours)
+  if (isRecentlyProcessed && !materialInfo.isCompleted) {
+    return (
+      <div className="flex items-center bg-gradient-to-r from-emerald-50 to-green-50 px-3 py-1.5 rounded-full border border-emerald-200 shadow-sm">
+        <span className="text-emerald-500 mr-1.5">✨</span>
+        <span className="font-bold text-emerald-700 text-sm">
+          <span className="hidden sm:inline">NEW</span>
+          <span className="sm:hidden">NEW</span>
+        </span>
+      </div>
+    );
+  }
+  
   // Check if this item has a grade (including grade of 0) and show it
   const hasGrade = lesson.grade_value !== null && lesson.grade_value !== undefined && lesson.grade_value !== '';
   if (hasGrade || (lesson.grade_value === 0 && materialInfo.hasMaxScore)) {
@@ -139,7 +180,8 @@ const StatusBadge = ({ lesson, materialInfo }) => {
     );
   }
   return null;
-};
+});
+StatusBadge.displayName = 'StatusBadge';
 
 export default function MaterialListItem({ 
   lesson, 

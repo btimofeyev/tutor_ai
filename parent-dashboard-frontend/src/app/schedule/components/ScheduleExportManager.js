@@ -139,7 +139,7 @@ export default function ScheduleExportManager({
 
     const subjectBreakdown = {};
     filteredEvents.forEach(event => {
-      const subject = event.subject_name || event.title || 'Other';
+      const subject = event.base_subject_name || event.subject_name || event.title || 'Other';
       const duration = event.duration || event.duration_minutes || 30;
       subjectBreakdown[subject] = (subjectBreakdown[subject] || 0) + duration;
     });
@@ -219,7 +219,7 @@ export default function ScheduleExportManager({
           title: 'Daily Schedule Highlights',
           content: Object.entries(eventsByDate).map(([date, events]) => {
             const dayTotal = events.reduce((sum, e) => sum + (e.duration || 30), 0);
-            const subjects = [...new Set(events.map(e => e.subject_name || e.title))].slice(0, 3);
+            const subjects = [...new Set(events.map(e => e.base_subject_name || e.subject_name || e.title))].slice(0, 3);
             return `${format(new Date(date), 'EEE, MMM d')}: ${Math.round(dayTotal/60*10)/10}h - ${subjects.join(', ')}`;
           })
         }
@@ -246,7 +246,7 @@ export default function ScheduleExportManager({
             .sort((a, b) => (a.startTime || a.start_time || '').localeCompare(b.startTime || b.start_time || ''))
             .map(event => {
               const time = event.startTime || event.start_time || format(new Date(event.start), 'HH:mm');
-              const subject = event.subject_name || event.title || 'Study';
+              const subject = event.base_subject_name || event.subject_name || event.title || 'Study';
               const duration = event.duration || event.duration_minutes || 30;
               const status = event.status === 'completed' ? ' ✓' : '';
               const notes = exportOptions.includeNotes && event.notes ? ` - ${event.notes}` : '';
@@ -262,7 +262,7 @@ export default function ScheduleExportManager({
   const createSubjectSpecificExport = ({ childName, dateRange, subjectBreakdown, filteredEvents, totalHours }) => {
     const subjectSections = Object.entries(subjectBreakdown).map(([subject, totalMinutes]) => {
       const subjectEvents = filteredEvents.filter(e => 
-        (e.subject_name || e.title || 'Other') === subject
+        (e.base_subject_name || e.subject_name || e.title || 'Other') === subject
       );
       
       const sessions = subjectEvents.map(event => {

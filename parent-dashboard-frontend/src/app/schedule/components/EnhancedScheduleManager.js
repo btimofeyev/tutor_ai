@@ -5,11 +5,9 @@ import {
   CalendarDaysIcon,
   Cog6ToothIcon,
   DocumentDuplicateIcon,
-  ArrowsUpDownIcon,
   PrinterIcon
 } from '@heroicons/react/24/outline';
 import AdvancedScheduleCalendar from './AdvancedScheduleCalendar';
-import DragDropScheduleCalendar from './DragDropScheduleCalendar';
 import ScheduleTemplatesManager from './ScheduleTemplatesManager';
 import PDFGenerator from './PDFGenerator';
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
@@ -21,7 +19,8 @@ export default function EnhancedScheduleManager({
   subscriptionPermissions,
   childSubjects = [],
   schedulePreferences = {},
-  scheduleManagement
+  scheduleManagement,
+  onGenerateAISchedule
 }) {
   const [activeView, setActiveView] = useState('advanced'); // advanced, dragdrop
   const [showTemplates, setShowTemplates] = useState(false);
@@ -256,7 +255,7 @@ export default function EnhancedScheduleManager({
           day: dayName,
           time: event.startTime || event.start_time || format(date, 'HH:mm'),
           duration: event.duration || event.duration_minutes || 30,
-          subject: event.subject_name || event.subject || event.title || 'Study'
+          subject: event.base_subject_name || event.subject_name || event.subject || event.title || 'Study'
         });
       });
 
@@ -331,7 +330,7 @@ export default function EnhancedScheduleManager({
     }
   };
 
-  // Simple, clear tab selector
+  // Simple, clear tab selector - removed organize tab
   const renderViewSelector = () => (
     <div className="flex items-center gap-2">
       <button
@@ -340,13 +339,6 @@ export default function EnhancedScheduleManager({
       >
         <CalendarDaysIcon className="h-4 w-4" />
         Calendar
-      </button>
-      <button
-        onClick={() => setActiveView('dragdrop')}
-        className={`${activeView === 'dragdrop' ? 'btn-primary' : 'btn-secondary'}`}
-      >
-        <ArrowsUpDownIcon className="h-4 w-4" />
-        Organize
       </button>
       <button
         onClick={() => setActiveView('templates')}
@@ -361,8 +353,8 @@ export default function EnhancedScheduleManager({
   // Render action buttons - enhanced styling
   const renderActionButtons = () => (
     <div className="flex items-center gap-3">
-      {/* Quick Save as Template button - show in calendar views */}
-      {(activeView === 'advanced' || activeView === 'dragdrop') && (
+      {/* Quick Save as Template button - show in calendar view */}
+      {activeView === 'advanced' && (
         <button
           onClick={() => handleSaveAsTemplate()}
           className="btn-yellow"
@@ -487,15 +479,7 @@ export default function EnhancedScheduleManager({
                     <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg">
                       <CalendarDaysIcon className="h-6 w-6 text-white" />
                     </div>
-                    Schedule Calendar
-                  </>
-                )}
-                {activeView === 'dragdrop' && (
-                  <>
-                    <div className="p-2 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow-lg">
-                      <ArrowsUpDownIcon className="h-6 w-6 text-white" />
-                    </div>
-                    Organize Schedule
+                    Smart Schedule Calendar
                   </>
                 )}
                 {activeView === 'templates' && (
@@ -508,8 +492,7 @@ export default function EnhancedScheduleManager({
                 )}
               </h1>
               <p className="text-sm text-gray-600 ml-14">
-                {activeView === 'advanced' && 'View and manage your family\'s learning schedule'}
-                {activeView === 'dragdrop' && 'Drag and drop to reorganize scheduled sessions'}
+                {activeView === 'advanced' && 'AI-powered calendar with drag-and-drop organization'}
                 {activeView === 'templates' && 'Create and apply schedule templates to save time'}
               </p>
             </div>
@@ -573,6 +556,7 @@ export default function EnhancedScheduleManager({
             </div>
           ) : (
             <AdvancedScheduleCalendar
+              key={`calendar-${selectedChildrenIds.join('-') || childId}`}
               childId={childId}
               selectedChildrenIds={selectedChildrenIds}
               allChildren={allChildren}
@@ -580,62 +564,12 @@ export default function EnhancedScheduleManager({
               scheduleManagement={finalScheduleManagement}
               childSubjects={childSubjects}
               schedulePreferences={schedulePreferences}
+              onGenerateAISchedule={onGenerateAISchedule}
             />
           )}
         </>
       )}
 
-      {activeView === 'dragdrop' && (
-        <>
-          {applyingTemplate ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="animate-pulse space-y-4">
-                {/* Drag-drop header skeleton */}
-                <div className="flex justify-between items-center mb-6">
-                  <div className="h-6 bg-gray-200 rounded w-40"></div>
-                  <div className="h-8 bg-gray-200 rounded w-24"></div>
-                </div>
-                
-                {/* Time slots skeleton */}
-                <div className="space-y-3">
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-4">
-                      <div className="h-4 bg-gray-200 rounded w-16"></div>
-                      <div className="flex-1 grid grid-cols-7 gap-2">
-                        {Array.from({ length: 7 }).map((_, j) => (
-                          <div key={j} className="h-12 bg-gray-100 rounded border border-gray-200 flex items-center justify-center">
-                            {Math.random() > 0.8 && (
-                              <div className="h-8 bg-blue-200 rounded w-full mx-1"></div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Loading indicator */}
-                <div className="text-center py-4">
-                  <div className="inline-flex items-center gap-2 text-blue-600">
-                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm font-medium">Organizing schedule entries...</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <DragDropScheduleCalendar
-              childId={childId}
-              selectedChildrenIds={selectedChildrenIds}
-              allChildren={allChildren}
-              subscriptionPermissions={subscriptionPermissions}
-              scheduleManagement={finalScheduleManagement}
-              childSubjects={childSubjects}
-              onEventUpdate={handleEventUpdate}
-            />
-          )}
-        </>
-      )}
 
       {activeView === 'templates' && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">

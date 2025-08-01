@@ -67,7 +67,7 @@ const TodayOverviewItem = React.memo(({ item, type, onToggleComplete }) => {
                 </span>
               )}
               {isAssignment && item.due_date && (
-                <span>Due: {new Date(item.due_date + 'T00:00:00Z').toLocaleDateString()}</span>
+                <span>Due: {new Date(item.due_date + 'T00:00:00').toLocaleDateString()}</span>
               )}
               {item.subject_name && (
                 <span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs">
@@ -125,8 +125,8 @@ export default function TodayOverview({
     const fetchTodaySchedule = async () => {
       setLoadingSchedule(true);
       try {
-        // Use the correct API endpoint structure
-        const response = await api.get(`/api/schedule/${selectedChild.id}`);
+        // Use the correct API endpoint structure (baseURL already includes /api)
+        const response = await api.get(`/schedule/${selectedChild.id}`);
         const allScheduleItems = response.data || [];
         
         // Filter for today's items using the correct field name
@@ -149,89 +149,84 @@ export default function TodayOverview({
     fetchTodaySchedule();
   }, [selectedChild?.id]);
 
-  const { todaysWork, priorityItems } = useMemo(() => {
+  const { upcomingWork, todaySchedule, totalIncompleteItems } = useMemo(() => {
     const allLessons = Object.values(lessonsBySubject).flat();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Get assignments due today
-    const todayAssignments = allLessons.filter(lesson => {
-      if (!lesson.due_date) return false;
-      const dueDate = new Date(lesson.due_date + 'T00:00:00Z');
+    // Get all incomplete lessons with due dates (filter out assignments - those are for students)
+    const incompleteWithDueDates = allLessons.filter(lesson => 
+      !lesson.completed_at && 
+      lesson.due_date &&
+      !APP_GRADABLE_CONTENT_TYPES.includes(lesson.content_type) // Exclude assignments
+    );
+    
+    // Add urgency info to each item
+    const itemsWithUrgency = incompleteWithDueDates.map(lesson => {
+      const dueDate = new Date(lesson.due_date + 'T00:00:00');
       dueDate.setHours(0, 0, 0, 0);
-      return dueDate.getTime() === today.getTime() && !lesson.completed_at;
+      const daysDiff = Math.floor((dueDate - today) / (1000 * 60 * 60 * 24));
+      
+      let type = 'future';
+      let urgencyScore = 1000 + daysDiff; // Default for future items
+      
+      if (daysDiff < 0) {
+        type = 'overdue';
+        urgencyScore = daysDiff; // Negative number, so most overdue will be most negative
+      } else if (daysDiff === 0) {
+        type = 'due-today';
+        urgencyScore = 0;
+      } else if (daysDiff === 1) {
+        type = 'tomorrow';
+        urgencyScore = 1;
+      } else if (daysDiff <= 3) {
+        type = 'upcoming';
+        urgencyScore = daysDiff;
+      } else if (daysDiff <= 7) {
+        type = 'this-week';
+        urgencyScore = 10 + daysDiff;
+      }
+      
+      return {
+        ...lesson,
+        type,
+        urgencyScore,
+        daysUntilDue: daysDiff
+      };
     });
     
-    // Get overdue items (higher priority)
-    const overdueAssignments = allLessons.filter(lesson => 
-      !lesson.completed_at && isDateOverdue(lesson.due_date)
-    );
+    // Sort by urgency (most urgent first)
+    const sortedByUrgency = itemsWithUrgency.sort((a, b) => {
+      // First sort by urgency score (lower is more urgent)
+      if (a.urgencyScore !== b.urgencyScore) {
+        return a.urgencyScore - b.urgencyScore;
+      }
+      // Then by title for items with same urgency
+      return a.title.localeCompare(b.title);
+    });
     
-    // Get due soon items
-    const dueSoonAssignments = allLessons.filter(lesson => 
-      !lesson.completed_at && 
-      isDateDueSoon(lesson.due_date, 3) && 
-      !isDateOverdue(lesson.due_date) &&
-      !todayAssignments.includes(lesson)
-    );
-
-    // Combine today's work: schedule items + assignments due today
-    const todaysWork = [
-      ...todayScheduleItems.map(item => ({ ...item, type: 'scheduled' })),
-      ...todayAssignments.map(item => ({ ...item, type: 'due-today' }))
-    ].sort((a, b) => {
-      // Sort by time for schedule items, then by title
+    // Show only top 3 most urgent lessons for parents to work through
+    const upcomingWork = sortedByUrgency.slice(0, 3);
+    
+    // Today's schedule items (if any)
+    const todaySchedule = todayScheduleItems.map(item => ({ 
+      ...item, 
+      type: 'scheduled',
+      urgencyScore: -1 // Schedule items always show first
+    })).sort((a, b) => {
       if (a.start_time && b.start_time) {
         return a.start_time.localeCompare(b.start_time);
       }
-      if (a.start_time && !b.start_time) return -1;
-      if (!a.start_time && b.start_time) return 1;
-      return a.title.localeCompare(b.title);
-    }).slice(0, maxItems);
-    
-    // If no schedule items available, show more assignments due today and this week
-    if (todayScheduleItems.length === 0 && todayAssignments.length === 0) {
-      const thisWeekAssignments = allLessons.filter(lesson => 
-        !lesson.completed_at && 
-        isDateDueSoon(lesson.due_date, 7) && 
-        !isDateOverdue(lesson.due_date)
-      ).slice(0, 3);
-      
-      todaysWork.push(...thisWeekAssignments.map(item => ({ ...item, type: 'this-week' })));
-    }
+      return 0;
+    });
 
-    // Priority items: overdue + due soon
-    const priorityItems = [
-      ...overdueAssignments.map(item => ({ ...item, type: 'overdue' })),
-      ...dueSoonAssignments.map(item => ({ ...item, type: 'upcoming' }))
-    ].sort((a, b) => {
-      // Overdue items first, then by due date
-      if (a.type === 'overdue' && b.type !== 'overdue') return -1;
-      if (a.type !== 'overdue' && b.type === 'overdue') return 1;
-      if (a.due_date && b.due_date) {
-        return new Date(a.due_date) - new Date(b.due_date);
-      }
-      return a.title.localeCompare(b.title);
-    }).slice(0, maxItems);
-
-    return { todaysWork, priorityItems };
+    return { upcomingWork, todaySchedule, totalIncompleteItems: incompleteWithDueDates.length };
   }, [lessonsBySubject, todayScheduleItems, maxItems]);
 
-  // Don't show if no items
-  if (todaysWork.length === 0 && priorityItems.length === 0) {
-    return (
-      <div className="mb-6">
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6 text-center">
-          <div className="text-4xl mb-3">🎉</div>
-          <h3 className="text-lg font-semibold text-green-800 mb-2">
-            All Caught Up!
-          </h3>
-          <p className="text-sm text-green-700">
-            No urgent assignments or overdue work right now. Great job staying on top of things!
-          </p>
-        </div>
-      </div>
-    );
+  // Show component even with just a few items to give parents a quick snapshot
+  // But hide if absolutely nothing to show
+  if (upcomingWork.length === 0 && todaySchedule.length === 0) {
+    return null;
   }
 
   const todayDate = new Date().toLocaleDateString(undefined, { 
@@ -241,34 +236,44 @@ export default function TodayOverview({
   });
 
   return (
-    <section className="mb-6" aria-labelledby="todays-focus-heading">
+    <section className="mb-4" aria-labelledby="upcoming-work-heading">
       <div className="mb-4">
-        <h2 id="todays-focus-heading" className="text-lg font-semibold text-text-primary flex items-center gap-2">
-          <span className="text-xl" aria-hidden="true">📅</span>
-          Today&apos;s Focus - {todayDate}
+        <h2 id="upcoming-work-heading" className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <span className="text-lg" aria-hidden="true">📋</span>
+          Next 3 Lessons
         </h2>
-        <p className="text-sm text-text-secondary mt-1">
-          Schedule items and important assignments for today
+        <p className="text-sm text-gray-600 mt-1">
+          {upcomingWork.filter(item => item.type === 'overdue').length > 0 ? (
+            <span className="text-red-600 font-medium">
+              ⚠️ {upcomingWork.filter(item => item.type === 'overdue').length} overdue lessons need attention
+            </span>
+          ) : upcomingWork.filter(item => item.type === 'due-today').length > 0 ? (
+            <span className="text-orange-600 font-medium">
+              📅 {upcomingWork.filter(item => item.type === 'due-today').length} lessons due today
+            </span>
+          ) : (
+            'Complete lessons in order - next one will appear as you finish'
+          )}
         </p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Today's Schedule & Assignments */}
-        {todaysWork.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4" role="region" aria-labelledby="todays-plan-heading">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+        {/* Today's Schedule (if any) */}
+        {todaySchedule.length > 0 && (
+          <div className="p-4 border-b border-gray-200">
             <div className="flex items-center gap-2 mb-3">
-              <CalendarDaysIcon className="h-5 w-5 text-blue-500" aria-hidden="true" />
-              <h3 id="todays-plan-heading" className="font-semibold text-blue-800">
-                {todayScheduleItems.length > 0 ? "Today's Plan" : "Upcoming Work"} ({todaysWork.length})
+              <CalendarDaysIcon className="h-5 w-5 text-blue-600" aria-hidden="true" />
+              <h3 className="font-semibold text-gray-900">
+                Today&apos;s Schedule - {todayDate}
               </h3>
             </div>
             {loadingSchedule ? (
-              <div className="text-center py-2 text-blue-600">Loading schedule...</div>
+              <div className="text-center py-2 text-gray-500">Loading schedule...</div>
             ) : (
               <div className="space-y-2">
-                {todaysWork.map((item, index) => (
+                {todaySchedule.map((item, index) => (
                   <TodayOverviewItem
-                    key={`today-${item.id || index}`}
+                    key={`schedule-${item.id || index}`}
                     item={item}
                     type={item.type}
                     onToggleComplete={onToggleComplete}
@@ -279,27 +284,36 @@ export default function TodayOverview({
           </div>
         )}
 
-        {/* Priority Items */}
-        {priorityItems.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4" role="region" aria-labelledby="needs-attention-heading">
-            <div className="flex items-center gap-2 mb-3">
-              <ExclamationTriangleIcon className="h-5 w-5 text-amber-500" aria-hidden="true" />
-              <h3 id="needs-attention-heading" className="font-semibold text-amber-800">
-                Needs Attention ({priorityItems.length})
-              </h3>
-            </div>
-            <div className="space-y-2">
-              {priorityItems.map(item => (
-                <TodayOverviewItem
-                  key={`priority-${item.id}`}
-                  item={item}
-                  type={item.type}
-                  onToggleComplete={onToggleComplete}
-                />
-              ))}
-            </div>
+        {/* Upcoming Assignments */}
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <ExclamationTriangleIcon className="h-5 w-5 text-orange-500" aria-hidden="true" />
+              Lessons to Complete
+            </h3>
+            <span className="text-sm text-gray-500">
+              {upcomingWork.length} items
+            </span>
           </div>
-        )}
+          
+          <div className="space-y-2">
+            {upcomingWork.map((item, index) => (
+              <TodayOverviewItem
+                key={`upcoming-${item.id || index}`}
+                item={item}
+                type={item.type}
+                onToggleComplete={onToggleComplete}
+              />
+            ))}
+          </div>
+          
+          {/* Show indicator if there are more items */}
+          {totalIncompleteItems > upcomingWork.length && (
+            <div className="mt-3 text-center text-sm text-gray-500">
+              Showing {upcomingWork.length} most urgent items out of {totalIncompleteItems} total
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

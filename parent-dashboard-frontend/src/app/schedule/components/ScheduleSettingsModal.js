@@ -12,6 +12,7 @@ export default function ScheduleSettingsModal({
   onSave,
   schedulePreferences = {},
   childName = 'Student',
+  childSubjects = [],
   isSaving = false 
 }) {
   // Form state
@@ -21,7 +22,8 @@ export default function ScheduleSettingsModal({
     max_daily_study_minutes: 240,
     break_duration_minutes: 15,
     difficult_subjects_morning: true,
-    study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+    study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+    subject_frequencies: {} // { subject_id: frequency_per_week }
   });
 
   const [errors, setErrors] = useState({});
@@ -29,17 +31,25 @@ export default function ScheduleSettingsModal({
   // Initialize form when modal opens or preferences change
   useEffect(() => {
     if (isOpen && schedulePreferences) {
+      // Initialize subject frequencies with defaults
+      const subjectFrequencies = {};
+      childSubjects.forEach(subject => {
+        subjectFrequencies[subject.child_subject_id] = 
+          schedulePreferences.subject_frequencies?.[subject.child_subject_id] || 3; // Default 3 times per week
+      });
+
       setFormData({
         preferred_start_time: schedulePreferences.preferred_start_time || '09:00',
         preferred_end_time: schedulePreferences.preferred_end_time || '15:00', 
         max_daily_study_minutes: schedulePreferences.max_daily_study_minutes || 240,
         break_duration_minutes: schedulePreferences.break_duration_minutes || 15,
         difficult_subjects_morning: schedulePreferences.difficult_subjects_morning !== false,
-        study_days: schedulePreferences.study_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+        study_days: schedulePreferences.study_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+        subject_frequencies: subjectFrequencies
       });
       setErrors({});
     }
-  }, [isOpen, schedulePreferences]);
+  }, [isOpen, schedulePreferences, childSubjects]);
 
   // Handle input changes
   const handleInputChange = (e) => {
@@ -63,6 +73,17 @@ export default function ScheduleSettingsModal({
       study_days: prev.study_days.includes(day)
         ? prev.study_days.filter(d => d !== day)
         : [...prev.study_days, day]
+    }));
+  };
+
+  // Handle subject frequency changes
+  const handleSubjectFrequencyChange = (subjectId, frequency) => {
+    setFormData(prev => ({
+      ...prev,
+      subject_frequencies: {
+        ...prev.subject_frequencies,
+        [subjectId]: parseInt(frequency)
+      }
     }));
   };
 
@@ -304,6 +325,55 @@ export default function ScheduleSettingsModal({
                 <p className="text-red-600 text-xs mt-2">{errors.study_days}</p>
               )}
             </div>
+
+            {/* Subject Frequency Preferences */}
+            {childSubjects.length > 0 && (
+              <div className="border border-[var(--border-subtle)] rounded-lg p-4 bg-[var(--background-main)]">
+                <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
+                  Subject Frequency Preferences
+                </h4>
+                
+                <p className="text-sm text-[var(--text-secondary)] mb-4">
+                  Set how many days per week you want to schedule each subject. This helps the AI create a balanced weekly schedule that matches your teaching preferences.
+                </p>
+                
+                <div className="space-y-3">
+                  {childSubjects.map(subject => (
+                    <div key={subject.child_subject_id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-[var(--text-primary)]">
+                          {subject.custom_subject_name_override || subject.subject?.name || subject.name}
+                        </span>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1">
+                          Current: {formData.subject_frequencies[subject.child_subject_id] || 3} days per week
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-[var(--text-secondary)]">Days/week:</label>
+                        <select
+                          value={formData.subject_frequencies[subject.child_subject_id] || 3}
+                          onChange={(e) => handleSubjectFrequencyChange(subject.child_subject_id, e.target.value)}
+                          className="text-sm border border-gray-300 rounded px-2 py-1 bg-white min-w-[60px]"
+                        >
+                          <option value={1}>1</option>
+                          <option value={2}>2</option>
+                          <option value={3}>3</option>
+                          <option value={4}>4</option>
+                          <option value={5}>5</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-xs text-blue-800">
+                    <span className="font-medium">Tip:</span> Higher frequency subjects (4-5 days) will be prioritized for the best time slots. 
+                    For example, if you set Math to 5 days and Art to 2 days, Math will get the morning slots when focus is highest.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Learning Preferences */}
             <div className="border border-[var(--border-subtle)] rounded-lg p-4 bg-[var(--background-main)]">

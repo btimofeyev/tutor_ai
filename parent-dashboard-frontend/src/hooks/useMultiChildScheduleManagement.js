@@ -1,10 +1,11 @@
 // hooks/useMultiChildScheduleManagement.js
 import { useState, useEffect, useCallback } from 'react';
-import api from '../utils/api';
+import api, { uploadApi } from '../utils/api';
 
 export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptionPermissions, allChildren) {
   // Combined state for all selected children's schedule entries
   const [allScheduleEntries, setAllScheduleEntries] = useState({});
+  const [schedulePreferences, setSchedulePreferences] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -404,19 +405,189 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   };
 
 
+  // Fetch schedule preferences for multiple children
+  const fetchMultipleChildrenPreferences = useCallback(async (childrenIds) => {
+    if (!childrenIds || childrenIds.length === 0) return;
+    
+    try {
+      const promises = childrenIds.map(childId => 
+        api.get(`/schedule/preferences/${childId}`).catch(err => {
+          // Return default preferences on error
+          return { 
+            data: {
+              preferred_start_time: '09:00',
+              preferred_end_time: '15:00',
+              max_daily_study_minutes: 240,
+              break_duration_minutes: 15,
+              difficult_subjects_morning: true,
+              study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+              subject_frequencies: {}
+            }
+          };
+        })
+      );
+      
+      const responses = await Promise.all(promises);
+      
+      // Organize preferences by child ID
+      const preferencesByChild = {};
+      childrenIds.forEach((childId, index) => {
+        preferencesByChild[childId] = responses[index]?.data || {};
+      });
+      
+      setSchedulePreferences(preferencesByChild);
+    } catch (err) {
+      console.error('Error fetching preferences:', err);
+      // Set default preferences for all children
+      const defaultPrefs = {};
+      childrenIds.forEach(childId => {
+        defaultPrefs[childId] = {
+          preferred_start_time: '09:00',
+          preferred_end_time: '15:00',
+          max_daily_study_minutes: 240,
+          break_duration_minutes: 15,
+          difficult_subjects_morning: true,
+          study_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+          subject_frequencies: {}
+        };
+      });
+      setSchedulePreferences(defaultPrefs);
+    }
+  }, []);
+
+  // Update schedule preferences for a specific child
+  const updateSchedulePreferences = async (preferences, childId) => {
+    try {
+      setLoading(true);
+      const response = await api.post(`/schedule/preferences/${childId}`, preferences);
+      
+      // Update the preferences in local state
+      setSchedulePreferences(prev => ({
+        ...prev,
+        [childId]: response.data
+      }));
+      
+      setError(null);
+      return { success: true, data: response.data };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || 'Failed to update preferences';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate AI-powered schedule for multiple children
+  const generateAISchedule = async (options = {}) => {
+    try {
+      setLoading(true);
+      
+      const {
+        start_date = new Date().toISOString().split('T')[0], // Default to today
+        days_to_schedule = 7,
+        preferences = {}
+      } = options;
+
+      if (!selectedChildrenIds || selectedChildrenIds.length === 0) {
+        throw new Error('No children selected for AI scheduling');
+      }
+
+      // Deep clean function to remove any non-serializable data
+      const deepClean = (obj, path = 'root') => {
+        if (obj === null || obj === undefined) return obj;
+        if (typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean') return obj;
+        if (obj instanceof Date) return obj.toISOString();
+        if (Array.isArray(obj)) {
+          return obj.map((item, index) => deepClean(item, `${path}[${index}]`));
+        }
+        if (typeof obj === 'object') {
+          // Check if it's a DOM element or has circular references
+          if (obj.nodeType || obj.window || obj.ownerDocument || obj.constructor?.name?.includes('HTML')) {
+            console.warn(`Removing DOM element found at path: ${path}`, obj.constructor?.name);
+            return undefined;
+          }
+          if (obj.target && obj.preventDefault && obj.stopPropagation) {
+            console.warn(`Removing event object found at path: ${path}`);
+            return undefined;
+          }
+          const cleaned = {};
+          for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+              const cleanedValue = deepClean(obj[key], `${path}.${key}`);
+              if (cleanedValue !== undefined) {
+                cleaned[key] = cleanedValue;
+              }
+            }
+          }
+          return cleaned;
+        }
+        if (typeof obj === 'function') {
+          console.warn(`Removing function found at path: ${path}`);
+          return undefined;
+        }
+        return undefined; // Other non-serializable types
+      };
+
+      const cleanPreferences = deepClean(preferences, 'preferences') || {};
+
+      // Ensure child IDs are clean strings
+      const safeChildIds = selectedChildrenIds.filter(id => id && typeof id === 'string');
+
+      const requestPayload = {
+        child_ids: safeChildIds,
+        start_date: String(start_date),
+        days_to_schedule: Number(days_to_schedule),
+        preferences: cleanPreferences
+      };
+
+      // Add debug logging to catch any circular reference issues before they happen
+      try {
+        const testStringify = JSON.stringify(requestPayload);
+        console.log('Multi-child AI Schedule Request:', testStringify);
+      } catch (circularError) {
+        console.error('Circular reference detected before API call:', circularError);
+        console.log('Request payload object:', requestPayload);
+        throw new Error(`Cannot serialize request data: ${circularError.message}`);
+      }
+
+      const response = await uploadApi.post('/schedule/ai-generate', requestPayload);
+
+      // Refresh the schedule entries for all selected children
+      await fetchMultipleChildrenSchedules(selectedChildrenIds);
+      
+      setError(null);
+      return { 
+        success: true, 
+        data: response.data,
+        message: response.data.message,
+        entriesCreated: response.data.entries_created
+      };
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || 'Failed to generate AI schedule';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Load data when selected children change
   useEffect(() => {
     if (selectedChildrenIds && selectedChildrenIds.length > 0) {
       fetchMultipleChildrenSchedules(selectedChildrenIds);
+      fetchMultipleChildrenPreferences(selectedChildrenIds);
     } else {
       // Clear all entries if no children selected
       setAllScheduleEntries({});
+      setSchedulePreferences({});
     }
-  }, [selectedChildrenIds, fetchMultipleChildrenSchedules]);
+  }, [selectedChildrenIds, fetchMultipleChildrenSchedules, fetchMultipleChildrenPreferences]);
 
   return {
     // Data
     allScheduleEntries,
+    schedulePreferences,
     calendarEvents: getCombinedCalendarEvents(),
     
     // Loading states
@@ -435,6 +606,8 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     createScheduleEntriesBatch,
     updateScheduleEntry,
     deleteScheduleEntry,
+    updateSchedulePreferences,
+    generateAISchedule,
     
     // Status updates
     markEntryCompleted,
@@ -450,6 +623,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     // Refresh
     refresh: () => {
       fetchMultipleChildrenSchedules(selectedChildrenIds);
+      fetchMultipleChildrenPreferences(selectedChildrenIds);
     }
   };
 }

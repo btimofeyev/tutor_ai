@@ -2,7 +2,7 @@
 export const APP_CONTENT_TYPES = [
   "lesson",
   "worksheet", 
-  "assignment",
+  "review",
   "test",
   "quiz",
   "notes",
@@ -12,15 +12,31 @@ export const APP_CONTENT_TYPES = [
 
 export const APP_GRADABLE_CONTENT_TYPES = [
   "worksheet",
-  "assignment", 
+  "review",
   "test",
   "quiz",
 ];
 
-export const defaultWeightsForNewSubject = APP_CONTENT_TYPES.map((ct) => ({
-  content_type: ct,
-  weight: APP_GRADABLE_CONTENT_TYPES.includes(ct) ? 0.1 : 0.0,
-}));
+// Realistic weight distribution that adds up to 100%
+export const defaultWeightsForNewSubject = APP_CONTENT_TYPES.map((ct) => {
+  const weightMap = {
+    // Gradable content types - total 100% (redistributed from removing assignment)
+    "worksheet": 0.25,     // 25% - Regular practice work (was 15%, +10% from removed assignment)
+    "review": 0.30,        // 30% - Chapter/unit reviews (was 25%, +5% from removed assignment)
+    "test": 0.25,          // 25% - Tests and major assessments (was 20%, +5% from removed assignment)
+    "quiz": 0.20,          // 20% - Quick assessments and checks (was 15%, +5% from removed assignment)
+    // Non-gradable content types - 0%
+    "lesson": 0.0,         // Teaching materials
+    "notes": 0.0,          // Reference materials
+    "reading_material": 0.0, // Textbooks, articles
+    "other": 0.0           // Miscellaneous
+  };
+  
+  return {
+    content_type: ct,
+    weight: weightMap[ct] || 0.0
+  };
+});
 
 // Form styles are now consolidated in dashboardStyles.js
 // Import them from there to avoid duplication

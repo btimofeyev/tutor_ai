@@ -15,6 +15,9 @@ export function useModalManagement() {
   const [showDeleteMaterialModal, setShowDeleteMaterialModal] = useState(false);
   const [deletingMaterial, setDeletingMaterial] = useState(null);
   const [isDeletingMaterial, setIsDeletingMaterial] = useState(false);
+  
+  // Lesson view modal
+  const [viewingLesson, setViewingLesson] = useState(null);
 
   // Lesson group management state
   const [expandedUnitsInModal, setExpandedUnitsInModal] = useState({});
@@ -84,6 +87,14 @@ export function useModalManagement() {
     setShowDeleteMaterialModal(false);
     setDeletingMaterial(null);
     setIsDeletingMaterial(false);
+  };
+
+  const openViewLessonModal = (lesson) => {
+    setViewingLesson(lesson);
+  };
+
+  const closeViewLessonModal = () => {
+    setViewingLesson(null);
   };
 
   const openChildLoginSettingsModal = (child) => {
@@ -174,6 +185,9 @@ export function useModalManagement() {
     deletingMaterial,
     isDeletingMaterial,
     setIsDeletingMaterial,
+    
+    // Lesson view modal state
+    viewingLesson,
 
     // Child modal state
     isChildLoginSettingsModalOpen,
@@ -219,6 +233,8 @@ export function useModalManagement() {
     closeAddMaterialModal,
     openDeleteMaterialModal,
     closeDeleteMaterialModal,
+    openViewLessonModal,
+    closeViewLessonModal,
     openChildLoginSettingsModal,
     closeChildLoginSettingsModal,
     openDeleteChildModal,

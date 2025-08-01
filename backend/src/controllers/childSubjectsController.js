@@ -122,6 +122,40 @@ exports.assignSubjectToChild = async (req, res) => {
       // Continue with the main operation
     }
 
+    // Auto-create default grade weights for the new subject assignment
+    try {
+      const defaultWeights = [
+        { content_type: 'worksheet', weight: 0.25 },      // 25%
+        { content_type: 'assignment', weight: 0.30 },     // 30% 
+        { content_type: 'test', weight: 0.25 },           // 25%
+        { content_type: 'quiz', weight: 0.20 },           // 20%
+        { content_type: 'lesson', weight: 0.00 },         // 0%
+        { content_type: 'notes', weight: 0.00 },          // 0%
+        { content_type: 'reading_material', weight: 0.00 }, // 0%
+        { content_type: 'other', weight: 0.00 }           // 0%
+      ];
+
+      const weightsData = defaultWeights.map(w => ({
+        child_subject_id: data.id,
+        content_type: w.content_type,
+        weight: w.weight.toFixed(2)
+      }));
+
+      const { error: weightsError } = await supabase
+        .from('subject_grade_weights')
+        .insert(weightsData);
+
+      if (weightsError) {
+        console.warn('Failed to auto-create default weights:', weightsError);
+        // Don't fail the whole operation if weights creation fails
+      } else {
+        console.log('Auto-created default weights for subject assignment:', data.id);
+      }
+    } catch (weightsCreationError) {
+      console.warn('Error auto-creating default weights:', weightsCreationError);
+      // Continue with the main operation
+    }
+
     res.status(201).json(data);
   } catch (error) {
     console.error('Error assigning subject:', error);

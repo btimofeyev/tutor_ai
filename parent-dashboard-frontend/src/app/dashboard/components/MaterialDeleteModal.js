@@ -78,7 +78,7 @@ export default function MaterialDeleteModal({
                 </p>
                 {material.due_date && (
                   <p className="text-sm text-gray-700">
-                    <span className="font-medium">Due Date:</span> {new Date(material.due_date + 'T00:00:00Z').toLocaleDateString()}
+                    <span className="font-medium">Due Date:</span> {new Date(material.due_date + 'T00:00:00').toLocaleDateString()}
                   </p>
                 )}
                 {material.grade_value !== null && material.grade_value !== undefined && (

@@ -29,18 +29,18 @@ export function NoSubjectsCard({ childName }) {
   const router = useRouter();
   
   return (
-    <div className="text-center p-8 bg-background-card rounded-lg shadow border border-border-subtle">
-      <div className="text-6xl mb-4">📚</div>
+    <div className="text-center p-6 bg-background-card rounded-lg shadow border border-border-subtle">
+      <div className="text-4xl mb-3">📚</div>
       <h3 className="text-lg font-semibold text-text-primary mb-2">
-        Let&apos;s Set Up {childName}&apos;s Subjects
+        Set Up {childName}&apos;s Subjects
       </h3>
-      <p className="text-text-secondary mb-4">
-        Start by adding the subjects your child will be studying this year.
+      <p className="text-text-secondary mb-4 text-sm">
+        Add the subjects your child will be studying to get started.
       </p>
       <Button
         onClick={() => router.push("/subject-management")}
         variant="primary"
-        className="px-6 py-3"
+        className="px-4 py-2 text-sm"
       >
         Add Subjects
       </Button>

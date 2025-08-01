@@ -1,6 +1,8 @@
 {
   "dependencies": {
     "@supabase/supabase-js": "^2.50.2",
-    "dotenv": "^16.5.0"
+    "dotenv": "^16.5.0",
+    "find-unused-exports": "^7.1.1",
+    "unimported": "^1.31.0"
   }
 }

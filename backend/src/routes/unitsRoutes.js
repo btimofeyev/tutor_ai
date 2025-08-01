@@ -17,6 +17,9 @@ router.put('/:unit_id', unitsController.updateUnit);
 // Delete a unit
 router.delete('/:unit_id', unitsController.deleteUnit);
 
+// Cascade delete a unit (deletes all lesson containers and materials first)
+router.delete('/:unit_id/cascade', unitsController.cascadeDeleteUnit);
+
 // Reorder units (bulk update sequence_order)
 router.patch('/reorder', unitsController.reorderUnits);
 

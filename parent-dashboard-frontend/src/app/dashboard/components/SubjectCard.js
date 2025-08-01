@@ -9,7 +9,11 @@ import {
     ListBulletIcon, 
     ClockIcon, 
     AdjustmentsHorizontalIcon,
-    PlusIcon
+    PlusIcon,
+    EyeIcon,
+    PencilIcon,
+    TrashIcon,
+    CheckCircleIcon
 } from '@heroicons/react/24/outline'; // For all other generic icons
 import MaterialListItem from './MaterialListItem';
 import LessonGroupedMaterials from './LessonGroupedMaterials';
@@ -51,11 +55,13 @@ const SubjectCard = memo(function SubjectCard({
     onManageUnits,
     onToggleComplete,
     onDeleteMaterial,
-    onCreateLessonGroup
+    onCreateLessonGroup,
+    onAddMaterial
 }) {
     const [isSubjectExpanded, setIsSubjectExpanded] = useState(true); // Subject card collapsible state
     const [expandedUnits, setExpandedUnits] = useState({});
     const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
+    const [expandedLessons, setExpandedLessons] = useState({}); // Track which lessons are expanded
     const [creatingLessonGroupForUnit, setCreatingLessonGroupForUnit] = useState(null);
     const [newLessonGroupTitle, setNewLessonGroupTitle] = useState("");
     const [bulkLessonGroupCount, setBulkLessonGroupCount] = useState(1);
@@ -66,7 +72,7 @@ const SubjectCard = memo(function SubjectCard({
         today.setHours(0, 0, 0, 0);
         return lessons
             .filter(lesson => !lesson.completed_at && lesson.due_date)
-            .map(lesson => ({ ...lesson, dueDateObj: new Date(lesson.due_date + 'T00:00:00Z') }))
+            .map(lesson => ({ ...lesson, dueDateObj: new Date(lesson.due_date + 'T00:00:00') }))
             .filter(lesson => lesson.dueDateObj >= today)
             .sort((a, b) => a.dueDateObj - b.dueDateObj)
             .slice(0, 3);
@@ -76,6 +82,72 @@ const SubjectCard = memo(function SubjectCard({
         if (!subject.child_subject_id) return [];
         return lessons.filter(lesson => !lesson.lesson_id);
     }, [lessons, subject.child_subject_id]);
+
+    // Get next 3 lessons grouped by chapter
+    const nextThreeByChapter = useMemo(() => {
+        if (!subject.child_subject_id || !units.length) return [];
+        
+        const allLessonContainers = [];
+        
+        // Collect all lesson containers from all units, sorted by sequence
+        for (const unit of units.sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.name.localeCompare(b.name))) {
+            const lessonContainers = (lessonsByUnit[unit.id] || [])
+                .sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.title.localeCompare(b.title))
+                .map((container, index) => ({
+                    ...container,
+                    unitName: unit.name,
+                    unitId: unit.id,
+                    lessonNumber: index + 1,
+                    globalOrder: (unit.sequence_order || 0) * 1000 + (container.sequence_order || 0)
+                }));
+            
+            allLessonContainers.push(...lessonContainers);
+        }
+        
+        // Sort all lessons globally and take the first 3
+        const sortedLessons = allLessonContainers
+            .sort((a, b) => a.globalOrder - b.globalOrder)
+            .slice(0, 3);
+        
+        // Group lessons by chapter and add materials
+        const chapterGroups = {};
+        
+        sortedLessons.forEach(lesson => {
+            const allMaterials = lessons.filter(material => material.lesson_id === lesson.id);
+            
+            // Categorize materials by content type
+            const materialsByType = {
+                lessons: allMaterials.filter(m => m.content_type === 'lesson' || m.content_type === 'reading'),
+                worksheets: allMaterials.filter(m => m.content_type === 'worksheet' || m.content_type === 'assignment'),
+                quizzes: allMaterials.filter(m => m.content_type === 'quiz' || m.content_type === 'test'),
+                videos: allMaterials.filter(m => m.content_type === 'video'),
+                other: allMaterials.filter(m => !['lesson', 'reading', 'worksheet', 'assignment', 'quiz', 'test', 'video'].includes(m.content_type))
+            };
+            
+            const totalMaterials = allMaterials.length;
+            const completedMaterials = allMaterials.filter(m => m.completed_at).length;
+            
+            const enrichedLesson = {
+                ...lesson,
+                materialsByType,
+                totalMaterials,
+                completedMaterials,
+                completionPercent: totalMaterials > 0 ? Math.round((completedMaterials / totalMaterials) * 100) : 0
+            };
+            
+            // Group by chapter (unit)
+            if (!chapterGroups[lesson.unitId]) {
+                chapterGroups[lesson.unitId] = {
+                    unitId: lesson.unitId,
+                    unitName: lesson.unitName,
+                    lessons: []
+                };
+            }
+            chapterGroups[lesson.unitId].lessons.push(enrichedLesson);
+        });
+        
+        return Object.values(chapterGroups);
+    }, [lessons, subject.child_subject_id, units, lessonsByUnit]);
 
     if (!subject.child_subject_id) {
         return (
@@ -90,6 +162,7 @@ const SubjectCard = memo(function SubjectCard({
 
     const toggleUnitExpansion = (unitId) => setExpandedUnits(prev => ({ ...prev, [unitId]: !prev[unitId] }));
     const toggleLessonContainerExpansion = (lcId) => setExpandedLessonContainers(prev => ({ ...prev, [lcId]: !prev[lcId] }));
+    const toggleLessonExpansion = (lessonId) => setExpandedLessons(prev => ({ ...prev, [lessonId]: !prev[lessonId] }));
     
     const handleCreateLessonGroup = async (unitId) => {
         if (!newLessonGroupTitle.trim()) return;
@@ -318,19 +391,32 @@ const SubjectCard = memo(function SubjectCard({
                             </div>
                         </div>
                         {subjectStats && (
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                    <span className="text-gray-600">{subjectStats.total} total</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                    <span className="text-gray-600">{subjectStats.completed} completed</span>
-                                </div>
-                                {subjectStats.avgGradePercent !== null && (
+                            <div className="space-y-2">
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                                        <span className="text-gray-600">Avg: {subjectStats.avgGradePercent}%</span>
+                                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                        <span className="text-gray-600">{subjectStats.total} assignments</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                        <span className="text-gray-600">{subjectStats.completed} completed</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                                        <span className="text-gray-600">
+                                            {subjectStats.total > 0 ? Math.round((subjectStats.completed / subjectStats.total) * 100) : 0}% done
+                                        </span>
+                                    </div>
+                                </div>
+                                {subjectStats.avgGradePercent !== null && subjectStats.gradableItemsCount > 0 && (
+                                    <div className="flex items-center gap-2 bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-200">
+                                        <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                                        <span className="text-indigo-800 font-semibold text-sm">
+                                            Grade Average: {subjectStats.avgGradePercent}% 
+                                            <span className="text-indigo-600 font-normal ml-1">
+                                                ({subjectStats.gradableItemsCount} graded)
+                                            </span>
+                                        </span>
                                     </div>
                                 )}
                             </div>
@@ -369,56 +455,276 @@ const SubjectCard = memo(function SubjectCard({
             {/* Content Section - Collapsible */}
             <div className={`transition-all duration-300 ease-in-out ${isSubjectExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
                 <div className="p-4 sm:p-6">
-                {upcomingDueItems.length > 0 && (
-                    <div className="mb-3 p-2 bg-amber-50 rounded border-l-2 border-orange-300">
-                        <h4 className="text-xs font-medium text-orange-700 mb-1 flex items-center">
-                            <ClockIcon className="h-3 w-3 mr-1" />
-                            Upcoming Deadlines ({upcomingDueItems.length})
-                        </h4>
-                        <div className="text-xs text-orange-600 space-y-0.5">
-                            {upcomingDueItems.slice(0, 3).map(item => (
-                                <div key={item.id} className="flex justify-between items-center">
-                                    <span className="truncate mr-2">{item.title}</span>
-                                    <span className="text-orange-500 whitespace-nowrap">
-                                        {new Date(item.due_date + 'T00:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                    </span>
+                {/* Next Lessons Grouped by Chapter */}
+                {nextThreeByChapter.length > 0 ? (
+                    <div className="space-y-4">
+                        {nextThreeByChapter.map((chapter, chapterIndex) => (
+                            <div key={chapter.unitId} className="space-y-3">
+                                {/* Chapter Header with View All Button */}
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                        <ClockIcon className="h-5 w-5 text-blue-500" />
+                                        {chapter.unitName.toLowerCase().startsWith('chapter') ? 
+                                            chapter.unitName : 
+                                            `Chapter ${chapterIndex + 1}: ${chapter.unitName}`
+                                        }
+                                    </h4>
+                                    {chapterIndex === 0 && (
+                                        <Link 
+                                            href={`/subject/${subject.child_subject_id}`}
+                                            className="inline-flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                                        >
+                                            <EyeIcon className="h-4 w-4" />
+                                            View All
+                                        </Link>
+                                    )}
                                 </div>
-                            ))}
-                            {upcomingDueItems.length > 3 && (
-                                <div className="text-orange-500 italic">+ {upcomingDueItems.length - 3} more</div>
-                            )}
+                                    
+                                    {/* Lessons in Chapter */}
+                                    <div className="space-y-3">
+                                        {chapter.lessons.map((lesson) => {
+                                            const isExpanded = !!expandedLessons[lesson.id];
+                                            return (
+                                                <div key={lesson.id} className="bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
+                                                    {/* Lesson Header - Clickable to expand */}
+                                                    <button
+                                                        onClick={() => toggleLessonExpansion(lesson.id)}
+                                                        className="w-full p-3 text-left hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center justify-between">
+                                                                    <h5 className="text-sm font-semibold text-gray-900 truncate mr-4">
+                                                                        {lesson.title}
+                                                                    </h5>
+                                                                    <div className="flex items-center gap-3 text-xs text-gray-600 flex-shrink-0">
+                                                                        <span>{lesson.totalMaterials} items</span>
+                                                                        {lesson.totalMaterials > 0 && (
+                                                                            <span className="text-green-600 font-medium">
+                                                                                {lesson.completionPercent}%
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 ml-3">
+                                                                {lesson.totalMaterials > 0 && (
+                                                                    <div className="w-6 h-6 relative">
+                                                                        <svg className="w-6 h-6 transform -rotate-90" viewBox="0 0 36 36">
+                                                                            <path
+                                                                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                                                className="stroke-gray-200"
+                                                                                fill="none"
+                                                                                strokeWidth="4"
+                                                                            />
+                                                                            <path
+                                                                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                                                className="stroke-green-500"
+                                                                                fill="none"
+                                                                                strokeWidth="4"
+                                                                                strokeDasharray={`${lesson.completionPercent}, 100`}
+                                                                            />
+                                                                        </svg>
+                                                                    </div>
+                                                                )}
+                                                                <ChevronIcon isExpanded={isExpanded} />
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                        
+                                        {/* Expandable Content */}
+                                        <div className={`transition-all duration-300 ease-in-out ${
+                                            isExpanded ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'
+                                        } overflow-hidden`}>
+                                            {isExpanded && (
+                                                <div className="px-3 pb-3 space-y-2">
+                                                    {/* Materials organized by type */}
+                                                    {Object.entries(lesson.materialsByType).map(([type, materials]) => {
+                                                        if (materials.length === 0) return null;
+                                                        
+                                                        const typeConfig = {
+                                                            lessons: { label: 'Lessons', icon: '📖', color: 'blue' },
+                                                            worksheets: { label: 'Assignments', icon: '📝', color: 'green' },
+                                                            quizzes: { label: 'Quizzes', icon: '📊', color: 'red' },
+                                                            videos: { label: 'Videos', icon: '🎥', color: 'purple' },
+                                                            other: { label: 'Other', icon: '📁', color: 'gray' }
+                                                        };
+                                                        
+                                                        const config = typeConfig[type] || typeConfig.other;
+                                                        
+                                                        return (
+                                                            <div key={type} className="bg-white rounded-md border border-gray-100 p-2">
+                                                                <h6 className="text-xs font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
+                                                                    <span className="text-sm">{config.icon}</span>
+                                                                    {config.label} ({materials.length})
+                                                                </h6>
+                                                                <div className="space-y-1">
+                                                                    {materials.map(material => (
+                                                                        <div key={material.id} className="group flex items-center justify-between text-xs bg-gray-50 hover:bg-blue-50 rounded p-1.5 transition-colors">
+                                                                            <div className="flex items-center flex-1 min-w-0">
+                                                                                {material.completed_at && (
+                                                                                    <CheckCircleIcon className="h-3 w-3 text-green-500 mr-1.5 flex-shrink-0" />
+                                                                                )}
+                                                                                <span className={`truncate mr-2 flex-1 ${
+                                                                                    material.completed_at ? 'text-gray-500 line-through' : 'text-gray-700'
+                                                                                }`}>
+                                                                                    {material.title}
+                                                                                </span>
+                                                                                {material.due_date && (
+                                                                                    <span className="text-orange-600 whitespace-nowrap mr-1 text-xs">
+                                                                                        {(() => {
+                                                                                            const dueDate = new Date(material.due_date + 'T00:00:00');
+                                                                                            const today = new Date();
+                                                                                            today.setHours(0, 0, 0, 0);
+                                                                                            const tomorrow = new Date(today);
+                                                                                            tomorrow.setDate(tomorrow.getDate() + 1);
+                                                                                            
+                                                                                            if (dueDate.getTime() === today.getTime()) return 'Today';
+                                                                                            if (dueDate.getTime() === tomorrow.getTime()) return 'Tomorrow';
+                                                                                            
+                                                                                            const diffTime = dueDate.getTime() - today.getTime();
+                                                                                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                                                            
+                                                                                            if (diffDays > 0 && diffDays <= 7) return `${diffDays}d`;
+                                                                                            return dueDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                                                                                        })()}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            
+                                                                            {/* Action buttons - show on hover */}
+                                                                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        onToggleComplete(material.id, !material.completed_at);
+                                                                                    }}
+                                                                                    className="p-0.5 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors"
+                                                                                    title={material.completed_at ? "Mark incomplete" : "Mark complete"}
+                                                                                >
+                                                                                    <CheckCircleIcon className="h-3 w-3" />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        onOpenEditModal(material);
+                                                                                    }}
+                                                                                    className="p-0.5 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors"
+                                                                                    title="Edit material"
+                                                                                >
+                                                                                    <PencilIcon className="h-3 w-3" />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        onDeleteMaterial(material);
+                                                                                    }}
+                                                                                    className="p-0.5 text-red-600 hover:text-red-700 hover:bg-red-100 rounded transition-colors"
+                                                                                    title="Delete material"
+                                                                                >
+                                                                                    <TrashIcon className="h-3 w-3" />
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    
+                                                    {lesson.totalMaterials === 0 && (
+                                                        <div className="text-center py-3 text-gray-500 text-sm">
+                                                            <span className="text-lg mb-1 block">📝</span>
+                                                            No materials yet
+                                                            <button 
+                                                                onClick={onAddMaterial}
+                                                                className="block mx-auto mt-1 text-blue-600 hover:text-blue-700 text-xs font-medium"
+                                                            >
+                                                                Add Materials
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
-                )}
-
-                {(units.length > 0 || generalMaterials.length > 0) ? (
+                ))}
+                    </div>
+                ) : lessons.length > 0 ? (
+                    // Fallback to simple list if no structured lessons
                     <div className="space-y-4">
-                        {units
-                            .sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.name.localeCompare(b.name))
-                            .map(renderUnitSection)
-                        }
-
-                        {generalMaterials.length > 0 && (
-                            <div className="pt-4 border-t border-gray-100">
-                                <h4 className="text-lg font-semibold text-gray-900 mb-3">General Materials</h4>
-                                <div className="space-y-1">
-                                    {generalMaterials.map(material => (
-                                        <MaterialListItem
-                                            key={material.id}
-                                            lesson={material}
-                                            onOpenEditModal={onOpenEditModal}
-                                            onToggleComplete={onToggleComplete}
-                                            onDeleteMaterial={onDeleteMaterial}
-                                        />
-                                    ))}
-                                </div>
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                <ClockIcon className="h-5 w-5 text-blue-500" />
+                                All Materials
+                            </h4>
+                            <Link 
+                                href={`/subject/${subject.child_subject_id}`}
+                                className="inline-flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                            >
+                                <EyeIcon className="h-4 w-4" />
+                                View All
+                            </Link>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            {lessons.slice(0, 5).map(lesson => (
+                                <MaterialListItem
+                                    key={lesson.id}
+                                    lesson={lesson}
+                                    onOpenEditModal={onOpenEditModal}
+                                    onToggleComplete={onToggleComplete}
+                                    onDeleteMaterial={onDeleteMaterial}
+                                    isCompact={true}
+                                />
+                            ))}
+                        </div>
+                        
+                        {lessons.length > 5 && (
+                            <div className="pt-2 border-t border-gray-100">
+                                <p className="text-sm text-gray-500 text-center">
+                                    + {lessons.length - 5} more materials
+                                </p>
                             </div>
                         )}
                     </div>
                 ) : (
-                    <div className="text-center py-8">
-                        <ListBulletIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <p className="text-gray-500 text-sm">No materials or units for this subject yet.</p>
+                    <div className="text-center py-4">
+                        {lessons.length > 0 ? (
+                            <div className="space-y-3">
+                                <div className="text-gray-400">
+                                    <svg className="h-8 w-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="text-gray-700 text-sm font-medium">No upcoming work</p>
+                                    <Link 
+                                        href={`/subject/${subject.child_subject_id}`}
+                                        className="inline-flex items-center gap-1 mt-2 px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                                    >
+                                        <EyeIcon className="h-4 w-4" />
+                                        View All Materials
+                                    </Link>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <ListBulletIcon className="h-8 w-8 mx-auto text-gray-300" />
+                                <p className="text-gray-500 text-sm">No materials yet</p>
+                                <button 
+                                    onClick={onAddMaterial}
+                                    className="inline-flex items-center gap-1 px-3 py-1 text-sm text-sky-600 hover:text-sky-700 hover:bg-sky-50 rounded-lg transition-colors"
+                                >
+                                    <PlusIcon className="h-4 w-4" />
+                                    Get Started
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
                 </div>
@@ -457,7 +763,8 @@ SubjectCard.propTypes = {
   onManageUnits: PropTypes.func.isRequired,
   onToggleComplete: PropTypes.func.isRequired,
   onDeleteMaterial: PropTypes.func.isRequired,
-  onCreateLessonGroup: PropTypes.func.isRequired
+  onCreateLessonGroup: PropTypes.func.isRequired,
+  onAddMaterial: PropTypes.func.isRequired
 };
 
 SubjectCard.defaultProps = {

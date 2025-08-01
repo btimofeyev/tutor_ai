@@ -720,7 +720,7 @@ export default class PDFGenerator {
     // Group events by subject
     const eventsBySubject = {};
     events.forEach(event => {
-      const subject = event.subject_name || event.title || 'Other';
+      const subject = event.base_subject_name || event.subject_name || event.title || 'Other';
       if (!eventsBySubject[subject]) eventsBySubject[subject] = [];
       eventsBySubject[subject].push(event);
     });

@@ -19,7 +19,7 @@ const MATERIAL_TYPES = {
     isGradable: false
   },
   worksheet: {
-    label: 'Worksheet', 
+    label: 'Assignment', 
     description: 'Practice problems, homework',
     icon: '✏️',
     isGradable: true
@@ -34,6 +34,12 @@ const MATERIAL_TYPES = {
     label: 'Test',
     description: 'Major assessments, exams',
     icon: '📋',
+    isGradable: true
+  },
+  review: {
+    label: 'Review',
+    description: 'Chapter or unit reviews',
+    icon: '📑',
     isGradable: true
   },
   reading_material: {
@@ -53,6 +59,7 @@ const MATERIAL_TYPES = {
 export default function AddMaterialFormSimplified({
   childSubjects,
   selectedChild,
+  preSelectedSubject,
   onComplete,
   onClose
 }) {
@@ -66,7 +73,8 @@ export default function AddMaterialFormSimplified({
     lessonNumber: 1,
     materialType: 'worksheet',
     dueDate: '',
-    files: []
+    files: [],
+    enableAiAnalysis: true
   });
   const [chapters, setChapters] = useState([]);
   const [lessons, setLessons] = useState([]);
@@ -75,7 +83,7 @@ export default function AddMaterialFormSimplified({
   const [loadingChapters, setLoadingChapters] = useState(false);
   const [loadingLessons, setLoadingLessons] = useState(false);
 
-  // Initialize due date to tomorrow
+  // Initialize due date to tomorrow and pre-select subject if provided
   useEffect(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -83,7 +91,20 @@ export default function AddMaterialFormSimplified({
       ...prev,
       dueDate: tomorrow.toISOString().split('T')[0]
     }));
-  }, []);
+    
+    // Pre-select subject if provided
+    if (preSelectedSubject && childSubjects) {
+      const subject = childSubjects.find(s => s.name === preSelectedSubject);
+      if (subject) {
+        setFormData(prev => ({
+          ...prev,
+          subject: subject.name,
+          subjectId: subject.child_subject_id
+        }));
+        fetchChapters(subject.child_subject_id);
+      }
+    }
+  }, [preSelectedSubject, childSubjects, fetchChapters]);
 
   // Fetch chapters when subject changes
   const fetchChapters = useCallback(async (subjectId) => {
@@ -324,22 +345,35 @@ export default function AddMaterialFormSimplified({
           lesson: formData.lesson,
           materialType: formData.materialType,
           dueDate: formData.dueDate,
-          originalName: file.name
+          originalName: file.name,
+          enableAiAnalysis: formData.enableAiAnalysis
         }));
       });
       
       uploadFormData.append('child_id', selectedChild.id);
       uploadFormData.append('fileCount', formData.files.length);
       
-      const response = await api.post('/materials/quick-upload', uploadFormData, {
+      // Always add fields for AI analysis since file uploads require AI processing
+      uploadFormData.append('child_subject_id', formData.subjectId);
+      uploadFormData.append('user_content_type', formData.materialType);
+      
+      // Always use AI analysis endpoint for file uploads
+      const endpoint = '/materials/upload';
+      console.log('Using AI analysis endpoint for file upload:', endpoint);
+      
+      const response = await api.post(endpoint, uploadFormData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
-      if (response.data.success) {
-        setAnalysisResults(response.data.results);
+      // AI analysis endpoint returns { lesson_json: ... }
+      if (response.data.lesson_json) {
+        setAnalysisResults({
+          aiAnalysis: response.data.lesson_json,
+          needsApproval: true
+        });
         setStep('approval');
       } else {
-        throw new Error(response.data.message || 'Upload failed');
+        throw new Error('AI analysis failed');
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -353,10 +387,33 @@ export default function AddMaterialFormSimplified({
   // Handle approval
   const handleApprove = async () => {
     try {
+      if (analysisResults.needsApproval) {
+        // Save AI-analyzed material using the save endpoint
+        const saveData = {
+          lesson_id: formData.lesson,
+          child_subject_id: formData.subjectId,
+          title: analysisResults.aiAnalysis.title,
+          content_type: analysisResults.aiAnalysis.content_type || formData.materialType,
+          lesson_json: JSON.stringify(analysisResults.aiAnalysis),
+          due_date: formData.dueDate,
+          material_relationship: formData.materialType === 'lesson' ? null : 
+            (formData.materialType === 'worksheet' ? 'worksheet_for' :
+             formData.materialType === 'quiz' || formData.materialType === 'test' ? 'assignment_for' : 'supplement_for'),
+          is_primary_lesson: formData.materialType === 'lesson'
+        };
+
+        const response = await api.post('/materials/save', saveData);
+        
+        if (response.data) {
+          console.log('AI-analyzed material saved successfully');
+        }
+      }
+      
       await onComplete();
       onClose();
     } catch (error) {
       console.error('Error completing upload:', error);
+      alert('Failed to save material. Please try again.');
     }
   };
 
@@ -475,6 +532,20 @@ export default function AddMaterialFormSimplified({
             />
           </div>
 
+          {/* AI Analysis Info */}
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <div className="flex items-center">
+              <span className="text-blue-600 text-xl mr-3">🤖</span>
+              <div>
+                <div className="text-sm font-medium text-blue-900">AI Analysis Enabled</div>
+                <p className="text-xs text-blue-700 mt-1">
+                  AI will analyze your materials and suggest learning objectives, difficulty level, and time estimates. 
+                  You can review and approve the analysis before saving.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* File Upload */}
           <div>
             <label className={labelClasses}>Files *</label>
@@ -535,17 +606,42 @@ export default function AddMaterialFormSimplified({
       {step === 'approval' && analysisResults && (
         <div className="text-center py-8">
           <CheckSolidIcon className="h-12 w-12 text-green-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Materials Added Successfully!</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            AI Analysis Complete!
+          </h3>
           <p className="text-sm text-gray-600 mb-6">
-            {analysisResults.created} materials have been organized in your curriculum.
+            AI has analyzed your materials. Review the analysis below and approve to save.
           </p>
+          
+          {/* Show AI Analysis Results */}
+          {analysisResults.aiAnalysis && (
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+              <h4 className="font-semibold text-gray-900 mb-3">AI Analysis Results:</h4>
+              <div className="space-y-2 text-sm">
+                <div><strong>Title:</strong> {analysisResults.aiAnalysis.title || 'Not specified'}</div>
+                <div><strong>Content Type:</strong> {analysisResults.aiAnalysis.content_type || 'Not specified'}</div>
+                <div><strong>Estimated Time:</strong> {analysisResults.aiAnalysis.estimated_time_minutes || 'Not specified'} minutes</div>
+                <div><strong>Difficulty:</strong> {analysisResults.aiAnalysis.difficulty_level || 'Not specified'}</div>
+                {analysisResults.aiAnalysis.learning_objectives && (
+                  <div>
+                    <strong>Learning Objectives:</strong>
+                    <ul className="list-disc list-inside ml-4 mt-1">
+                      {analysisResults.aiAnalysis.learning_objectives.map((obj, index) => (
+                        <li key={index}>{obj}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           <div className="space-y-3">
             <Button
               onClick={handleApprove}
               variant="primary"
               className="w-full"
             >
-              View in Curriculum
+              Approve & Save to Curriculum
             </Button>
             <Button
               onClick={onClose}

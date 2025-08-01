@@ -18,11 +18,11 @@ import Button from '../../../components/ui/Button';
 
 const QUICK_ASSIGNMENT_TYPES = [
   { value: "reading", label: "📚 Reading Assignment", icon: "📚" },
-  { value: "worksheet", label: "📝 Worksheet/Practice", icon: "📝" },
+  { value: "worksheet", label: "📝 Assignment/Practice", icon: "📝" },
   { value: "project", label: "🎨 Project/Activity", icon: "🎨" },
   { value: "test", label: "📋 Test/Quiz", icon: "📋" },
   { value: "lesson", label: "📖 Lesson/Study", icon: "📖" },
-  { value: "review", label: "🔄 Review/Practice", icon: "🔄" },
+  { value: "review", label: "📑 Review/Chapter Review", icon: "📑" },
   { value: "other", label: "📌 Other Assignment", icon: "📌" }
 ];
 

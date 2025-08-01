@@ -6,6 +6,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { ModalErrorBoundary } from '../../../components/ErrorBoundary';
 import AddMaterialTabs from './AddMaterialTabs';
 import EditMaterialModal from './EditMaterialModal';
+import LessonViewModal from './LessonViewModal';
 import MaterialDeleteModal from './MaterialDeleteModal';
 import ChildAccountDeleteModal from './ChildAccountDeleteModal';
 import ChildLoginSettingsModal from './ChildLoginSettingsModal';
@@ -64,6 +65,7 @@ export default function DashboardModals({
   onCreateLessonGroupInModal,
   onBatchSave,
   clearCredentialMessages,
+  onToggleComplete,
   
   // Toast functions
   showSuccess,
@@ -174,6 +176,19 @@ export default function DashboardModals({
           showError={showError}
         />
       </ModalErrorBoundary>
+
+      {/* Lesson View Modal */}
+      {modalManagement.viewingLesson && (
+        <LessonViewModal
+          lesson={modalManagement.viewingLesson}
+          onClose={modalManagement.closeViewLessonModal}
+          onEdit={(lesson) => {
+            modalManagement.closeViewLessonModal();
+            materialManagement.startEditingLesson(lesson);
+          }}
+          onToggleComplete={onToggleComplete}
+        />
+      )}
 
       {/* Edit Material Modal */}
       {materialManagement.editingLesson && (
@@ -316,6 +331,7 @@ DashboardModals.propTypes = {
   onCreateLessonGroupInModal: PropTypes.func.isRequired,
   onBatchSave: PropTypes.func.isRequired,
   clearCredentialMessages: PropTypes.func.isRequired,
+  onToggleComplete: PropTypes.func.isRequired,
   showSuccess: PropTypes.func.isRequired,
   showError: PropTypes.func.isRequired
 };

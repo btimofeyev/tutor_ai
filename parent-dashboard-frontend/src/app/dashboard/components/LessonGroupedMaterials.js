@@ -35,7 +35,7 @@ const MaterialTypeLabel = ({ type, isPrimary }) => {
     
     switch (type) {
         case 'worksheet_for':
-            return '📋 Worksheet';
+            return '📋 Assignment';
         case 'assignment_for':
             return '📝 Assignment';
         case 'supplement_for':
@@ -72,7 +72,14 @@ export default function LessonGroupedMaterials({
             setLoading(true);
             setError(null);
             try {
+                console.log('Fetching materials for lesson container:', lessonContainer.id, lessonContainer.title);
                 const response = await api.get(`/materials/lesson/${lessonContainer.id}/grouped`);
+                console.log('Grouped materials response:', {
+                    lesson_id: lessonContainer.id,
+                    lesson_title: lessonContainer.title,
+                    materials: response.data.materials,
+                    total_materials: response.data.total_materials
+                });
                 setGroupedMaterials(response.data.materials);
             } catch (err) {
                 console.error('Error fetching grouped materials:', err);
@@ -198,7 +205,7 @@ export default function LessonGroupedMaterials({
                         )}
 
                         {/* Worksheets */}
-                        {renderMaterialGroup(groupedMaterials.worksheets, 'Worksheets', 'worksheet_for')}
+                        {renderMaterialGroup(groupedMaterials.worksheets, 'Assignments', 'worksheet_for')}
                         
                         {/* Assignments */}
                         {renderMaterialGroup(groupedMaterials.assignments, 'Assignments', 'assignment_for')}

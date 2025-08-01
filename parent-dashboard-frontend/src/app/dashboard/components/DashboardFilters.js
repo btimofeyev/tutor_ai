@@ -26,16 +26,16 @@ const DashboardFilters = memo(function DashboardFilters({
     >
       <div className="mb-4">
         <h3 className="text-sm font-medium text-text-primary flex items-center gap-2">
-          <span>🔍</span>
-          Find Specific Assignments
+          <span>⚙️</span>
+          Filter Assignments
         </h3>
         <p className="text-xs text-text-secondary mt-1">
           Use these filters to focus on what&apos;s most important right now
         </p>
       </div>
 
-      {/* Search Bar */}
-      {setSearchTerm && (
+      {/* Search Bar - Removed for now */}
+      {/* {setSearchTerm && (
         <div className="mb-4">
           <div className="relative">
             <input
@@ -58,7 +58,7 @@ const DashboardFilters = memo(function DashboardFilters({
             )}
           </div>
         </div>
-      )}
+      )} */}
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
         <div>

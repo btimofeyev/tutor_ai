@@ -42,6 +42,9 @@ export default function CreateScheduleEntryModal({
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [availableUnits, setAvailableUnits] = useState([]);
   const [availableLessons, setAvailableLessons] = useState([]);
+  
+  // Material type filter state
+  const [showAllMaterialTypes, setShowAllMaterialTypes] = useState(false);
 
   // Initialize form when modal opens or slot changes
   useEffect(() => {
@@ -66,6 +69,7 @@ export default function CreateScheduleEntryModal({
       setSelectedUnitId('');
       setAvailableUnits([]);
       setAvailableLessons([]);
+      setShowAllMaterialTypes(false);
     }
   }, [isOpen, selectedSlot, selectedChildrenIds]);
 
@@ -121,7 +125,7 @@ export default function CreateScheduleEntryModal({
           if (conflicts.length > 0) {
             const conflictDetails = conflicts.map(conflict => {
               const childName = allChildren.find(c => c.id === conflict.child_id)?.name || 'Unknown Child';
-              const subject = conflict.subject_name || conflict.title || 'Study';
+              const subject = conflict.base_subject_name || conflict.subject_name || conflict.title || 'Study';
               return `${subject} (${childName})`;
             }).join(', ');
             
@@ -201,10 +205,30 @@ export default function CreateScheduleEntryModal({
         return false;
       }
       
+      // Filter by content type unless showing all types
+      if (!showAllMaterialTypes) {
+        const isLesson = lesson.content_type === 'lesson' || 
+                        lesson.content_type === 'reading' || 
+                        lesson.content_type === 'video';
+        if (!isLesson) {
+          console.log(`Excluding non-lesson material: ${lesson.title} (type: ${lesson.content_type})`);
+          return false;
+        }
+      }
+      
       console.log(`Including lesson: ${lesson.title}`);
       return true;
     });
   };
+
+  // Re-filter lessons when showAllMaterialTypes changes
+  useEffect(() => {
+    if (selectedSubjectId && selectedUnitId) {
+      handleUnitSelection(selectedUnitId);
+    } else if (selectedSubjectId) {
+      handleSubjectSelection(selectedSubjectId);
+    }
+  }, [showAllMaterialTypes]);
 
   // Handle material selection
   const handleMaterialChange = (e) => {
@@ -294,7 +318,7 @@ export default function CreateScheduleEntryModal({
       if (conflicts.length > 0) {
         const conflictDetails = conflicts.map(conflict => {
           const childName = allChildren.find(c => c.id === conflict.child_id)?.name || 'Unknown Child';
-          const subject = conflict.subject_name || conflict.title || 'Study';
+          const subject = conflict.base_subject_name || conflict.subject_name || conflict.title || 'Study';
           return `${subject} (${childName})`;
         }).join(', ');
         
@@ -544,14 +568,27 @@ export default function CreateScheduleEntryModal({
                       {/* Step 3: Select Specific Lesson */}
                       {selectedSubjectId && (
                         <div>
-                          <label className={stepLabelStyles}>
-                            {availableUnits.length > 0 ? '3. Choose Specific Lesson' : '2. Choose Specific Lesson'}
-                          </label>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className={stepLabelStyles}>
+                              {availableUnits.length > 0 ? '3. Choose Material to Schedule' : '2. Choose Material to Schedule'}
+                            </label>
+                            <label className="flex items-center gap-2 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={showAllMaterialTypes}
+                                onChange={(e) => setShowAllMaterialTypes(e.target.checked)}
+                                className="rounded border-[var(--border-input)] text-[var(--accent-blue)] focus:ring-[var(--accent-blue)] h-3 w-3"
+                              />
+                              <span className="text-[var(--text-secondary)]">Show assignments & reviews</span>
+                            </label>
+                          </div>
                           {availableLessons.length === 0 ? (
                             <div className="text-sm text-[var(--text-tertiary)] italic p-3 bg-[var(--background-main)] rounded border border-[var(--border-subtle)]">
                               {selectedSubjectId && (lessonsBySubject[selectedSubjectId] || []).length > 0 ? 
-                                'All lessons for this subject have been completed or are already scheduled.' :
-                                `No lessons found for this ${selectedUnitId ? 'unit' : 'subject'}. Upload lessons or select a different option.`
+                                showAllMaterialTypes ? 
+                                  'All materials for this subject have been completed or are already scheduled.' :
+                                  'All lessons for this subject have been completed or are already scheduled. Try enabling "Show assignments & reviews" above.' :
+                                `No ${showAllMaterialTypes ? 'materials' : 'lessons'} found for this ${selectedUnitId ? 'unit' : 'subject'}. Upload materials or select a different option.`
                               }
                             </div>
                           ) : (
@@ -562,20 +599,47 @@ export default function CreateScheduleEntryModal({
                               onChange={handleMaterialChange}
                               className={formInputStyles}
                             >
-                              <option value="">Select a specific lesson...</option>
+                              <option value="">Select a material...</option>
                               {availableLessons
                                 .sort((a, b) => {
-                                  // Sort by title to ensure consistent ordering
+                                  // Sort by content type first, then by creation date/title
+                                  const typeOrder = { lesson: 1, reading: 2, video: 3, worksheet: 4, assignment: 5, quiz: 6, test: 7, review: 8 };
+                                  const typeA = typeOrder[a.content_type] || 99;
+                                  const typeB = typeOrder[b.content_type] || 99;
+                                  if (typeA !== typeB) return typeA - typeB;
+                                  
+                                  // Sort by created_at if available, otherwise by title
+                                  if (a.created_at && b.created_at) {
+                                    return new Date(a.created_at) - new Date(b.created_at);
+                                  }
+                                  
                                   const titleA = a.title || '';
                                   const titleB = b.title || '';
                                   return titleA.localeCompare(titleB);
                                 })
-                                .map((lesson) => (
-                                <option key={lesson.id} value={lesson.id}>
-                                  {lesson.title?.replace(/\(\)$/, '') || 'Untitled Lesson'}
-                                  {lesson.content_type && ` • ${lesson.content_type.replace(/_/g, ' ')}`}
-                                </option>
-                              ))}
+                                .map((lesson, index) => {
+                                  const typeLabel = lesson.content_type ? 
+                                    lesson.content_type.charAt(0).toUpperCase() + lesson.content_type.slice(1).replace(/_/g, ' ') : 
+                                    'Unknown';
+                                  
+                                  // Show actual lesson title with number for clarity
+                                  const lessonNumber = index + 1;
+                                  let displayTitle = lesson.title || 'Untitled';
+                                  
+                                  // Clean up the title and truncate if too long
+                                  displayTitle = displayTitle.replace(/\(\)$/, '');
+                                  if (displayTitle.length > 30) {
+                                    displayTitle = displayTitle.substring(0, 27) + '...';
+                                  }
+                                  
+                                  const fullDisplayTitle = `${lessonNumber}. ${displayTitle}`;
+                                  
+                                  return (
+                                    <option key={lesson.id} value={lesson.id}>
+                                      {fullDisplayTitle} • {typeLabel}
+                                    </option>
+                                  );
+                                })}
                             </select>
                           )}
                         </div>

@@ -1,18 +1,111 @@
-// Centralized subject color management
-// This ensures consistent colors across the entire application
+// Modern semantic subject color management with gradients and enhanced visual design
+// This ensures consistent, meaningful colors across the entire application
 
-// Soft pastel colors aligned with student app design system
+// Semantic color mapping for specific subjects with modern gradients
+export const SEMANTIC_SUBJECT_COLORS = {
+  // Core Academic Subjects - Beautiful, modern colors
+  'Mathematics': { 
+    bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300', 
+    bgDark: 'bg-gradient-to-br from-blue-500 to-indigo-600', 
+    gradient: 'bg-gradient-to-br from-blue-100 to-blue-200',
+    accent: 'blue', icon: '🔢', name: 'Mathematics'
+  },
+  'Math': { 
+    bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300', 
+    bgDark: 'bg-gradient-to-br from-blue-500 to-indigo-600', 
+    gradient: 'bg-gradient-to-br from-blue-100 to-blue-200',
+    accent: 'blue', icon: '🔢', name: 'Mathematics'
+  },
+  'English Language Arts': { 
+    bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300', 
+    bgDark: 'bg-gradient-to-br from-emerald-500 to-green-600', 
+    gradient: 'bg-gradient-to-br from-green-100 to-green-200',
+    accent: 'green', icon: '📚', name: 'English Language Arts'
+  },
+  'English': { 
+    bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300', 
+    bgDark: 'bg-gradient-to-br from-emerald-500 to-green-600', 
+    gradient: 'bg-gradient-to-br from-green-100 to-green-200',
+    accent: 'green', icon: '📚', name: 'English'
+  },
+  'Science': { 
+    bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300', 
+    bgDark: 'bg-gradient-to-br from-purple-500 to-violet-600', 
+    gradient: 'bg-gradient-to-br from-purple-100 to-purple-200',
+    accent: 'purple', icon: '🔬', name: 'Science'
+  },
+  'Bible': { 
+    bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300', 
+    bgDark: 'bg-gradient-to-br from-amber-400 to-yellow-500', 
+    gradient: 'bg-gradient-to-br from-yellow-100 to-yellow-200',
+    accent: 'yellow', icon: '✝️', name: 'Bible'
+  },
+  'History': { 
+    bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300', 
+    bgDark: 'bg-gradient-to-br from-orange-500 to-amber-600', 
+    gradient: 'bg-gradient-to-br from-amber-100 to-amber-200',
+    accent: 'amber', icon: '🏛️', name: 'History'
+  },
+  'Geography': { 
+    bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-300', 
+    bgDark: 'bg-gradient-to-br from-teal-500 to-cyan-600', 
+    gradient: 'bg-gradient-to-br from-teal-100 to-teal-200',
+    accent: 'teal', icon: '🌍', name: 'Geography'
+  },
+  
+  // Creative & Arts Subjects - Soft, artistic colors 
+  'Art': { 
+    bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-300', 
+    bgDark: 'bg-gradient-to-br from-pink-400 to-rose-500', 
+    gradient: 'bg-gradient-to-br from-pink-100 to-pink-200',
+    accent: 'pink', icon: '🎨', name: 'Art'
+  },
+  'Music': { 
+    bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300', 
+    bgDark: 'bg-gradient-to-br from-indigo-500 to-purple-600', 
+    gradient: 'bg-gradient-to-br from-indigo-100 to-indigo-200',
+    accent: 'indigo', icon: '🎵', name: 'Music'
+  },
+  'Literature': { 
+    bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-300', 
+    bgDark: 'bg-gradient-to-br from-rose-500 to-pink-600', 
+    gradient: 'bg-gradient-to-br from-rose-100 to-rose-200',
+    accent: 'rose', icon: '📖', name: 'Literature'
+  },
+  
+  // Physical & Practical Subjects - Energetic, warm colors
+  'Physical Education': { 
+    bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300', 
+    bgDark: 'bg-gradient-to-br from-orange-500 to-red-500', 
+    gradient: 'bg-gradient-to-br from-orange-100 to-orange-200',
+    accent: 'orange', icon: '⚽', name: 'Physical Education'
+  },
+  'PE': { 
+    bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300', 
+    bgDark: 'bg-gradient-to-br from-orange-500 to-red-500', 
+    gradient: 'bg-gradient-to-br from-orange-100 to-orange-200',
+    accent: 'orange', icon: '⚽', name: 'Physical Education'
+  },
+  'Foreign Language': { 
+    bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-300', 
+    bgDark: 'bg-gradient-to-br from-sky-500 to-cyan-600', 
+    gradient: 'bg-gradient-to-br from-cyan-100 to-cyan-200',
+    accent: 'cyan', icon: '🌐', name: 'Foreign Language'
+  }
+};
+
+// Beautiful fallback colors for subjects not in semantic mapping
 export const SUBJECT_COLORS = [
-  { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', name: 'Blue', bgDark: 'bg-blue-200' },
-  { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200', name: 'Green', bgDark: 'bg-green-200' },
-  { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-200', name: 'Yellow', bgDark: 'bg-yellow-200' },
-  { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', name: 'Purple', bgDark: 'bg-purple-200' },
-  { bg: 'bg-pink-100', text: 'text-pink-700', border: 'border-pink-200', name: 'Pink', bgDark: 'bg-pink-200' },
-  { bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-200', name: 'Indigo', bgDark: 'bg-indigo-200' },
-  { bg: 'bg-teal-100', text: 'text-teal-700', border: 'border-teal-200', name: 'Teal', bgDark: 'bg-teal-200' },
-  { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200', name: 'Orange', bgDark: 'bg-orange-200' },
-  { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', name: 'Red', bgDark: 'bg-red-200' },
-  { bg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-200', name: 'Cyan', bgDark: 'bg-cyan-200' }
+  { bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-300', name: 'Slate', bgDark: 'bg-gradient-to-br from-slate-500 to-gray-600', gradient: 'bg-gradient-to-br from-slate-100 to-slate-200', accent: 'slate', icon: '📄' },
+  { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300', name: 'Red', bgDark: 'bg-gradient-to-br from-red-500 to-rose-600', gradient: 'bg-gradient-to-br from-red-100 to-red-200', accent: 'red', icon: '❤️' },
+  { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300', name: 'Emerald', bgDark: 'bg-gradient-to-br from-emerald-500 to-teal-600', gradient: 'bg-gradient-to-br from-emerald-100 to-emerald-200', accent: 'emerald', icon: '💎' },
+  { bg: 'bg-sky-100', text: 'text-sky-800', border: 'border-sky-300', name: 'Sky', bgDark: 'bg-gradient-to-br from-sky-500 to-blue-600', gradient: 'bg-gradient-to-br from-sky-100 to-sky-200', accent: 'sky', icon: '☁️' },
+  { bg: 'bg-violet-100', text: 'text-violet-800', border: 'border-violet-300', name: 'Violet', bgDark: 'bg-gradient-to-br from-violet-500 to-purple-600', gradient: 'bg-gradient-to-br from-violet-100 to-violet-200', accent: 'violet', icon: '💜' },
+  { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-300', name: 'Fuchsia', bgDark: 'bg-gradient-to-br from-fuchsia-400 to-pink-500', gradient: 'bg-gradient-to-br from-fuchsia-100 to-fuchsia-200', accent: 'fuchsia', icon: '🌸' },
+  { bg: 'bg-lime-100', text: 'text-lime-800', border: 'border-lime-300', name: 'Lime', bgDark: 'bg-gradient-to-br from-lime-500 to-green-600', gradient: 'bg-gradient-to-br from-lime-100 to-lime-200', accent: 'lime', icon: '🍋' },
+  { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300', name: 'Amber', bgDark: 'bg-gradient-to-br from-amber-500 to-orange-600', gradient: 'bg-gradient-to-br from-amber-100 to-amber-200', accent: 'amber', icon: '🌟' },
+  { bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-300', name: 'Rose', bgDark: 'bg-gradient-to-br from-rose-500 to-pink-600', gradient: 'bg-gradient-to-br from-rose-100 to-rose-200', accent: 'rose', icon: '🌹' },
+  { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-300', name: 'Cyan', bgDark: 'bg-gradient-to-br from-cyan-500 to-teal-600', gradient: 'bg-gradient-to-br from-cyan-100 to-cyan-200', accent: 'cyan', icon: '🌊' }
 ];
 
 // Predefined colors for common generic learning types
@@ -30,17 +123,25 @@ const GENERIC_SUBJECT_COLORS = {
 };
 
 /**
- * Get consistent color for a subject based on its position in the child's subjects list
+ * Get consistent color for a subject with semantic mapping priority
  * @param {string} subjectName - Name of the subject
  * @param {Array} childSubjects - Array of child's subjects
- * @returns {Object} Color object with bg, text, border classes
+ * @returns {Object} Color object with bg, text, border, gradient classes and icon
  */
 export function getSubjectColor(subjectName, childSubjects) {
   // Handle the case where subjectName might be like "Bible: Lesson 3"
   // Extract just the subject part before the colon
   const baseSubjectName = subjectName?.split(':')[0]?.trim() || subjectName;
   
-  // Try to find subject by matching various name formats
+  // 1. First check semantic subject colors (priority mapping)
+  if (SEMANTIC_SUBJECT_COLORS[baseSubjectName]) {
+    return SEMANTIC_SUBJECT_COLORS[baseSubjectName];
+  }
+  if (SEMANTIC_SUBJECT_COLORS[subjectName]) {
+    return SEMANTIC_SUBJECT_COLORS[subjectName];
+  }
+  
+  // 2. Try to find subject by matching various name formats in child subjects
   const subjectIndex = childSubjects.findIndex(s => {
     const displayName = s.custom_subject_name_override || s.subject?.name || s.name;
     const baseName = s.subject?.name || s.name;
@@ -56,13 +157,21 @@ export function getSubjectColor(subjectName, childSubjects) {
     return SUBJECT_COLORS[subjectIndex % SUBJECT_COLORS.length];
   }
   
-  // Check for predefined generic subject colors
+  // 3. Check for predefined generic subject colors
   if (GENERIC_SUBJECT_COLORS[subjectName]) {
     return GENERIC_SUBJECT_COLORS[subjectName];
   }
+  if (GENERIC_SUBJECT_COLORS[baseSubjectName]) {
+    return GENERIC_SUBJECT_COLORS[baseSubjectName];
+  }
   
-  // Enhanced fallback - use a pleasant default color instead of grey
-  return { bg: 'bg-neutral-100', text: 'text-neutral-700', border: 'border-neutral-200', name: 'Neutral', bgDark: 'bg-neutral-200' };
+  // 4. Enhanced fallback - use a pleasant default color
+  return { 
+    bg: 'bg-neutral-100', text: 'text-neutral-800', border: 'border-neutral-300', 
+    name: 'Neutral', bgDark: 'bg-gradient-to-br from-neutral-400 to-neutral-600', 
+    gradient: 'bg-gradient-to-br from-neutral-100 to-neutral-200',
+    accent: 'neutral', icon: '📄'
+  };
 }
 
 /**
@@ -84,6 +193,36 @@ export function getSubjectTextColor(subjectName, childSubjects) {
  */
 export function getSubjectDarkBgColor(subjectName, childSubjects) {
   return getSubjectColor(subjectName, childSubjects).bgDark;
+}
+
+/**
+ * Get gradient background class for modern calendar events
+ * @param {string} subjectName - Name of the subject
+ * @param {Array} childSubjects - Array of child's subjects
+ * @returns {string} Gradient background class
+ */
+export function getSubjectGradient(subjectName, childSubjects) {
+  return getSubjectColor(subjectName, childSubjects).gradient;
+}
+
+/**
+ * Get subject icon/emoji for visual identification
+ * @param {string} subjectName - Name of the subject
+ * @param {Array} childSubjects - Array of child's subjects
+ * @returns {string} Subject icon/emoji
+ */
+export function getSubjectIcon(subjectName, childSubjects) {
+  return getSubjectColor(subjectName, childSubjects).icon || '📄';
+}
+
+/**
+ * Get accent color name for theming
+ * @param {string} subjectName - Name of the subject
+ * @param {Array} childSubjects - Array of child's subjects
+ * @returns {string} Accent color name
+ */
+export function getSubjectAccent(subjectName, childSubjects) {
+  return getSubjectColor(subjectName, childSubjects).accent || 'neutral';
 }
 
 
@@ -112,7 +251,10 @@ export function getMultiChildSubjectStyle(subjectName, childId, childSubjects, a
     ...baseColor,
     opacity: childVariation.opacity,
     border: childVariation.border,
-    childVariation: childVariation.name
+    childVariation: childVariation.name,
+    // Enhanced visual differentiation
+    bgWithVariation: `${baseColor.gradient} ${childVariation.opacity}`,
+    borderWithVariation: `${baseColor.border} ${childVariation.border}`
   };
 }
 

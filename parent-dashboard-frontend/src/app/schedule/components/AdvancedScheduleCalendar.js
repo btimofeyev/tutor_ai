@@ -48,7 +48,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
-import { getSubjectColor, getSubjectDarkBgColor, getSubjectTextColor, getMultiChildSubjectStyle, getChildVariation } from '../../../utils/subjectColors';
+import { getSubjectColor, getSubjectDarkBgColor, getSubjectTextColor, getSubjectGradient, getSubjectIcon, getMultiChildSubjectStyle, getChildVariation } from '../../../utils/subjectColors';
 // Removed WorkloadVisualization and CollapsibleWorkloadSummary components
 
 const VIEW_TYPES = {
@@ -158,7 +158,7 @@ export default function AdvancedScheduleCalendar({
   }, [currentDate, viewType, weeksToShow]);
 
 
-  // Time slots (flexible based on preferences) - fallback for when no events exist
+  // Dynamic time slots based on 15-minute increments for maximum flexibility
   const timeSlots = useMemo(() => {
     const startHour = schedulePreferences?.preferred_start_time ? 
       parseInt(schedulePreferences.preferred_start_time.split(':')[0]) : 9;
@@ -167,9 +167,12 @@ export default function AdvancedScheduleCalendar({
     
     const slots = [];
     for (let hour = startHour; hour <= endHour; hour++) {
+      // Add all four 15-minute increments per hour: :00, :15, :30, :45
       slots.push(`${hour.toString().padStart(2, '0')}:00`);
       if (hour < endHour) {
+        slots.push(`${hour.toString().padStart(2, '0')}:15`);
         slots.push(`${hour.toString().padStart(2, '0')}:30`);
+        slots.push(`${hour.toString().padStart(2, '0')}:45`);
       }
     }
     return slots;
@@ -421,31 +424,35 @@ export default function AdvancedScheduleCalendar({
     return Math.max(0, availableMinutes);
   }, [getEventsForDay, schedulePreferences]);
 
-  // Handle time slot clicks with smart duration suggestions
+  // Enhanced time slot click handler with smart 15-minute increment suggestions
   const handleTimeSlotClick = (day, timeSlot) => {
     if (isTimeSlotOccupied(day, timeSlot)) return;
     
     const availableMinutes = calculateAvailableTime(day, timeSlot);
     
-    // Suggest optimal duration based on available time
+    // Smart duration suggestions based on common lesson lengths and 15-minute increments
+    const commonDurations = [15, 30, 45, 60, 75, 90]; // Common lesson durations
     let suggestedDuration = 30; // Default
-    if (availableMinutes >= 60) {
-      suggestedDuration = 60;
-    } else if (availableMinutes >= 45) {
-      suggestedDuration = 45;
-    } else if (availableMinutes >= 30) {
-      suggestedDuration = 30;
-    } else if (availableMinutes >= 15) {
-      suggestedDuration = 15;
+    
+    // Find the best fit duration that doesn't exceed available time
+    for (let i = commonDurations.length - 1; i >= 0; i--) {
+      if (commonDurations[i] <= availableMinutes) {
+        suggestedDuration = commonDurations[i];
+        break;
+      }
     }
+    
+    // Provide multiple duration options for the user
+    const durationOptions = commonDurations.filter(d => d <= availableMinutes);
     
     openCreateModal({
       date: format(day, 'yyyy-MM-dd'),
       time: timeSlot,
       suggestedDuration: suggestedDuration,
       availableMinutes: availableMinutes,
+      durationOptions: durationOptions,
       smartSuggestion: availableMinutes !== suggestedDuration ? 
-        `${availableMinutes} minutes available until next lesson` : null
+        `${availableMinutes} minutes available. Suggested: ${suggestedDuration}min` : null
     });
   };
 
@@ -460,12 +467,12 @@ export default function AdvancedScheduleCalendar({
       const eventStartTime = new Date(`2000-01-01T${eventTimeStr}`);
       const eventDuration = event.duration || event.duration_minutes || 30;
       
-      // Calculate visual end time based on how we display the event
-      const visualHeight = Math.ceil(eventDuration / 30);
-      const visualDurationMinutes = visualHeight * 30; // Convert back to minutes for overlap calculation
+      // Calculate visual end time based on 15-minute increments
+      const visualHeight = Math.ceil(eventDuration / 15);
+      const visualDurationMinutes = visualHeight * 15; // Convert back to minutes for overlap calculation
       const eventEndTime = new Date(eventStartTime.getTime() + (visualDurationMinutes * 60000));
       
-      const slotEndTime = new Date(slotTime.getTime() + (30 * 60000));
+      const slotEndTime = new Date(slotTime.getTime() + (15 * 60000)); // 15-minute slot
       return (slotTime < eventEndTime && slotEndTime > eventStartTime);
     });
   };
@@ -581,44 +588,48 @@ export default function AdvancedScheduleCalendar({
       onDragEnd={handleDragEnd}
     >
       <div className="space-y-3">
-        {/* Drag Instructions - show when events exist */}
+        {/* Enhanced Drag Instructions with modern design */}
         {calendarEvents && calendarEvents.length > 0 && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-4 shadow-sm">
+          <div className="bg-gradient-to-r from-blue-50/90 to-indigo-50/90 backdrop-blur-sm border border-blue-200/60 rounded-xl p-4 mb-4 shadow-lg">
             <div className="flex items-start gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
+              <div className="p-2 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl shadow-sm">
                 <ArrowsUpDownIcon className="h-4 w-4 text-blue-600" />
               </div>
               <div className="flex-1">
-                <h4 className="text-sm font-semibold text-blue-900 mb-1">Interactive Schedule</h4>
-                <p className="text-sm text-blue-700">
-                  Drag events to reschedule • Click weekdays to generate AI schedule • Double-click events to edit
+                <h4 className="text-sm font-bold text-blue-900 mb-1">✨ Interactive Schedule</h4>
+                <p className="text-sm text-blue-700 font-medium">
+                  Drag events to reschedule with 15-minute precision • Click weekdays for AI scheduling • Double-click to edit
                 </p>
               </div>
             </div>
           </div>
         )}
         
-        {/* Success message */}
+        {/* Enhanced success message */}
         {showSuccessMessage && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 animate-fade-in">
-            <div className="flex items-center gap-2 text-green-800 text-sm">
-              <CheckIcon className="h-4 w-4" />
-              <span>Schedule updated successfully!</span>
+          <div className="bg-gradient-to-r from-green-50/90 to-emerald-50/90 backdrop-blur-sm border border-green-200/60 rounded-xl p-3 mb-4 shadow-lg animate-fade-in">
+            <div className="flex items-center gap-2 text-green-800 text-sm font-medium">
+              <div className="p-1 bg-green-100 rounded-full">
+                <CheckIcon className="h-4 w-4" />
+              </div>
+              <span>✅ Schedule updated successfully!</span>
             </div>
           </div>
         )}
         
-        {/* Local changes indicator */}
+        {/* Enhanced local changes indicator */}
         {localChanges && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+          <div className="bg-gradient-to-r from-yellow-50/90 to-amber-50/90 backdrop-blur-sm border border-yellow-200/60 rounded-xl p-3 mb-4 shadow-lg">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-yellow-800 text-sm">
-                <ExclamationTriangleIcon className="h-4 w-4" />
-                <span>Changes saved locally. Server sync may be required - check your internet connection.</span>
+              <div className="flex items-center gap-2 text-yellow-800 text-sm font-medium">
+                <div className="p-1 bg-yellow-100 rounded-full">
+                  <ExclamationTriangleIcon className="h-4 w-4" />
+                </div>
+                <span>⚠️ Changes saved locally. Server sync may be required - check your connection.</span>
               </div>
               <button
                 onClick={() => setLocalChanges(false)}
-                className="text-yellow-600 hover:text-yellow-800"
+                className="text-yellow-600 hover:text-yellow-800 font-bold text-lg transition-colors duration-200"
                 title="Dismiss this notification"
               >
                 ×
@@ -627,45 +638,45 @@ export default function AdvancedScheduleCalendar({
           </div>
         )}
 
-        {/* Compact Header with Navigation */}
-        <div className="flex justify-between items-center">
-        <div className="flex items-center gap-1">
+        {/* Enhanced Modern Header with Navigation */}
+        <div className="flex justify-between items-center bg-white/60 backdrop-blur-sm rounded-xl p-4 shadow-sm border border-gray-200/50">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => navigate(-1)}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100/70 rounded-xl transition-all duration-200 hover:shadow-md"
             aria-label="Previous period"
           >
-            <ChevronLeftIcon className="h-4 w-4" />
+            <ChevronLeftIcon className="h-5 w-5 text-gray-600" />
           </button>
           
-          <h2 className="text-sm font-medium text-text-primary min-w-[160px] text-center">
+          <h2 className="text-lg font-bold text-gray-800 min-w-[180px] text-center">
             {renderTitle()}
           </h2>
           
           <button
             onClick={() => navigate(1)}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100/70 rounded-xl transition-all duration-200 hover:shadow-md"
             aria-label="Next period"
           >
-            <ChevronRightIcon className="h-4 w-4" />
+            <ChevronRightIcon className="h-5 w-5 text-gray-600" />
           </button>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {renderWeekSelector()}
           {renderViewSelector()}
           <button
             onClick={goToToday}
-            className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md"
+            className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100/70 rounded-xl transition-all duration-200 hover:shadow-md"
           >
-            Today
+            📅 Today
           </button>
           <button
             onClick={() => openCreateModal()}
-            className="btn-primary px-3 py-1.5 text-sm"
+            className="px-4 py-2 text-sm font-semibold bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 flex items-center gap-2"
           >
             <PlusIcon className="h-4 w-4" />
-            Add
+            Add Lesson
           </button>
         </div>
       </div>
@@ -685,6 +696,7 @@ export default function AdvancedScheduleCalendar({
           childSubjects={childSubjects}
           selectedChildrenIds={selectedChildrenIds}
           allChildren={allChildren}
+          calculateAvailableTime={calculateAvailableTime}
         />
       )}
 
@@ -766,10 +778,10 @@ function DraggableScheduleEvent({
 
   const subject = event.base_subject_name || event.subject_name || event.title || 'Study';
   const duration = event.duration || event.duration_minutes || 30;
-  // Calculate height to show actual time slot usage (45min = 1.5 slots, 60min = 2 slots)
-  const timeSlotHeight = 64; // Each 30-minute slot is 64px
-  const actualHeightPx = Math.max(timeSlotHeight, (duration / 30) * timeSlotHeight); // Scale precisely with duration
-  const height = Math.ceil(duration / 30); // Still need this for grid layout calculations
+  // Calculate height based on 15-minute increments for precise visual representation
+  const timeSlotHeight = 64; // Each 15-minute slot is 64px to match the grid
+  const actualHeightPx = Math.max(timeSlotHeight, (duration / 15) * timeSlotHeight); // Scale precisely with 15-min increments
+  const height = Math.ceil(duration / 15); // Grid layout calculations based on 15-min slots
   const displayTitle = event.title || subject;
   
   // Get child name if multiple children are selected
@@ -784,76 +796,89 @@ function DraggableScheduleEvent({
       {...attributes}
     >
       <div
-        className={`relative rounded-md p-1.5 cursor-move transition-all hover:shadow-lg hover:scale-[1.02] border-2 ${
+        className={`absolute inset-x-1 top-1 rounded-xl p-2 cursor-move transition-all duration-300 ease-out hover:shadow-2xl hover:scale-[1.02] border-2 z-10 ${
           isDragging 
-            ? 'border-blue-500 shadow-xl ring-2 ring-blue-200' 
-            : 'border-transparent hover:border-blue-300'
-        } ${getSubjectColor(subject, childSubjects).bg} ${getSubjectColor(subject, childSubjects).border}`}
+            ? 'border-white/60 shadow-2xl ring-2 ring-white/50 scale-105' 
+            : 'border-white/40 hover:border-white/60 shadow-lg'
+        } ${getSubjectGradient(subject, childSubjects)}`}
         style={{ 
-          minHeight: `${actualHeightPx - 8}px`,
-          height: `${actualHeightPx - 8}px`
+          height: `${actualHeightPx - 8}px` // Allow proper spanning for longer events
         }}
         {...listeners}
       >
-        {/* Drag handle */}
-        <div className={`absolute top-1 right-1 transition-all duration-200 ${
-          isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        {/* Modern drag handle */}
+        <div className={`absolute top-2 right-2 transition-all duration-300 ${
+          isDragging ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'
         }`}>
-          <div className="p-1 bg-white bg-opacity-80 rounded shadow-sm">
-            <ArrowsUpDownIcon className="h-3 w-3 text-gray-600" />
+          <div className="p-1.5 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-white/20">
+            <ArrowsUpDownIcon className="h-3 w-3 text-gray-700" />
           </div>
         </div>
 
         {/* Event content */}
-        {height === 1 ? (
+        {height <= 1 ? (
           /* Compact layout for 30-minute slots */
           <div className="h-full flex items-center justify-between p-2 overflow-hidden">
-            <div className="flex-1 min-w-0 pr-2">
-              <div className={`font-semibold text-xs truncate leading-tight ${getSubjectColor(subject, childSubjects).text} ${event.status === 'completed' ? 'line-through' : ''}`}>
-                {displayTitle}
+            <div className="flex items-center flex-1 min-w-0 pr-2">
+              <div className="text-sm mr-2 opacity-90">
+                {getSubjectIcon(subject, childSubjects)}
               </div>
-              <div className={`text-xs opacity-75 mt-0.5 ${getSubjectColor(subject, childSubjects).text}`}>
-                {duration}m
+              <div className="flex-1 min-w-0">
+                <div className={`font-bold text-xs truncate leading-tight ${getSubjectTextColor(subject, childSubjects)} ${event.status === 'completed' ? 'line-through opacity-70' : ''}`}>
+                  {displayTitle}
+                </div>
+                <div className={`text-xs font-bold mt-0.5 ${getSubjectTextColor(subject, childSubjects)} opacity-80`}>
+                  {duration}m
+                </div>
               </div>
             </div>
             
             {event.status === 'completed' && (
-              <CheckIcon className="h-3 w-3 text-green-600" />
+              <div className="p-1 bg-green-500/90 rounded-full shadow-sm">
+                <CheckIcon className="h-3 w-3 text-white" />
+              </div>
             )}
           </div>
         ) : (
           /* Full layout for longer slots */
-          <div className="h-full flex flex-col justify-between p-2 overflow-hidden">
-            {/* Main content area */}
-            <div className="flex-1 overflow-hidden">
-              {/* Subject/Title - Main heading */}
-              <div className={`font-semibold text-xs mb-2 truncate ${getSubjectColor(subject, childSubjects).text} ${event.status === 'completed' ? 'line-through' : ''}`}>
-                {displayTitle}
+          <div className="h-full flex flex-col justify-between p-3 overflow-hidden">
+            {/* Header with icon and title */}
+            <div className="flex items-start gap-2 flex-1 overflow-hidden">
+              <div className="text-base opacity-90 mt-0.5 flex-shrink-0">
+                {getSubjectIcon(subject, childSubjects)}
               </div>
-              
-              {/* Lesson title if available - Secondary info */}
-              {event.lesson?.title && event.lesson.title !== displayTitle && (
-                <div className={`text-xs opacity-90 mb-1 line-clamp-2 ${getSubjectColor(subject, childSubjects).text}`}>
-                  {event.lesson.title}
+              <div className="flex-1 min-w-0">
+                {/* Subject/Title - Main heading */}
+                <div className={`font-bold text-sm mb-1 truncate ${getSubjectTextColor(subject, childSubjects)} ${event.status === 'completed' ? 'line-through opacity-70' : ''}`}>
+                  {displayTitle}
                 </div>
-              )}
-              
-              {/* Child name for multi-child view */}
-              {childName && (
-                <div className={`text-xs opacity-80 truncate ${getSubjectColor(subject, childSubjects).text}`}>
-                  {childName}
-                </div>
-              )}
+                
+                {/* Lesson title if available - Secondary info */}
+                {event.lesson?.title && event.lesson.title !== displayTitle && (
+                  <div className={`text-xs font-semibold mb-1 line-clamp-2 ${getSubjectTextColor(subject, childSubjects)} opacity-90`}>
+                    {event.lesson.title}
+                  </div>
+                )}
+                
+                {/* Child name for multi-child view */}
+                {childName && (
+                  <div className={`text-xs font-bold truncate bg-white/40 px-2 py-1 rounded-md mt-1 ${getSubjectTextColor(subject, childSubjects)}`}>
+                    {childName}
+                  </div>
+                )}
+              </div>
             </div>
             
             {/* Bottom section with duration and completion */}
-            <div className="flex justify-between items-center mt-2">
-              <div className={`text-xs opacity-75 ${getSubjectColor(subject, childSubjects).text}`}>
+            <div className={`flex justify-between items-center mt-2 pt-2 border-t ${getSubjectTextColor(subject, childSubjects)} border-current opacity-20`}>
+              <div className={`text-xs font-bold bg-white/40 px-2 py-1 rounded-md ${getSubjectTextColor(subject, childSubjects)} opacity-90`}>
                 {duration}m
               </div>
               
               {event.status === 'completed' && (
-                <CheckIcon className="h-3 w-3 text-green-600" />
+                <div className="p-1 bg-green-500/90 rounded-full shadow-sm">
+                  <CheckIcon className="h-3 w-3 text-white" />
+                </div>
               )}
             </div>
           </div>
@@ -901,32 +926,32 @@ function DroppableTimeSlot({
   return (
     <div
       ref={setNodeRef}
-      className={`group transition-all duration-200 ${
+      className={`group transition-all duration-300 ease-out ${
         isOver && !isOccupied 
-          ? 'bg-gradient-to-br from-blue-100 to-blue-200 border-blue-400 shadow-inner' :
+          ? 'bg-gradient-to-br from-blue-100/80 to-blue-200/80 border-blue-400/60 shadow-inner backdrop-blur-sm' :
         isOccupied 
           ? 'bg-transparent'
-          : `cursor-pointer ${isWeekend ? 'hover:bg-gray-100' : 'hover:bg-blue-50'}`
-      } ${isWeekend ? 'bg-gray-50' : ''} border-r border-b border-gray-200 relative`}
+          : `cursor-pointer ${isWeekend ? 'hover:bg-gray-100/50' : 'hover:bg-blue-50/50 hover:shadow-sm'}`
+      } ${isWeekend ? 'bg-gray-50/30' : 'bg-white/50'} border-r border-b border-gray-200/60 relative backdrop-blur-xs`}
       onClick={handleClick}
       data-day={format(day, 'yyyy-MM-dd')}
       data-time={timeSlot}
       style={{ minHeight: '64px' }}
     >
-      {/* Drop zone indicator */}
+      {/* Modern drop zone indicator */}
       {isOver && !isOccupied && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-blue-600 text-xs font-medium bg-white px-2 py-1 rounded shadow-sm border border-blue-300">
-            Drop here
+          <div className="text-blue-700 text-xs font-semibold bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow-lg border border-blue-300/60 animate-pulse">
+            Drop here ✨
           </div>
         </div>
       )}
       
-      {/* Available time hint on hover for empty slots */}
+      {/* Enhanced available time hint on hover for empty slots */}
       {!isOccupied && availableMinutes && availableMinutes < 60 && (
-        <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <div className="text-xs text-gray-500 bg-yellow-50 px-1 py-0.5 rounded border border-yellow-200">
-            {availableMinutes}min
+        <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-1 group-hover:translate-y-0">
+          <div className="text-xs text-amber-700 font-medium bg-amber-50/90 backdrop-blur-sm px-2 py-1 rounded-lg border border-amber-200/60 shadow-sm">
+            ⏱️ {availableMinutes}min
           </div>
         </div>
       )}
@@ -947,7 +972,8 @@ function WeekView({
   openEditModal,
   childSubjects,
   selectedChildrenIds,
-  allChildren
+  allChildren,
+  calculateAvailableTime
 }) {
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -955,10 +981,10 @@ function WeekView({
   const allEvents = dateRange.days.flatMap(day => getEventsForDay(day));
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-      {/* Clean day headers - now clickable */}
-      <div className="grid grid-cols-8">
-        <div className="p-3 text-xs font-medium text-gray-500 bg-gray-50 border-b border-r border-gray-200">TIME</div>
+    <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-gray-200/50 overflow-hidden shadow-xl">
+      {/* Modern day headers - now clickable */}
+      <div className="grid grid-cols-8 bg-gradient-to-r from-slate-50/80 to-gray-50/80 backdrop-blur-sm">
+        <div className="p-4 text-xs font-semibold text-gray-600 bg-gradient-to-br from-gray-50/90 to-gray-100/90 border-b border-r border-gray-200/60 backdrop-blur-sm">TIME</div>
         {dateRange.days.map((day, index) => {
           const dayStats = getDayStats(day);
           const isWeekend = index >= 5;
@@ -969,58 +995,40 @@ function WeekView({
           return (
             <div 
               key={day.toString()} 
-              className={`p-3 text-center border-b border-gray-200 transition-all duration-200 ${
-                isWeekend ? 'bg-gray-50' : 'bg-white'
+              className={`p-4 text-center border-b border-gray-200/60 transition-all duration-300 ease-out ${
+                isWeekend ? 'bg-gray-50/70' : 'bg-white/70'
               } ${
-                isClickableWeekday ? 'cursor-pointer hover:bg-blue-50 hover:shadow-md' : ''
+                isClickableWeekday ? 'cursor-pointer hover:bg-blue-50/80 hover:shadow-lg hover:backdrop-blur-md transform hover:scale-105' : ''
               } ${
-                isTodayDay ? 'bg-blue-100 ring-2 ring-blue-300 ring-opacity-50' : ''
-              }`}
+                isTodayDay ? 'bg-gradient-to-br from-blue-100/90 to-blue-200/70 ring-2 ring-blue-300/60 ring-opacity-50 backdrop-blur-sm' : ''
+              } backdrop-blur-xs`}
               onClick={() => isClickableWeekday ? handleDayClick(day) : null}
               title={isClickableWeekday ? `Click to schedule lessons starting ${format(day, 'EEEE, MMM d')}` : format(day, 'EEEE, MMM d')}
             >
-              <div className="text-xs font-medium text-gray-500 uppercase">
+              <div className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 {dayNames[index]}
               </div>
-              <div className={`text-lg font-semibold mt-1 ${
-                isTodayDay ? 'text-blue-800' : 'text-gray-900'
+              <div className={`text-xl font-bold mt-1 ${
+                isTodayDay ? 'text-blue-900' : 'text-gray-900'
               }`}>
                 {format(day, 'd')}
               </div>
-              {dayStats.totalMinutes > 0 && (
-                <div className="mt-2">
-                  <div className={`h-1 w-full rounded-full ${
-                    isTodayDay ? 'bg-blue-400' : 'bg-blue-300'
-                  }`} />
-                  <div className="text-xs text-gray-500 mt-1">
-                    {dayStats.totalHours}h
-                  </div>
-                </div>
-              )}
-              {/* Add AI scheduling indicator for weekdays */}
-              {isClickableWeekday && !isWeekend && (
-                <div className="mt-1">
-                  <div className="text-xs text-blue-600 opacity-70">
-                    🧠 Click to schedule
-                  </div>
-                </div>
-              )}
             </div>
           );
         })}
       </div>
 
-      {/* Fixed 30-minute time slots grid */}
+      {/* Modern time slots grid with glassmorphism */}
       <div className="max-h-[500px] overflow-y-auto scrollbar-thin">
         <SortableContext items={allEvents.map(e => e.id) || []} strategy={verticalListSortingStrategy}>
-          <div className="grid grid-cols-8 border border-gray-200 rounded-lg overflow-hidden bg-white">
-            {/* Time labels column */}
-            <div className="bg-gray-50 border-r border-gray-200">
-              <div className="h-10 border-b border-gray-200 flex items-center justify-center text-xs font-medium text-gray-500">
+          <div className="grid grid-cols-8 bg-gradient-to-br from-white/60 to-gray-50/40 backdrop-blur-sm">
+            {/* Enhanced time labels column */}
+            <div className="bg-gradient-to-b from-gray-50/90 to-gray-100/80 border-r border-gray-200/60 backdrop-blur-sm">
+              <div className="h-12 border-b border-gray-200/60 flex items-center justify-center text-xs font-semibold text-gray-600">
                 Time
               </div>
               {timeSlots.map(timeSlot => (
-                <div key={timeSlot} className="h-12 border-b border-gray-100 flex items-center justify-center text-xs text-gray-600">
+                <div key={timeSlot} className="h-16 border-b border-gray-100/60 flex items-center justify-center text-xs font-medium text-gray-600 bg-white/20">
                   {timeSlot}
                 </div>
               ))}
@@ -1035,62 +1043,86 @@ function WeekView({
               const isTodayDay = isToday(day);
               
               return (
-                <div key={dayString} className="border-r border-gray-200 last:border-r-0">
-                  {/* Day header */}
-                  <div 
-                    className={`h-10 border-b border-gray-200 flex flex-col items-center justify-center cursor-pointer transition-colors ${
-                      isTodayDay ? 'bg-blue-50 text-blue-700' : 
-                      isWeekendDay ? 'bg-gray-100 text-gray-500' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                    }`}
-                    onClick={() => handleDayClick(day)}
-                  >
-                    <div className="font-medium text-xs">{dayNames[dayIndex]}</div>
-                    <div className={`text-xs font-bold ${isTodayDay ? 'text-blue-600' : ''}`}>
-                      {format(day, 'd')}
-                    </div>
-                    {dayStats.totalMinutes > 0 && (
-                      <div className="text-xs text-gray-500">
-                        {dayStats.totalHours}h
-                      </div>
-                    )}
-                  </div>
+                <div key={dayString} className="border-r border-gray-200/60 last:border-r-0">
 
-                  {/* Fixed 30-minute time slots */}
-                  {timeSlots.map(timeSlot => {
-                    const isOccupied = events.some(event => {
-                      const eventTimeStr = event.startTime || event.start_time || format(new Date(event.start), 'HH:mm');
+                  {/* Dynamic 15-minute time slots */}
+                  {timeSlots.map((timeSlot, timeSlotIndex) => {
+                    // Check if this slot starts an event
+                    const eventStartingHere = events.find(event => {
+                      let eventTimeStr = event.startTime || event.start_time;
+                      if (!eventTimeStr && event.start) {
+                        eventTimeStr = format(new Date(event.start), 'HH:mm');
+                      }
+                      if (!eventTimeStr && event.scheduled_date && event.start_time) {
+                        eventTimeStr = event.start_time;
+                      }
+                      // Normalize time format - remove seconds if present
+                      if (eventTimeStr && eventTimeStr.length === 8) {
+                        eventTimeStr = eventTimeStr.substring(0, 5);
+                      }
                       return eventTimeStr === timeSlot;
                     });
 
-                    if (isOccupied) {
-                      // Show the scheduled event
-                      const event = events.find(e => {
-                        const eventTimeStr = e.startTime || e.start_time || format(new Date(e.start), 'HH:mm');
-                        return eventTimeStr === timeSlot;
-                      });
+                    // Check if this slot is occupied by a spanning event
+                    const isOccupiedBySpanningEvent = events.some(event => {
+                      let eventTimeStr = event.startTime || event.start_time;
+                      if (!eventTimeStr && event.start) {
+                        eventTimeStr = format(new Date(event.start), 'HH:mm');
+                      }
+                      if (!eventTimeStr && event.scheduled_date && event.start_time) {
+                        eventTimeStr = event.start_time;
+                      }
+                      if (eventTimeStr && eventTimeStr.length === 8) {
+                        eventTimeStr = eventTimeStr.substring(0, 5);
+                      }
+                      
+                      if (!eventTimeStr) return false;
+                      
+                      const eventStartTime = new Date(`2000-01-01T${eventTimeStr}`);
+                      const currentSlotTime = new Date(`2000-01-01T${timeSlot}`);
+                      const eventDuration = event.duration || event.duration_minutes || 30;
+                      const eventEndTime = new Date(eventStartTime.getTime() + (eventDuration * 60000));
+                      const slotEndTime = new Date(currentSlotTime.getTime() + (15 * 60000));
+                      
+                      return currentSlotTime < eventEndTime && slotEndTime > eventStartTime && eventTimeStr !== timeSlot;
+                    });
 
-                      if (event) {
-                        return (
+                    if (eventStartingHere) {
+                      // Show the event starting here with proper height
+                      const duration = eventStartingHere.duration || eventStartingHere.duration_minutes || 30;
+                      const slotsSpanned = Math.ceil(duration / 15);
+                      
+                      return (
+                        <div key={timeSlot} className="relative" style={{ minHeight: '64px' }}>
                           <DraggableScheduleEvent
-                            key={`${event.id}-${timeSlot}`}
-                            event={event}
-                            timeSlot={timeSlot}
-                            openEditModal={openEditModal}
+                            key={`${eventStartingHere.id}-${timeSlot}`}
+                            event={eventStartingHere}
+                            onEdit={openEditModal}
                             childSubjects={childSubjects}
                             selectedChildrenIds={selectedChildrenIds}
                             allChildren={allChildren}
                           />
-                        );
-                      }
+                        </div>
+                      );
+                    } else if (isOccupiedBySpanningEvent) {
+                      // This slot is occupied by a spanning event, render empty slot
+                      return (
+                        <div key={timeSlot} className="relative" style={{ minHeight: '64px' }}>
+                          {/* Empty slot occupied by spanning event */}
+                        </div>
+                      );
                     }
 
                     // Empty available slot
                     return (
                       <DroppableTimeSlot
                         key={timeSlot}
+                        id={`${format(day, 'yyyy-MM-dd')}_${timeSlot}`}
                         day={day}
                         timeSlot={timeSlot}
-                        onClick={() => handleTimeSlotClick(day, timeSlot)}
+                        isOccupied={false}
+                        onCreateNew={handleTimeSlotClick}
+                        availableMinutes={calculateAvailableTime(day, timeSlot)}
                       />
                     );
                   })}

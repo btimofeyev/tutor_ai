@@ -159,6 +159,7 @@ const ParentNotesSection = ({ selectedChild }) => {
   const [editingNoteId, setEditingNoteId] = useState(null);
   const { showSuccess, showError } = useToast();
   
+  // Use global notes (not child-specific)
   const {
     notes,
     loading,
@@ -167,7 +168,7 @@ const ParentNotesSection = ({ selectedChild }) => {
     updateNote,
     deleteNote,
     clearError
-  } = useParentNotes(selectedChild?.id);
+  } = useParentNotes(null, true); // Pass null for childId and true for isGlobal
 
 
   // Handle updating note
@@ -190,11 +191,6 @@ const ParentNotesSection = ({ selectedChild }) => {
       showError('Failed to delete note. Please try again.');
     }
   };
-
-  // Don't render if no child selected
-  if (!selectedChild) {
-    return null;
-  }
 
   // Error state
   if (error) {
@@ -221,7 +217,7 @@ const ParentNotesSection = ({ selectedChild }) => {
       <div className="mb-3">
         <h3 id="parent-notes-heading" className="text-sm font-medium text-gray-700 flex items-center gap-1">
           <span className="text-sm" aria-hidden="true">📝</span>
-          Quick Notes {notes.length > 0 && <span className="text-xs text-gray-500">({notes.length})</span>}
+          Quick Notes (All Children) {notes.length > 0 && <span className="text-xs text-gray-500">({notes.length})</span>}
         </h3>
       </div>
 

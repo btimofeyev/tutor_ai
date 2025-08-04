@@ -60,7 +60,12 @@ app.use('/api/progress', progressRoutes); // Fixed: removed 'Routes' suffix
 app.use('/api/schedule', scheduleRoutes); // Add Schedule routes
 app.use('/api/parent/chat-insights', chatInsightsRoutes); // Add Chat Insights routes
 app.use('/api/stripe', stripeRoutes); // Add Stripe routes
-app.use('/api/children', parentNotesRoutes); // Add Parent Notes routes
+app.use('/api/children', parentNotesRoutes); // Add Parent Notes routes (child-specific and global)
+
+// Health check route
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

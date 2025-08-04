@@ -1,839 +1,652 @@
-# SCHEDULING_SYSTEM.md - Complete Scheduling System Documentation
-
-## Overview
-Comprehensive documentation for the AI-powered scheduling system in the Tutor AI parent dashboard. This system enables parents to create, manage, and automatically generate study schedules for their homeschooled children using both manual entry and AI-powered schedule generation.
-
-**Current Implementation Status**: Fixed 30-minute time slot system with drag-and-drop functionality and visual event duration display.
+# Tutor AI Scheduling System Documentation
 
 ## Table of Contents
-1. [Current Implementation Overview](#current-implementation-overview)
-2. [Time Slot System](#time-slot-system)
-3. [Calendar Components](#calendar-components)
-4. [Drag and Drop Functionality](#drag-and-drop-functionality)
-5. [Event Display System](#event-display-system)
-6. [AI Schedule Generation](#ai-schedule-generation)
-7. [Backend Implementation](#backend-implementation)
-8. [Frontend Components](#frontend-components)
-9. [User Experience Flow](#user-experience-flow)
-10. [Technical Implementation Details](#technical-implementation-details)
-11. [Recent Changes & Fixes](#recent-changes--fixes)
+1. [Overview](#overview)
+2. [Architecture](#architecture)
+3. [Core Components](#core-components)
+4. [Features](#features)
+5. [API Reference](#api-reference)
+6. [AI Scheduling Engine](#ai-scheduling-engine)
+7. [User Workflows](#user-workflows)
+8. [Technical Implementation](#technical-implementation)
+9. [Database Schema](#database-schema)
+10. [Performance & Optimization](#performance--optimization)
 
----
+## Overview
 
-## Current Implementation Overview
+The Tutor AI Scheduling System is a comprehensive, AI-powered calendar and scheduling solution designed specifically for homeschool education. It provides intelligent schedule generation, drag-and-drop calendar management, multi-child coordination, and template-based scheduling patterns.
 
-### Architecture Summary
-The current scheduling system uses a **fixed 30-minute time slot grid** with enhanced visual event display and drag-and-drop functionality. The system is stable, performant, and user-friendly for homeschool parents managing multiple children's schedules.
+### Key Capabilities
+- **AI-Powered Scheduling**: Intelligent schedule generation based on cognitive load theory
+- **Multi-Child Support**: Coordinate schedules across multiple children
+- **Drag-and-Drop Interface**: 15-minute precision scheduling with visual feedback
+- **Template System**: Pre-built and custom schedule patterns
+- **Real-time Conflict Detection**: Prevent scheduling conflicts across family
+- **Multiple Views**: Week, multi-week, and month calendar views
+- **PDF Export**: Generate printable schedules
 
-### Key Features (As Implemented)
-- ✅ **Fixed 30-Minute Time Slots**: Reliable grid system from 9 AM - 3 PM (configurable)
-- ✅ **Visual Event Duration**: Events show their actual duration (45-min lessons span 1.5 slots visually)
-- ✅ **Drag-and-Drop Rescheduling**: Move lessons between time slots by dragging
-- ✅ **Multi-Child Support**: Color-coded events for different children
-- ✅ **Three View Types**: Week, Multi-Week, and Month views
-- ✅ **AI Schedule Generation**: Rule-based automatic scheduling
-- ✅ **Smart Duration Suggestions**: System suggests optimal lesson duration based on available time
-- ✅ **Weekend Handling**: Different behavior for weekdays vs weekends
-- ✅ **Real-time Updates**: Immediate UI updates with server sync
+## Architecture
 
-### System Constraints
-- **Time Slots**: Fixed 30-minute increments (not dynamic)
-- **Visual Gaps**: 45-minute lessons show properly but still operate on 30-minute grid
-- **Working Hours**: Default 9 AM - 3 PM (respects schedule preferences)
-- **Weekday Focus**: AI scheduling primarily targets Monday-Friday
+### Frontend Architecture
+```
+parent-dashboard-frontend/src/app/schedule/
+├── page.js                          # Main schedule page component
+├── components/
+│   ├── AdvancedScheduleCalendar.js  # Main calendar with drag-drop
+│   ├── EnhancedScheduleManager.js   # View manager and coordinator
+│   ├── AIScheduleConfigModal.js     # AI configuration interface
+│   ├── ScheduleTemplatesManager.js  # Template management
+│   ├── CreateScheduleEntryModal.js  # Entry creation form
+│   ├── EditScheduleEntryModal.js    # Entry editing form
+│   ├── ScheduleSettingsModal.js     # Preferences configuration
+│   ├── PDFGenerator.js              # PDF export functionality
+│   └── ScheduleExportManager.js     # Export options interface
 
----
+hooks/
+├── useScheduleManagement.js         # Single-child scheduling hook
+└── useMultiChildScheduleManagement.js # Multi-child coordination hook
+```
 
-## Time Slot System
+### Backend Architecture
+```
+backend/src/
+├── routes/scheduleRoutes.js         # API endpoint definitions
+├── controllers/scheduleController.js # Request handlers
+└── services/schedulingService.js    # AI scheduling logic
+```
 
-### Fixed 30-Minute Grid
-The calendar uses a **fixed time slot system** where each slot represents 30 minutes:
+### State Management
+The system uses a custom hooks-based architecture for state management:
+- **Local-first approach**: Data cached in localStorage with 5-minute expiry
+- **Batch operations**: Prevents UI flickering during bulk updates
+- **Optimistic updates**: Immediate UI feedback with background sync
+- **Multi-child state**: Separate state management for family coordination
 
+## Core Components
+
+### AdvancedScheduleCalendar
+The main calendar component with advanced features:
+- **Drag-and-drop**: Built with @dnd-kit for smooth interactions
+- **Multiple views**: Week (default), Multi-week (2-4 weeks), Month
+- **Time slots**: 15-minute increments for precise scheduling
+- **Visual feedback**: Hover states, drop zones, conflict indicators
+- **Local persistence**: Remembers last viewed date/settings
+
+Key Features:
 ```javascript
-// Time slots generation (9 AM - 3 PM default)
-const timeSlots = useMemo(() => {
-  const startHour = schedulePreferences?.preferred_start_time ? 
-    parseInt(schedulePreferences.preferred_start_time.split(':')[0]) : 9;
-  const endHour = schedulePreferences?.preferred_end_time ? 
-    parseInt(schedulePreferences.preferred_end_time.split(':')[0]) : 15;
-  
-  const slots = [];
-  for (let hour = startHour; hour <= endHour; hour++) {
-    slots.push(`${hour.toString().padStart(2, '0')}:00`);
-    if (hour < endHour) {
-      slots.push(`${hour.toString().padStart(2, '0')}:30`);
-    }
-  }
-  return slots;
-}, [schedulePreferences]);
-```
-
-### Time Slot Grid Layout
-```
-┌─────────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐
-│  TIME   │ MON │ TUE │ WED │ THU │ FRI │ SAT │ SUN │
-├─────────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
-│  9:00   │  🟦 │     │  🟩 │     │     │     │     │
-├─────────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
-│  9:30   │  🟦 │     │  🟩 │     │  🟨 │     │     │
-├─────────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
-│ 10:00   │     │  🟧 │  🟩 │     │  🟨 │     │     │
-└─────────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘
-```
-
-- **Blue (🟦)**: 60-minute lesson spanning 2 slots
-- **Green (🟩)**: 45-minute lesson spanning 1.5 slots visually  
-- **Orange (🟧)**: 30-minute lesson in single slot
-- **Yellow (🟨)**: 15-minute lesson in single slot
-
-### Slot Interaction
-- **Click Empty Slot**: Opens lesson creation modal with smart duration suggestions
-- **Drag Event**: Move lessons between slots
-- **Double-click Event**: Opens edit modal
-- **Hover Effects**: Shows available time hints
-
----
-
-## Calendar Components
-
-### WeekView (Primary Interface)
-The main calendar interface with clickable day headers and time slot grid:
-
-```javascript
-function WeekView({ 
-  dateRange, 
-  timeSlots, 
-  getEventsForDay, 
-  getDayStats,
-  handleTimeSlotClick,
-  handleDayClick, 
-  openEditModal,
-  childSubjects,
-  selectedChildrenIds,
-  allChildren
-}) {
-  // Fixed grid layout: 8 columns (1 time + 7 days)
-  return (
-    <div className="grid grid-cols-8 border border-gray-200 rounded-lg overflow-hidden bg-white">
-      {/* Time labels column */}
-      <div className="bg-gray-50 border-r border-gray-200">
-        {timeSlots.map(timeSlot => (
-          <div key={timeSlot} className="h-12 border-b border-gray-100">
-            {timeSlot}
-          </div>
-        ))}
-      </div>
-
-      {/* Day columns */}
-      {dateRange.days.map((day, dayIndex) => (
-        <div key={dayString} className="border-r border-gray-200 last:border-r-0">
-          {/* Fixed 30-minute time slots */}
-          {timeSlots.map(timeSlot => (
-            <DroppableTimeSlot
-              key={timeSlot}
-              day={day}
-              timeSlot={timeSlot}
-              onClick={() => handleTimeSlotClick(day, timeSlot)}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-```
-
-### MultiWeekView & MonthView
-- **MultiWeekView**: Shows 2-4 weeks in compact grid format
-- **MonthView**: Traditional month calendar with event indicators
-- **Same Functionality**: All views support day-click and event interaction
-
-### Day Header Behavior
-```javascript
-// Clickable day headers for weekdays
-<div 
-  className={`h-10 border-b border-gray-200 flex flex-col items-center justify-center cursor-pointer transition-colors ${
-    isTodayDay ? 'bg-blue-50 text-blue-700' : 
-    isWeekendDay ? 'bg-gray-100 text-gray-500' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-  }`}
-  onClick={() => handleDayClick(day)}
->
-  <div className="font-medium text-xs">{dayNames[dayIndex]}</div>
-  <div className={`text-xs font-bold ${isTodayDay ? 'text-blue-600' : ''}`}>
-    {format(day, 'd')}
-  </div>
-</div>
-```
-
----
-
-## Drag and Drop Functionality
-
-### Implementation with @dnd-kit
-The system uses `@dnd-kit/core` for reliable drag-and-drop functionality:
-
-```javascript
-// DragDropScheduleCalendar.js - Main drag context
-<DndContext
-  sensors={sensors}
-  collisionDetection={closestCenter}
-  onDragStart={handleDragStart}
-  onDragOver={handleDragOver}
-  onDragEnd={handleDragEnd}
->
-  <SortableContext items={allEvents.map(e => e.id) || []} strategy={verticalListSortingStrategy}>
-    {/* Calendar grid */}
-  </SortableContext>
-</DndContext>
-```
-
-### Draggable Events
-Each scheduled lesson is draggable:
-
-```javascript
-function DraggableScheduleEvent({ event, onEdit, childSubjects, isOverlay = false }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: event.id });
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.7 : 1,
-        minHeight: `${actualHeightPx - 8}px`, // Visual height based on duration
-        height: `${actualHeightPx - 8}px`
-      }}
-      {...attributes}
-      {...listeners}
-    >
-      {/* Event content with drag handle */}
-    </div>
-  );
-}
-```
-
-### Drop Zones
-Each empty time slot is a drop zone:
-
-```javascript
-function DroppableTimeSlot({ day, timeSlot, onClick }) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: `${format(day, 'yyyy-MM-dd')}_${timeSlot}`
-  });
-  
-  return (
-    <div
-      ref={setNodeRef}
-      className={`${isOver ? 'bg-blue-100 border-blue-400' : 'hover:bg-blue-50'} 
-                  cursor-pointer border-r border-b border-gray-200`}
-      onClick={onClick}
-      data-day={format(day, 'yyyy-MM-dd')}
-      data-time={timeSlot}
-      style={{ minHeight: '64px' }}
-    >
-      {/* Drop indicator when dragging over */}
-    </div>
-  );
-}
-```
-
-### Drag End Handling
-```javascript
-const handleDragEnd = useCallback(async (event) => {
-  const { active, over } = event;
-  if (!over) return;
-
-  // Parse drop target ID: "2025-08-01_09:30"
-  const [dayStr, timeStr] = over.id.split('_');
-  const eventToMove = calendarEvents?.find(e => e.id === active.id);
-
-  // Update schedule entry
-  const updateResult = await updateScheduleEntry(eventToMove.id, {
-    scheduled_date: dayStr,
-    start_time: timeStr
-  }, childId);
-  
-  // Show success feedback
-  if (updateResult.success) {
-    setShowSuccessMessage(true);
-    setTimeout(() => setShowSuccessMessage(false), 2000);
-  }
-}, [calendarEvents, updateScheduleEntry, childId]);
-```
-
----
-
-## Event Display System
-
-### Visual Duration Representation
-Events display their actual duration while operating on the 30-minute grid:
-
-```javascript
-// Event height calculation
-const duration = event.duration || event.duration_minutes || 30;
-const timeSlotHeight = 64; // Each 30-minute slot is 64px
-const actualHeightPx = Math.max(timeSlotHeight, (duration / 30) * timeSlotHeight);
-
-// Examples:
-// 15 minutes = 64px (minimum 1 slot)
-// 30 minutes = 64px (1 slot)
-// 45 minutes = 96px (1.5 slots visually)
-// 60 minutes = 128px (2 slots)
-```
-
-### Event Layout Types
-The system automatically chooses layout based on duration:
-
-```javascript
-{height === 1 ? (
-  /* Compact layout for 30-minute slots */
-  <div className="h-full flex items-center justify-between p-2">
-    <div className="flex-1 min-w-0 pr-2">
-      <div className="font-semibold text-xs truncate">{displayTitle}</div>
-      <div className="text-xs opacity-75">{duration}m</div>
-    </div>
-  </div>
-) : (
-  /* Full layout for longer slots */
-  <div className="h-full flex flex-col justify-between p-2">
-    <div className="flex-1">
-      <div className="font-semibold text-xs mb-2">{displayTitle}</div>
-      {event.lesson?.title && (
-        <div className="text-xs opacity-90 mb-1">{event.lesson.title}</div>
-      )}
-    </div>
-    <div className="flex justify-between items-center">
-      <div className="text-xs opacity-75">{duration}m</div>
-      {event.status === 'completed' && (
-        <CheckIcon className="h-3 w-3 text-green-600" />
-      )}
-    </div>
-  </div>
-)}
-```
-
-### Color Coding System
-Events are color-coded by subject and child:
-
-```javascript
-// Subject-based colors
-const subjectColors = {
-  'Mathematics': 'bg-blue-100 text-blue-800 border-blue-200',
-  'English Language Arts': 'bg-green-100 text-green-800 border-green-200',
-  'Science': 'bg-purple-100 text-purple-800 border-purple-200',
-  'Bible': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  // ... more subjects
+// Calendar views
+const VIEW_TYPES = {
+  WEEK: 'week',        // 7-day view with time slots
+  MULTI_WEEK: 'multi-week', // 2-4 week overview
+  MONTH: 'month'       // Traditional month calendar
 };
 
-// Multi-child variation
-const getChildVariation = (childId, baseColor) => {
-  // Adds child-specific variation to base subject color
-  return `${baseColor} ring-2 ring-${childColor}-300`;
-};
+// Time slot configuration (15-minute increments)
+const timeSlots = ['09:00', '09:15', '09:30', '09:45', '10:00', ...];
 ```
 
----
+### EnhancedScheduleManager
+Container component managing different views and features:
+- **View switching**: Calendar, Templates, Settings
+- **Template application**: Batch schedule creation with conflict resolution
+- **PDF generation**: Export schedules for printing
+- **Loading states**: Skeleton loaders during operations
 
-## System Architecture
+### AIScheduleConfigModal
+Configuration interface for AI schedule generation:
+- **Start date options**: Today, Tomorrow, Next Monday, Custom
+- **Duration settings**: 1 week, 2 weeks, 1 month
+- **Subject frequencies**: Configure lessons per week per subject
+- **Study intensity**: Light (1-2), Balanced (2-3), Intensive (3+) subjects/day
+- **Advanced options**: 
+  - Difficulty distribution (morning/afternoon/balanced)
+  - Session length preferences
+  - Multi-child coordination modes
 
-### Core Components
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (React)                         │
-├─────────────────────────────────────────────────────────────┤
-│ SchedulePage → EnhancedScheduleManager → AdvancedScheduleCalendar │
-│     ↓                    ↓                       ↓           │
-│ handleGenerateAISchedule  │              handleDayClick      │
-│                          │                       │          │
-│ useScheduleManagement ←──┘              WeekView/MonthView   │
-│ useMultiChildScheduleManagement                              │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ HTTP Request
-┌─────────────────────────────────────────────────────────────┐
-│                   Backend (Express.js)                      │
-├─────────────────────────────────────────────────────────────┤
-│ scheduleController.js                                       │
-│   ├── generateAISchedule()                                 │
-│   ├── generateSimpleSchedule()                             │
-│   └── getNextWeekdays()                                    │
-│                              │                              │
-│ Database (Supabase)         │                              │
-│   ├── schedule_entries      │                              │
-│   ├── children             │                              │
-│   └── materials            │                              │
-└─────────────────────────────────────────────────────────────┘
-```
+### ScheduleTemplatesManager
+Template creation and management system:
+- **Pre-built templates**: Morning Focus, Balanced Daily, Subject-Intensive
+- **Custom templates**: Save current schedule as reusable template
+- **Category organization**: Weekly, Subject-focused, Grade-specific
+- **Batch application**: Apply to multiple children simultaneously
 
-### Data Flow
-1. **User Interaction**: Click on calendar day or AI Schedule button
-2. **Frontend Processing**: Determine scheduling mode (single entry vs AI generation)
-3. **Backend Processing**: Generate schedule entries using rule-based algorithm
-4. **Database Storage**: Insert schedule entries with conflict checking
-5. **UI Update**: Refresh calendar view with new entries
+## Features
 
----
-
-## Calendar Day-Click Functionality
-
-### Feature Overview
-Parents can click on any calendar day to either create a single lesson entry or generate an AI-powered schedule starting from that day.
-
-### Implementation Details
+### 1. Calendar Views
 
 #### Week View (Default)
-- **Day Headers**: Clickable headers for Monday-Friday
-- **Current Day Highlighting**: Blue background with ring effect
-- **Visual Indicators**: "🧠 Click to schedule" text on weekdays
-- **Hover Effects**: Blue background on hover with shadow
-- **Weekend Behavior**: Saturday/Sunday only allow single lesson creation
+- **Grid layout**: 7 days × time slots (15-min increments)
+- **Time range**: Based on schedule preferences (default 9 AM - 3 PM)
+- **Event display**: Color-coded by subject with duration visualization
+- **Click actions**: 
+  - Weekday headers: AI schedule generation prompt
+  - Time slots: Create new entry
+  - Events: Edit existing entry
 
+#### Multi-Week View
+- **Options**: 2, 3, or 4 weeks display
+- **Compact layout**: Shows event titles and counts
+- **Overview focus**: Quick assessment of schedule density
+- **Navigation**: Jump between week ranges
+
+#### Month View
+- **Traditional calendar**: Full month grid
+- **Event preview**: Shows 2 events + count
+- **Current month highlight**: Grays out other months
+- **Quick navigation**: Click any day to schedule
+
+### 2. Drag-and-Drop Scheduling
+
+**Implementation**:
 ```javascript
-// Week View Day Header Implementation
-<div 
-  className={`p-3 text-center border-b border-gray-200 transition-all duration-200 ${
-    isWeekend ? 'bg-gray-50' : 'bg-white'
-  } ${
-    isClickableWeekday ? 'cursor-pointer hover:bg-blue-50 hover:shadow-md' : ''
-  } ${
-    isTodayDay ? 'bg-blue-100 ring-2 ring-blue-300 ring-opacity-50' : ''
-  }`}
-  onClick={() => isClickableWeekday ? handleDayClick(day) : null}
->
-```
-
-#### Month View & Multi-Week View
-- **Full Day Cells**: Entire day cell is clickable
-- **Event Preview**: Shows existing events as small indicators
-- **Same Functionality**: Identical day-click behavior as week view
-
-### User Experience Flow
-1. **Click Day**: User clicks on any weekday in calendar
-2. **Confirmation Dialog**: 
-   ```
-   What would you like to do for [Day Name]?
-   
-   1. Create single lesson entry
-   2. Generate AI schedule starting from this day
-   
-   Click "OK" for AI schedule, "Cancel" to create single entry.
-   ```
-3. **AI Schedule**: If chosen, generates lessons from clicked day through Friday
-4. **Single Entry**: Opens manual lesson creation modal
-
----
-
-## AI Schedule Generation
-
-### Simple Rule-Based Algorithm
-The system uses a straightforward rule-based approach instead of complex AI to ensure reliability and speed.
-
-#### Algorithm Overview
-```javascript
-function generateSimpleSchedule(scheduleRequests, startDate, daysToSchedule = 5) {
-  // 1. Calculate weekdays from start date through Friday only
-  const weekdays = getNextWeekdays(startDate, daysToSchedule);
-  
-  // 2. Assign optimal time slots based on cognitive load
-  const timeSlots = {
-    'Mathematics': '09:00',          // High cognitive load - morning
-    'English Language Arts': '10:00', // Medium cognitive load
-    'Bible': '11:00',                // Medium cognitive load
-    'Science': '14:00',              // Lower cognitive load - afternoon
-    'Literature': '15:00',           // Lowest cognitive load
-    'Art': '16:00',                  // Creative subjects last
-    'Music': '16:00'
-  };
-  
-  // 3. For each subject, take next 5 lessons and distribute across weekdays
-  // 4. Create database entries with proper metadata
-}
-```
-
-#### Key Features
-- **Cognitive Load Optimization**: Math in morning, creative subjects in afternoon
-- **Subject Distribution**: Maximum 5 lessons per subject across available days
-- **Week Boundary Respect**: Never schedules beyond Friday of clicked week
-- **Conflict Avoidance**: Checks for existing schedule conflicts
-- **Multi-Child Support**: Coordinates schedules across multiple children
-
-#### Time Slot Assignment
-| Subject | Time | Reasoning |
-|---------|------|-----------|
-| Mathematics | 9:00 AM | High cognitive load - peak morning focus |
-| English Language Arts | 10:00 AM | Medium cognitive load |
-| Bible | 11:00 AM | Medium cognitive load |
-| Science | 2:00 PM | Lower cognitive load - post-lunch |
-| Literature | 3:00 PM | Lowest cognitive load |
-| Art/Music | 4:00 PM | Creative subjects when energy is lower |
-
----
-
-## Backend Implementation
-
-### Core Functions
-
-#### `generateAISchedule()` Controller
-```javascript
-const generateAISchedule = async (req, res) => {
-  // 1. Extract parameters
-  const { child_ids, start_date, days_to_schedule = 7, preferences = {} } = req.body;
-  
-  // 2. Verify parent ownership of children
-  // 3. Fetch materials for each child
-  // 4. Generate simple rule-based schedule
-  const generatedSchedule = generateSimpleSchedule(scheduleRequests, start_date, days_to_schedule);
-  
-  // 5. Convert to database format and insert
-  // 6. Return success response
-}
-```
-
-#### `getNextWeekdays()` Function - Recent Fix
-```javascript
-function getNextWeekdays(startDate, maxCount = 5) {
-  const weekdays = [];
-  const currentDate = new Date(startDate + 'T00:00:00'); // UTC parsing fix
-  let dateToCheck = new Date(currentDate);
-  
-  while (weekdays.length < maxCount) {
-    const dayOfWeek = dateToCheck.getDay();
-    
-    // Only include weekdays (Monday-Friday)
-    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-      weekdays.push(dateToCheck.toISOString().split('T')[0]);
-      
-      // Stop immediately when we reach Friday
-      if (dayOfWeek === 5) break;
-    } else if (dayOfWeek === 6 || dayOfWeek === 0) {
-      // Stop if we hit weekend
-      break;
-    }
-    
-    dateToCheck.setDate(dateToCheck.getDate() + 1);
-  }
-  
-  return weekdays;
-}
-```
-
-#### Database Schema
-```sql
--- schedule_entries table
-CREATE TABLE schedule_entries (
-  id UUID PRIMARY KEY,
-  child_id UUID REFERENCES children(id),
-  subject_name TEXT NOT NULL,
-  scheduled_date DATE NOT NULL,
-  start_time TIME NOT NULL,
-  duration_minutes INTEGER NOT NULL,
-  status TEXT DEFAULT 'scheduled',
-  created_by TEXT DEFAULT 'parent',
-  notes JSONB, -- Stores material metadata
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
----
-
-## Frontend Components
-
-### Component Hierarchy
-```
-SchedulePage
-├── EnhancedScheduleManager
-│   ├── AdvancedScheduleCalendar
-│   │   ├── WeekView (default)
-│   │   ├── MultiWeekView
-│   │   └── MonthView
-│   ├── DragDropScheduleCalendar
-│   └── ScheduleTemplatesManager
-├── CreateScheduleEntryModal
-├── EditScheduleEntryModal
-└── ScheduleSettingsModal
-```
-
-### Key Props Flow
-```javascript
-// SchedulePage.js
-const handleGenerateAISchedule = async (customStartDate = null) => {
-  const startDate = customStartDate || getDefaultStartDate();
-  // ... AI scheduling logic
-};
-
-// EnhancedScheduleManager.js
-<AdvancedScheduleCalendar
-  onGenerateAISchedule={onGenerateAISchedule}
-  // ... other props
-/>
-
-// AdvancedScheduleCalendar.js
-const handleDayClick = (day) => {
-  const clickedDate = format(day, 'yyyy-MM-dd');
-  // Show confirmation dialog
-  if (window.confirm(confirmMessage)) {
-    onGenerateAISchedule(clickedDate);
-  }
+// Drag-and-drop with 15-minute precision
+const handleDragEnd = async (event) => {
+  const [dayStr, timeStr] = dropTargetId.split('_');
+  await updateScheduleEntry(entryId, {
+    scheduled_date: dayStr,
+    start_time: timeStr
+  });
 };
 ```
 
-### Styling Classes
-```css
-/* Current day highlighting */
-.bg-blue-100.ring-2.ring-blue-300.ring-opacity-50
+**Features**:
+- **Visual feedback**: Drag preview, drop zones, hover states
+- **Conflict prevention**: Real-time validation during drag
+- **Multi-child awareness**: Shows child names on events
+- **Undo support**: Local state allows reverting changes
 
-/* Clickable weekday hover effects */
-.cursor-pointer.hover:bg-blue-50.hover:shadow-md
+### 3. AI Schedule Generation
 
-/* AI scheduling indicator */
-.text-xs.text-blue-600.opacity-70
-```
+**Multi-Stage Process**:
+1. **Context Analysis**: Analyze available materials and preferences
+2. **Time Slot Generation**: Create optimal learning windows
+3. **Subject Assignment**: Match subjects to cognitive load patterns
+4. **Conflict Resolution**: Ensure family-wide compatibility
+5. **Optimization**: Balance workload and variety
 
----
+**Configuration Options**:
+- **Cognitive Load Distribution**: Morning focus vs. balanced
+- **Session Durations**: 30-45min (short), 45-60min (medium), 60+min (long)
+- **Multi-Child Coordination**:
+  - Sequential: One child at a time
+  - Parallel: Different subjects simultaneously
+  - Balanced: AI optimizes for family
 
-## User Experience Flow
+### 4. Template System
 
-### Scenario 1: Click Monday
-1. **User Action**: Click on Monday header in week view
-2. **System Response**: Shows dialog with options
-3. **AI Schedule Selected**: Confirms "Generate schedule starting Monday"
-4. **Backend Processing**: Schedules lessons Mon-Fri (5 days)
-5. **Result**: Creates ~25 lesson entries (5 subjects × 5 days)
+**Default Templates**:
+1. **Morning Focus**: High-cognitive subjects early, lighter afternoon
+2. **Balanced Daily**: Even distribution throughout day
+3. **Math Intensive**: Extra mathematics with supporting subjects
+4. **Science Explorer**: Hands-on experiments with journaling
 
-### Scenario 2: Click Wednesday
-1. **User Action**: Click on Wednesday header
-2. **System Response**: Shows dialog
-3. **AI Schedule Selected**: Confirms "Generate schedule starting Wednesday"
-4. **Backend Processing**: Schedules lessons Wed-Fri (3 days)
-5. **Result**: Creates ~15 lesson entries (5 subjects × 3 days)
-
-### Scenario 3: Click Friday
-1. **User Action**: Click on Friday header
-2. **System Response**: Shows dialog
-3. **AI Schedule Selected**: Confirms "Generate schedule starting Friday"
-4. **Backend Processing**: Schedules lessons Friday only (1 day)
-5. **Result**: Creates ~5 lesson entries (5 subjects × 1 day)
-
-### Scenario 4: Click Weekend
-1. **User Action**: Click on Saturday/Sunday
-2. **System Response**: Opens manual lesson creation modal
-3. **No AI Option**: Weekends only allow single lesson entry
-
----
-
-## Technical Implementation Details
-
-### Date Handling
-- **Input Format**: `YYYY-MM-DD` (ISO date string)
-- **Timezone**: UTC with explicit `T00:00:00` suffix to prevent timezone issues
-- **Validation**: Ensures dates are parsed correctly across different locales
-
-### Conflict Resolution
-- **Family-Wide Checking**: Prevents overlapping schedules across all children
-- **Time Slot Logic**: 30-minute increments with visual height calculation
-- **Status Filtering**: Excludes 'skipped' entries from conflict detection
-
-### Error Handling
-- **Missing Materials**: Gracefully handles children with no available lessons
-- **Database Failures**: Returns descriptive error messages
-- **API Timeouts**: Uses `uploadApi` with extended timeout for AI operations
-
-### Performance Optimization
-- **Batch Operations**: Creates multiple schedule entries in single database transaction
-- **Local State Updates**: Updates UI immediately without waiting for server response
-- **Skeleton Loading**: Shows detailed loading states during AI generation
-
----
-
-## Troubleshooting & Issues
-
-### Common Issues
-
-#### Issue 1: Saturday Scheduling Bug
-**Problem**: AI scheduler was including Saturday when clicking Thursday
-```
-📅 Start date: 2025-07-31 (Wednesday) // Wrong day detection
-📅 Generated weekdays: 2025-07-31, 2025-08-01, 2025-08-02 // Including Saturday
-```
-
-**Root Cause**: 
-1. Date parsing without timezone specification
-2. Incorrect Friday calculation logic
-3. Using `<=` instead of `<` in loop condition
-
-**Solution**: 
-1. Added explicit UTC parsing: `new Date(startDate + 'T00:00:00')`
-2. Simplified logic to stop immediately at Friday
-3. Added detailed logging for debugging
-
-#### Issue 2: React Hooks Initialization Error
-**Problem**: `Cannot access 'handleSubjectSelection' before initialization`
-
-**Solution**: Moved `useEffect` after function definitions in modal components
-
-#### Issue 3: Material Filtering in Schedule Modal
-**Problem**: Schedule modal showed all materials (lessons, assignments, reviews)
-
-**Solution**: Added `content_type` filtering to show only lesson materials
-
-### Debugging Tools
-
-#### Backend Logging
+**Template Application**:
 ```javascript
-console.log(`📅 Start date: ${startDate} (${dayName})`);
-console.log(`🔍 Checking date: ${date} (${dayName})`);
-console.log(`✅ Added weekday: ${date}`);
-console.log(`🛑 Reached Friday, stopping`);
+const handleApplyTemplate = async (template, startDate) => {
+  // Convert template to schedule entries
+  const scheduleEntries = template.sessions.map(session => ({
+    subject_name: session.subject,
+    scheduled_date: calculateDateForDay(startDate, session.day),
+    start_time: session.time,
+    duration_minutes: session.duration
+  }));
+  
+  // Batch create with conflict resolution
+  await createScheduleEntriesBatch(scheduleEntries);
+};
 ```
 
-#### Frontend Console Commands
+### 5. Multi-Child Coordination
+
+**Features**:
+- **Checkbox filtering**: Show/hide individual children
+- **Color coding**: Visual distinction per child
+- **Conflict detection**: Prevents overlapping family time
+- **Batch operations**: Apply changes to multiple children
+
+**State Management**:
 ```javascript
-// Clear localStorage cache
-localStorage.clear();
+// Separate entries per child
+const [allScheduleEntries, setAllScheduleEntries] = useState({
+  'child-id-1': [...entries],
+  'child-id-2': [...entries]
+});
 
-// Check current schedule state
-scheduleManagement.calendarEvents;
-
-// Verify child selection
-selectedChildrenIds;
+// Combined calendar events
+const getCombinedCalendarEvents = () => {
+  return selectedChildrenIds.flatMap(childId => 
+    formatEntriesForCalendar(allScheduleEntries[childId])
+  );
+};
 ```
-
----
-
-## Recent Changes & Fixes
-
-### August 1st, 2025 - Revert to Fixed Time Slot System
-**Major Change**: Reverted from dynamic time slot system back to reliable fixed 30-minute slots due to complexity and scope issues.
-
-**Changes Made**:
-1. **Removed Dynamic Time Slot Generation**: Eliminated complex dynamic slot calculation logic
-2. **Restored Fixed 30-Minute Grid**: Back to simple, reliable time slot system
-3. **Preserved Visual Duration Display**: Events still show their actual duration (45-min spans 1.5 slots)
-4. **Maintained Drag-and-Drop**: All drag-and-drop functionality preserved
-5. **Fixed Parsing Errors**: Resolved JSX syntax errors in calendar components
-6. **Added Missing Components**: Restored MultiWeekView and MonthView components
-
-**Current Status**: ✅ **Stable and Working**
-- Fixed 30-minute time slots (9 AM - 3 PM default)
-- Visual event duration representation
-- Reliable drag-and-drop rescheduling
-- Multi-child support with color coding
-- AI schedule generation functional
-
-### July 31st, 2025 - Calendar Day-Click Implementation
-1. ✅ **Added day-click functionality to week view headers**
-2. ✅ **Implemented current day highlighting with blue ring**
-3. ✅ **Added hover effects and visual indicators**
-4. ✅ **Created confirmation dialog for AI vs manual scheduling**
-
-### July 31st, 2025 - Weekend Scheduling Bug Fix
-**Problem**: Clicking Thursday July 31st scheduled lessons on Saturday August 2nd
-
-**Changes Made**:
-1. **Rewrote `getNextWeekdays()` function** with simpler, more reliable logic
-2. **Added explicit UTC date parsing** to prevent timezone issues
-3. **Implemented immediate Friday stopping** to prevent weekend overflow
-4. **Enhanced logging** for better debugging
-
-**Before Fix**:
-```
-📅 Generated weekdays: 2025-07-31, 2025-08-01, 2025-08-02 (3 days)
-```
-
-**After Fix** (Expected):
-```
-📅 Generated weekdays: 2025-07-31, 2025-08-01 (2 days)
-```
-
-### Code Quality Improvements
-1. **Enhanced Error Handling**: Better error messages and fallback behavior
-2. **Improved User Feedback**: Loading states and confirmation dialogs
-3. **Performance Optimization**: Batch database operations
-4. **Mobile Responsiveness**: Touch-friendly click targets
-
----
-
-## Future Enhancements
-
-### Planned Features
-1. **Drag-and-Drop Rescheduling**: Move lessons between days visually
-2. **Recurring Schedule Templates**: Save and reuse common patterns
-3. **Smart Conflict Resolution**: Automatic time slot adjustment
-4. **Advanced Preferences**: Subject-specific timing preferences
-5. **Calendar Export**: iCal/Google Calendar integration
-
-### Technical Debt
-1. **Timezone Handling**: Implement proper user timezone support
-2. **Database Optimization**: Add indexes for schedule queries
-3. **Real-time Updates**: WebSocket integration for multi-user editing
-4. **Offline Support**: Local storage fallback for network issues
-
----
 
 ## API Reference
 
-### Schedule Generation Endpoint
-```javascript
-POST /api/schedule/ai-generate
-Content-Type: application/json
+### Schedule Endpoints
 
+#### GET /api/schedule/:child_id
+Fetch schedule entries for a specific child.
+
+**Response**:
+```json
+[
+  {
+    "id": "uuid",
+    "child_id": "uuid",
+    "subject_name": "Mathematics",
+    "scheduled_date": "2024-08-03",
+    "start_time": "09:00",
+    "duration_minutes": 45,
+    "status": "scheduled",
+    "lesson": { /* lesson details */ },
+    "materials": [ /* associated materials */ ]
+  }
+]
+```
+
+#### POST /api/schedule
+Create new schedule entry.
+
+**Request**:
+```json
+{
+  "child_id": "uuid",
+  "subject_name": "Science",
+  "scheduled_date": "2024-08-03",
+  "start_time": "10:00",
+  "duration_minutes": 60,
+  "lesson_id": "uuid (optional)",
+  "notes": "Chapter 3 experiments"
+}
+```
+
+#### PUT /api/schedule/:id
+Update existing schedule entry.
+
+#### DELETE /api/schedule/:id
+Remove schedule entry.
+
+### AI Generation Endpoint
+
+#### POST /api/schedule/ai-generate
+Generate AI-powered schedule.
+
+**Request**:
+```json
 {
   "child_ids": ["uuid1", "uuid2"],
-  "start_date": "2025-07-31",
+  "start_date": "2024-08-03",
   "days_to_schedule": 7,
   "preferences": {
     "preferred_start_time": "09:00",
-    "preferred_end_time": "15:00"
+    "preferred_end_time": "15:00",
+    "subject_frequencies": {
+      "Mathematics": 5,
+      "Science": 3,
+      "English": 4
+    },
+    "study_intensity": "balanced",
+    "coordination_mode": "balanced"
   }
 }
-
-// Response
-{
-  "success": true,
-  "message": "Successfully generated 14 schedule entries",
-  "entries_created": 14,
-  "schedule_entries": [...],
-  "ai_summary": "Simple AI scheduler created 14 study sessions across 2 days"
-}
 ```
 
-### Schedule CRUD Endpoints
+### Preferences Endpoints
+
+#### GET /api/schedule/preferences/:child_id
+Fetch scheduling preferences.
+
+#### POST /api/schedule/preferences/:child_id
+Update scheduling preferences.
+
+## AI Scheduling Engine
+
+### Cognitive Load Theory Implementation
+
+The AI scheduler uses cognitive load weights to optimize learning:
+
 ```javascript
-GET /api/schedule/:child_id        // Get child's schedule
-POST /api/schedule                 // Create schedule entry
-PUT /api/schedule/:id             // Update schedule entry
-DELETE /api/schedule/:id          // Delete schedule entry
+const COGNITIVE_LOAD_WEIGHTS = {
+  // High cognitive load (0.90-0.95) - Best in morning
+  'Mathematics': 0.95,
+  'Science': 0.90,
+  
+  // Medium cognitive load (0.65-0.70) - Good for mid-day
+  'English Language Arts': 0.70,
+  'Social Studies': 0.65,
+  
+  // Lower cognitive load (0.30-0.40) - Suitable for afternoon
+  'Art': 0.40,
+  'Physical Education': 0.35,
+  'Music': 0.30
+};
 ```
 
+### Learning Windows
+
+Optimal time slots based on cognitive science:
+
+```javascript
+const LEARNING_WINDOWS = {
+  HIGH_COGNITIVE: { 
+    start: '09:00', 
+    end: '11:30', 
+    efficiency: 1.0 
+  },
+  MEDIUM_COGNITIVE: { 
+    start: '11:30', 
+    end: '14:00', 
+    efficiency: 0.8 
+  },
+  LOW_COGNITIVE: { 
+    start: '14:00', 
+    end: '17:00', 
+    efficiency: 0.6 
+  }
+};
+```
+
+### Multi-Stage Reasoning Process
+
+1. **Context Analysis**
+   - Available materials per subject
+   - Child preferences and constraints
+   - Existing schedule conflicts
+
+2. **Time Slot Generation**
+   - Create available slots based on preferences
+   - Apply break times and lunch periods
+   - Consider family-wide constraints
+
+3. **AI Subject Assignment**
+   - Match high-cognitive subjects to morning slots
+   - Distribute subjects based on frequency requirements
+   - Balance daily cognitive load
+
+4. **Conflict Resolution**
+   - Check family-wide availability
+   - Adjust for multi-child coordination
+   - Maintain minimum break times
+
+5. **Final Optimization**
+   - Ensure variety (avoid same subject consecutively)
+   - Balance weekly distribution
+   - Apply interdependency rules
+
+## User Workflows
+
+### Creating a Schedule Entry
+
+1. **Click Methods**:
+   - Click empty time slot in calendar
+   - Click "Add Lesson" button
+   - Click day header for AI scheduling
+
+2. **Entry Form**:
+   - Select subject from assigned subjects
+   - Choose specific lesson/material (optional)
+   - Set duration (15-minute increments)
+   - Add notes
+
+3. **Conflict Detection**:
+   - Real-time validation
+   - Visual indicators for conflicts
+   - Suggest alternative times
+
+### Using AI Scheduling
+
+1. **Access AI Config**:
+   - Click "Configure AI Schedule" button
+   - Or click weekday header in calendar
+
+2. **Configure Settings**:
+   - Choose start date (presets available)
+   - Select duration (1 week, 2 weeks, 1 month)
+   - Adjust subject frequencies
+   - Set intensity level
+
+3. **Advanced Options**:
+   - Difficulty distribution
+   - Session length preferences
+   - Multi-child coordination mode
+
+4. **Generate & Review**:
+   - AI creates optimal schedule
+   - Preview before applying
+   - Manual adjustments available
+
+### Applying Templates
+
+1. **Access Templates**:
+   - Click "Templates" tab
+   - Or "Save as Template" for current schedule
+
+2. **Select Template**:
+   - Browse pre-built options
+   - Filter by category
+   - Preview sessions
+
+3. **Configure Application**:
+   - Choose start date
+   - Select target children
+   - Review conflicts
+
+4. **Apply & Adjust**:
+   - Batch create entries
+   - Automatic conflict resolution
+   - Manual fine-tuning
+
+## Technical Implementation
+
+### State Management Pattern
+
+```javascript
+// Multi-child state structure
+const scheduleState = {
+  allScheduleEntries: {
+    'child-1': [...entries],
+    'child-2': [...entries]
+  },
+  schedulePreferences: {
+    'child-1': {...prefs},
+    'child-2': {...prefs}
+  },
+  loading: false,
+  error: null,
+  batchMode: false // Prevents flickering
+};
+```
+
+### Caching Strategy
+
+```javascript
+// localStorage with expiry
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+const getCachedData = (key) => {
+  const cached = localStorage.getItem(key);
+  if (!cached) return null;
+  
+  const { data, timestamp } = JSON.parse(cached);
+  if (Date.now() - timestamp > CACHE_DURATION) {
+    localStorage.removeItem(key);
+    return null;
+  }
+  
+  return data;
+};
+```
+
+### Batch Operations
+
+```javascript
+// Prevent UI flickering during bulk updates
+const createScheduleEntriesBatch = async (entries) => {
+  setBatchMode(true);
+  
+  try {
+    // Create all entries
+    const results = await Promise.all(
+      entries.map(entry => createSingleEntry(entry))
+    );
+    
+    // Update state once
+    setAllScheduleEntries(prev => ({
+      ...prev,
+      [childId]: [...prev[childId], ...results]
+    }));
+    
+  } finally {
+    setBatchMode(false);
+  }
+};
+```
+
+### Drag-Drop Implementation
+
+```javascript
+// Using @dnd-kit for smooth drag-drop
+const handleDragEnd = async (event) => {
+  const { active, over } = event;
+  
+  // Parse drop target
+  const [date, time] = over.id.split('_');
+  
+  // Extract real IDs (handles composite IDs)
+  const entryId = extractRealEntryId(active.id);
+  const childId = extractChildId(active.id);
+  
+  // Update with conflict check
+  await updateScheduleEntry(entryId, {
+    scheduled_date: date,
+    start_time: time
+  }, childId);
+};
+```
+
+## Database Schema
+
+### Core Tables
+
+#### schedule_entries
+```sql
+CREATE TABLE schedule_entries (
+  id UUID PRIMARY KEY,
+  child_id UUID REFERENCES children(id),
+  lesson_id UUID REFERENCES lessons(id),
+  subject_name VARCHAR(255),
+  scheduled_date DATE,
+  start_time TIME,
+  duration_minutes INTEGER,
+  status VARCHAR(50), -- 'scheduled', 'completed', 'missed'
+  notes TEXT,
+  created_by VARCHAR(50),
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+```
+
+#### schedule_preferences
+```sql
+CREATE TABLE schedule_preferences (
+  id UUID PRIMARY KEY,
+  child_id UUID REFERENCES children(id),
+  preferred_start_time TIME DEFAULT '09:00',
+  preferred_end_time TIME DEFAULT '15:00',
+  max_daily_study_minutes INTEGER DEFAULT 240,
+  break_duration_minutes INTEGER DEFAULT 15,
+  difficult_subjects_morning BOOLEAN DEFAULT true,
+  study_days JSONB DEFAULT '["monday","tuesday","wednesday","thursday","friday"]',
+  subject_frequencies JSONB,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+```
+
+## Performance & Optimization
+
+### Rendering Optimizations
+
+1. **Memoization**: Heavy calculations cached with useMemo
+2. **Virtualization**: Considered for large calendars
+3. **Batch Updates**: Prevent multiple re-renders
+4. **Lazy Loading**: Components loaded on demand
+
+### Data Fetching
+
+1. **Parallel Fetching**: Multiple children loaded simultaneously
+2. **Optimistic Updates**: Immediate UI feedback
+3. **Error Boundaries**: Graceful failure handling
+4. **Retry Logic**: Automatic retry on network failures
+
+### Calendar Performance
+
+```javascript
+// Optimize event filtering
+const getEventsForDay = useCallback((day) => {
+  const dayString = format(day, 'yyyy-MM-dd');
+  return calendarEvents.filter(event => 
+    event.date === dayString
+  );
+}, [calendarEvents]);
+
+// Memoize expensive calculations
+const timeSlots = useMemo(() => 
+  generateTimeSlots(preferences), 
+  [preferences]
+);
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Schedule not updating**
+   - Check network connection
+   - Verify localStorage isn't full
+   - Clear cache and refresh
+
+2. **Drag-drop not working**
+   - Ensure events have unique IDs
+   - Check for console errors
+   - Verify permissions
+
+3. **AI generation fails**
+   - Ensure materials are uploaded
+   - Check subject assignments
+   - Verify API key configuration
+
+4. **Multi-child conflicts**
+   - Review coordination settings
+   - Check time preferences
+   - Use sequential mode for testing
+
+### Debug Tools
+
+```javascript
+// Enable debug logging
+localStorage.setItem('schedule_debug', 'true');
+
+// Clear all caches
+localStorage.removeItem('schedule_cache');
+localStorage.removeItem('schedule-calendar-date');
+
+// Force refresh
+window.location.reload();
+```
+
+## Future Enhancements
+
+1. **Real-time Collaboration**: WebSocket support for live updates
+2. **Mobile App**: Native mobile experience
+3. **Calendar Integrations**: Sync with Google Calendar, iCal
+4. **Advanced Analytics**: Learning progress visualization
+5. **Voice Commands**: "Schedule math for tomorrow morning"
+6. **Recurring Events**: Weekly/monthly patterns
+7. **Resource Booking**: Shared family resources (computer, lab space)
+8. **Notification System**: Reminders and alerts
+
 ---
 
-## Development Workflow
-
-### Testing Checklist
-- [ ] Click Monday → Should schedule Mon-Fri (5 days)
-- [ ] Click Wednesday → Should schedule Wed-Fri (3 days)
-- [ ] Click Friday → Should schedule Friday only (1 day)
-- [ ] Click Saturday → Should open manual entry modal
-- [ ] Current day is highlighted with blue background
-- [ ] Hover effects work on weekday headers
-- [ ] Confirmation dialog appears with correct options
-- [ ] Backend logs show correct day names and date ranges
-
-### Deployment Steps
-1. **Backend Changes**: Update controller functions
-2. **Frontend Changes**: Update React components
-3. **Database Migrations**: Apply any schema changes
-4. **Server Restart**: Restart backend to load new code
-5. **Browser Refresh**: Clear cache and test functionality
-
----
-
-*This documentation is maintained as the scheduling system evolves. Last updated: July 31st, 2025*
+*Last Updated: August 2025*
+*Version: 1.0*

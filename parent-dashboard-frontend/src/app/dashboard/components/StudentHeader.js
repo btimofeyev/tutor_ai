@@ -34,41 +34,11 @@ const colorVariants = {
 };
 
 const StudentHeader = memo(function StudentHeader({ selectedChild, dashboardStats, onAddMaterial }) {
-  // Use the database notes hook
-  const { notes: dbNotes, createNote, deleteNote, updateNote } = useParentNotes(selectedChild?.id);
+  // Use the global database notes hook (not child-specific)
+  const { notes: dbNotes, createNote, deleteNote, updateNote } = useParentNotes(null, true);
   
   // Local state for header-specific functionality
-  const [localNotes, setLocalNotes] = useState([]);
   const [newNoteText, setNewNoteText] = useState("");
-  const [hasInitialized, setHasInitialized] = useState(false);
-
-  // Migration effect: move local notes to database if database is empty
-  useEffect(() => {
-    if (selectedChild && !hasInitialized && dbNotes.length === 0 && localNotes.length > 0) {
-      // Migrate local notes to database
-      const migrateNotes = async () => {
-        try {
-          for (const noteText of localNotes) {
-            await createNote({
-              note_text: noteText,
-              color: 'yellow'
-            });
-          }
-          // Clear local notes after successful migration
-          setLocalNotes([]);
-        } catch (error) {
-          console.warn('Failed to migrate notes to database:', error);
-        }
-      };
-      
-      migrateNotes();
-      setHasInitialized(true);
-    } else if (selectedChild && dbNotes.length > 0) {
-      // Use database notes and clear local ones
-      setLocalNotes([]);
-      setHasInitialized(true);
-    }
-  }, [selectedChild?.id, dbNotes.length, hasInitialized]);
 
   // Note management functions
   const addNote = async () => {
@@ -84,9 +54,8 @@ const StudentHeader = memo(function StudentHeader({ selectedChild, dashboardStat
           color: randomColor
         });
       } catch (error) {
-        console.warn('Failed to create note in database, falling back to local:', error);
-        // Fallback to local storage only if database fails
-        setLocalNotes(prev => [...prev, newNoteText.trim()]);
+        console.error('Failed to create note in database:', error);
+        // Note: Database is required for global notes functionality
       }
       setNewNoteText("");
     }

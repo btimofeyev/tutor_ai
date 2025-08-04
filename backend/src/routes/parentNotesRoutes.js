@@ -6,6 +6,9 @@ const { authenticateParent } = require('../middleware/auth');
 // All routes require parent authentication
 router.use(authenticateParent);
 
+// ===== NOTES ROUTES (HANDLES BOTH CHILD-SPECIFIC AND GLOBAL) =====
+// Global notes use "global" as child_id
+
 // Get all notes for a specific child
 router.get('/:child_id/notes', parentNotesController.getNotes);
 

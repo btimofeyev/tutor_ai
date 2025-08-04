@@ -319,6 +319,25 @@ function DashboardPageContent() {
     return allLessons.filter(lesson => selectedMaterials.has(lesson.id));
   }, [selectedMaterials, childrenData.lessonsBySubject]);
 
+  // Filter lessons to show only the current child's lessons
+  const currentChildLessonsBySubject = useMemo(() => {
+    if (!childrenData.selectedChild) return {};
+    
+    // Get subjects for the current child
+    const currentChildSubjects = childrenData.childSubjects[childrenData.selectedChild.id] || [];
+    const currentChildSubjectIds = currentChildSubjects.map(subject => subject.child_subject_id);
+    
+    // Filter lessonsBySubject to include only current child's subjects
+    const filteredLessons = {};
+    currentChildSubjectIds.forEach(subjectId => {
+      if (childrenData.lessonsBySubject[subjectId]) {
+        filteredLessons[subjectId] = childrenData.lessonsBySubject[subjectId];
+      }
+    });
+    
+    return filteredLessons;
+  }, [childrenData.selectedChild?.id, childrenData.childSubjects, childrenData.lessonsBySubject]);
+
   const isLoading = session === undefined || subscriptionLoading || (childrenData.loadingInitial && childrenData.children.length === 0);
 
   if (isLoading) {
@@ -461,7 +480,8 @@ function DashboardPageContent() {
               {/* Today's Focus - Takes up 2/3 on large screens */}
               <div className="xl:col-span-2">
                 <TodayOverview
-                  lessonsBySubject={childrenData.lessonsBySubject}
+                  key={childrenData.selectedChild?.id}
+                  lessonsBySubject={currentChildLessonsBySubject}
                   selectedChild={childrenData.selectedChild}
                   onToggleComplete={handleToggleLessonComplete}
                   onEdit={handleOpenEditModal}

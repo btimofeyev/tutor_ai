@@ -24,6 +24,9 @@ export function useChildrenData(session) {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingChildData, setLoadingChildData] = useState(false);
   
+  // Track if initial child selection has been done
+  const [hasAutoSelectedChild, setHasAutoSelectedChild] = useState(false);
+  
   // Cache expiry time (5 minutes)
   const CACHE_EXPIRY_MS = 5 * 60 * 1000;
   
@@ -133,10 +136,21 @@ export function useChildrenData(session) {
       setChildSubjects(prev => ({ ...prev, [selectedChild.id]: subjects }));
       
       // Initialize data structures for each subject
+      // Clear existing data for the current child's subjects first
+      const currentChildSubjects = childSubjects[selectedChild.id] || [];
+      const currentChildSubjectIds = currentChildSubjects.map(s => s.child_subject_id);
+      
       const newLessonsByUnit = { ...lessonsByUnit };
       const newLessonsBySubject = { ...lessonsBySubject };
       const newGradeWeights = { ...gradeWeights };
       const newUnitsBySubject = { ...unitsBySubject };
+      
+      // Clear data for current child's subjects to prevent stale data
+      currentChildSubjectIds.forEach(subjectId => {
+        delete newLessonsBySubject[subjectId];
+        delete newGradeWeights[subjectId];
+        delete newUnitsBySubject[subjectId];
+      });
       
       // Create all API calls for parallel execution
       const subjectPromises = subjects.map(async (subject) => {
@@ -267,12 +281,28 @@ export function useChildrenData(session) {
     }
   }, [session, fetchChildren]);
 
-  // Auto-select first child if none selected
+  // Auto-select child when children are first loaded (not on subsequent updates)
   useEffect(() => {
-    if (children.length > 0 && !selectedChild) {
+    if (children.length > 0 && !selectedChild && !hasAutoSelectedChild) {
+      // Check if there's a persisted selectedChild ID from sessionStorage
+      const persistedChildId = typeof window !== 'undefined' ? 
+        sessionStorage.getItem('tutor_ai_selected_child_id') : null;
+      
+      if (persistedChildId) {
+        // Try to find the persisted child in the current children list
+        const persistedChild = children.find(child => child.id.toString() === persistedChildId);
+        if (persistedChild) {
+          setSelectedChild(persistedChild);
+          setHasAutoSelectedChild(true);
+          return;
+        }
+      }
+      
+      // Fallback to first child if no valid persisted child found
       setSelectedChild(children[0]);
+      setHasAutoSelectedChild(true);
     }
-  }, [children, selectedChild]);
+  }, [children.length, selectedChild, hasAutoSelectedChild]); // Use children.length instead of children array
 
   // Invalidate cache for a specific child (useful when data is modified)
   const invalidateChildCache = useCallback((childId) => {
@@ -357,11 +387,26 @@ export function useChildrenData(session) {
     }
   }, [selectedChild]); // Only depend on selectedChild, not the function
 
+  // Create a wrapped setSelectedChild that persists to sessionStorage
+  const setSelectedChildWithPersistence = useCallback((child) => {
+    setSelectedChild(child);
+    if (typeof window !== 'undefined' && child) {
+      sessionStorage.setItem('tutor_ai_selected_child_id', child.id.toString());
+    }
+  }, []);
+
+  // Also persist when selectedChild changes internally (like from auto-selection)
+  useEffect(() => {
+    if (selectedChild && typeof window !== 'undefined') {
+      sessionStorage.setItem('tutor_ai_selected_child_id', selectedChild.id.toString());
+    }
+  }, [selectedChild]);
+
   return {
     // Children data
     children,
     selectedChild,
-    setSelectedChild,
+    setSelectedChild: setSelectedChildWithPersistence,
     
     // Child-specific data
     childSubjects,

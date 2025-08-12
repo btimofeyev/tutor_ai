@@ -146,7 +146,7 @@ export default function SubscriptionManager({
               <span className="font-medium text-text-primary">🆓 Free Plan</span>
               <div className="text-text-tertiary mt-0.5">{maxChildrenForCurrentPlan} child • Basic features</div>
             </div>
-            
+
             <div className="space-y-1">
               <Button
                 variant="primaryGradient"

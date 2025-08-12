@@ -3,13 +3,13 @@
 
 // Error handling utilities
 export const handleApiError = (error, defaultMessage = "An error occurred") => {
-  const message = error.response?.data?.error || 
-                  error.response?.data?.message || 
-                  error.message || 
+  const message = error.response?.data?.error ||
+                  error.response?.data?.message ||
+                  error.message ||
                   defaultMessage;
-  
+
   const code = error.response?.data?.code;
-  
+
   return {
     success: false,
     error: message,
@@ -33,13 +33,13 @@ export const createErrorResponse = (error, message = "Operation failed") => ({
 // Date formatting utilities
 export const formatDate = (dateString, options = {}) => {
   if (!dateString) return '';
-  
+
   const defaultOptions = {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
   };
-  
+
   try {
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString(undefined, { ...defaultOptions, ...options });
@@ -50,20 +50,20 @@ export const formatDate = (dateString, options = {}) => {
 
 export const formatDueDate = (dueDateString) => {
   if (!dueDateString) return '';
-  
+
   try {
     const dueDate = new Date(dueDateString + 'T00:00:00');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const diffTime = dueDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays < 0) return 'Overdue';
     if (diffDays === 0) return 'Due Today';
     if (diffDays === 1) return 'Due Tomorrow';
     if (diffDays <= 7) return `Due in ${diffDays} days`;
-    
+
     return formatDate(dueDateString, { month: 'short', day: 'numeric' });
   } catch (error) {
     return dueDateString;
@@ -72,7 +72,7 @@ export const formatDueDate = (dueDateString) => {
 
 export const isOverdue = (dueDateString) => {
   if (!dueDateString) return false;
-  
+
   try {
     const dueDate = new Date(dueDateString + 'T00:00:00');
     const today = new Date();
@@ -85,15 +85,15 @@ export const isOverdue = (dueDateString) => {
 
 export const isDueSoon = (dueDateString, daysThreshold = 7) => {
   if (!dueDateString) return false;
-  
+
   try {
     const dueDate = new Date(dueDateString + 'T00:00:00');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const diffTime = dueDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     return diffDays >= 0 && diffDays <= daysThreshold;
   } catch (error) {
     return false;
@@ -115,20 +115,20 @@ export const validateUsername = (username) => {
 
 export const validateGrade = (grade) => {
   if (!grade) return { valid: true }; // Grade is optional
-  
+
   const numericGrade = parseFloat(grade);
   if (isNaN(numericGrade)) return { valid: false, error: "Grade must be a number." };
   if (numericGrade < 0) return { valid: false, error: "Grade cannot be negative." };
-  
+
   return { valid: true };
 };
 
 export const validateEmail = (email) => {
   if (!email) return { valid: false, error: "Email is required." };
-  
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) return { valid: false, error: "Please enter a valid email address." };
-  
+
   return { valid: true };
 };
 
@@ -157,10 +157,10 @@ export const sortByProperty = (array, property, direction = 'asc') => {
   return [...array].sort((a, b) => {
     const aVal = a[property];
     const bVal = b[property];
-    
+
     if (aVal === null || aVal === undefined) return 1;
     if (bVal === null || bVal === undefined) return -1;
-    
+
     if (direction === 'asc') {
       return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
     } else {
@@ -196,7 +196,7 @@ export const debounce = (func, wait) => {
 // Local storage utilities
 export const getFromLocalStorage = (key, defaultValue = null) => {
   if (typeof window === 'undefined') return defaultValue;
-  
+
   try {
     const stored = localStorage.getItem(key);
     return stored ? JSON.parse(stored) : defaultValue;
@@ -208,7 +208,7 @@ export const getFromLocalStorage = (key, defaultValue = null) => {
 
 export const saveToLocalStorage = (key, value) => {
   if (typeof window === 'undefined') return false;
-  
+
   try {
     localStorage.setItem(key, JSON.stringify(value));
     return true;
@@ -220,7 +220,7 @@ export const saveToLocalStorage = (key, value) => {
 
 export const removeFromLocalStorage = (key) => {
   if (typeof window === 'undefined') return false;
-  
+
   try {
     localStorage.removeItem(key);
     return true;
@@ -233,7 +233,7 @@ export const removeFromLocalStorage = (key) => {
 // Form utilities
 export const createFormData = (files, additionalData = {}) => {
   const formData = new FormData();
-  
+
   // Add files
   if (files instanceof FileList) {
     for (let i = 0; i < files.length; i++) {
@@ -244,12 +244,12 @@ export const createFormData = (files, additionalData = {}) => {
       formData.append("files", file, file.name);
     });
   }
-  
+
   // Add additional data
   Object.entries(additionalData).forEach(([key, value]) => {
     formData.append(key, value);
   });
-  
+
   return formData;
 };
 
@@ -269,20 +269,20 @@ export const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const retryWithBackoff = async (fn, maxRetries = 3, baseDelay = 1000) => {
   let lastError;
-  
+
   for (let i = 0; i <= maxRetries; i++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error;
-      
+
       if (i === maxRetries) break;
-      
+
       const delay = baseDelay * Math.pow(2, i);
       await wait(delay);
     }
   }
-  
+
   throw lastError;
 };
 
@@ -294,17 +294,17 @@ export const getFileExtension = (filename) => {
 
 export const formatFileSize = (bytes) => {
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
 export const isValidFileType = (filename, allowedTypes = []) => {
   if (!allowedTypes.length) return true;
-  
+
   const extension = getFileExtension(filename);
   return allowedTypes.includes(extension);
 };

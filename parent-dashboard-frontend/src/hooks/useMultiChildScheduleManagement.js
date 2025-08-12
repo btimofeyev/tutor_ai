@@ -8,7 +8,6 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   const [schedulePreferences, setSchedulePreferences] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
 
   // State for batch operations to prevent flickering
   const [batchMode, setBatchMode] = useState(false);
@@ -19,27 +18,26 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
 
-
   // Fetch schedule entries for multiple children
   const fetchMultipleChildrenSchedules = useCallback(async (childrenIds) => {
     if (!childrenIds || childrenIds.length === 0) return;
-    
+
     setLoading(true);
     try {
-      const promises = childrenIds.map(childId => 
+      const promises = childrenIds.map(childId =>
         api.get(`/schedule/${childId}`).catch(err => {
           return { data: [] }; // Return empty data on error
         })
       );
-      
+
       const responses = await Promise.all(promises);
-      
+
       // Organize entries by child ID - only include selected children
       const entriesByChild = {};
       childrenIds.forEach((childId, index) => {
         entriesByChild[childId] = responses[index]?.data || [];
       });
-      
+
       // Replace entire state with only selected children's data
       setAllScheduleEntries(entriesByChild);
       setError(null);
@@ -54,38 +52,38 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   // Get combined calendar events for all selected children
   const getCombinedCalendarEvents = useCallback(() => {
     const allEvents = [];
-    
+
     // Only process entries for currently selected children
     selectedChildrenIds.forEach(childId => {
       const entries = allScheduleEntries[childId] || [];
       const child = allChildren.find(c => c.id === childId);
       const childName = child?.name || 'Unknown';
-      
+
       entries.forEach(entry => {
         // Extract material info from lesson container (matches single-child hook logic)
         const lesson = entry.lesson;
         const materials = lesson?.materials || [];
-        
+
         // Sort materials consistently by title to ensure reproducible ordering
         const sortedMaterials = [...materials].sort((a, b) => {
           const titleA = a.title || '';
           const titleB = b.title || '';
           return titleA.localeCompare(titleB);
         });
-        
+
         // Try to get the specific material from metadata in notes (SAME AS SINGLE-CHILD HOOK)
         let specificMaterial = null;
         let displayTitle;
         let materialMetadata = null;
-        
+
         try {
           if (entry.notes && typeof entry.notes === 'string' && entry.notes.startsWith('{')) {
             materialMetadata = JSON.parse(entry.notes);
-            
+
             if (materialMetadata.specific_material_id) {
               // Find the specific material that was scheduled
               specificMaterial = sortedMaterials.find(m => m.id === materialMetadata.specific_material_id);
-              
+
               if (specificMaterial) {
                 displayTitle = `${entry.subject_name}: ${specificMaterial.title}`;
               } else if (materialMetadata.material_title) {
@@ -97,7 +95,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         } catch (e) {
           // Failed to parse metadata, will use fallback logic
         }
-        
+
         // Fallback logic if no specific material found (SAME AS SINGLE-CHILD HOOK)
         if (!displayTitle) {
           const firstMaterial = sortedMaterials[0]; // Take first material if multiple exist
@@ -112,9 +110,9 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
             displayTitle = entry.subject_name || 'Study Time';
           }
         }
-        
+
         const displayMaterial = specificMaterial || sortedMaterials[0]; // Use specific material or fallback to first
-        
+
         allEvents.push({
           id: `${childId}-${entry.id}`,
           title: displayTitle,
@@ -150,8 +148,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         });
       });
     });
-    
-    
+
     return allEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
   }, [allScheduleEntries, allChildren, selectedChildrenIds]);
 
@@ -159,14 +156,14 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   const createScheduleEntry = async (entryData, targetChildId) => {
     try {
       setLoading(true);
-      
+
       // Try API first, but fallback to local state if it fails
       try {
         const response = await api.post('/schedule', {
           ...entryData,
           child_id: targetChildId
         });
-        
+
         // Add the new entry to the local state for the specific child (skip if in batch mode)
         if (!batchMode) {
           setAllScheduleEntries(prev => ({
@@ -183,7 +180,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           setError(errorMessage);
           return { success: false, error: errorMessage };
         }
-        
+
         // For other API errors, create a local entry as fallback
         const localEntry = {
           id: Date.now().toString(),
@@ -199,7 +196,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
-        
+
         // Add to local state for the specific child (skip if in batch mode)
         if (!batchMode) {
           setAllScheduleEntries(prev => ({
@@ -223,30 +220,29 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   const updateScheduleEntry = async (entryId, updateData, childId) => {
     try {
       setLoading(true);
-      
+
       // Ensure we have a valid childId
       if (!childId) {
         const errorMessage = 'Cannot update entry: missing child information';
         setError(errorMessage);
         return { success: false, error: errorMessage };
       }
-      
-      
+
       // Try API first, but fallback to local state if it fails
       try {
         const response = await api.put(`/schedule/${entryId}`, updateData);
-        
+
         // Update the entry in local state for the specific child
         setAllScheduleEntries(prev => ({
           ...prev,
-          [childId]: (prev[childId] || []).map(entry => 
+          [childId]: (prev[childId] || []).map(entry =>
             entry.id === entryId ? response.data : entry
           )
         }));
         setError(null);
         return { success: true, data: response.data };
       } catch (apiError) {
-        
+
         // Update local entry if API fails
         setAllScheduleEntries(prev => ({
           ...prev,
@@ -277,11 +273,11 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   const deleteScheduleEntry = async (entryId, childId) => {
     try {
       setLoading(true);
-      
+
       // Try API first, but fallback to local state if it fails
       try {
         await api.delete(`/schedule/${entryId}`);
-        
+
         // Remove the entry from local state for the specific child
         setAllScheduleEntries(prev => ({
           ...prev,
@@ -290,7 +286,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
         setError(null);
         return { success: true };
       } catch (apiError) {
-        
+
         // Remove from local state if API fails
         setAllScheduleEntries(prev => ({
           ...prev,
@@ -308,16 +304,15 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     }
   };
 
-
   // Batch create multiple schedule entries for specific children (prevents individual refreshes)
   const createScheduleEntriesBatch = async (entriesWithChildIds) => {
     try {
       setLoading(true);
       setBatchMode(true); // Enable batch mode to prevent individual state updates
-      
+
       const results = [];
       const successfulEntriesByChild = {};
-      
+
       // Create entries one by one but don't update state individually
       for (const { entryData, targetChildId } of entriesWithChildIds) {
         try {
@@ -333,7 +328,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           results.push({ success: false, error, childId: targetChildId });
         }
       }
-      
+
       // Update state with all successful entries at once
       if (Object.keys(successfulEntriesByChild).length > 0) {
         setAllScheduleEntries(prev => {
@@ -344,9 +339,9 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           return updated;
         });
       }
-      
+
       const totalSuccessful = Object.values(successfulEntriesByChild).flat().length;
-      
+
       return {
         success: totalSuccessful > 0,
         results,
@@ -367,11 +362,11 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   // Mark schedule entry as completed with sync notification
   const markEntryCompleted = async (entryId, childId) => {
     const result = await updateScheduleEntry(entryId, { status: 'completed' }, childId);
-    
+
     // Show success message if materials were synced
     if (result.success && result.data?.synced_materials > 0) {
     }
-    
+
     return result;
   };
 
@@ -404,16 +399,15 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     setShowSettingsModal(false);
   };
 
-
   // Fetch schedule preferences for multiple children
   const fetchMultipleChildrenPreferences = useCallback(async (childrenIds) => {
     if (!childrenIds || childrenIds.length === 0) return;
-    
+
     try {
-      const promises = childrenIds.map(childId => 
+      const promises = childrenIds.map(childId =>
         api.get(`/schedule/preferences/${childId}`).catch(err => {
           // Return default preferences on error
-          return { 
+          return {
             data: {
               preferred_start_time: '09:00',
               preferred_end_time: '15:00',
@@ -426,15 +420,15 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
           };
         })
       );
-      
+
       const responses = await Promise.all(promises);
-      
+
       // Organize preferences by child ID
       const preferencesByChild = {};
       childrenIds.forEach((childId, index) => {
         preferencesByChild[childId] = responses[index]?.data || {};
       });
-      
+
       setSchedulePreferences(preferencesByChild);
     } catch (err) {
       console.error('Error fetching preferences:', err);
@@ -460,13 +454,13 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     try {
       setLoading(true);
       const response = await api.post(`/schedule/preferences/${childId}`, preferences);
-      
+
       // Update the preferences in local state
       setSchedulePreferences(prev => ({
         ...prev,
         [childId]: response.data
       }));
-      
+
       setError(null);
       return { success: true, data: response.data };
     } catch (err) {
@@ -482,7 +476,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
   const generateAISchedule = async (options = {}) => {
     try {
       setLoading(true);
-      
+
       const {
         start_date = new Date().toISOString().split('T')[0], // Default to today
         days_to_schedule = 7,
@@ -544,10 +538,8 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
       // Add debug logging to catch any circular reference issues before they happen
       try {
         const testStringify = JSON.stringify(requestPayload);
-        console.log('Multi-child AI Schedule Request:', testStringify);
-      } catch (circularError) {
+        } catch (circularError) {
         console.error('Circular reference detected before API call:', circularError);
-        console.log('Request payload object:', requestPayload);
         throw new Error(`Cannot serialize request data: ${circularError.message}`);
       }
 
@@ -555,10 +547,10 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
 
       // Refresh the schedule entries for all selected children
       await fetchMultipleChildrenSchedules(selectedChildrenIds);
-      
+
       setError(null);
-      return { 
-        success: true, 
+      return {
+        success: true,
         data: response.data,
         message: response.data.message,
         entriesCreated: response.data.entries_created
@@ -589,18 +581,17 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     allScheduleEntries,
     schedulePreferences,
     calendarEvents: getCombinedCalendarEvents(),
-    
+
     // Loading states
     loading,
     error,
-    
+
     // Modal states
     showCreateModal,
     showEditModal,
     showSettingsModal,
     editingEntry,
 
-    
     // CRUD operations
     createScheduleEntry,
     createScheduleEntriesBatch,
@@ -608,10 +599,10 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     deleteScheduleEntry,
     updateSchedulePreferences,
     generateAISchedule,
-    
+
     // Status updates
     markEntryCompleted,
-    
+
     // Modal controls
     openCreateModal,
     closeCreateModal,
@@ -619,7 +610,7 @@ export function useMultiChildScheduleManagement(selectedChildrenIds, subscriptio
     closeEditModal,
     openSettingsModal,
     closeSettingsModal,
-    
+
     // Refresh
     refresh: () => {
       fetchMultipleChildrenSchedules(selectedChildrenIds);

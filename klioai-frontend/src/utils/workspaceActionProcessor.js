@@ -10,7 +10,6 @@ export class WorkspaceActionProcessor {
       return null;
     }
 
-
     let updatedWorkspace = currentWorkspace;
 
     actions.forEach((action, index) => {
@@ -19,35 +18,35 @@ export class WorkspaceActionProcessor {
         case 'create_workspace':
           updatedWorkspace = this.handleCreateWorkspace(action);
           break;
-        
+
         case 'add_content':
           updatedWorkspace = this.handleAddContent(action, updatedWorkspace);
           break;
-          
+
         case 'add_problems':
           updatedWorkspace = this.handleAddProblems(action, updatedWorkspace);
           break;
-          
+
         case 'evaluate_content':
           this.handleEvaluateContent(action);
           break;
-          
+
         case 'mark_correct':
           this.handleMarkCorrect(action);
           break;
-          
+
         case 'mark_incorrect':
           this.handleMarkIncorrect(action);
           break;
-          
+
         case 'clear_workspace':
           updatedWorkspace = null;
           break;
-          
+
         case 'error':
           console.error('Workspace action error:', action.message);
           break;
-          
+
         default:
       }
     });
@@ -56,14 +55,14 @@ export class WorkspaceActionProcessor {
   }
 
   handleCreateWorkspace(action) {
-    
+
     // Handle creative writing toolkit, subject workspaces, and legacy math workspaces
     const workspace = action.workspace;
     const isCreativeWritingToolkit = workspace.type === 'creative_writing_toolkit';
     const isSubjectWorkspace = workspace.subject && workspace.content;
-    
+
     let workspaceContent;
-    
+
     if (isCreativeWritingToolkit) {
       // Creative Writing Toolkit
       workspaceContent = {
@@ -133,7 +132,7 @@ export class WorkspaceActionProcessor {
   }
 
   handleAddProblems(action, currentWorkspace) {
-    
+
     // Update the existing workspace content, or create from currentWorkspace if none exists
     this.setWorkspaceContent(prevContent => {
       // If no existing workspace content but we have currentWorkspace from backend, create it
@@ -151,12 +150,12 @@ export class WorkspaceActionProcessor {
           createdAt: currentWorkspace.createdAt
         };
       }
-      
+
       // If no workspace content and no currentWorkspace, can't add problems
       if (!prevContent) {
         return prevContent;
       }
-      
+
       const newProblems = action.newProblems.map(problem => ({
         id: problem.id,
         index: problem.index,
@@ -180,11 +179,11 @@ export class WorkspaceActionProcessor {
   }
 
   handleMarkCorrect(action) {
-    
+
     // Update workspace content
     this.setWorkspaceContent(prevContent => {
       if (!prevContent) return prevContent;
-      
+
       const updatedProblems = [...prevContent.problems];
       if (updatedProblems[action.problemIndex]) {
         updatedProblems[action.problemIndex] = {
@@ -208,11 +207,11 @@ export class WorkspaceActionProcessor {
   }
 
   handleMarkIncorrect(action) {
-    
+
     // Update workspace content
     this.setWorkspaceContent(prevContent => {
       if (!prevContent) return prevContent;
-      
+
       const updatedProblems = [...prevContent.problems];
       if (updatedProblems[action.problemIndex]) {
         updatedProblems[action.problemIndex] = {
@@ -237,7 +236,7 @@ export class WorkspaceActionProcessor {
 
   // NEW: Handle adding content to subject workspaces
   handleAddContent(action, currentWorkspace) {
-    
+
     // Update the existing workspace content
     this.setWorkspaceContent(prevContent => {
       // If no existing workspace content but we have currentWorkspace from backend, create it
@@ -261,11 +260,11 @@ export class WorkspaceActionProcessor {
           createdAt: currentWorkspace.createdAt
         };
       }
-      
+
       if (!prevContent) {
         return prevContent;
       }
-      
+
       const newContent = action.newContent.map(item => ({
         id: item.id,
         index: item.index,
@@ -281,7 +280,7 @@ export class WorkspaceActionProcessor {
 
       // Add to content array (or problems array for legacy workspaces)
       const contentKey = prevContent.content ? 'content' : 'problems';
-      
+
       return {
         ...prevContent,
         [contentKey]: [...(prevContent[contentKey] || []), ...newContent],
@@ -294,15 +293,15 @@ export class WorkspaceActionProcessor {
 
   // NEW: Handle subject-agnostic content evaluation
   handleEvaluateContent(action) {
-    
+
     // Update workspace content
     this.setWorkspaceContent(prevContent => {
       if (!prevContent) return prevContent;
-      
+
       // Handle both content and problems arrays
       const contentKey = prevContent.content ? 'content' : 'problems';
       const updatedItems = [...(prevContent[contentKey] || [])];
-      
+
       if (updatedItems[action.contentIndex]) {
         updatedItems[action.contentIndex] = {
           ...updatedItems[action.contentIndex],

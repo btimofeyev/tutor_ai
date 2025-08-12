@@ -45,5 +45,4 @@ router.put('/:material_id/toggle-complete', materialsController.toggleMaterialCo
 router.delete('/:material_id', materialsController.deleteMaterial);
 router.post('/create-manual', materialsController.createMaterialManually);
 
-
 module.exports = router;

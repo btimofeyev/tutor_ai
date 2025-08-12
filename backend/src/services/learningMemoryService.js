@@ -1,9 +1,10 @@
 // Fixed learningMemoryService.js - Removes supabase.raw error
 const supabase = require('../utils/supabaseClient');
 const { OpenAI } = require('openai');
+const keyManager = require('../utils/secureKeys');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: keyManager.getOpenAIKey()
 });
 
 class LearningMemoryService {

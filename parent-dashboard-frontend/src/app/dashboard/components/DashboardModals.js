@@ -14,8 +14,8 @@ import GradeInputModal from './GradeInputModal';
 import UnitManagementModal from './UnitManagementModal';
 import BatchEditModal from './BatchEditModal';
 import UpgradePrompt from '../../../components/UpgradePrompt';
-import { 
-  modalBackdropStyles, 
+import {
+  modalBackdropStyles,
   modalContainerStyles,
   modalCloseButtonStyles
 } from '../../../utils/dashboardStyles';
@@ -25,7 +25,7 @@ export default function DashboardModals({
   modalManagement,
   materialManagement,
   childrenData,
-  
+
   // Data
   assignedSubjects,
   currentUnitsForAddFormSubject,
@@ -33,11 +33,11 @@ export default function DashboardModals({
   editingMaterialLessonContainers,
   subscription,
   subscriptionPermissions,
-  
+
   // Constants
   APP_CONTENT_TYPES,
   APP_GRADABLE_CONTENT_TYPES,
-  
+
   // Handlers
   onAddLessonFormSubmit,
   onApproveNewLesson,
@@ -66,11 +66,11 @@ export default function DashboardModals({
   onBatchSave,
   clearCredentialMessages,
   onToggleComplete,
-  
+
   // Toast functions
   showSuccess,
   showError,
-  
+
   // Batch selection
   selectedMaterials
 }) {
@@ -93,13 +93,13 @@ export default function DashboardModals({
                   onFormSubmit={onAddLessonFormSubmit}
                   onApprove={onApproveNewLesson}
                   onManualSubmit={onManualMaterialSubmit}
-                  
+
                   uploading={materialManagement.uploading}
                   savingLesson={materialManagement.savingLesson}
-                  
+
                   lessonJsonForApproval={materialManagement.lessonJsonForApproval}
                   onUpdateLessonJsonField={onUpdateLessonJsonForApprovalField}
-                  
+
                   lessonTitleForApproval={materialManagement.lessonTitleForApproval}
                   onLessonTitleForApprovalChange={(e) =>
                     materialManagement.setLessonTitleForApproval(e.target.value)
@@ -116,7 +116,7 @@ export default function DashboardModals({
                   onLessonCompletedForApprovalChange={(e) =>
                     materialManagement.setLessonCompletedForApproval(e.target.checked)
                   }
-                  
+
                   currentAddLessonSubject={materialManagement.addLessonSubject}
                   onAddLessonSubjectChange={(e) =>
                     materialManagement.setAddLessonSubject(e.target.value)
@@ -127,7 +127,7 @@ export default function DashboardModals({
                   }
                   onAddLessonFileChange={(e) => materialManagement.setAddLessonFile(e.target.files)}
                   currentAddLessonFile={materialManagement.addLessonFile}
-                  
+
                   appContentTypes={APP_CONTENT_TYPES}
                   appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
                   unitsForSelectedSubject={currentUnitsForAddFormSubject}
@@ -203,6 +203,7 @@ export default function DashboardModals({
           appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
           unitsForSubject={childrenData.unitsBySubject[materialManagement.editForm?.child_subject_id] || []}
           lessonContainersForSubject={editingMaterialLessonContainers}
+          subjectId={materialManagement.editForm?.child_subject_id}
         />
       )}
 
@@ -234,7 +235,7 @@ export default function DashboardModals({
           isSaving={modalManagement.isSavingCredentials}
         />
       )}
-      
+
       {/* Upgrade Prompt Modal */}
       {modalManagement.showUpgradePrompt && (
         <UpgradePrompt
@@ -280,7 +281,7 @@ export default function DashboardModals({
       <BatchEditModal
         isOpen={modalManagement.showBatchEditModal}
         onClose={modalManagement.closeBatchEditModal}
-        selectedItems={Array.from(selectedMaterials).map(id => 
+        selectedItems={Array.from(selectedMaterials).map(id =>
           Object.values(childrenData.lessonsBySubject).flat().find(lesson => lesson.id === parseInt(id))
         ).filter(Boolean)}
         onSave={onBatchSave}
@@ -303,7 +304,7 @@ DashboardModals.propTypes = {
   APP_CONTENT_TYPES: PropTypes.array.isRequired,
   APP_GRADABLE_CONTENT_TYPES: PropTypes.array.isRequired,
   selectedMaterials: PropTypes.object.isRequired,
-  
+
   // Handler functions
   onAddLessonFormSubmit: PropTypes.func.isRequired,
   onApproveNewLesson: PropTypes.func.isRequired,

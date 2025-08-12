@@ -10,7 +10,7 @@ export function useDashboardModals() {
   const [newUnitNameModalState, setNewUnitNameModalState] = useState("");
   const [bulkUnitCount, setBulkUnitCount] = useState(1);
   const [editingUnit, setEditingUnit] = useState(null);
-  
+
   // Lesson group management state
   const [expandedUnitsInModal, setExpandedUnitsInModal] = useState({});
   const [creatingLessonGroupForUnit, setCreatingLessonGroupForUnit] = useState(null);
@@ -209,7 +209,7 @@ export function useDashboardModals() {
     setIsDeletingMaterial,
     openDeleteMaterialModal,
     closeDeleteMaterialModal,
-    
+
     showDeleteChildModal,
     deletingChild,
     isDeletingChild,

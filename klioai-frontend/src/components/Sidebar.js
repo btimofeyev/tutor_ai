@@ -57,7 +57,6 @@ export default function Sidebar({ childName, onLogout, onClearChat, onQuickActio
   const sidebarButtonDefaultStyles = `${sidebarButtonBaseStyles} text-[var(--text-secondary)] hover:bg-[var(--accent-blue)]/20 hover:text-[var(--text-primary)] focus-visible:ring-[var(--accent-blue)]`;
   const sidebarButtonDestructiveStyles = `${sidebarButtonBaseStyles} text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10 hover:text-[var(--accent-red)] focus-visible:ring-[var(--accent-red)]`;
 
-
   return (
     <aside className="w-56 md:w-60 bg-[var(--background-card)] border-r border-[var(--border-subtle)] flex flex-col p-3 space-y-4" role="navigation" aria-label="Main navigation">
       {/* Logo/Brand - Klio AI Themed */}
@@ -76,7 +75,7 @@ export default function Sidebar({ childName, onLogout, onClearChat, onQuickActio
           </span>
         </Link>
       </div>
-      
+
       <div className="flex-1">
         {/* Quick Actions Section */}
         <div className="mb-4">
@@ -97,7 +96,7 @@ export default function Sidebar({ childName, onLogout, onClearChat, onQuickActio
               <FiChevronRight size={16} className="text-[var(--text-tertiary)]" aria-hidden="true" />
             )}
           </button>
-          
+
           {quickActionsExpanded && (
             <div className="mt-2 ml-4 space-y-1" id="quick-actions-menu" role="menu">
               {QUICK_ACTIONS.map((action) => (

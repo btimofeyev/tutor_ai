@@ -12,7 +12,7 @@ const GET_UNIVERSAL_SYSTEM_PROMPT = (userHintContentType, inputDescription = "th
 
     // Contextual instructions per content type
     let mainSummaryInstruction = "Provide a concise but thorough summary (max 300 words) of any instructional or thematic content, focusing on what a student is expected to learn or do. If there is little instructional content and the material is just a list of questions/problems, summarize the overall topic very briefly.";
-    let tasksInstruction = `List EVERY instruction, question, math problem, or assignment instruction as they literally appear, in an array. 
+    let tasksInstruction = `List EVERY instruction, question, math problem, or assignment instruction as they literally appear, in an array.
 **CRITICAL:**
 - PRESERVE STRUCTURE: When an instruction or direction applies to multiple questions, list the instruction (as its own array item) directly before the relevant numbered questions.
 - Maintain the exact sequence—do not reorder.
@@ -76,7 +76,7 @@ You are an expert educational document extractor. Your task is to **extract and 
 - **Identify teaching methodology**: Determine the pedagogical approach (step-by-step, discovery-based, etc.).
 - **Extract answer keys**: If solutions or answers are provided, capture them completely.
 - **Describe visual content**: Provide detailed descriptions of all diagrams, images, or visual aids.
-- **WORKSHEET SPECIFIC REQUIREMENTS**: 
+- **WORKSHEET SPECIFIC REQUIREMENTS**:
   - ALWAYS fill out assignment_metadata for worksheets with clear title, objectives, key terms, time estimate, difficulty, and total points
   - ALWAYS extract ALL questions into worksheet_questions array with number, full text, type, and points if specified
   - assignment_metadata and worksheet_questions are REQUIRED for worksheets, null for other content types

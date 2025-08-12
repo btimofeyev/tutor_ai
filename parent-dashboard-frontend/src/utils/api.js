@@ -7,12 +7,12 @@ const getApiBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  
+
   // Development fallback
   if (process.env.NODE_ENV === 'development') {
     return 'http://localhost:5000/api';
   }
-  
+
   // Production fallback (should not reach here if env var is set)
   console.warn('NEXT_PUBLIC_API_URL not set. Using default production URL.');
   return '/api'; // Relative URL for production
@@ -25,23 +25,23 @@ const api = axios.create({
 
 // Log the API configuration for debugging
 if (process.env.NODE_ENV === 'development') {
-  console.log('API Base URL:', getApiBaseUrl());
+  console.log('API Base URL:', api.defaults.baseURL);
 }
 
 // Request interceptor for authentication
 api.interceptors.request.use(async config => {
   const supabase = createClientComponentClient();
   const { data: { session } } = await supabase.auth.getSession();
-  
+
   if (session?.access_token) {
     config.headers['Authorization'] = `Bearer ${session.access_token}`;
   }
-  
+
   // Keep the x-parent-id header for legacy compatibility if needed
   if (session?.user?.id) {
     config.headers['x-parent-id'] = session.user.id;
   }
-  
+
   return config;
 }, error => {
   // Request error handling
@@ -57,7 +57,7 @@ api.interceptors.response.use(
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
-      
+
       if (status === 401) {
         console.warn('Authentication failed. Redirecting to login...');
         // Could trigger logout or redirect logic here
@@ -73,7 +73,7 @@ api.interceptors.response.use(
       // Other error
       console.error('API Error:', error.message);
     }
-    
+
     return Promise.reject(error);
   }
 );

@@ -9,8 +9,8 @@ import { ProcessingNotificationProvider } from '../components/ProcessingNotifica
 const inter = Inter({ subsets: ['latin'], variable: '--font-main' });
 
 export const metadata = {
-  title: 'Klio AI', 
-  description: 'Intelligent Homeschooling, Effortlessly Orchestrated.', 
+  title: 'Klio AI',
+  description: 'Intelligent Homeschooling, Effortlessly Orchestrated.',
 };
 
 export default function RootLayout({ children }) {

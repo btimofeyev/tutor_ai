@@ -4,20 +4,12 @@ const supabase = require('../utils/supabaseClient');
 const mcpClient = require('../services/mcpClientWrapper');
 const memoryService = require('../services/learningMemoryService');
 const chatHistoryService = require('../services/chatHistoryService');
+const contextService = require('../services/contextService');
 const { formatLearningContextForAI, isLessonQuery } = require('../middleware/mcpContext');
 const { getCurrentDateInfo, getDueDateStatus } = require('../utils/dateUtils');
 const { ENHANCED_KLIO_SYSTEM_PROMPT } = require('../utils/enhancedSystemPrompt');
-const { formatEnhancedLearningContext } = require('../utils/enhancedContextFormatter');
-const { enhanceConversationContext, addConversationGuidance, generatePersonalizedResponse } = require('../utils/conversationEnhancer');
 const { WORKSPACE_TOOLS, getEvaluationTypeForSubject, generateWorkspaceFromMaterial, detectSubjectFromMaterial, findCrossSubjectConnections, suggestComplementaryActivities } = require('../utils/workspaceTools');
 const { getWorkspaceHandler } = require('../utils/workspaceFunctionHandlers');
-const { 
-  analyzeStudentProfile, 
-  generateConversationStrategy, 
-  generatePersonalityContext,
-  shouldCelebrate,
-  generateContextualSuggestions
-} = require('../utils/conversationIntelligence');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -753,7 +745,7 @@ exports.chat = async (req, res) => {
     const memoryContext = buildMemoryContext(recentMemories, learningProfile);
     
     // Enhance conversation context with lesson awareness
-    const conversationEnhancements = enhanceConversationContext(message, mcpContext, child);
+    const conversationEnhancements = contextService.enhanceConversationContext(message, mcpContext);
     
     const subjects = mcpContext?.childSubjects
       ?.map(cs => cs.subject?.name || cs.custom_subject_name_override)
@@ -815,7 +807,7 @@ exports.chat = async (req, res) => {
 
     // 🧠 ADAPTIVE CONVERSATION INTELLIGENCE - Analyze student profile
     // Analyze student profile for adaptive tutoring
-    const studentProfile = await analyzeStudentProfile(childId);
+    const studentProfile = await contextService.analyzeStudentProfile(childId);
     
     // Determine current context for strategy adaptation
     const currentContext = {
@@ -827,17 +819,24 @@ exports.chat = async (req, res) => {
     };
     
     // Generate adaptive conversation strategy
-    const conversationStrategy = generateConversationStrategy(studentProfile, currentContext);
-    const personalityContext = generatePersonalityContext(conversationStrategy, message);
+    // Simplified conversation strategy based on student profile
+    const conversationStrategy = {
+      approach: studentProfile.confidence_level === 'low' ? 'encouraging' : 'challenging',
+      pace: studentProfile.engagement_level === 'high' ? 'normal' : 'slower'
+    };
     
     // Log adaptive strategy for debugging
-    console.log(`🧠 Adaptive: ${studentProfile.confidence_level} confidence, ${conversationStrategy.response_style} style`);
+    console.log(`🧠 Adaptive: ${studentProfile.confidence_level} confidence, ${conversationStrategy.approach} approach`);
     
     // Check if we should trigger a celebration
-    const celebrationCheck = shouldCelebrate(message, conversationStrategy, studentProfile);
+    // Simple celebration check
+    const celebrationCheck = studentProfile.recent_success_rate > 0.8 && message.toLowerCase().includes('right');
     
     // Generate contextual suggestions for this student
-    const contextualSuggestions = generateContextualSuggestions(studentProfile, currentContext, conversationStrategy);
+    // Simple contextual suggestions
+    const contextualSuggestions = mcpContext.overdue?.length > 0 ? 
+      ["Let's focus on your overdue assignments first"] : 
+      ["Great work! Let's continue with your current lessons"];
     
     // Enhance system prompt with adaptive personality and strategy
     const adaptivePersonalityPrompt = `

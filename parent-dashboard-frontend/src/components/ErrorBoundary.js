@@ -9,11 +9,11 @@ import Button from './ui/Button';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { 
-      hasError: false, 
-      error: null, 
+    this.state = {
+      hasError: false,
+      error: null,
       errorInfo: null,
-      retryCount: 0 
+      retryCount: 0
     };
   }
 
@@ -25,7 +25,7 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     // Log error details
     console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
+
     this.setState({
       error,
       errorInfo,
@@ -38,7 +38,7 @@ class ErrorBoundary extends React.Component {
   reportError = (error, errorInfo) => {
     // In a real app, you would send this to your error reporting service
     // Examples: Sentry, LogRocket, Bugsnag, etc.
-    
+
     const errorReport = {
       message: error.message,
       stack: error.stack,
@@ -51,7 +51,7 @@ class ErrorBoundary extends React.Component {
 
     // For now, just log it
     console.error('Error Report:', errorReport);
-    
+
     // Example: Send to error service
     // errorReportingService.captureException(error, { extra: errorReport });
   };
@@ -102,11 +102,11 @@ class ErrorBoundary extends React.Component {
             <div className="flex justify-center mb-4">
               <ExclamationTriangleIcon className="h-16 w-16 text-red-500" />
             </div>
-            
+
             <h2 className="text-xl font-bold text-gray-900 mb-2">
               Oops! Something went wrong
             </h2>
-            
+
             <p className="text-gray-600 mb-6">
               We encountered an unexpected error. This has been reported to our team.
             </p>
@@ -135,7 +135,7 @@ class ErrorBoundary extends React.Component {
                 <ArrowPathIcon className="h-4 w-4 mr-2" />
                 Try Again
               </Button>
-              
+
               <Button
                 variant="primary"
                 onClick={this.handleReload}
@@ -165,9 +165,9 @@ export const withErrorBoundary = (Component, errorBoundaryProps = {}) => {
       <Component {...props} />
     </ErrorBoundary>
   );
-  
+
   WrappedComponent.displayName = `withErrorBoundary(${Component.displayName || Component.name})`;
-  
+
   return WrappedComponent;
 };
 

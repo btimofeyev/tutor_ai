@@ -2,28 +2,33 @@
 const supabase = require('../utils/supabaseClient');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const logger = require('../utils/logger')('childAuthController');
 
-// JWT secret - should be in .env
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
+// Ensure JWT_SECRET is set in production
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  logger.error('JWT_SECRET is not set in environment variables');
+  throw new Error('JWT_SECRET must be set in environment variables');
+}
 const JWT_EXPIRES_IN = '2h'; // 2 hour sessions for children
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 // Generate tokens
 const generateTokens = (childId, childName) => {
   const accessToken = jwt.sign(
-    { 
-      child_id: childId, 
+    {
+      child_id: childId,
       name: childName,
-      type: 'child_access' 
+      type: 'child_access'
     },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   );
 
   const refreshToken = jwt.sign(
-    { 
+    {
       child_id: childId,
-      type: 'child_refresh' 
+      type: 'child_refresh'
     },
     JWT_SECRET,
     { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
@@ -37,17 +42,17 @@ exports.childLogin = async (req, res) => {
   const { username, pin } = req.body;
 
   if (!username || !pin) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Username and PIN are required',
-      code: 'MISSING_CREDENTIALS' 
+      code: 'MISSING_CREDENTIALS'
     });
   }
 
   // Validate PIN format (4-6 digits)
   if (!/^\d{4,6}$/.test(pin)) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Invalid PIN format',
-      code: 'INVALID_PIN_FORMAT' 
+      code: 'INVALID_PIN_FORMAT'
     });
   }
 
@@ -61,17 +66,17 @@ exports.childLogin = async (req, res) => {
 
     if (error || !child) {
       // Don't reveal if username exists
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Invalid username or PIN',
-        code: 'INVALID_CREDENTIALS' 
+        code: 'INVALID_CREDENTIALS'
       });
     }
 
     // Check if PIN is set
     if (!child.access_pin_hash) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Account not activated. Please ask your parent to set up your PIN.',
-        code: 'ACCOUNT_NOT_ACTIVATED' 
+        code: 'ACCOUNT_NOT_ACTIVATED'
       });
     }
 
@@ -88,9 +93,9 @@ exports.childLogin = async (req, res) => {
         }])
         .select(); // Ignore errors for failed attempt logging
 
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Invalid username or PIN',
-        code: 'INVALID_CREDENTIALS' 
+        code: 'INVALID_CREDENTIALS'
       });
     }
 
@@ -135,9 +140,9 @@ exports.childLogin = async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Login failed. Please try again.',
-      code: 'SERVER_ERROR' 
+      code: 'SERVER_ERROR'
     });
   }
 };
@@ -147,16 +152,16 @@ exports.refreshToken = async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Refresh token required',
-      code: 'MISSING_TOKEN' 
+      code: 'MISSING_TOKEN'
     });
   }
 
   try {
     // Verify refresh token
     const decoded = jwt.verify(refreshToken, JWT_SECRET);
-    
+
     if (decoded.type !== 'child_refresh') {
       throw new Error('Invalid token type');
     }
@@ -171,20 +176,20 @@ exports.refreshToken = async (req, res) => {
       .limit(1);
 
     if (!sessions || sessions.length === 0) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Session expired. Please login again.',
-        code: 'SESSION_EXPIRED' 
+        code: 'SESSION_EXPIRED'
       });
     }
 
     // Verify refresh token matches session (optional extra security)
     const session = sessions[0];
     const isValidRefreshToken = await bcrypt.compare(refreshToken, session.refresh_token_hash);
-    
+
     if (!isValidRefreshToken) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Invalid refresh token',
-        code: 'INVALID_TOKEN' 
+        code: 'INVALID_TOKEN'
       });
     }
 
@@ -196,9 +201,9 @@ exports.refreshToken = async (req, res) => {
       .single();
 
     if (!child) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Account not found',
-        code: 'ACCOUNT_NOT_FOUND' 
+        code: 'ACCOUNT_NOT_FOUND'
       });
     }
 
@@ -221,17 +226,17 @@ exports.refreshToken = async (req, res) => {
 
   } catch (error) {
     console.error('Token refresh error:', error);
-    
+
     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Invalid or expired token',
-        code: 'INVALID_TOKEN' 
+        code: 'INVALID_TOKEN'
       });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       error: 'Token refresh failed',
-      code: 'SERVER_ERROR' 
+      code: 'SERVER_ERROR'
     });
   }
 };
@@ -246,9 +251,9 @@ exports.childLogout = async (req, res) => {
       // Invalidate specific session
       await supabase
         .from('child_sessions')
-        .update({ 
+        .update({
           expires_at: new Date().toISOString(),
-          ended_at: new Date().toISOString() 
+          ended_at: new Date().toISOString()
         })
         .eq('id', sessionId)
         .eq('child_id', childId);
@@ -256,9 +261,9 @@ exports.childLogout = async (req, res) => {
       // Invalidate all sessions for this child
       await supabase
         .from('child_sessions')
-        .update({ 
+        .update({
           expires_at: new Date().toISOString(),
-          ended_at: new Date().toISOString() 
+          ended_at: new Date().toISOString()
         })
         .eq('child_id', childId)
         .gte('expires_at', new Date().toISOString());
@@ -300,9 +305,9 @@ exports.getLoginHints = async (req, res) => {
   const { parentEmail } = req.query;
 
   if (!parentEmail) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Parent email required',
-      code: 'MISSING_EMAIL' 
+      code: 'MISSING_EMAIL'
     });
   }
 
@@ -317,9 +322,9 @@ exports.getLoginHints = async (req, res) => {
 
     if (!parent) {
       // Don't reveal if email exists
-      return res.json({ 
+      return res.json({
         success: true,
-        hints: [] 
+        hints: []
       });
     }
 
@@ -333,7 +338,7 @@ exports.getLoginHints = async (req, res) => {
     // Return hints (first letter + asterisks)
     const hints = (children || []).map(child => ({
       name: child.name,
-      usernameHint: child.child_username 
+      usernameHint: child.child_username
         ? child.child_username[0] + '*'.repeat(child.child_username.length - 1)
         : null
     }));
@@ -345,9 +350,9 @@ exports.getLoginHints = async (req, res) => {
 
   } catch (error) {
     console.error('Get hints error:', error);
-    res.json({ 
+    res.json({
       success: true,
-      hints: [] 
+      hints: []
     });
   }
 };

@@ -5,7 +5,6 @@ const getTestInsights = (req, res) => {
     res.status(200).json({ message: "This is a test insight from the backend." });
 };
 
-
 const getChildrenWithConversations = async (req, res) => {
     const parentId = req.user.id;
     try {
@@ -88,7 +87,6 @@ const markNotificationsAsRead = async (req, res) => {
     }
 };
 
-
 const getStickyNotesByChild = async (req, res) => {
     const { childId } = req.params;
     const parentId = req.user.id;
@@ -120,7 +118,6 @@ const getStickyNotesByChild = async (req, res) => {
     }
 };
 
-
 const addStickyNote = async (req, res) => {
     const { child_id, note_text, created_by } = req.body;
     const parentId = req.user.id;
@@ -150,7 +147,6 @@ const addStickyNote = async (req, res) => {
         res.status(500).json({ message: 'Failed to add sticky note.' });
     }
 };
-
 
 const updateStickyNote = async (req, res) => {
     const { noteId } = req.params;
@@ -183,7 +179,6 @@ const updateStickyNote = async (req, res) => {
     }
 };
 
-
 const deleteStickyNote = async (req, res) => {
     const { noteId } = req.params;
     const parentId = req.user.id;
@@ -215,12 +210,12 @@ const deleteStickyNote = async (req, res) => {
 const getChatInsights = async (req, res) => {
     const parentId = req.user.id;
     const { days = 14, status = 'all', childId } = req.query;
-    
+
     try {
         // Calculate date range
         const daysAgo = new Date();
         daysAgo.setDate(daysAgo.getDate() - parseInt(days));
-        
+
         let query = supabase
             .from('parent_conversation_notifications')
             .select(`
@@ -229,23 +224,23 @@ const getChatInsights = async (req, res) => {
             `)
             .eq('parent_id', parentId)
             .gte('created_at', daysAgo.toISOString());
-        
+
         // Apply status filter - use 'status' column instead of 'is_read'
         if (status === 'read') {
             query = query.eq('status', 'read');
         } else if (status === 'unread') {
             query = query.eq('status', 'unread');
         }
-        
+
         // Apply child filter
         if (childId) {
             query = query.eq('child_id', childId);
         }
-        
+
         const { data, error } = await query.order('created_at', { ascending: false });
-        
+
         if (error) throw error;
-        
+
         // Group insights by date
         const groupedInsights = {};
         data.forEach(insight => {
@@ -256,7 +251,7 @@ const getChatInsights = async (req, res) => {
                     summaries: []
                 };
             }
-            
+
             groupedInsights[date].summaries.push({
                 id: insight.id,
                 status: insight.status,
@@ -269,17 +264,17 @@ const getChatInsights = async (req, res) => {
                 childName: insight.summary_data?.childName || insight.children?.name || 'Unknown Child'
             });
         });
-        
+
         // Convert to array format expected by frontend
-        const chatInsights = Object.values(groupedInsights).sort((a, b) => 
+        const chatInsights = Object.values(groupedInsights).sort((a, b) =>
             new Date(b.date).getTime() - new Date(a.date).getTime()
         );
-        
+
         res.json({
             success: true,
             chatInsights
         });
-        
+
     } catch (error) {
         console.error('Error fetching chat insights:', error);
         res.status(500).json({
@@ -293,16 +288,16 @@ const getChatInsights = async (req, res) => {
 const markChatInsightAsRead = async (req, res) => {
     const { id } = req.params;
     const parentId = req.user.id;
-    
+
     try {
         const { error } = await supabase
             .from('parent_conversation_notifications')
             .update({ status: 'read' })
             .eq('id', id)
             .eq('parent_id', parentId);
-        
+
         if (error) throw error;
-        
+
         res.json({ success: true });
     } catch (error) {
         console.error('Error marking insight as read:', error);
@@ -317,16 +312,16 @@ const markChatInsightAsRead = async (req, res) => {
 const deleteChatInsight = async (req, res) => {
     const { id } = req.params;
     const parentId = req.user.id;
-    
+
     try {
         const { error } = await supabase
             .from('parent_conversation_notifications')
             .delete()
             .eq('id', id)
             .eq('parent_id', parentId);
-        
+
         if (error) throw error;
-        
+
         res.json({ success: true });
     } catch (error) {
         console.error('Error deleting insight:', error);
@@ -341,22 +336,22 @@ const deleteChatInsight = async (req, res) => {
 const markAllChatInsightsAsRead = async (req, res) => {
     const parentId = req.user.id;
     const { childId } = req.body;
-    
+
     try {
         let query = supabase
             .from('parent_conversation_notifications')
             .update({ status: 'read' })
             .eq('parent_id', parentId)
             .eq('status', 'unread');
-        
+
         if (childId) {
             query = query.eq('child_id', childId);
         }
-        
+
         const { data, error } = await query.select('id');
-        
+
         if (error) throw error;
-        
+
         res.json({
             success: true,
             updatedCount: data.length

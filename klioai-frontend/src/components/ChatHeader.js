@@ -2,8 +2,8 @@
 import { motion } from 'framer-motion';
 import { FiTrendingUp, FiAward, FiSidebar } from 'react-icons/fi';
 
-export default function ChatHeader({ 
-  learningStreak = 0, 
+export default function ChatHeader({
+  learningStreak = 0,
   todaysPracticeCount = 0,
   hasWorkspace = false,
   isWorkspaceExpanded = false,
@@ -13,7 +13,7 @@ export default function ChatHeader({
     <header className="bg-[var(--background-card)] border-b border-[var(--border-subtle)] sticky top-0 z-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-12">
-          
+
           {/* Workspace Toggle Button - Mobile Only */}
           {hasWorkspace && onToggleWorkspace && (
             <button
@@ -25,10 +25,10 @@ export default function ChatHeader({
               <span>{isWorkspaceExpanded ? 'Hide' : 'Show'} Workspace</span>
             </button>
           )}
-          
+
           {/* Learning Stats */}
           <div className="flex items-center space-x-2">
-            
+
             {/* Learning Streak */}
             {learningStreak > 0 && (
               <motion.div

@@ -4,7 +4,7 @@
 // Form styling constants - consolidated from dashboardConstants.js
 export const FORM_STYLES = {
   inputBaseClass: "block w-full border-border-input focus:outline-none focus:ring-1 focus:ring-accent-blue focus:border-accent-blue rounded-lg bg-background-card text-text-primary placeholder-text-tertiary shadow-sm",
-  inputPaddingClass: "py-2 px-3", 
+  inputPaddingClass: "py-2 px-3",
   inputSizeClass: "text-sm",
   labelClass: "block text-xs font-medium text-text-secondary mb-1"
 };
@@ -36,7 +36,7 @@ export const buttonVariants = {
 
 export const buttonSizes = {
   sm: "px-3 py-1.5 text-xs",
-  md: "px-4 py-2 text-sm", 
+  md: "px-4 py-2 text-sm",
   lg: "px-6 py-3 text-base"
 };
 
@@ -52,7 +52,7 @@ export const cardContentStyles = "p-4";
 // Status indicator styles
 export const statusStyles = {
   complete: "bg-green-100 text-green-800",
-  incomplete: "bg-gray-100 text-gray-800", 
+  incomplete: "bg-gray-100 text-gray-800",
   overdue: "bg-red-100 text-red-800",
   dueSoon: "bg-orange-100 text-orange-800"
 };
@@ -78,7 +78,7 @@ export const animationClasses = {
 // Grid and layout constants
 export const gridStyles = {
   responsive2Col: "grid grid-cols-1 md:grid-cols-2 gap-4",
-  responsive3Col: "grid grid-cols-1 md:grid-cols-3 gap-4", 
+  responsive3Col: "grid grid-cols-1 md:grid-cols-3 gap-4",
   responsive4Col: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
 };
 
@@ -98,7 +98,7 @@ export const cn = (...classes) => {
 // Common class combinations
 export const combineClasses = {
   formField: (additionalClasses = '') => cn(formInputStyles, additionalClasses),
-  button: (variant = 'primary', size = 'md', additionalClasses = '') => 
+  button: (variant = 'primary', size = 'md', additionalClasses = '') =>
     cn(buttonBaseStyles, buttonVariants[variant], buttonSizes[size], additionalClasses),
   modal: (additionalClasses = '') => cn(modalContainerStyles, additionalClasses),
   card: (additionalClasses = '') => cn(cardStyles, additionalClasses)

@@ -1,80 +1,64 @@
 const supabase = require('../utils/supabaseClient');
-
-// Helper to get parent_id from request header
-function getParentId(req) {
-  return req.header('x-parent-id');
-}
-
-// Helper to verify parent owns the child
-async function verifyChildOwnership(parentId, childId) {
-  const { data, error } = await supabase
-    .from('children')
-    .select('id')
-    .eq('id', childId)
-    .eq('parent_id', parentId)
-    .single();
-
-  return !error && data;
-}
+const ControllerHelpers = require('../utils/controllerHelpers');
+const ResponseHelpers = require('../utils/responseHelpers');
 
 // Assign a subject to a child
-exports.assignSubjectToChild = async (req, res) => {
-  const parent_id = getParentId(req);
+exports.assignSubjectToChild = ResponseHelpers.asyncHandler(async (req, res) => {
+  const parent_id = ControllerHelpers.getParentId(req);
   const { child_id, subject_id, custom_subject_name_override } = req.body;
 
-  if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
-  if (!child_id || !subject_id) {
-    return res.status(400).json({ error: 'child_id and subject_id are required' });
+  // Validate required fields
+  if (!parent_id) return ResponseHelpers.missingParentId(res);
+  
+  const validation = ControllerHelpers.validateRequiredFields(req.body, ['child_id', 'subject_id']);
+  if (!validation.valid) {
+    return ResponseHelpers.missingRequiredFields(res, validation.missingFields);
   }
 
-  try {
-    // Verify parent owns the child
-    const ownsChild = await verifyChildOwnership(parent_id, child_id);
-    if (!ownsChild) {
-      return res.status(403).json({ error: 'Access denied to this child' });
-    }
+  // Verify parent owns the child
+  const ownsChild = await ControllerHelpers.verifyChildOwnership(parent_id, child_id);
+  if (!ownsChild) {
+    return ResponseHelpers.childAccessDenied(res, child_id);
+  }
 
-    // Verify subject exists
-    const { data: subject, error: subjectError } = await supabase
-      .from('subjects')
-      .select('id, name')
-      .eq('id', subject_id)
-      .single();
+  // Verify subject exists
+  const subjectCheck = await ControllerHelpers.verifySubjectExists(subject_id);
+  if (!subjectCheck.exists) {
+    return ResponseHelpers.notFound(res, 'Subject not found');
+  }
 
-    if (subjectError || !subject) {
-      return res.status(404).json({ error: 'Subject not found' });
-    }
+  // Check if already assigned
+  const { data: existing } = await supabase
+    .from('child_subjects')
+    .select('id')
+    .eq('child_id', child_id)
+    .eq('subject_id', subject_id)
+    .maybeSingle();
 
-    // Check if already assigned
-    const { data: existing } = await supabase
-      .from('child_subjects')
-      .select('id')
-      .eq('child_id', child_id)
-      .eq('subject_id', subject_id)
-      .maybeSingle();
+  if (existing) {
+    return ResponseHelpers.conflict(res, 'Subject already assigned to this child');
+  }
 
-    if (existing) {
-      return res.status(409).json({ error: 'Subject already assigned to this child' });
-    }
+  // Create assignment
+  const { data, error } = await supabase
+    .from('child_subjects')
+    .insert([{
+      child_id,
+      subject_id,
+      custom_subject_name_override: ControllerHelpers.sanitizeString(custom_subject_name_override)
+    }])
+    .select(`
+      id,
+      custom_subject_name_override,
+      created_at,
+      child:child_id (id, name),
+      subject:subject_id (id, name)
+    `)
+    .single();
 
-    // Create assignment
-    const { data, error } = await supabase
-      .from('child_subjects')
-      .insert([{
-        child_id,
-        subject_id,
-        custom_subject_name_override: custom_subject_name_override ? custom_subject_name_override.trim() : null
-      }])
-      .select(`
-        id,
-        custom_subject_name_override,
-        created_at,
-        child:child_id (id, name),
-        subject:subject_id (id, name)
-      `)
-      .single();
-
-    if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    return ResponseHelpers.badRequest(res, `Failed to assign subject: ${error.message}`);
+  }
 
     // Auto-create "Chapter 1" unit for the new subject assignment
     try {
@@ -93,8 +77,6 @@ exports.assignSubjectToChild = async (req, res) => {
         console.warn('Failed to auto-create Chapter 1:', unitError);
         // Don't fail the whole operation if unit creation fails
       } else {
-        console.log('Auto-created Chapter 1 for subject assignment:', data.id);
-        
         // Auto-create "Lesson 1" within Chapter 1
         try {
           const { data: lessonData, error: lessonError } = await supabase
@@ -111,8 +93,7 @@ exports.assignSubjectToChild = async (req, res) => {
           if (lessonError) {
             console.warn('Failed to auto-create Lesson 1:', lessonError);
           } else {
-            console.log('Auto-created Lesson 1 for Chapter 1:', unitData.id);
-          }
+            }
         } catch (lessonCreationError) {
           console.warn('Error auto-creating Lesson 1:', lessonCreationError);
         }
@@ -126,7 +107,7 @@ exports.assignSubjectToChild = async (req, res) => {
     try {
       const defaultWeights = [
         { content_type: 'worksheet', weight: 0.25 },      // 25%
-        { content_type: 'assignment', weight: 0.30 },     // 30% 
+        { content_type: 'assignment', weight: 0.30 },     // 30%
         { content_type: 'test', weight: 0.25 },           // 25%
         { content_type: 'quiz', weight: 0.20 },           // 20%
         { content_type: 'lesson', weight: 0.00 },         // 0%
@@ -149,75 +130,69 @@ exports.assignSubjectToChild = async (req, res) => {
         console.warn('Failed to auto-create default weights:', weightsError);
         // Don't fail the whole operation if weights creation fails
       } else {
-        console.log('Auto-created default weights for subject assignment:', data.id);
-      }
+        }
     } catch (weightsCreationError) {
       console.warn('Error auto-creating default weights:', weightsCreationError);
       // Continue with the main operation
     }
 
-    res.status(201).json(data);
-  } catch (error) {
-    console.error('Error assigning subject:', error);
-    res.status(500).json({ error: 'Failed to assign subject' });
-  }
-};
+  return ResponseHelpers.created(res, data, 'Subject assigned successfully');
+});
 
 // Unassign a subject from a child
-exports.unassignSubjectFromChild = async (req, res) => {
-  const parent_id = getParentId(req);
+exports.unassignSubjectFromChild = ResponseHelpers.asyncHandler(async (req, res) => {
+  const parent_id = ControllerHelpers.getParentId(req);
   const { child_id, subject_id } = req.body;
 
-  if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
-  if (!child_id || !subject_id) {
-    return res.status(400).json({ error: 'child_id and subject_id are required' });
+  // Validate required fields
+  if (!parent_id) return ResponseHelpers.missingParentId(res);
+  
+  const validation = ControllerHelpers.validateRequiredFields(req.body, ['child_id', 'subject_id']);
+  if (!validation.valid) {
+    return ResponseHelpers.missingRequiredFields(res, validation.missingFields);
   }
 
-  try {
-    // Verify parent owns the child
-    const ownsChild = await verifyChildOwnership(parent_id, child_id);
-    if (!ownsChild) {
-      return res.status(403).json({ error: 'Access denied to this child' });
-    }
-
-    // Check if assignment exists
-    const { data: assignment } = await supabase
-      .from('child_subjects')
-      .select('id')
-      .eq('child_id', child_id)
-      .eq('subject_id', subject_id)
-      .single();
-
-    if (!assignment) {
-      return res.status(404).json({ error: 'Subject assignment not found' });
-    }
-
-    // Check if there are any units/materials that would be orphaned
-    const { count: unitsCount } = await supabase
-      .from('units')
-      .select('*', { count: 'exact', head: true })
-      .eq('child_subject_id', assignment.id);
-
-    if (unitsCount > 0) {
-      return res.status(400).json({ 
-        error: `Cannot unassign subject with ${unitsCount} existing units. Delete units first.` 
-      });
-    }
-
-    // Delete assignment
-    const { error } = await supabase
-      .from('child_subjects')
-      .delete()
-      .eq('child_id', child_id)
-      .eq('subject_id', subject_id);
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ message: 'Subject unassigned successfully' });
-  } catch (error) {
-    console.error('Error unassigning subject:', error);
-    res.status(500).json({ error: 'Failed to unassign subject' });
+  // Verify parent owns the child
+  const ownsChild = await ControllerHelpers.verifyChildOwnership(parent_id, child_id);
+  if (!ownsChild) {
+    return ResponseHelpers.childAccessDenied(res, child_id);
   }
-};
+
+  // Check if assignment exists
+  const { data: assignment } = await supabase
+    .from('child_subjects')
+    .select('id')
+    .eq('child_id', child_id)
+    .eq('subject_id', subject_id)
+    .single();
+
+  if (!assignment) {
+    return ResponseHelpers.notFound(res, 'Subject assignment not found');
+  }
+
+  // Check if there are any units/materials that would be orphaned
+  const { count: unitsCount } = await supabase
+    .from('units')
+    .select('*', { count: 'exact', head: true })
+    .eq('child_subject_id', assignment.id);
+
+  if (unitsCount > 0) {
+    return ResponseHelpers.badRequest(res, `Cannot unassign subject with ${unitsCount} existing units. Delete units first.`);
+  }
+
+  // Delete assignment
+  const { error } = await supabase
+    .from('child_subjects')
+    .delete()
+    .eq('child_id', child_id)
+    .eq('subject_id', subject_id);
+
+  if (error) {
+    return ResponseHelpers.badRequest(res, `Failed to unassign subject: ${error.message}`);
+  }
+
+  return ResponseHelpers.success(res, null, 'Subject unassigned successfully');
+});
 
 // Unassign by child_subject_id (alternative endpoint)
 exports.unassignByChildSubjectId = async (req, res) => {
@@ -249,8 +224,8 @@ exports.unassignByChildSubjectId = async (req, res) => {
       .eq('child_subject_id', child_subject_id);
 
     if (unitsCount > 0) {
-      return res.status(400).json({ 
-        error: `Cannot unassign subject with ${unitsCount} existing units. Delete units first.` 
+      return res.status(400).json({
+        error: `Cannot unassign subject with ${unitsCount} existing units. Delete units first.`
       });
     }
 

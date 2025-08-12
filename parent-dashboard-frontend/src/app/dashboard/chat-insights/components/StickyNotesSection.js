@@ -14,34 +14,34 @@ export default function StickyNotesSection({
   emptyMessage = "No conversations this day"
 }) {
   const [formattedDate, setFormattedDate] = useState('');
-  
+
   // Format date on client side to avoid hydration mismatch
   useEffect(() => {
     if (!date) return;
-    
+
     const formatSectionDate = (dateString) => {
       const date = new Date(dateString);
       const today = new Date();
       const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-      
+
       // Reset time to compare dates only
       today.setHours(0, 0, 0, 0);
       yesterday.setHours(0, 0, 0, 0);
       date.setHours(0, 0, 0, 0);
-      
+
       if (date.getTime() === today.getTime()) {
         return '📅 Today';
       } else if (date.getTime() === yesterday.getTime()) {
         return '📅 Yesterday';
       } else {
-        return `📅 ${date.toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          month: 'short', 
-          day: 'numeric' 
+        return `📅 ${date.toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric'
         })}`;
       }
     };
-    
+
     setFormattedDate(formatSectionDate(date));
   }, [date]);
 
@@ -92,13 +92,13 @@ export default function StickyNotesSection({
           <motion.div
             key={summary.id}
             initial={{ opacity: 0, y: 20, rotate: -2 }}
-            animate={{ 
-              opacity: 1, 
-              y: 0, 
+            animate={{
+              opacity: 1,
+              y: 0,
               rotate: (index % 3) * 2 - 2 // Slight rotation variation: -2, 0, 2 degrees
             }}
-            transition={{ 
-              duration: 0.3, 
+            transition={{
+              duration: 0.3,
               delay: index * 0.1 // Stagger animation
             }}
           >
@@ -120,7 +120,7 @@ export default function StickyNotesSection({
               📊 Total learning time: {summaries.reduce((total, summary) => total + (summary.totalMinutes || 0), 0)} minutes
             </span>
             <span>
-              🎯 Problems solved: {summaries.reduce((total, summary) => 
+              🎯 Problems solved: {summaries.reduce((total, summary) =>
                 total + (summary.learningProgress?.problemsSolved || 0), 0
               )}
             </span>

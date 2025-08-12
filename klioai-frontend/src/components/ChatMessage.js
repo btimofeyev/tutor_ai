@@ -9,7 +9,7 @@ const formatRelativeTime = (timestamp) => {
   const now = new Date();
   const messageTime = new Date(timestamp);
   const diffInMinutes = Math.floor((now - messageTime) / (1000 * 60));
-  
+
   if (diffInMinutes < 1) return 'just now';
   if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
   if (diffInMinutes < 1440) { // Less than 24 hours
@@ -49,32 +49,32 @@ const KlioAvatar = ({ messageType = 'default' }) => {
 // Detect the emotional tone and content type of messages
 const analyzeMessageTone = (content) => {
   if (!content) return { type: 'default', hasEmojis: false, celebratory: false };
-  
+
   const contentLower = content.toLowerCase();
-  
+
   // Celebration indicators
   const celebrationWords = [
     'excellent', 'perfect', 'fantastic', 'amazing', 'great job', 'well done',
     'correct', 'right', 'brilliant', 'outstanding', 'wonderful', 'superb'
   ];
-  
-  // Encouragement indicators  
+
+  // Encouragement indicators
   const encouragementWords = [
     'keep going', 'you can do it', 'try again', 'almost there', 'good effort',
     'nice work', 'getting better', 'improving', 'progress'
   ];
-  
+
   // Question indicators
   const questionWords = [
     'what do you think', 'can you', 'how about', 'what if', 'let\'s try',
     'what would happen', 'can you tell me'
   ];
-  
+
   const hasEmojis = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(content);
-  
+
   let type = 'default';
   let celebratory = false;
-  
+
   if (celebrationWords.some(word => contentLower.includes(word))) {
     type = 'celebration';
     celebratory = true;
@@ -83,46 +83,46 @@ const analyzeMessageTone = (content) => {
   } else if (questionWords.some(word => contentLower.includes(word)) || content.includes('?')) {
     type = 'question';
   }
-  
+
   return { type, hasEmojis, celebratory };
 };
 
 // ENHANCED: Better detection for ALL types of structured content including LaTeX
 const hasStructuredContent = (content) => {
   if (!content || typeof content !== 'string') return false;
-  
+
   const indicators = [
     // LaTeX expressions (PRIORITY - these are very common in math)
     /\\?\(\s*[^)]*[\+\-\*×÷\/\\]\s*[^)]*\s*\\?\)/,  // \( 7 + 5 \) or ( 7 + 5 )
     /\\frac\{[^}]+\}\{[^}]+\}/,  // \frac{2}{3}
     /\\times/,  // \times
-    
+
     // Numbered lists with math content
     /^\s*\d+\.\s*[^.]*[\+\-\*×÷\/\\]/m,  // 1. 4 × something
-    
+
     // Math problems - ANY arithmetic
     /\d+\s*[\+\-\*×÷\/]\s*\d+/,
     /what\s+is\s+\d+[\+\-\*×÷\/]\d+/i,
     /\*\*[^*]*\d+[^*]*\*\*/,  // Bold text with numbers
-    
+
     // Fractions
     /\d+\/\d+.*[×\*].*\d+\/\d+/,
     /multiply.*numerator/i,
     /multiply.*denominator/i,
-    
+
     // Problem indicators
     /problem\s*\d+/i,
     /question\s*\d+/i,
-    
+
     // Learning content
     /learning goals/i,
     /assignment/i,
-    
+
     // Step-by-step content
     /step\s*\d+/i,
     /first.*second/i,
     /\d+\.\s*\*\*/,
-    
+
     // Educational patterns that suggest practice/workspace
     /tackle.*together/i,
     /let's.*solve/i,
@@ -132,7 +132,7 @@ const hasStructuredContent = (content) => {
     /let me know what.*come up with/i,
     /work through/i,
     /try solving/i,
-    
+
     // Creative writing patterns
     /write.*story/i,
     /create.*character/i,
@@ -144,103 +144,103 @@ const hasStructuredContent = (content) => {
     /character.*development/i,
     /setting.*description/i,
     /narrative.*voice/i,
-    
+
     // Math instruction patterns
     /multiply.*together/i,
     /add.*numbers/i,
     /solve.*equation/i,
     /calculate/i,
-    
+
     // Tree diagrams and visual content
     /tree diagram/i,
     /fundamental principle/i
   ];
-  
+
   const hasIndicator = indicators.some(pattern => pattern.test(content));
-  
+
   // Additional check for multiple numbers that might be problems
   const numberCount = (content.match(/\d+/g) || []).length;
   const hasMultipleNumbers = numberCount >= 2;
-  
+
   // Check for math-related keywords
   const mathKeywords = ['solve', 'calculate', 'multiply', 'add', 'subtract', 'divide', 'problem', 'equation', 'answer', 'practice', 'try'];
   const hasMathKeywords = mathKeywords.some(keyword => content.toLowerCase().includes(keyword));
-  
+
   // Check for creative writing keywords
   const writingKeywords = ['story', 'character', 'plot', 'setting', 'write', 'essay', 'paragraph', 'creative', 'narrative', 'brainstorm', 'draft', 'revise'];
   const hasWritingKeywords = writingKeywords.some(keyword => content.toLowerCase().includes(keyword));
-  
+
   // Special check for numbered lists that look like practice problems
   const hasNumberedMathList = /^\s*\d+\.\s*\\?\(/m.test(content) || // 1. \( or 1. (
                               /^\s*\d+\.\s*[^.]*[\+\-\*×÷\/]/m.test(content); // 1. something with math
-  
+
   return hasIndicator || hasNumberedMathList || (hasMultipleNumbers && hasMathKeywords) || hasWritingKeywords;
 };
 
 // Function to automatically style Klio's structured responses
 function formatKlioMessage(content) {
   if (!content) return content;
-  
+
   // Auto-detect and style urgent items (🚨) - more flexible patterns
   let formattedContent = content.replace(
-    /(🚨[^\n]*(?:overdue|OVERDUE|was due|past due)[^\n]*)/gi, 
+    /(🚨[^\n]*(?:overdue|OVERDUE|was due|past due)[^\n]*)/gi,
     '<span class="urgent-item">$1</span>'
   );
-  
+
   // Auto-detect and style due today items (⚠️)
   formattedContent = formattedContent.replace(
-    /(⚠️[^\n]*(?:due today|DUE TODAY|today)[^\n]*)/gi, 
+    /(⚠️[^\n]*(?:due today|DUE TODAY|today)[^\n]*)/gi,
     '<span class="due-today-item">$1</span>'
   );
-  
+
   // Auto-detect and style upcoming items (📅)
   formattedContent = formattedContent.replace(
-    /(📅[^\n]*(?:due tomorrow|DUE TOMORROW|tomorrow|coming up)[^\n]*)/gi, 
+    /(📅[^\n]*(?:due tomorrow|DUE TOMORROW|tomorrow|coming up)[^\n]*)/gi,
     '<span class="upcoming-item">$1</span>'
   );
-  
+
   // Also catch lines that mention overdue without emoji
   formattedContent = formattedContent.replace(
-    /([^\n]*(?:overdue|was due yesterday)[^\n]*)/gi, 
+    /([^\n]*(?:overdue|was due yesterday)[^\n]*)/gi,
     '<span class="urgent-item">$1</span>'
   );
-  
-  // Catch lines that mention due today without emoji  
+
+  // Catch lines that mention due today without emoji
   formattedContent = formattedContent.replace(
-    /([^\n]*(?:due today)[^\n]*)/gi, 
+    /([^\n]*(?:due today)[^\n]*)/gi,
     '<span class="due-today-item">$1</span>'
   );
-  
+
   // Catch lines that mention due tomorrow without emoji
   formattedContent = formattedContent.replace(
-    /([^\n]*(?:due tomorrow)[^\n]*)/gi, 
+    /([^\n]*(?:due tomorrow)[^\n]*)/gi,
     '<span class="upcoming-item">$1</span>'
   );
-  
+
   // Auto-detect and style grade information
   formattedContent = formattedContent.replace(
-    /(Your .+ average is .+|Grade: .+\/.+|scored .+\/.+|\d+\.\d+%|\d+%)/g, 
+    /(Your .+ average is .+|Grade: .+\/.+|scored .+\/.+|\d+\.\d+%|\d+%)/g,
     '<span class="grade-info">$1</span>'
   );
-  
+
   // Auto-detect and style section headers (like "URGENT - Overdue!")
   formattedContent = formattedContent.replace(
     /^(URGENT[^\n]*|Due Today[^\n]*|Due Tomorrow[^\n]*|Coming up[^\n]*)/gm,
     '<strong>$1</strong>'
   );
-  
+
   // Style math problems in bold and LaTeX expressions
   formattedContent = formattedContent.replace(
     /(\*\*[^*]+\*\*)/g,
     '<span class="math-problem-highlight">$1</span>'
   );
-  
+
   // Style LaTeX expressions
   formattedContent = formattedContent.replace(
     /(\\?\([^)]*[\+\-\*×÷\/\\][^)]*\\?\))/g,
     '<span class="math-problem-highlight">$1</span>'
   );
-  
+
   return formattedContent;
 }
 
@@ -248,7 +248,7 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
   const isKlio = message.role === 'klio';
   const [showCelebration, setShowCelebration] = useState(false);
   const [copied, setCopied] = useState(false);
-  
+
   // Memoize message analysis to prevent recalculation
   const messageAnalysis = useMemo(() => analyzeMessageTone(message.content), [message.content]);
 
@@ -262,7 +262,7 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
       console.error('Failed to copy message:', err);
     }
   };
-  
+
   // Trigger celebration effect for celebratory messages
   useEffect(() => {
     if (isKlio && messageAnalysis.celebratory) {
@@ -275,15 +275,15 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
   // Simplified animations for better performance
   const messageVariants = useMemo(() => ({
     hidden: { opacity: 0, y: 10 },
-    visible: { 
-      opacity: 1, 
-      y: 0, 
-      transition: { 
-        type: messageAnalysis.celebratory ? "spring" : "tween", 
-        stiffness: 300, 
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        type: messageAnalysis.celebratory ? "spring" : "tween",
+        stiffness: 300,
         damping: 25,
         duration: messageAnalysis.celebratory ? undefined : 0.2
-      } 
+      }
     },
     exit: { opacity: 0, transition: { duration: 0.1 } }
   }), [messageAnalysis.celebratory]);
@@ -305,7 +305,7 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
       // Dynamic styling based on message tone
       let borderColor = 'var(--accent-blue)';
       let bgColor = 'var(--background-card)';
-      
+
       switch (messageAnalysis.type) {
         case 'celebration':
           borderColor = 'var(--accent-yellow)';
@@ -323,12 +323,12 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
           baseBubbleClasses = `p-3 shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50 text-[var(--text-primary)]`;
           break;
       }
-      
+
       // Klio's Normal Message: Left and Bottom border with dynamic color
       borderBubbleClasses = `border-l-[3px] border-b-[3px] border-[${borderColor}]`;
       roundedClasses = 'rounded-tr-xl rounded-br-xl rounded-tl-xl';
       timestampClasses += ' text-[var(--text-secondary)] self-start';
-      
+
       // Remove distracting animations - focus on content quality
     }
   } else {
@@ -343,10 +343,10 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
 
   // Memoize message content formatting
   const { displayContent, shouldUseHTML } = useMemo(() => {
-    const formatted = isKlio && !message.isError 
-      ? formatKlioMessage(message.content) 
+    const formatted = isKlio && !message.isError
+      ? formatKlioMessage(message.content)
       : message.content;
-    
+
     return {
       displayContent: formatted,
       shouldUseHTML: isKlio && !message.isError && formatted !== message.content
@@ -354,7 +354,7 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
   }, [isKlio, message.isError, message.content, formatKlioMessage]);
 
   // Memoize structured content detection
-  const hasStructured = useMemo(() => 
+  const hasStructured = useMemo(() =>
     hasStructuredWorkspace || hasStructuredContent(message.content),
     [hasStructuredWorkspace, message.content]
   );
@@ -368,7 +368,7 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
       }
       return;
     }
-    
+
     // Fallback to parsing message content
     if (onSendToWorkspace) {
       onSendToWorkspace(message);
@@ -387,15 +387,15 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
       aria-label={`Message from ${isKlio ? 'Klio AI assistant' : 'student'}`}
     >
       {isKlio && !message.isError && <KlioAvatar messageType={messageAnalysis.type} />}
-      
+
       <div className={`flex flex-col max-w-[75%] sm:max-w-[70%] ${isKlio && message.isError ? 'ml-10' : ''}`}>
         <div className={finalBubbleClasses} role={isKlio ? 'assistant' : 'user'}>
           {message.isError && (
             <FiAlertTriangle className="inline-block mr-1.5 mb-0.5" size={16} />
           )}
-          
+
           {shouldUseHTML ? (
-            <div 
+            <div
               className="text-sm sm:text-base whitespace-pre-wrap font-fredoka break-words chat-message-content"
               dangerouslySetInnerHTML={{ __html: displayContent }}
             />
@@ -404,7 +404,7 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
               {displayContent}
             </div>
           )}
-          
+
           {/* Message Action Buttons */}
           <div className="flex items-center gap-2 mt-2">
             {/* Copy Button - Only for Klio messages */}
@@ -419,7 +419,7 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
                 <span>{copied ? 'Copied!' : 'Copy'}</span>
               </button>
             )}
-            
+
             {/* ENHANCED: Send to Workspace Button - Shows for ANY structured content */}
             {isKlio && hasStructured && onSendToWorkspace && (
               <motion.button
@@ -427,7 +427,7 @@ const ChatMessage = memo(function ChatMessage({ message, onSendToWorkspace, hasS
                 className="text-xs bg-[var(--accent-blue)]/20 text-[var(--accent-blue-darker-for-border)] px-2 py-1 rounded-full hover:bg-[var(--accent-blue)]/30 transition-all duration-200 flex items-center space-x-1 border border-[var(--accent-blue)]/40 hover:border-[var(--accent-blue)]/60 focus-visible:ring-2 focus-visible:ring-[var(--accent-blue)] focus-visible:ring-offset-1 touch-manipulation"
               title="Send these problems to your workspace for practice"
               aria-label="Send problems to workspace for interactive practice"
-              whileHover={{ 
+              whileHover={{
                 scale: 1.05,
                 boxShadow: "0 4px 12px rgba(59, 130, 246, 0.2)"
               }}

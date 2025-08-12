@@ -4,12 +4,12 @@ import React, { useState } from 'react';
 import { XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 
-export default function MaterialDeleteModal({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
+export default function MaterialDeleteModal({
+  isOpen,
+  onClose,
+  onConfirm,
   material,
-  isDeleting = false 
+  isDeleting = false
 }) {
   const [showConfirm, setShowConfirm] = useState(false);
 

@@ -1,9 +1,9 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  DocumentArrowUpIcon, 
-  CheckCircleIcon as CheckSolidIcon, 
-  ArrowPathIcon, 
+import {
+  DocumentArrowUpIcon,
+  CheckCircleIcon as CheckSolidIcon,
+  ArrowPathIcon,
   PlusIcon,
   InformationCircleIcon
 } from '@heroicons/react/24/outline';
@@ -19,7 +19,7 @@ const MATERIAL_TYPES = {
     isGradable: false
   },
   worksheet: {
-    label: 'Assignment', 
+    label: 'Assignment',
     description: 'Practice problems, homework',
     icon: '✏️',
     isGradable: true
@@ -91,7 +91,7 @@ export default function AddMaterialFormSimplified({
       ...prev,
       dueDate: tomorrow.toISOString().split('T')[0]
     }));
-    
+
     // Pre-select subject if provided
     if (preSelectedSubject && childSubjects) {
       const subject = childSubjects.find(s => s.name === preSelectedSubject);
@@ -109,12 +109,12 @@ export default function AddMaterialFormSimplified({
   // Fetch chapters when subject changes
   const fetchChapters = useCallback(async (subjectId) => {
     if (!subjectId) return;
-    
+
     setLoadingChapters(true);
     try {
       const response = await api.get(`/units/subject/${subjectId}`);
       const units = response.data || [];
-      
+
       // Sort by sequence order and name
       const sortedUnits = units.sort((a, b) => {
         if (a.sequence_order !== b.sequence_order) {
@@ -122,9 +122,9 @@ export default function AddMaterialFormSimplified({
         }
         return a.name.localeCompare(b.name);
       });
-      
+
       setChapters(sortedUnits);
-      
+
       // Auto-select Chapter 1 if it exists
       if (sortedUnits.length > 0) {
         const chapter1 = sortedUnits.find(u => u.name.includes('1')) || sortedUnits[0];
@@ -146,12 +146,12 @@ export default function AddMaterialFormSimplified({
   // Fetch lessons when chapter changes
   const fetchLessons = useCallback(async (chapterId) => {
     if (!chapterId) return;
-    
+
     setLoadingLessons(true);
     try {
       const response = await api.get(`/lesson-containers/unit/${chapterId}`);
       const lessonContainers = response.data || [];
-      
+
       // Sort by sequence order and title
       const sortedLessons = lessonContainers.sort((a, b) => {
         if (a.sequence_order !== b.sequence_order) {
@@ -159,9 +159,9 @@ export default function AddMaterialFormSimplified({
         }
         return a.title.localeCompare(b.title);
       });
-      
+
       setLessons(sortedLessons);
-      
+
       // Auto-select Lesson 1 if it exists
       if (sortedLessons.length > 0) {
         const lesson1 = sortedLessons.find(l => l.title.includes('1')) || sortedLessons[0];
@@ -203,7 +203,7 @@ export default function AddMaterialFormSimplified({
   const handleSubjectChange = (e) => {
     const subjectName = e.target.value;
     const subject = childSubjects.find(s => s.name === subjectName);
-    
+
     setFormData(prev => ({
       ...prev,
       subject: subjectName,
@@ -211,7 +211,7 @@ export default function AddMaterialFormSimplified({
       chapter: '',
       lesson: ''
     }));
-    
+
     if (subject?.child_subject_id) {
       fetchChapters(subject.child_subject_id);
     }
@@ -220,7 +220,7 @@ export default function AddMaterialFormSimplified({
   // Handle chapter selection/creation
   const handleChapterChange = async (e) => {
     const value = e.target.value;
-    
+
     if (value === 'create_new') {
       // Create new chapter
       try {
@@ -231,12 +231,12 @@ export default function AddMaterialFormSimplified({
           description: `Auto-created chapter for new materials`,
           sequence_order: nextChapterNumber
         });
-        
+
         const newChapter = response.data;
-        setChapters(prev => [...prev, newChapter].sort((a, b) => 
+        setChapters(prev => [...prev, newChapter].sort((a, b) =>
           (a.sequence_order || 0) - (b.sequence_order || 0)
         ));
-        
+
         setFormData(prev => ({
           ...prev,
           chapter: newChapter.id,
@@ -244,7 +244,7 @@ export default function AddMaterialFormSimplified({
           lesson: '',
           lessonNumber: 1
         }));
-        
+
         // Automatically create Lesson 1 in the new chapter
         const lessonResponse = await api.post('/lesson-containers', {
           unit_id: newChapter.id,
@@ -252,7 +252,7 @@ export default function AddMaterialFormSimplified({
           description: 'Auto-created lesson for new materials',
           sequence_order: 1
         });
-        
+
         const newLesson = lessonResponse.data;
         setLessons([newLesson]);
         setFormData(prev => ({
@@ -279,7 +279,7 @@ export default function AddMaterialFormSimplified({
   // Handle lesson selection/creation
   const handleLessonChange = async (e) => {
     const value = e.target.value;
-    
+
     if (value === 'create_new') {
       // Create new lesson
       try {
@@ -290,12 +290,12 @@ export default function AddMaterialFormSimplified({
           description: 'Auto-created lesson for new materials',
           sequence_order: nextLessonNumber
         });
-        
+
         const newLesson = response.data;
-        setLessons(prev => [...prev, newLesson].sort((a, b) => 
+        setLessons(prev => [...prev, newLesson].sort((a, b) =>
           (a.sequence_order || 0) - (b.sequence_order || 0)
         ));
-        
+
         setFormData(prev => ({
           ...prev,
           lesson: newLesson.id,
@@ -323,18 +323,18 @@ export default function AddMaterialFormSimplified({
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.subject || !formData.chapter || !formData.lesson || formData.files.length === 0) {
       alert('Please fill in all required fields and select at least one file.');
       return;
     }
-    
+
     setUploading(true);
     setStep('upload');
-    
+
     try {
       const uploadFormData = new FormData();
-      
+
       // Add files
       formData.files.forEach((file, index) => {
         uploadFormData.append('files', file);
@@ -349,22 +349,22 @@ export default function AddMaterialFormSimplified({
           enableAiAnalysis: formData.enableAiAnalysis
         }));
       });
-      
+
       uploadFormData.append('child_id', selectedChild.id);
       uploadFormData.append('fileCount', formData.files.length);
-      
+
       // Always add fields for AI analysis since file uploads require AI processing
       uploadFormData.append('child_subject_id', formData.subjectId);
       uploadFormData.append('user_content_type', formData.materialType);
-      
+
       // Always use AI analysis endpoint for file uploads
       const endpoint = '/materials/upload';
-      console.log('Using AI analysis endpoint for file upload:', endpoint);
-      
+      // Using AI analysis endpoint for file upload
+
       const response = await api.post(endpoint, uploadFormData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+
       // AI analysis endpoint returns { lesson_json: ... }
       if (response.data.lesson_json) {
         setAnalysisResults({
@@ -396,19 +396,18 @@ export default function AddMaterialFormSimplified({
           content_type: analysisResults.aiAnalysis.content_type || formData.materialType,
           lesson_json: JSON.stringify(analysisResults.aiAnalysis),
           due_date: formData.dueDate,
-          material_relationship: formData.materialType === 'lesson' ? null : 
+          material_relationship: formData.materialType === 'lesson' ? null :
             (formData.materialType === 'worksheet' ? 'worksheet_for' :
              formData.materialType === 'quiz' || formData.materialType === 'test' ? 'assignment_for' : 'supplement_for'),
           is_primary_lesson: formData.materialType === 'lesson'
         };
 
         const response = await api.post('/materials/save', saveData);
-        
+
         if (response.data) {
-          console.log('AI-analyzed material saved successfully');
-        }
+          }
       }
-      
+
       await onComplete();
       onClose();
     } catch (error) {
@@ -539,7 +538,7 @@ export default function AddMaterialFormSimplified({
               <div>
                 <div className="text-sm font-medium text-blue-900">AI Analysis Enabled</div>
                 <p className="text-xs text-blue-700 mt-1">
-                  AI will analyze your materials and suggest learning objectives, difficulty level, and time estimates. 
+                  AI will analyze your materials and suggest learning objectives, difficulty level, and time estimates.
                   You can review and approve the analysis before saving.
                 </p>
               </div>
@@ -612,7 +611,7 @@ export default function AddMaterialFormSimplified({
           <p className="text-sm text-gray-600 mb-6">
             AI has analyzed your materials. Review the analysis below and approve to save.
           </p>
-          
+
           {/* Show AI Analysis Results */}
           {analysisResults.aiAnalysis && (
             <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">

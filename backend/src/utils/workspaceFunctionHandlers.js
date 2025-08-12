@@ -9,7 +9,7 @@ class WorkspaceFunctionHandlers {
   }
 
   async handleCreateCreativeWritingToolkit(args, childId) {
-    
+
     try {
       this.sessionId = `creative-writing-${Date.now()}-${childId}`;
     } catch (error) {
@@ -43,7 +43,7 @@ class WorkspaceFunctionHandlers {
         }))
       })) : [],
       progress: {
-        total_questions: args.brainstorming_questions.length + 
+        total_questions: args.brainstorming_questions.length +
           (args.planning_sections ? args.planning_sections.reduce((sum, section) => sum + section.prompts.length, 0) : 0),
         completed: 0,
         phase: 'brainstorming' // brainstorming, planning, ready_to_write
@@ -52,7 +52,7 @@ class WorkspaceFunctionHandlers {
     };
 
     this.currentWorkspace = toolkit;
-    
+
     return {
       action: 'create_workspace',
       workspace: toolkit,
@@ -61,7 +61,7 @@ class WorkspaceFunctionHandlers {
   }
 
   async handleCreateMathWorkspace(args, childId) {
-    
+
     // Start new practice session
     try {
       // Create a simple session ID for tracking
@@ -98,7 +98,7 @@ class WorkspaceFunctionHandlers {
     };
 
     this.currentWorkspace = workspace;
-    
+
     return {
       action: 'create_workspace',
       workspace: workspace,
@@ -114,12 +114,11 @@ class WorkspaceFunctionHandlers {
       };
     }
 
-
     const newProblems = args.problems.map((problem, index) => ({
       id: `problem-${Date.now()}-${index}`,
       index: this.currentWorkspace.problems.length + index,
       text: problem.text,
-      type: problem.type, 
+      type: problem.type,
       hint: problem.hint,
       difficulty: problem.difficulty || 'medium',
       status: 'pending',
@@ -173,7 +172,7 @@ class WorkspaceFunctionHandlers {
         newStats.lifetime_correct = currentStats.lifetime_correct + 1;
         newStats.current_streak = currentStats.current_streak + 1;
         newStats.weekly_correct = newStats.weekly_correct + 1;
-        
+
         // Update best streak if current streak is better
         if (newStats.current_streak > currentStats.best_streak) {
           newStats.best_streak = newStats.current_streak;
@@ -220,7 +219,6 @@ class WorkspaceFunctionHandlers {
       return { action: 'error', message: 'Problem not found' };
     }
 
-
     // Update problem status
     const wasCorrect = problem.status === 'correct';
     problem.status = 'correct';
@@ -247,7 +245,6 @@ class WorkspaceFunctionHandlers {
       return { action: 'error', message: 'Problem not found' };
     }
 
-
     // Update problem status
     problem.status = 'incorrect';
     problem.feedback = args.guidance || 'Not quite right. Try again! 💪';
@@ -264,7 +261,7 @@ class WorkspaceFunctionHandlers {
   }
 
   async handleClearWorkspace(args, childId) {
-    
+
     const oldWorkspace = this.currentWorkspace;
     this.currentWorkspace = null;
     this.sessionId = null;
@@ -279,7 +276,7 @@ class WorkspaceFunctionHandlers {
 
   // NEW: Subject-agnostic workspace creation
   async handleCreateSubjectWorkspace(args, childId) {
-    
+
     // Start new practice session
     try {
       this.sessionId = `${args.subject}-${Date.now()}-${childId}`;
@@ -322,7 +319,7 @@ class WorkspaceFunctionHandlers {
     };
 
     this.currentWorkspace = workspace;
-    
+
     return {
       action: 'create_workspace',
       workspace: workspace,
@@ -339,12 +336,11 @@ class WorkspaceFunctionHandlers {
       };
     }
 
-
     const newContent = args.content.map((item, index) => ({
       id: `content-${Date.now()}-${index}`,
       index: this.currentWorkspace.content.length + index,
       text: item.text,
-      type: item.type, 
+      type: item.type,
       hint: item.hint,
       difficulty: item.difficulty || 'medium',
       evaluation_criteria: item.evaluation_criteria || { type: 'binary' },
@@ -381,21 +377,20 @@ class WorkspaceFunctionHandlers {
     // Support both new 'content' array and legacy 'problems' array
     const contentArray = this.currentWorkspace.content || this.currentWorkspace.problems;
     const item = contentArray[args.content_index];
-    
+
     if (!item) {
       return { action: 'error', message: 'Content item not found' };
     }
 
-
     // Update item status and feedback
     item.status = args.evaluation_result;
     item.feedback = args.feedback;
-    
+
     // Handle different evaluation types
     if (args.rubric_scores) {
       item.rubric_scores = args.rubric_scores;
     }
-    
+
     if (args.evidence_quality) {
       item.evidence_quality = args.evidence_quality;
     }

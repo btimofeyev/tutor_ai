@@ -2,14 +2,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
-import { 
-  FiUser, 
-  FiArrowLeft, 
-  FiLogIn, 
-  FiCheckCircle, 
-  FiXCircle, 
-  FiLoader, 
-  FiGrid, 
+import {
+  FiUser,
+  FiArrowLeft,
+  FiLogIn,
+  FiCheckCircle,
+  FiXCircle,
+  FiLoader,
+  FiGrid,
   FiKey,
   FiArrowRight // For next button
 } from 'react-icons/fi';
@@ -47,7 +47,7 @@ export default function KlioLoginPage() {
 
     const savedUsername = localStorage.getItem('klio_username');
     const savedAvatarData = localStorage.getItem('klio_avatar');
-    
+
     if (savedUsername) {
       setUsername(savedUsername);
       setRememberUsername(true);
@@ -55,7 +55,7 @@ export default function KlioLoginPage() {
         try {
           const parsedAvatar = JSON.parse(savedAvatarData);
           setSelectedAvatar(parsedAvatar);
-          setShowPinPad(true); 
+          setShowPinPad(true);
         } catch (e) {
           console.error("Failed to parse saved avatar:", e);
           localStorage.removeItem('klio_avatar'); // Clear corrupted data
@@ -84,7 +84,7 @@ export default function KlioLoginPage() {
     }
     setError('');
     setShowPinPad(true);
-    
+
     if (rememberUsername) {
       localStorage.setItem('klio_username', username);
       localStorage.setItem('klio_avatar', JSON.stringify(selectedAvatar));
@@ -138,7 +138,7 @@ export default function KlioLoginPage() {
 
       setWelcomeName(data.child.name || username); // Use username as fallback
       setShowSuccess(true);
-      
+
       setTimeout(() => {
         router.push('/chat');
       }, 2500);
@@ -205,8 +205,8 @@ export default function KlioLoginPage() {
                       transition-all duration-150 ease-in-out cursor-pointer
                       focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent-blue)]
                       ${avatar.color}
-                      ${selectedAvatar?.id === avatar.id 
-                        ? 'ring-2 ring-offset-white ring-[var(--accent-blue)] scale-110 shadow-md' 
+                      ${selectedAvatar?.id === avatar.id
+                        ? 'ring-2 ring-offset-white ring-[var(--accent-blue)] scale-110 shadow-md'
                         : 'hover:scale-105 hover:shadow-sm'
                       }
                     `}
@@ -246,7 +246,7 @@ export default function KlioLoginPage() {
                 Remember me
               </label>
             </div>
-            
+
             {error && (
               <div className="flex items-center p-3 bg-[var(--accent-red)]/20 border border-[var(--accent-red)] rounded-[var(--radius-md)] text-[var(--text-primary)]">
                 <FiXCircle className="mr-2 text-[var(--accent-red)] flex-shrink-0" />
@@ -274,7 +274,7 @@ export default function KlioLoginPage() {
               <p className="text-sm text-[var(--text-secondary)]">Signing in as</p>
               <p className="text-lg font-semibold text-[var(--text-primary)]">{username}</p>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-3 text-center flex items-center justify-center">
                 <FiKey className="mr-2 text-[var(--text-secondary)]" /> Enter 4-Digit PIN
@@ -285,7 +285,7 @@ export default function KlioLoginPage() {
                     key={i}
                     className={`w-12 h-14 sm:w-14 sm:h-16 border-2 rounded-lg flex items-center justify-center transition-all duration-150
                       ${pin.length > i ? 'bg-[var(--accent-blue)] border-[var(--accent-blue)]' : 'bg-[var(--background-card)] border-[var(--border-subtle)]'}
-                      ${error && pin.length === i && i < pin.length ? 'border-red-500 animate-shake-short' : ''} 
+                      ${error && pin.length === i && i < pin.length ? 'border-red-500 animate-shake-short' : ''}
                     `}
                   >
                     {pin.length > i && (
@@ -302,7 +302,7 @@ export default function KlioLoginPage() {
                 <span className="text-sm">{error}</span>
               </div>
             )}
-            
+
             <div id="pin-pad" className="grid grid-cols-3 gap-2 sm:gap-2.5">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
                 <button
@@ -340,7 +340,7 @@ export default function KlioLoginPage() {
                 ⌫
               </button>
             </div>
-            
+
             <button
               type="button"
               onClick={attemptLogin}

@@ -1,12 +1,13 @@
 // app/dashboard/components/EditMaterialModal.js
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Button from '../../../components/ui/Button';
 import MaterialAnalysisView from './MaterialAnalysisView';
-import { 
-  SparklesIcon, 
+import api from '../../../utils/api';
+import {
+  SparklesIcon,
   DocumentTextIcon,
-  XMarkIcon 
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 export default function EditMaterialModal({
@@ -20,19 +21,59 @@ export default function EditMaterialModal({
   lessonContainersForSubject = [],
   appContentTypes = [],
   appGradableContentTypes = [],
+  subjectId, // New prop to get custom categories for this subject
 }) {
   const [activeTab, setActiveTab] = useState('analysis');
-  
-  if (!editingLesson || !editForm) return null;
+  const [customCategories, setCustomCategories] = useState([]);
+
+  // Fetch custom categories when modal opens
+  const fetchCustomCategories = useCallback(async () => {
+    if (!subjectId) return;
+    try {
+      const response = await api.get(`/custom-categories/${subjectId}`);
+      setCustomCategories(response.data || []);
+    } catch (error) {
+      console.error('Error fetching custom categories:', error);
+    }
+  }, [subjectId]);
+
+  useEffect(() => {
+    if (editingLesson && subjectId) {
+      fetchCustomCategories();
+    }
+  }, [editingLesson, subjectId, fetchCustomCategories]);
+
+  // Create merged content types (standard + custom categories)
+  const allContentTypes = useMemo(() => {
+    const merged = [...appContentTypes];
+
+    // Add custom categories with unique identifier
+    customCategories.forEach(category => {
+      merged.push(`custom_${category.id}`);
+    });
+
+    return merged;
+  }, [appContentTypes, customCategories]);
+
+  // Format content type names for display
+  const formatContentTypeName = (contentType) => {
+    if (contentType.startsWith('custom_')) {
+      const categoryId = parseInt(contentType.replace('custom_', ''));
+      const category = customCategories.find(cat => cat.id === categoryId);
+      return category ? category.category_name : contentType;
+    }
+    return contentType.charAt(0).toUpperCase() + contentType.slice(1).replace(/_/g, ' ');
+  };
 
   // Parse lesson JSON for analysis view
   const analysisData = useMemo(() => {
+    if (!editForm?.lesson_json_string) return {};
     try {
       return JSON.parse(editForm.lesson_json_string || '{}');
     } catch {
       return {};
     }
-  }, [editForm.lesson_json_string]);
+  }, [editForm?.lesson_json_string]);
 
   // Check if material has rich AI analysis
   const hasRichAnalysis = useMemo(() => {
@@ -46,18 +87,20 @@ export default function EditMaterialModal({
     );
   }, [analysisData]);
 
+  if (!editingLesson || !editForm) return null;
+
   // Handle AI analysis data changes
   const handleAnalysisChange = (fieldName, newValue) => {
     try {
       const currentJson = { ...analysisData };
       currentJson[fieldName] = newValue;
-      onFormChange({ 
-        target: { 
-          name: 'lesson_json_string', 
-          value: JSON.stringify(currentJson, null, 2) 
-        } 
+      onFormChange({
+        target: {
+          name: 'lesson_json_string',
+          value: JSON.stringify(currentJson, null, 2)
+        }
       });
-      
+
       // Also update the title field if title was changed
       if (fieldName === 'title') {
         onFormChange({ target: { name: 'title', value: newValue } });
@@ -95,8 +138,8 @@ export default function EditMaterialModal({
               {editingLesson.title}
             </span>
           </div>
-          <button 
-            className="text-gray-400 hover:text-black text-3xl p-1" 
+          <button
+            className="text-gray-400 hover:text-black text-3xl p-1"
             onClick={onClose}
             title="Close"
           >
@@ -152,33 +195,48 @@ export default function EditMaterialModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="edit-title" className="block text-sm font-medium text-gray-700 mb-1">Title*</label>
-                  <input 
-                    type="text" 
-                    name="title" 
-                    id="edit-title" 
-                    value={editForm.title || ''} 
-                    onChange={onFormChange} 
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                    required 
+                  <input
+                    type="text"
+                    name="title"
+                    id="edit-title"
+                    value={editForm.title || ''}
+                    onChange={onFormChange}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
                   />
                 </div>
 
                 <div>
                   <label htmlFor="edit-content_type" className="block text-sm font-medium text-gray-700 mb-1">Content Type*</label>
-                  <select 
-                    name="content_type" 
-                    id="edit-content_type" 
-                    value={editForm.content_type || ''} 
-                    onChange={onFormChange} 
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                  <select
+                    name="content_type"
+                    id="edit-content_type"
+                    value={editForm.content_type || ''}
+                    onChange={onFormChange}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   >
                     <option value="">Select Content Type</option>
+                    {/* Standard content types */}
                     {appContentTypes.map((type) => (
                       <option key={type} value={type}>
-                        {type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ')}
+                        {formatContentTypeName(type)}
                       </option>
                     ))}
+                    {/* Custom categories */}
+                    {customCategories.length > 0 && (
+                      <optgroup label="Custom Categories">
+                        {customCategories.map((category) => (
+                          <option
+                            key={`custom_${category.id}`}
+                            value={`custom_${category.id}`}
+                            className="text-purple-600"
+                          >
+                            📝 {category.category_name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
               </div>
@@ -186,24 +244,24 @@ export default function EditMaterialModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="edit-due_date" className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-                  <input 
-                    type="date" 
-                    name="due_date" 
-                    id="edit-due_date" 
-                    value={editForm.due_date || ''} 
-                    onChange={onFormChange} 
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                  <input
+                    type="date"
+                    name="due_date"
+                    id="edit-due_date"
+                    value={editForm.due_date || ''}
+                    onChange={onFormChange}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
 
                 <div>
                   <label htmlFor="edit-lesson_id" className="block text-sm font-medium text-gray-700 mb-1">Lesson Container*</label>
-                  <select 
-                    name="lesson_id" 
-                    id="edit-lesson_id" 
-                    value={editForm.lesson_id || ''} 
-                    onChange={onFormChange} 
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                  <select
+                    name="lesson_id"
+                    id="edit-lesson_id"
+                    value={editForm.lesson_id || ''}
+                    onChange={onFormChange}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   >
                     <option value="">Select Lesson Container</option>
@@ -217,7 +275,7 @@ export default function EditMaterialModal({
               </div>
 
               {/* Grading Section */}
-              {appGradableContentTypes.includes(editForm.content_type) && (
+              {(appGradableContentTypes.includes(editForm.content_type) || editForm.content_type?.startsWith('custom_')) && (
                 <div className="p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
                   <h3 className="text-lg font-semibold text-gray-800 flex items-center">
                     📊 Grading & Assessment
@@ -225,37 +283,37 @@ export default function EditMaterialModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label htmlFor="edit-grade_value" className="block text-sm font-medium text-gray-600 mb-1">Current Grade</label>
-                      <input 
-                        type="text" 
-                        name="grade_value" 
-                        id="edit-grade_value" 
-                        value={editForm.grade_value || ''} 
-                        onChange={onFormChange} 
-                        placeholder="e.g., A, 95, 8.5" 
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      <input
+                        type="text"
+                        name="grade_value"
+                        id="edit-grade_value"
+                        value={editForm.grade_value || ''}
+                        onChange={onFormChange}
+                        placeholder="e.g., A, 95, 8.5"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                     <div>
                       <label htmlFor="edit-grade_max_value" className="block text-sm font-medium text-gray-600 mb-1">Max Score</label>
-                      <input 
-                        type="text" 
-                        name="grade_max_value" 
-                        id="edit-grade_max_value" 
-                        value={editForm.grade_max_value || ''} 
-                        onChange={onFormChange} 
-                        placeholder="e.g., 100, 10" 
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      <input
+                        type="text"
+                        name="grade_max_value"
+                        id="edit-grade_max_value"
+                        value={editForm.grade_max_value || ''}
+                        onChange={onFormChange}
+                        placeholder="e.g., 100, 10"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                   </div>
                   <div>
                     <label htmlFor="edit-grading_notes" className="block text-sm font-medium text-gray-600 mb-1">Grading Notes</label>
-                    <textarea 
-                      name="grading_notes" 
-                      id="edit-grading_notes" 
-                      value={editForm.grading_notes || ''} 
-                      onChange={onFormChange} 
-                      rows="3" 
+                    <textarea
+                      name="grading_notes"
+                      id="edit-grading_notes"
+                      value={editForm.grading_notes || ''}
+                      onChange={onFormChange}
+                      rows="3"
                       placeholder="Notes about performance, areas for improvement, etc."
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
@@ -271,24 +329,24 @@ export default function EditMaterialModal({
                     <p className="text-sm text-gray-600 mt-1">Mark this material as completed</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      name="completed_at" 
-                      id="edit-completed_toggle" 
-                      checked={!!editForm.completed_at} 
-                      onChange={e => onFormChange({ 
-                        target: { 
-                          name: 'completed_at', 
-                          value: e.target.checked ? new Date().toISOString() : null 
-                        } 
-                      })} 
+                    <input
+                      type="checkbox"
+                      name="completed_at"
+                      id="edit-completed_toggle"
+                      checked={!!editForm.completed_at}
+                      onChange={e => onFormChange({
+                        target: {
+                          name: 'completed_at',
+                          value: e.target.checked ? new Date().toISOString() : null
+                        }
+                      })}
                       className="sr-only"
                     />
                     <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${!!editForm.completed_at ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
                   </label>
                 </div>
               </div>
-              
+
               {/* Advanced - Raw Data */}
               <details className="border border-gray-200 rounded-lg">
                 <summary className="cursor-pointer p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
@@ -296,13 +354,13 @@ export default function EditMaterialModal({
                 </summary>
                 <div className="p-4 border-t">
                   <p className="text-sm text-gray-600 mb-2">
-                    Direct edit of the material's JSON data. Be careful when modifying this.
+                    Direct edit of the material&apos;s JSON data. Be careful when modifying this.
                   </p>
-                  <textarea 
-                    name="lesson_json_string" 
-                    value={editForm.lesson_json_string || ''} 
-                    onChange={onFormChange} 
-                    rows="6" 
+                  <textarea
+                    name="lesson_json_string"
+                    value={editForm.lesson_json_string || ''}
+                    onChange={onFormChange}
+                    rows="6"
                     className="w-full border border-gray-300 rounded-lg p-3 font-mono text-xs bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="JSON data will appear here..."
                   />
@@ -328,9 +386,9 @@ export default function EditMaterialModal({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-              type="button" 
-              variant="primary" 
+            <Button
+              type="button"
+              variant="primary"
               disabled={isSaving}
               onClick={onSave}
             >

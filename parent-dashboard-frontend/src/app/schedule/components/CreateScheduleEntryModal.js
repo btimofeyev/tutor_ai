@@ -8,10 +8,10 @@ const formInputStyles = "block w-full border-2 border-gray-300 focus:outline-non
 const formLabelStyles = "block text-sm font-medium text-gray-900 mb-1";
 const stepLabelStyles = "text-sm font-medium text-gray-600 mb-1 block";
 
-export default function CreateScheduleEntryModal({ 
-  isOpen, 
-  onClose, 
-  onSave, 
+export default function CreateScheduleEntryModal({
+  isOpen,
+  onClose,
+  onSave,
   selectedSlot,
   childSubjects = [],
   materials = [],
@@ -42,7 +42,7 @@ export default function CreateScheduleEntryModal({
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [availableUnits, setAvailableUnits] = useState([]);
   const [availableLessons, setAvailableLessons] = useState([]);
-  
+
   // Material type filter state
   const [showAllMaterialTypes, setShowAllMaterialTypes] = useState(false);
 
@@ -51,7 +51,7 @@ export default function CreateScheduleEntryModal({
     if (isOpen && selectedSlot) {
       // Auto-select child if only one child is selected, otherwise require selection
       const defaultChildId = selectedChildrenIds.length === 1 ? selectedChildrenIds[0] : '';
-      
+
       setFormData({
         child_id: defaultChildId,
         subject_name: '',
@@ -63,7 +63,7 @@ export default function CreateScheduleEntryModal({
         is_material_based: false
       });
       setErrors({});
-      
+
       // Reset hierarchical selection state to prevent null value errors
       setSelectedSubjectId('');
       setSelectedUnitId('');
@@ -76,7 +76,7 @@ export default function CreateScheduleEntryModal({
   // Handle input changes
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (name === 'is_material_based') {
       setFormData(prev => ({
         ...prev,
@@ -85,7 +85,7 @@ export default function CreateScheduleEntryModal({
         material_id: checked ? prev.material_id : '',
         subject_name: checked ? '' : prev.subject_name
       }));
-      
+
       // Reset hierarchical selection when switching modes
       if (checked) {
         setSelectedSubjectId('');
@@ -104,31 +104,31 @@ export default function CreateScheduleEntryModal({
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
-    
+
     // Re-check conflicts when time-related fields change
     if (name === 'scheduled_date' || name === 'start_time' || name === 'duration_minutes') {
       // Clear existing conflict error first
       setErrors(prev => ({ ...prev, time_conflict: '' }));
-      
+
       // Check for conflicts with new values (after state update)
       setTimeout(() => {
         const newValue = type === 'number' ? parseInt(value) || 0 : value;
         const updatedFormData = { ...formData, [name]: newValue };
-        
+
         if (updatedFormData.scheduled_date && updatedFormData.start_time) {
           const conflicts = checkTimeConflicts(
-            updatedFormData.scheduled_date, 
-            updatedFormData.start_time, 
+            updatedFormData.scheduled_date,
+            updatedFormData.start_time,
             updatedFormData.duration_minutes
           );
-          
+
           if (conflicts.length > 0) {
             const conflictDetails = conflicts.map(conflict => {
               const childName = allChildren.find(c => c.id === conflict.child_id)?.name || 'Unknown Child';
               const subject = conflict.base_subject_name || conflict.subject_name || conflict.title || 'Study';
               return `${subject} (${childName})`;
             }).join(', ');
-            
+
             setErrors(prev => ({ ...prev, time_conflict: `Cannot schedule - time conflicts with: ${conflictDetails}` }));
           }
         }
@@ -141,16 +141,16 @@ export default function CreateScheduleEntryModal({
     setSelectedSubjectId(subjectId);
     setSelectedUnitId('');
     setFormData(prev => ({ ...prev, material_id: '' }));
-    
+
     // Find the subject
     const subject = childSubjects.find(s => s.child_subject_id === subjectId);
     if (subject) {
       setFormData(prev => ({ ...prev, subject_name: subject.name }));
-      
+
       // Get units for this subject
       const units = unitsBySubject[subjectId] || [];
       setAvailableUnits(units);
-      
+
       // Get lessons for this subject and filter out completed/scheduled ones
       const allLessons = lessonsBySubject[subjectId] || [];
       const availableLessons = filterAvailableLessons(allLessons);
@@ -162,32 +162,28 @@ export default function CreateScheduleEntryModal({
   const handleUnitSelection = (unitId) => {
     setSelectedUnitId(unitId);
     setFormData(prev => ({ ...prev, material_id: '' }));
-    
-    
+
     if (selectedSubjectId) {
       const allLessons = lessonsBySubject[selectedSubjectId] || [];
-      
+
       if (unitId) {
         // Get lesson containers for this unit
         const lessonContainersForUnit = lessonsByUnit[unitId] || [];
-        
+
         // Extract lesson container IDs
         const lessonContainerIds = lessonContainersForUnit.map(container => container.id);
-        
+
         // Filter materials that belong to these lesson containers
         const unitLessons = allLessons.filter(lesson => {
           // Check if lesson belongs to a lesson container in this unit
           const belongsToUnit = lesson.lesson_id && lessonContainerIds.includes(lesson.lesson_id);
-          console.log(`Lesson "${lesson.title}" belongs to unit:`, belongsToUnit, 'lesson_id:', lesson.lesson_id);
           return belongsToUnit;
         });
-        
-        console.log('Filtered lessons for unit:', unitLessons);
+
         const availableUnitLessons = filterAvailableLessons(unitLessons);
         setAvailableLessons(availableUnitLessons);
       } else {
         // Show all available lessons for the subject if no unit is selected
-        console.log('No unit selected, showing all available lessons');
         const availableLessons = filterAvailableLessons(allLessons);
         setAvailableLessons(availableLessons);
       }
@@ -196,27 +192,22 @@ export default function CreateScheduleEntryModal({
 
   // Filter lessons to exclude completed ones only (temporarily disable scheduling check)
   const filterAvailableLessons = (lessons) => {
-    console.log('Filtering lessons - only excluding completed ones for now');
-    
     return lessons.filter(lesson => {
       // Only exclude completed lessons for now
       if (lesson.completed_at && lesson.completed_at !== null && lesson.completed_at !== '') {
-        console.log(`Excluding completed lesson: ${lesson.title}`);
         return false;
       }
-      
+
       // Filter by content type unless showing all types
       if (!showAllMaterialTypes) {
-        const isLesson = lesson.content_type === 'lesson' || 
-                        lesson.content_type === 'reading' || 
+        const isLesson = lesson.content_type === 'lesson' ||
+                        lesson.content_type === 'reading' ||
                         lesson.content_type === 'video';
         if (!isLesson) {
-          console.log(`Excluding non-lesson material: ${lesson.title} (type: ${lesson.content_type})`);
           return false;
         }
       }
-      
-      console.log(`Including lesson: ${lesson.title}`);
+
       return true;
     });
   };
@@ -233,28 +224,16 @@ export default function CreateScheduleEntryModal({
   // Handle material selection
   const handleMaterialChange = (e) => {
     const materialId = e.target.value;
-    
-    console.log('=== MATERIAL SELECTION DEBUG ===');
-    console.log('Selected dropdown value (material ID):', materialId);
-    
+
     // Find the material from the available lessons
     const selectedMaterial = availableLessons.find(m => m.id === materialId);
-    console.log('Material found in availableLessons:', selectedMaterial);
-    
-    // Show all available lessons for comparison
-    console.log('All available lessons:');
-    availableLessons.forEach((lesson, index) => {
-      console.log(`  [${index}] ID: ${lesson.id} | Title: ${lesson.title} | Selected: ${lesson.id === materialId ? 'YES' : 'no'}`);
-    });
-    
+
     // Additional validation
     if (materialId && !selectedMaterial) {
       console.error('ERROR: Selected material ID not found in availableLessons array!');
       console.error('This could indicate a data synchronization issue.');
     }
-    
-    console.log('=== END MATERIAL SELECTION DEBUG ===');
-    
+
     setFormData(prev => ({
       ...prev,
       material_id: materialId,
@@ -266,16 +245,16 @@ export default function CreateScheduleEntryModal({
   const checkTimeConflicts = (date, time, duration) => {
     const targetStart = new Date(`${date}T${time}`);
     const targetEnd = new Date(targetStart.getTime() + duration * 60000);
-    
+
     return calendarEvents.filter(event => {
       const eventDate = event.date || format(new Date(event.start), 'yyyy-MM-dd');
       if (eventDate !== date) return false;
-      
+
       const eventTime = event.startTime || event.start_time || format(new Date(event.start), 'HH:mm');
       const eventStart = new Date(`${eventDate}T${eventTime}`);
       const eventDuration = event.duration || event.duration_minutes || 30;
       const eventEnd = new Date(eventStart.getTime() + eventDuration * 60000);
-      
+
       // Check for overlap
       return targetStart < eventEnd && targetEnd > eventStart;
     });
@@ -321,7 +300,7 @@ export default function CreateScheduleEntryModal({
           const subject = conflict.base_subject_name || conflict.subject_name || conflict.title || 'Study';
           return `${subject} (${childName})`;
         }).join(', ');
-        
+
         newErrors.time_conflict = `Cannot schedule - time conflicts with: ${conflictDetails}`;
       }
     }
@@ -333,7 +312,7 @@ export default function CreateScheduleEntryModal({
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -346,20 +325,13 @@ export default function CreateScheduleEntryModal({
         duration_minutes: parseInt(formData.duration_minutes),
         child_id: formData.child_id || selectedChildrenIds[0]
       };
-      
+
       // Debug: Log what's being submitted
       const selectedMaterial = availableLessons.find(m => m.id === formData.material_id);
-      console.log('=== SUBMITTING SCHEDULE ENTRY ===');
-      console.log('Form data:', formData);
-      console.log('Cleaned data:', cleanedData);
-      console.log('Selected material from dropdown:', selectedMaterial);
-      console.log('Available lessons:', availableLessons.map(l => ({ id: l.id, title: l.title })));
-      console.log('====================================');
-      
       // Determine target child ID - use form selection or default to first selected child
       const targetChildId = cleanedData.child_id;
       const result = await onSave(cleanedData, targetChildId);
-      
+
       if (result.success) {
         onClose();
       } else {
@@ -518,7 +490,7 @@ export default function CreateScheduleEntryModal({
                   <label className={formLabelStyles}>
                     Select Lesson/Assignment
                   </label>
-                  
+
                   {childSubjects.length === 0 ? (
                     <div className="text-sm text-[var(--text-tertiary)] italic p-3 bg-[var(--background-main)] rounded border border-[var(--border-subtle)]">
                       No subjects assigned yet. Add subjects to your curriculum first, or uncheck the box above to schedule general study time.
@@ -584,8 +556,8 @@ export default function CreateScheduleEntryModal({
                           </div>
                           {availableLessons.length === 0 ? (
                             <div className="text-sm text-[var(--text-tertiary)] italic p-3 bg-[var(--background-main)] rounded border border-[var(--border-subtle)]">
-                              {selectedSubjectId && (lessonsBySubject[selectedSubjectId] || []).length > 0 ? 
-                                showAllMaterialTypes ? 
+                              {selectedSubjectId && (lessonsBySubject[selectedSubjectId] || []).length > 0 ?
+                                showAllMaterialTypes ?
                                   'All materials for this subject have been completed or are already scheduled.' :
                                   'All lessons for this subject have been completed or are already scheduled. Try enabling "Show assignments & reviews" above.' :
                                 `No ${showAllMaterialTypes ? 'materials' : 'lessons'} found for this ${selectedUnitId ? 'unit' : 'subject'}. Upload materials or select a different option.`
@@ -607,33 +579,33 @@ export default function CreateScheduleEntryModal({
                                   const typeA = typeOrder[a.content_type] || 99;
                                   const typeB = typeOrder[b.content_type] || 99;
                                   if (typeA !== typeB) return typeA - typeB;
-                                  
+
                                   // Sort by created_at if available, otherwise by title
                                   if (a.created_at && b.created_at) {
                                     return new Date(a.created_at) - new Date(b.created_at);
                                   }
-                                  
+
                                   const titleA = a.title || '';
                                   const titleB = b.title || '';
                                   return titleA.localeCompare(titleB);
                                 })
                                 .map((lesson, index) => {
-                                  const typeLabel = lesson.content_type ? 
-                                    lesson.content_type.charAt(0).toUpperCase() + lesson.content_type.slice(1).replace(/_/g, ' ') : 
+                                  const typeLabel = lesson.content_type ?
+                                    lesson.content_type.charAt(0).toUpperCase() + lesson.content_type.slice(1).replace(/_/g, ' ') :
                                     'Unknown';
-                                  
+
                                   // Show actual lesson title with number for clarity
                                   const lessonNumber = index + 1;
                                   let displayTitle = lesson.title || 'Untitled';
-                                  
+
                                   // Clean up the title and truncate if too long
                                   displayTitle = displayTitle.replace(/\(\)$/, '');
                                   if (displayTitle.length > 30) {
                                     displayTitle = displayTitle.substring(0, 27) + '...';
                                   }
-                                  
+
                                   const fullDisplayTitle = `${lessonNumber}. ${displayTitle}`;
-                                  
+
                                   return (
                                     <option key={lesson.id} value={lesson.id}>
                                       {fullDisplayTitle} • {typeLabel}
@@ -646,7 +618,7 @@ export default function CreateScheduleEntryModal({
                       )}
                     </div>
                   )}
-                  
+
                   {errors.material_id && (
                     <p className="text-red-600 text-xs mt-1">{errors.material_id}</p>
                   )}

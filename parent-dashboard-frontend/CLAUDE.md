@@ -249,6 +249,181 @@ npm run db:status
 - Advanced analytics dashboard
 - Mobile app development
 
+## Playwright MCP Integration
+
+### Overview
+The Playwright MCP (Model Context Protocol) server provides browser automation capabilities for testing and interacting with the parent dashboard. It uses Playwright's accessibility tree instead of screenshots, making it fast and LLM-friendly.
+
+### Installation & Configuration
+
+#### Basic Setup
+Create an MCP configuration file (already created at `/home/ben/Desktop/tutor_ai/mcp-config.json`):
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--headless",
+        "--browser=chromium",
+        "--output-dir=./playwright-output",
+        "--save-trace",
+        "--viewport-size=1280,720"
+      ]
+    }
+  }
+}
+```
+
+#### Starting the Server
+```bash
+# Regular mode (with display)
+./start-playwright-mcp.sh
+
+# Standalone mode (headless, on port 8931)
+./start-playwright-mcp.sh standalone
+```
+
+### Available Tools
+
+#### Core Navigation & Interaction
+- `browser_navigate` - Navigate to URLs
+- `browser_snapshot` - Get accessibility tree snapshot
+- `browser_click` - Click elements
+- `browser_type` - Type text into inputs
+- `browser_select_option` - Select dropdown options
+- `browser_take_screenshot` - Capture screenshots
+
+#### Wait & Verification
+- `browser_wait_for` - Wait for text/time
+- `browser_console_messages` - Get console logs
+- `browser_network_requests` - View network activity
+
+#### Advanced Features
+- `browser_evaluate` - Run JavaScript
+- `browser_file_upload` - Upload files
+- `browser_handle_dialog` - Handle alerts/prompts
+
+### Testing the Parent Dashboard
+
+#### 1. Login Flow
+```javascript
+// Navigate to login
+await browser_navigate({ url: "http://localhost:3000/login" });
+
+// Fill credentials
+await browser_type({
+  element: "Email input",
+  ref: "input[type='email']",
+  text: "parent@example.com"
+});
+
+await browser_type({
+  element: "Password input",
+  ref: "input[type='password']",
+  text: "password123"
+});
+
+// Submit
+await browser_click({
+  element: "Login button",
+  ref: "button[type='submit']"
+});
+```
+
+#### 2. Subject Card Interaction
+```javascript
+// Expand collapsed subject card (default state)
+await browser_click({
+  element: "Mathematics subject header",
+  ref: "button[class*='flex-1'][class*='text-left']"
+});
+
+// Navigate to subject detail
+await browser_click({
+  element: "View All link",
+  ref: "a[href*='/subject/']"
+});
+```
+
+#### 3. Material Management
+```javascript
+// Mark material complete
+await browser_click({
+  element: "Complete checkbox",
+  ref: "button[title*='Mark as complete']"
+});
+
+// Handle grade modal for gradable items
+if (/* grade modal appears */) {
+  await browser_type({
+    element: "Score input",
+    ref: "input#score-input",
+    text: "8"
+  });
+  
+  await browser_type({
+    element: "Total input",
+    ref: "input#total-input",
+    text: "10"
+  });
+  
+  await browser_click({
+    element: "Submit grade",
+    ref: "button[type='submit']"
+  });
+}
+```
+
+#### 4. Testing Needs Grading Section
+```javascript
+// Find items needing grades
+const snapshot = await browser_snapshot();
+if (snapshot.includes("Needs Grading")) {
+  // Click grade button
+  await browser_click({
+    element: "Grade button",
+    ref: "button:has-text('Grade')"
+  });
+  
+  // Enter grade...
+}
+```
+
+### Best Practices
+
+1. **Always use `browser_snapshot`** before interactions to understand page structure
+2. **Use meaningful element descriptions** for permission clarity
+3. **Handle async operations** with appropriate waits
+4. **Save traces** for debugging failed tests
+5. **Use headless mode** for CI/CD environments
+
+### Troubleshooting
+
+#### Browser Not Found
+```bash
+npx @playwright/mcp@latest browser_install
+```
+
+#### Permission Errors
+- Ensure `--allowed-origins` includes your dev server URLs
+- Check file paths are absolute for uploads
+
+#### Debugging Failed Tests
+1. Enable trace saving: `--save-trace`
+2. Take screenshots on errors
+3. Check console messages: `browser_console_messages`
+4. Review network requests: `browser_network_requests`
+
+### Example Test Suite
+See `/home/ben/Desktop/tutor_ai/test-dashboard-with-playwright.js` for a complete test suite example covering:
+- Login flow
+- Subject card interactions
+- Material completion
+- Grade entry
+- Adding new materials
+
 ---
 
 *This file serves as a comprehensive reference for the Tutor AI parent dashboard system. Update it as features evolve.*

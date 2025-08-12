@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { 
+import {
     BookOpenIcon,
     DocumentIcon,
     ClipboardDocumentListIcon,
@@ -17,7 +17,7 @@ const MaterialTypeIcon = ({ type, isPrimary }) => {
     if (isPrimary) {
         return <BookOpenIcon className="h-4 w-4 text-blue-600" />;
     }
-    
+
     switch (type) {
         case 'worksheet_for':
             return <ClipboardDocumentListIcon className="h-4 w-4 text-green-600" />;
@@ -32,7 +32,7 @@ const MaterialTypeIcon = ({ type, isPrimary }) => {
 
 const MaterialTypeLabel = ({ type, isPrimary }) => {
     if (isPrimary) return '📄 Primary Lesson';
-    
+
     switch (type) {
         case 'worksheet_for':
             return '📋 Assignment';
@@ -59,7 +59,7 @@ export default function LessonGroupedMaterials({
             type: typeof onOpenEditModal
         });
     }
-    
+
     const [groupedMaterials, setGroupedMaterials] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -67,19 +67,12 @@ export default function LessonGroupedMaterials({
 
     useEffect(() => {
         if (!lessonContainer?.id) return;
-        
+
         const fetchGroupedMaterials = async () => {
             setLoading(true);
             setError(null);
             try {
-                console.log('Fetching materials for lesson container:', lessonContainer.id, lessonContainer.title);
                 const response = await api.get(`/materials/lesson/${lessonContainer.id}/grouped`);
-                console.log('Grouped materials response:', {
-                    lesson_id: lessonContainer.id,
-                    lesson_title: lessonContainer.title,
-                    materials: response.data.materials,
-                    total_materials: response.data.total_materials
-                });
                 setGroupedMaterials(response.data.materials);
             } catch (err) {
                 console.error('Error fetching grouped materials:', err);
@@ -121,10 +114,10 @@ export default function LessonGroupedMaterials({
         return null;
     }
 
-    const totalMaterials = (groupedMaterials.primary_lesson ? 1 : 0) + 
-                           groupedMaterials.worksheets.length + 
-                           groupedMaterials.assignments.length + 
-                           groupedMaterials.supplements.length + 
+    const totalMaterials = (groupedMaterials.primary_lesson ? 1 : 0) +
+                           groupedMaterials.worksheets.length +
+                           groupedMaterials.assignments.length +
+                           groupedMaterials.supplements.length +
                            groupedMaterials.other.length;
 
     if (totalMaterials === 0) {
@@ -141,7 +134,7 @@ export default function LessonGroupedMaterials({
 
     const renderMaterialGroup = (materials, groupTitle, typeKey) => {
         if (materials.length === 0) return null;
-        
+
         return (
             <div className="mb-3">
                 <div className="flex items-center mb-2">
@@ -206,13 +199,13 @@ export default function LessonGroupedMaterials({
 
                         {/* Worksheets */}
                         {renderMaterialGroup(groupedMaterials.worksheets, 'Assignments', 'worksheet_for')}
-                        
+
                         {/* Assignments */}
                         {renderMaterialGroup(groupedMaterials.assignments, 'Assignments', 'assignment_for')}
-                        
+
                         {/* Supplements */}
                         {renderMaterialGroup(groupedMaterials.supplements, 'Supplemental Materials', 'supplement_for')}
-                        
+
                         {/* Other Materials */}
                         {renderMaterialGroup(groupedMaterials.other, 'Other Materials', 'other')}
                     </div>

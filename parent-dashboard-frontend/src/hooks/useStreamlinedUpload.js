@@ -20,13 +20,13 @@ export function useStreamlinedUpload(childId, onComplete) {
 
     try {
       const formData = new FormData();
-      
+
       // Add files to FormData
       files.forEach((fileData, index) => {
         // Handle both file objects and processed file data
         const file = fileData.file || fileData;
         formData.append('files', file);
-        
+
         // Add metadata for each file
         const fileMetadata = {
           subject: fileData.subject || metadata.subject,
@@ -38,20 +38,20 @@ export function useStreamlinedUpload(childId, onComplete) {
           originalName: file.name,
           enableAiAnalysis: fileData.enableAiAnalysis || metadata.enableAiAnalysis || false
         };
-        
+
         formData.append(`metadata_${index}`, JSON.stringify(fileMetadata));
       });
 
       formData.append('child_id', childId);
       formData.append('fileCount', files.length);
-      
+
       // Add additional fields for AI analysis
       formData.append('child_subject_id', metadata.subjectId || files[0]?.subjectId);
       formData.append('user_content_type', metadata.materialType || files[0]?.materialType);
 
       // Always use AI analysis endpoint since quick-upload was removed
       const endpoint = '/materials/upload';
-      
+
       // Simulate progress updates
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => Math.min(prev + 10, 90));
@@ -82,7 +82,7 @@ export function useStreamlinedUpload(childId, onComplete) {
       const errorMessage = error.response?.data?.message || error.message || 'Failed to upload files. Please try again.';
       setError(errorMessage);
       showError(errorMessage);
-      
+
       return {
         success: false,
         error: errorMessage
@@ -111,15 +111,15 @@ export function useStreamlinedUpload(childId, onComplete) {
         ...analysisData,
         approved: true
       });
-      
+
       if (response.data) {
         showSuccess('Assignment saved successfully!');
-        
+
         // Call onComplete callback if provided
         if (onComplete) {
           await onComplete();
         }
-        
+
         return {
           success: true,
           data: response.data
@@ -132,7 +132,7 @@ export function useStreamlinedUpload(childId, onComplete) {
       const errorMessage = error.response?.data?.message || error.message || 'Failed to save analysis. Please try again.';
       setError(errorMessage);
       showError(errorMessage);
-      
+
       return {
         success: false,
         error: errorMessage

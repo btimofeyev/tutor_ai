@@ -54,13 +54,13 @@ export default function HomePage() {
         <h1 className="text-5xl sm:text-6xl font-bold mb-4">
           Hi! I&apos;m <span className="text-[var(--accent-blue)]">Klio</span>
         </h1>
-        
+
         <p className="text-xl sm:text-2xl text-[var(--text-secondary)] mb-10">
           Your AI Learning Friend
         </p>
 
         <div>
-          {/* 
+          {/*
             Assuming your global Button component is set up to use .btn-primary styles
             If not, the direct class approach below works.
           */}
@@ -69,10 +69,10 @@ export default function HomePage() {
             {/* <Button variant="primary" size="lg" className="text-xl sm:text-2xl px-10 sm:px-12 py-5 sm:py-6">
                 Let&apos;s Learn! 🎯
             </Button> */}
-            <button 
+            <button
               className="btn-primary text-xl sm:text-2xl px-10 sm:px-12 py-5 sm:py-6 rounded-[var(--radius-lg)]"
               // Add 3D effect classes if Button component usually adds them and you want them here:
-              // style={{ 
+              // style={{
               //   borderBottom: `4px solid var(--accent-blue-darker-for-border)`,
               //   boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               // }}

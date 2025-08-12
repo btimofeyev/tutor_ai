@@ -58,11 +58,11 @@ export function useDashboardHandlers({
       const baseName = modalManagement.newUnitNameModalState.trim();
       const existingUnits = childrenData.unitsBySubject[modalManagement.managingUnitsForSubject.id] || [];
       const existingUnitNames = existingUnits.map(u => u.name.toLowerCase());
-      
+
       // Parse the base name to extract existing number
       const match = baseName.match(/^(.+?)\s+(\d+)$/);
       let namePrefix, startingNumber;
-      
+
       if (match) {
         namePrefix = match[1];
         startingNumber = parseInt(match[2]);
@@ -70,23 +70,23 @@ export function useDashboardHandlers({
         namePrefix = baseName;
         startingNumber = 1;
       }
-      
+
       // Find starting number that doesn't conflict
       while (existingUnitNames.includes(`${namePrefix} ${startingNumber}`.toLowerCase())) {
         startingNumber++;
       }
-      
+
       const newUnits = [];
       let createdCount = 0;
-      
+
       // Create units one by one to avoid race conditions
       for (let i = 0; i < modalManagement.bulkUnitCount; i++) {
         const unitName = `${namePrefix} ${startingNumber + i}`;
-        
+
         if (existingUnitNames.includes(unitName.toLowerCase())) {
           continue;
         }
-        
+
         try {
           const payload = {
             child_subject_id: modalManagement.managingUnitsForSubject.id,
@@ -111,7 +111,7 @@ export function useDashboardHandlers({
       const allUpdatedUnits = [
         ...(childrenData.unitsBySubject[modalManagement.managingUnitsForSubject.id] || []),
         ...newUnits
-      ].sort((a, b) => 
+      ].sort((a, b) =>
         (a.sequence_order || 0) - (b.sequence_order || 0) ||
         a.name.localeCompare(b.name)
       );
@@ -124,7 +124,7 @@ export function useDashboardHandlers({
       modalManagement.setNewUnitNameModalState("");
       modalManagement.setBulkUnitCount(1);
 
-      const successMessage = createdCount === 1 
+      const successMessage = createdCount === 1
         ? `Unit "${newUnits[0].name}" created successfully!`
         : `${createdCount} units created successfully!`;
       showSuccess(successMessage);
@@ -145,7 +145,7 @@ export function useDashboardHandlers({
     try {
       // Use the new cascade delete endpoint that handles everything on the server
       await api.delete(`/units/${unitId}/cascade`);
-      
+
       const updatedUnitsList = (
         childrenData.unitsBySubject[modalManagement.managingUnitsForSubject.id] || []
       ).filter((u) => u.id !== unitId);
@@ -177,20 +177,20 @@ export function useDashboardHandlers({
         unit_id: unitId,
         title: modalManagement.newLessonGroupTitle.trim()
       });
-      
+
       // Update the lesson containers for this unit
       const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
       const updatedLessonContainers = lessonsRes.data || [];
-      
+
       childrenData.setLessonsByUnit(prev => ({
         ...prev,
         [unitId]: updatedLessonContainers
       }));
-      
+
       // Reset form
       modalManagement.setNewLessonGroupTitle("");
       modalManagement.setCreatingLessonGroupForUnit(null);
-      
+
       showSuccess(`Lesson group "${modalManagement.newLessonGroupTitle.trim()}" created successfully!`);
     } catch (error) {
       showError(error.response?.data?.error || 'Failed to create lesson group.');
@@ -203,16 +203,16 @@ export function useDashboardHandlers({
         unit_id: unitId,
         title: title
       });
-      
+
       // Update the lesson containers for this unit
       const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
       const updatedLessonContainers = lessonsRes.data || [];
-      
+
       childrenData.setLessonsByUnit(prev => ({
         ...prev,
         [unitId]: updatedLessonContainers
       }));
-      
+
       showSuccess(`Lesson group "${title}" created successfully!`);
       return { success: true };
     } catch (error) {
@@ -242,7 +242,7 @@ export function useDashboardHandlers({
 
   const handleToggleLessonComplete = useCallback(async (lessonId, isCompleting = true) => {
     const result = await materialManagement.toggleLessonComplete(lessonId, isCompleting);
-    
+
     if (result.success) {
       await childrenData.refreshChildSpecificData();
       const message = isCompleting ? "Assignment marked as complete!" : "Assignment marked as incomplete.";
@@ -258,10 +258,10 @@ export function useDashboardHandlers({
 
   const handleConfirmDeleteMaterial = useCallback(async (materialId) => {
     modalManagement.setIsDeletingMaterial(true);
-    
+
     try {
       const result = await materialManagement.deleteMaterial(materialId);
-      
+
       if (result.success) {
         await childrenData.refreshChildSpecificData();
         modalManagement.closeDeleteMaterialModal();
@@ -318,7 +318,7 @@ export function useDashboardHandlers({
     }
 
     const result = await materialManagement.handleLessonUpload(formData);
-    
+
     if (!result.success) {
       showError(`Upload Error: ${result.error}`);
       materialManagement.setLessonJsonForApproval({ error: result.error, title: "Error" });
@@ -329,12 +329,12 @@ export function useDashboardHandlers({
       materialManagement.setLessonCompletedForApproval(false);
     } else {
       const receivedLessonJson = result.data.lesson_json || {};
-      
+
       const firstFileName = materialManagement.addLessonFile[0]?.name?.split(".")[0];
       materialManagement.setLessonTitleForApproval(
         receivedLessonJson?.title || firstFileName || "Untitled Material"
       );
-      
+
       const llmContentType = receivedLessonJson?.content_type_suggestion;
       const finalContentType =
         llmContentType && APP_CONTENT_TYPES.includes(llmContentType)
@@ -363,16 +363,16 @@ export function useDashboardHandlers({
 
   const handleManualMaterialSubmit = useCallback(async (materialDataFromForm) => {
     const result = await materialManagement.handleManualMaterialCreation(materialDataFromForm);
-    
+
     if (result.success) {
       showSuccess('Material added successfully!');
       modalManagement.closeAddMaterialModal();
       return { success: true };
     } else {
       showError(result.error || 'Failed to create material');
-      return { 
-        success: false, 
-        error: result.error || 'Failed to create material' 
+      return {
+        success: false,
+        error: result.error || 'Failed to create material'
       };
     }
   }, [materialManagement, modalManagement, showSuccess, showError]);
@@ -383,9 +383,9 @@ export function useDashboardHandlers({
       name: childrenData.newChildName,
       grade: childrenData.newChildGrade,
     };
-    
+
     const result = await childrenData.handleAddChild(childData);
-    
+
     if (result.success) {
       childrenData.setShowAddChild(false);
     } else {
@@ -411,7 +411,7 @@ export function useDashboardHandlers({
         success_url: `${window.location.origin}/dashboard?upgraded=true`,
         cancel_url: window.location.href
       });
-      
+
       window.location.href = response.data.checkout_url;
     } catch (error) {
       alert('Failed to start upgrade process. Please try again.');
@@ -430,12 +430,11 @@ export function useDashboardHandlers({
       return;
     }
 
-    // If marking as complete and it's a gradable assignment without a grade, show grade modal
+    // If marking as complete and it's a gradable assignment, show grade modal
     const isGradable = APP_GRADABLE_CONTENT_TYPES.includes(lesson.content_type);
-    const hasMaxScore = lesson.grade_max_value && String(lesson.grade_max_value).trim() !== '';
     const hasGrade = lesson.grade_value != null && lesson.grade_value !== '';
 
-    if (isCompleting && isGradable && hasMaxScore && !hasGrade) {
+    if (isCompleting && isGradable && !hasGrade) {
       modalManagement.openGradeModal(lesson);
       return;
     }
@@ -445,7 +444,7 @@ export function useDashboardHandlers({
     if (childrenData.selectedChild?.id) {
       childrenData.invalidateChildCache(childrenData.selectedChild.id);
     }
-    
+
     const result = await materialManagement.toggleLessonCompletion(lessonId, isCompleting);
     if (!result.success) {
       alert(result.error || "Could not update completion status.");
@@ -454,7 +453,7 @@ export function useDashboardHandlers({
       if (childrenData.selectedChild?.id) {
         await childrenData.refreshChildSpecificData(true);
       }
-      
+
       if (result.syncedEntries > 0) {
         // Handle sync notification if needed
       }
@@ -501,50 +500,63 @@ export function useDashboardHandlers({
 
   const handleGradeSubmit = useCallback(async (gradeValue) => {
     if (!modalManagement.gradingLesson) return;
-    
+
     modalManagement.setIsSubmittingGrade(true);
     try {
       // Invalidate cache before the API call to ensure fresh data
       if (childrenData.selectedChild?.id) {
         childrenData.invalidateChildCache(childrenData.selectedChild.id);
       }
-      
-      const result = await materialManagement.toggleLessonCompletion(modalManagement.gradingLesson.id, true, gradeValue);
-      
+
+      // If gradeValue is null, we're completing without a grade
+      const result = await materialManagement.toggleLessonCompletion(
+        modalManagement.gradingLesson.id,
+        true,
+        gradeValue
+      );
+
       if (result.success) {
         // Small delay to ensure backend processing is complete
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         // Force refresh the child data to update the UI immediately
         if (childrenData.selectedChild?.id) {
           await childrenData.refreshChildSpecificData(true);
         }
-        
+
         modalManagement.closeGradeModal();
+
+        // Show appropriate success message
+        if (gradeValue === null) {
+          showSuccess("Assignment marked as complete. You can add a grade later from the 'Needs Grading' section.");
+        } else {
+          showSuccess("Assignment completed and graded successfully!");
+        }
+
         if (result.syncedEntries > 0) {
           // Handle sync notification if needed
         }
       } else {
-        alert(result.error || "Could not update grade and completion status.");
+        showError(result.error || "Could not update grade and completion status.");
       }
     } catch (error) {
-      alert("Failed to save grade. Please try again.");
+      showError("Failed to save grade. Please try again.");
     } finally {
       modalManagement.setIsSubmittingGrade(false);
     }
-  }, [modalManagement, childrenData, materialManagement]);
+  }, [modalManagement, childrenData, materialManagement, showSuccess, showError]);
 
   const handleApproveNewLesson = useCallback(async (materialRelationshipData = {}) => {
     const currentAssignedSubjects = childrenData.childSubjects[childrenData.selectedChild?.id] || [];
     const subjectInfo = currentAssignedSubjects.find(
       (s) => s.child_subject_id === materialManagement.addLessonSubject
     );
-  
+
     if (!subjectInfo || !subjectInfo.child_subject_id) {
       alert("Selected subject invalid.");
       return;
     }
-  
+
     if (
       !materialManagement.lessonJsonForApproval ||
       !materialManagement.lessonTitleForApproval ||
@@ -558,11 +570,11 @@ export function useDashboardHandlers({
       alert("Please select or create a lesson container.");
       return;
     }
-    
+
     const result = await materialManagement.handleSaveLesson(childrenData.selectedChild?.id);
-  
+
     if (result.success) {
-      const fileInput = document.getElementById("lesson-file-input-main"); 
+      const fileInput = document.getElementById("lesson-file-input-main");
       if (fileInput) fileInput.value = "";
       modalManagement.closeAddMaterialModal();
     } else {
@@ -573,19 +585,19 @@ export function useDashboardHandlers({
   const handleCreateNewUnit = useCallback(async (newUnitName, childSubjectId) => {
     if (!childSubjectId) {
       alert('Error: A subject must be selected before creating a new unit.');
-      return { success: false }; 
+      return { success: false };
     }
     if (!newUnitName || !newUnitName.trim()) {
       alert('Error: New unit name cannot be empty.');
-      return { success: false }; 
+      return { success: false };
     }
-    
+
     try {
       const response = await api.post('/units', {
         child_subject_id: childSubjectId,
         name: newUnitName.trim()
       });
-      
+
       const updatedUnitsForSubject = [
         ...(childrenData.unitsBySubject[childSubjectId] || []),
         response.data,
@@ -599,18 +611,18 @@ export function useDashboardHandlers({
         ...prev,
         [childSubjectId]: updatedUnitsForSubject,
       }));
-      
+
       childrenData.setLessonsByUnit(prev => ({
         ...prev,
         [response.data.id]: []
       }));
-      
+
       if (materialManagement.lessonJsonForApproval) {
         materialManagement.updateLessonApprovalField('unit_id', response.data.id);
       }
-      
+
       return { success: true, data: response.data };
-  
+
     } catch (error) {
       return { success: false, error: error.response?.data?.error || error.message };
     }
@@ -618,34 +630,34 @@ export function useDashboardHandlers({
 
   const handleCreateNewLessonContainer = useCallback(async (newTitleFromForm, unitIdForCreation) => {
     const unitId = unitIdForCreation;
-  
+
     if (!unitId) {
       alert('Error: A unit must be selected before creating a new lesson group.');
-      return { success: false }; 
+      return { success: false };
     }
     if (!newTitleFromForm || !newTitleFromForm.trim()) {
       alert('Error: New lesson group title cannot be empty.');
-      return { success: false }; 
+      return { success: false };
     }
-    
+
     try {
       const response = await api.post('/lesson-containers', {
         unit_id: unitId,
         title: newTitleFromForm.trim()
       });
-      
+
       const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
       const updatedLessonContainersForUnit = lessonsRes.data || [];
-      
+
       childrenData.setLessonsByUnit(prev => ({
         ...prev,
         [unitId]: updatedLessonContainersForUnit
       }));
-      
-      materialManagement.setSelectedLessonContainer(response.data.id); 
-      
+
+      materialManagement.setSelectedLessonContainer(response.data.id);
+
       return { success: true, data: response.data };
-  
+
     } catch (error) {
       return { success: false, error: error.response?.data?.error || error.message };
     }
@@ -756,7 +768,7 @@ export function useDashboardHandlers({
         c.id === modalManagement.editingChildCredentials.id
           ? { ...c, access_pin_hash: "set" }
           : c
-      ); 
+      );
       childrenData.setChildren(updatedChildren);
       if (childrenData.selectedChild?.id === modalManagement.editingChildCredentials.id)
         childrenData.setSelectedChild((prev) => ({ ...prev, access_pin_hash: "set" }));
@@ -772,7 +784,7 @@ export function useDashboardHandlers({
   // Batch operations handlers
   const handleMaterialSelection = useCallback((material, isSelected) => {
     if (!setSelectedMaterials) return;
-    
+
     setSelectedMaterials(prev => {
       const newSet = new Set(prev);
       if (isSelected) {
@@ -883,12 +895,12 @@ export function useDashboardHandlers({
     handleDeleteUnit,
     handleUpdateUnit,
     handleCreateNewUnit,
-    
+
     // Lesson group handlers
     handleCreateLessonGroupInModal,
     handleCreateLessonGroupFromCard,
     handleCreateNewLessonContainer,
-    
+
     // Material handlers
     handleOpenEditModal,
     handleToggleLessonComplete,
@@ -900,7 +912,7 @@ export function useDashboardHandlers({
     handleManualMaterialSubmit,
     handleApproveNewLesson,
     handleUpdateLessonJsonForApprovalField,
-    
+
     // Child handlers
     handleOpenChildLoginSettingsModal,
     handleCloseChildLoginSettingsModal,
@@ -909,16 +921,16 @@ export function useDashboardHandlers({
     handleAddChildSubmit,
     handleSetChildUsername,
     handleSetChildPin,
-    
+
     // Grade handlers
     handleOpenGradeModal,
     handleGradeSubmit,
     handleGradeModalClose,
-    
+
     // Upgrade handlers
     handleUpgradeNeeded,
     handleGenericUpgrade,
-    
+
     // Batch operation handlers
     handleMaterialSelection,
     handleClearBatchSelection,
@@ -926,11 +938,11 @@ export function useDashboardHandlers({
     handleBatchDelete,
     handleBatchEdit,
     handleBatchSave,
-    
+
     // Modal handlers
     handleCloseDeleteMaterialModal,
     handleCloseDeleteChildModal,
-    
+
     // Utility handlers
     clearCredentialMessages,
     handleSaveLessonEdit,

@@ -22,47 +22,47 @@ exports.listChildren = async (req, res) => {
     .order('created_at', { ascending: true });
 
   if (error) return res.status(400).json({ error: error.message });
-  
+
   // Don't expose the pin hash in the response
   const sanitizedData = data.map(child => ({
     ...child,
     access_pin_hash: !!child.access_pin_hash // Convert to boolean for frontend
   }));
-  
+
   res.json(sanitizedData);
 };
 
 exports.createChild = async (req, res) => {
   const parent_id = req.header('x-parent-id');
   const { name, grade, birthdate } = req.body;
-  
+
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
   if (!name || !name.trim()) return res.status(400).json({ error: 'Child name is required' });
 
   // Note: Child limit is already enforced by middleware
   // req.permissions and req.childrenCount are available from middleware
-  
+
   try {
     // Create child
     const { data, error } = await supabase
         .from('children')
-        .insert([{ 
-          parent_id, 
-          name: name.trim(), 
-          grade: grade ? grade.trim() : null, 
-          birthdate: birthdate || null 
+        .insert([{
+          parent_id,
+          name: name.trim(),
+          grade: grade ? grade.trim() : null,
+          birthdate: birthdate || null
         }])
         .select()
         .single();
-        
+
     if (error) return res.status(400).json({ error: error.message });
-    
+
     // Sanitize response
     const sanitizedChild = {
       ...data,
       access_pin_hash: !!data.access_pin_hash
     };
-    
+
     res.status(201).json({
       ...sanitizedChild,
       // Include helpful subscription info
@@ -83,7 +83,7 @@ exports.updateChild = async (req, res) => {
   const parent_id = getParentId(req);
   const child_id = req.params.id;
   const { name, grade, birthdate } = req.body;
-  
+
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
   if (!child_id) return res.status(400).json({ error: 'Missing child_id' });
 
@@ -111,20 +111,20 @@ exports.updateChild = async (req, res) => {
     .single();
 
   if (error) return res.status(400).json({ error: error.message });
-  
+
   // Sanitize response
   const sanitizedChild = {
     ...data,
     access_pin_hash: !!data.access_pin_hash
   };
-  
+
   res.json(sanitizedChild);
 };
 
 exports.deleteChild = async (req, res) => {
   const parent_id = getParentId(req);
   const child_id = req.params.id;
-  
+
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
 
   // Verify ownership
@@ -238,7 +238,7 @@ exports.deleteChild = async (req, res) => {
       return res.status(400).json({ error: `Failed to delete child: ${childError.message}` });
     }
 
-    res.json({ 
+    res.json({
       message: `Child "${child.name}" and all associated data deleted successfully.`,
       deleted_child: child
     });
@@ -299,10 +299,10 @@ exports.setChildUsername = async (req, res) => {
           .single();
 
       if (updateError) throw updateError;
-      
-      res.json({ 
-        message: 'Username updated successfully.', 
-        child: updatedChild 
+
+      res.json({
+        message: 'Username updated successfully.',
+        child: updatedChild
       });
 
   } catch (error) {
@@ -348,7 +348,7 @@ exports.setChildPin = async (req, res) => {
           .eq('parent_id', parent_id)
           .select('id, name')
           .single();
-      
+
       if (updateError) throw updateError;
       res.json({ message: 'PIN updated successfully.' });
 

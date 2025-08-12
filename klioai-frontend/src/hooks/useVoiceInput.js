@@ -16,7 +16,7 @@ export function useVoiceInput() {
     if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
       const SpeechRecognition = window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
-      
+
       const recognition = recognitionRef.current;
       recognition.continuous = true;
       recognition.interimResults = true;

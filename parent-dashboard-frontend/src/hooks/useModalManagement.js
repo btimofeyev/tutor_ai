@@ -15,7 +15,7 @@ export function useModalManagement() {
   const [showDeleteMaterialModal, setShowDeleteMaterialModal] = useState(false);
   const [deletingMaterial, setDeletingMaterial] = useState(null);
   const [isDeletingMaterial, setIsDeletingMaterial] = useState(false);
-  
+
   // Lesson view modal
   const [viewingLesson, setViewingLesson] = useState(null);
 
@@ -185,7 +185,7 @@ export function useModalManagement() {
     deletingMaterial,
     isDeletingMaterial,
     setIsDeletingMaterial,
-    
+
     // Lesson view modal state
     viewingLesson,
 

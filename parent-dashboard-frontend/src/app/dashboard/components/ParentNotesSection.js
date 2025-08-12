@@ -1,9 +1,9 @@
 'use client';
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { 
-  PlusIcon, 
-  TrashIcon, 
+import {
+  PlusIcon,
+  TrashIcon,
   PencilIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
@@ -67,7 +67,7 @@ const CompactStickyNote = ({ note, onEdit, onDelete, isEditing, onSave, onCancel
         {/* Push pin decoration */}
         <div className="push-pin absolute -top-1 right-3 w-3 h-3 bg-red-500 rounded-full shadow-sm border border-red-600 z-10"></div>
         <div className="push-pin-hole absolute -top-0.5 right-3.5 w-1.5 h-1.5 bg-red-700 rounded-full z-20"></div>
-        
+
         {/* Delete button - show on hover */}
         {!isEditing && (
           <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -128,23 +128,23 @@ const CompactStickyNote = ({ note, onEdit, onDelete, isEditing, onSave, onCancel
           transform: rotate(-1deg);
           transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
-        
+
         .compact-sticky-note:hover {
           transform: rotate(0deg) translateY(-1px);
         }
-        
+
         .compact-sticky-note:nth-child(2n) {
           transform: rotate(1deg);
         }
-        
+
         .compact-sticky-note:nth-child(3n) {
           transform: rotate(-0.5deg);
         }
-        
+
         .push-pin {
           box-shadow: 0 1px 2px rgba(0,0,0,0.2);
         }
-        
+
         .push-pin-hole {
           box-shadow: inset 0 0.5px 1px rgba(0,0,0,0.3);
         }
@@ -153,12 +153,11 @@ const CompactStickyNote = ({ note, onEdit, onDelete, isEditing, onSave, onCancel
   );
 };
 
-
 // Main ParentNotesSection component
 const ParentNotesSection = ({ selectedChild }) => {
   const [editingNoteId, setEditingNoteId] = useState(null);
   const { showSuccess, showError } = useToast();
-  
+
   // Use global notes (not child-specific)
   const {
     notes,
@@ -169,7 +168,6 @@ const ParentNotesSection = ({ selectedChild }) => {
     deleteNote,
     clearError
   } = useParentNotes(null, true); // Pass null for childId and true for isGlobal
-
 
   // Handle updating note
   const handleUpdateNote = async (noteId, updateData) => {
@@ -235,7 +233,7 @@ const ParentNotesSection = ({ selectedChild }) => {
           ))}
         </div>
       ) : (
-        // Compact notes grid - responsive layout  
+        // Compact notes grid - responsive layout
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {/* Existing notes */}
           {notes.slice(0, 6).map((note) => (
@@ -293,6 +291,5 @@ CompactStickyNote.propTypes = {
   onSave: PropTypes.func.isRequired,
   onCancel: PropTypes.func.isRequired
 };
-
 
 export default ParentNotesSection;

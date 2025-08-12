@@ -27,7 +27,7 @@ export function NoChildSelectedCard({ hasChildren }) {
 
 export function NoSubjectsCard({ childName }) {
   const router = useRouter();
-  
+
   return (
     <div className="text-center p-6 bg-background-card rounded-lg shadow border border-border-subtle">
       <div className="text-4xl mb-3">📚</div>

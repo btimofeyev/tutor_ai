@@ -5,13 +5,13 @@ import PropTypes from 'prop-types';
 import { CheckCircleIcon, TrashIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 
-export default function BatchActionsBar({ 
-  selectedItems, 
-  onClearSelection, 
-  onBatchComplete, 
+export default function BatchActionsBar({
+  selectedItems,
+  onClearSelection,
+  onBatchComplete,
   onBatchDelete,
   onBatchEdit,
-  isVisible 
+  isVisible
 }) {
   if (!isVisible || selectedItems.length === 0) return null;
 
@@ -21,7 +21,7 @@ export default function BatchActionsBar({
       alert('All selected assignments are already completed.');
       return;
     }
-    
+
     if (confirm(`Mark ${incompleteItems.length} assignment(s) as complete?`)) {
       onBatchComplete(incompleteItems);
     }
@@ -44,7 +44,7 @@ export default function BatchActionsBar({
             {selectedItems.filter(item => !item.completed_at).length} incomplete
           </span>
         </div>
-        
+
         <button
           onClick={onClearSelection}
           className="text-gray-400 hover:text-gray-600 p-1"
@@ -53,7 +53,7 @@ export default function BatchActionsBar({
           <XMarkIcon className="h-5 w-5" />
         </button>
       </div>
-      
+
       <div className="flex gap-1 sm:gap-2 mt-3">
         <Button
           variant="primary"
@@ -66,7 +66,7 @@ export default function BatchActionsBar({
           <span className="hidden sm:inline">Mark Complete</span>
           <span className="sm:hidden">Complete</span>
         </Button>
-        
+
         <Button
           variant="secondary"
           size="sm"
@@ -77,7 +77,7 @@ export default function BatchActionsBar({
           <span className="hidden sm:inline">Edit Selected</span>
           <span className="sm:hidden">Edit</span>
         </Button>
-        
+
         <Button
           variant="outline"
           size="sm"

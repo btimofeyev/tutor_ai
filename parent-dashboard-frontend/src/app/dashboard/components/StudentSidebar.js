@@ -3,19 +3,20 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { 
-  ArrowLeftOnRectangleIcon, 
-  UserPlusIcon, 
-  Cog6ToothIcon, 
-  SparklesIcon, 
-  ChevronDownIcon, 
+import {
+  ArrowLeftOnRectangleIcon,
+  UserPlusIcon,
+  Cog6ToothIcon,
+  SparklesIcon,
+  ChevronDownIcon,
   ChevronUpIcon,
   ExclamationTriangleIcon,
   CreditCardIcon,
   CalendarDaysIcon,
   HomeIcon,
   ChatBubbleLeftRightIcon,
-  TrashIcon
+  TrashIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 import SubscriptionManager from '../../../components/SubscriptionManager';
@@ -67,15 +68,13 @@ export default function StudentSidebar({
 
   const handleDataCleanup = async () => {
     if (isCleaningData) return;
-    
+
     setIsCleaningData(true);
     try {
       const result = await performDataCleanup(childrenList || []);
-      console.log('Manual cleanup completed:', result);
-      
       // Show user feedback
       alert(`Data cleanup completed!\nCleaned ${result.totalCleaned} orphaned items.\nPage will refresh to show clean data.`);
-      
+
       // Force refresh to ensure clean state
       forceRefreshAllData();
     } catch (error) {
@@ -106,26 +105,33 @@ export default function StudentSidebar({
 
       <div className="px-6 pt-2 pb-3 border-b border-border-subtle mb-2">
         <div className="space-y-1">
-          <Link 
-            href="/dashboard" 
+          <Link
+            href="/dashboard"
             className="flex items-center px-3 py-2 text-sm font-medium text-text-primary hover:bg-[var(--accent-blue)]/20 rounded-md transition-colors"
           >
             <HomeIcon className="h-4 w-4 mr-2" />
             Dashboard
           </Link>
-          <Link 
-            href="/schedule" 
+          <Link
+            href="/schedule"
             className="flex items-center px-3 py-2 text-sm font-medium text-text-primary hover:bg-[var(--accent-blue)]/20 rounded-md transition-colors"
           >
             <CalendarDaysIcon className="h-4 w-4 mr-2" />
             Schedule
           </Link>
-          <Link 
-            href="/dashboard/chat-insights" 
+          <Link
+            href="/dashboard/chat-insights"
             className="flex items-center px-3 py-2 text-sm font-medium text-text-primary hover:bg-[var(--accent-blue)]/20 rounded-md transition-colors"
           >
             <ChatBubbleLeftRightIcon className="h-4 w-4 mr-2" />
             Chat Insights
+          </Link>
+          <Link
+            href="/gradebook"
+            className="flex items-center px-3 py-2 text-sm font-medium text-text-primary hover:bg-[var(--accent-blue)]/20 rounded-md transition-colors"
+          >
+            <AcademicCapIcon className="h-4 w-4 mr-2" />
+            Gradebook
           </Link>
         </div>
       </div>
@@ -218,7 +224,7 @@ export default function StudentSidebar({
               <ChevronDownIcon className="h-4 w-4 text-text-tertiary" />
             )}
           </button>
-          
+
           {showSubscriptionDetails && (
             <div className="mt-2 px-2">
               <SubscriptionManager
@@ -250,7 +256,7 @@ export default function StudentSidebar({
                     <p className="text-xs font-medium text-orange-800">Plan Limit Reached</p>
                     <p className="text-xs text-orange-600 mt-0.5">
                       {hasActiveSubscription ? (
-                        planType === 'klio_addon' ? 
+                        planType === 'klio_addon' ?
                           'The AI Add-on is for 1 child. Upgrade to Family Plan for up to 3 children.' :
                           planType === 'family' ?
                             'Family plan supports up to 3 children. Upgrade to Academy for more.' :
@@ -270,14 +276,14 @@ export default function StudentSidebar({
               value={newChildName}
               onChange={onNewChildNameChange}
               placeholder="Student Name"
-              className={formInputStyles} 
-              required 
+              className={formInputStyles}
+              required
             />
             <input
               value={newChildGrade}
               onChange={onNewChildGradeChange}
               placeholder="Grade Level"
-              className={formInputStyles} 
+              className={formInputStyles}
             />
             <div className="flex gap-2 mt-1.5">
               <Button type="submit" variant="primary" size="sm" className="flex-1">

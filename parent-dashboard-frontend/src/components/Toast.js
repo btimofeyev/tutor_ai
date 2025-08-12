@@ -28,7 +28,7 @@ const iconColorMap = {
 
 function ToastItem({ toast, onRemove }) {
   const Icon = iconMap[toast.type];
-  
+
   return (
     <div className={`flex items-start p-4 rounded-lg border shadow-lg ${colorMap[toast.type]} animate-fade-in`}>
       <Icon className={`h-5 w-5 mr-3 mt-0.5 flex-shrink-0 ${iconColorMap[toast.type]}`} />

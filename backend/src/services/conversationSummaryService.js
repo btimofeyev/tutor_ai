@@ -1,9 +1,10 @@
 // backend/src/services/conversationSummaryService.js
 const supabase = require('../utils/supabaseClient');
 const OpenAI = require('openai');
+const keyManager = require('../utils/secureKeys');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: keyManager.getOpenAIKey(),
 });
 
 class ConversationSummaryService {

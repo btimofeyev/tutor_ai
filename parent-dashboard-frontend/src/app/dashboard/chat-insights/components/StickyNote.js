@@ -2,19 +2,19 @@
 'use client';
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ChevronDownIcon, 
+import {
+  ChevronDownIcon,
   ChevronUpIcon,
   CheckIcon,
-  XMarkIcon 
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
-export default function StickyNote({ 
-  summary, 
+export default function StickyNote({
+  summary,
   color = 'yellow',
-  onMarkRead, 
+  onMarkRead,
   onDelete,
-  className = '' 
+  className = ''
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isActioning, setIsActioning] = useState(false);
@@ -107,7 +107,7 @@ export default function StickyNote({
             )}
           </div>
         </div>
-        
+
         {/* Action Buttons */}
         <div className="flex gap-1 ml-2">
           <button
@@ -157,7 +157,7 @@ export default function StickyNote({
         <div className="mb-3">
           <div className="flex flex-wrap gap-1">
             {(summary.subjectsDiscussed || []).map((subject, index) => (
-              <span 
+              <span
                 key={index}
                 className="px-2 py-1 text-xs rounded-full bg-white/60 font-medium"
               >

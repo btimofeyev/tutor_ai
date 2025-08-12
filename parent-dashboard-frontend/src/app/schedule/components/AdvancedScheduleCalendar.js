@@ -1,25 +1,25 @@
 // app/schedule/components/AdvancedScheduleCalendar.js
 "use client";
 import { useState, useMemo, useCallback } from 'react';
-import { 
-  format, 
-  addDays, 
-  addWeeks, 
-  startOfWeek, 
+import {
+  format,
+  addDays,
+  addWeeks,
+  startOfWeek,
   startOfMonth,
   endOfMonth,
   eachDayOfInterval,
-  isSameDay, 
+  isSameDay,
   parseISO,
   getDay,
   isWeekend,
-  isToday 
+  isToday
 } from 'date-fns';
-import { 
-  ChevronLeftIcon, 
-  ChevronRightIcon, 
-  PlusIcon, 
-  CalendarDaysIcon, 
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  CalendarDaysIcon,
   CheckIcon,
   ViewColumnsIcon,
   Squares2X2Icon,
@@ -57,15 +57,19 @@ const VIEW_TYPES = {
   MONTH: 'month'
 };
 
-export default function AdvancedScheduleCalendar({ 
-  childId, 
-  selectedChildrenIds = [], 
+export default function AdvancedScheduleCalendar({
+  childId,
+  selectedChildrenIds = [],
   allChildren = [],
-  subscriptionPermissions, 
-  scheduleManagement, 
+  subscriptionPermissions,
+  scheduleManagement,
   childSubjects = [],
   schedulePreferences = {},
-  onGenerateAISchedule
+  onGenerateAISchedule,
+  // New props for click-to-select lesson scheduling
+  selectedLessonContainer = null,
+  onCalendarSlotClick = () => {},
+  density = 'comfortable'
 }) {
   const [currentDate, setCurrentDate] = useState(() => {
     // Try to restore the last viewed date from localStorage
@@ -77,7 +81,7 @@ export default function AdvancedScheduleCalendar({
         const now = new Date();
         const sixMonthsAgo = new Date(now.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
         const sixMonthsFuture = new Date(now.getTime() + 6 * 30 * 24 * 60 * 60 * 1000);
-        
+
         if (parsedDate >= sixMonthsAgo && parsedDate <= sixMonthsFuture) {
           return parsedDate;
         }
@@ -91,10 +95,10 @@ export default function AdvancedScheduleCalendar({
   const [dragOverInfo, setDragOverInfo] = useState(null);
   const [localChanges, setLocalChanges] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  
+
   // Always call the hook to satisfy React rules
   const fallbackScheduleManagement = useScheduleManagement(childId, subscriptionPermissions);
-  
+
   // Use schedule management from props or create our own
   const {
     calendarEvents,
@@ -127,7 +131,7 @@ export default function AdvancedScheduleCalendar({
           end: addDays(weekStart, 6),
           days: Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
         };
-      
+
       case VIEW_TYPES.MULTI_WEEK:
         const multiWeekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
         const totalDays = weeksToShow * 7;
@@ -140,7 +144,7 @@ export default function AdvancedScheduleCalendar({
             days: Array.from({ length: 7 }, (_, j) => addDays(addWeeks(multiWeekStart, i), j))
           }))
         };
-      
+
       case VIEW_TYPES.MONTH:
         const monthStart = startOfMonth(currentDate);
         const monthEnd = endOfMonth(currentDate);
@@ -151,20 +155,19 @@ export default function AdvancedScheduleCalendar({
           end: calendarEnd,
           days: eachDayOfInterval({ start: calendarStart, end: calendarEnd })
         };
-      
+
       default:
         return { start: new Date(), end: new Date(), days: [] };
     }
   }, [currentDate, viewType, weeksToShow]);
 
-
   // Dynamic time slots based on 15-minute increments for maximum flexibility
   const timeSlots = useMemo(() => {
-    const startHour = schedulePreferences?.preferred_start_time ? 
+    const startHour = schedulePreferences?.preferred_start_time ?
       parseInt(schedulePreferences.preferred_start_time.split(':')[0]) : 9;
-    const endHour = schedulePreferences?.preferred_end_time ? 
+    const endHour = schedulePreferences?.preferred_end_time ?
       parseInt(schedulePreferences.preferred_end_time.split(':')[0]) : 15;
-    
+
     const slots = [];
     for (let hour = startHour; hour <= endHour; hour++) {
       // Add all four 15-minute increments per hour: :00, :15, :30, :45
@@ -182,7 +185,7 @@ export default function AdvancedScheduleCalendar({
   const getDayStats = (day) => {
     const dayString = format(day, 'yyyy-MM-dd');
     const events = calendarEvents || [];
-    
+
     const dayEvents = events.filter(event => {
       if (event.date) return event.date === dayString;
       if (event.start) return isSameDay(new Date(event.start), day);
@@ -192,7 +195,7 @@ export default function AdvancedScheduleCalendar({
     const totalMinutes = dayEvents.reduce((sum, event) => {
       return sum + (event.duration || event.duration_minutes || 30);
     }, 0);
-    
+
     return {
       totalMinutes,
       totalHours: Math.round(totalMinutes / 60 * 10) / 10,
@@ -216,16 +219,15 @@ export default function AdvancedScheduleCalendar({
   const getEventsForDay = useCallback((day) => {
     const dayString = format(day, 'yyyy-MM-dd');
     const events = calendarEvents || [];
-    
+
     const dayEvents = events.filter(event => {
       if (event.date) return event.date === dayString;
       if (event.start) return isSameDay(new Date(event.start), day);
       return false;
     });
-    
+
     return dayEvents;
   }, [calendarEvents]);
-
 
   // Navigation functions with localStorage persistence
   const navigate = (direction) => {
@@ -309,12 +311,12 @@ export default function AdvancedScheduleCalendar({
     // Extract the real entry ID and child ID from composite ID in multi-child mode
     let realEntryId = eventToMove.id;
     let childIdToUse = eventToMove.child_id;
-    
+
     // Check if this is a composite ID format: "childId-entryId"
     if (eventToMove.id && eventToMove.id.includes('-')) {
       const lastHyphenIndex = eventToMove.id.lastIndexOf('-');
       const hyphenCount = (eventToMove.id.match(/-/g) || []).length;
-      
+
       // UUIDs have 4 hyphens, so composite IDs will have 9 hyphens total
       if (hyphenCount > 4) {
         const parts = eventToMove.id.split('-');
@@ -324,12 +326,12 @@ export default function AdvancedScheduleCalendar({
         }
       }
     }
-    
+
     // If we still don't have a child_id, try to get it from the original entry
     if (!childIdToUse && eventToMove.originalEntry) {
       childIdToUse = eventToMove.originalEntry.child_id;
     }
-    
+
     // Final fallback: use the current childId if we're in single-child mode
     if (!childIdToUse) {
       childIdToUse = childId;
@@ -348,7 +350,7 @@ export default function AdvancedScheduleCalendar({
         scheduled_date: dayStr,
         start_time: timeStr
       }, childIdToUse);
-      
+
       // Show indicator if changes are local only
       if (updateResult && updateResult.localOnly) {
         setLocalChanges(true);
@@ -363,115 +365,67 @@ export default function AdvancedScheduleCalendar({
     }
   }, [calendarEvents, updateScheduleEntry, childId]);
 
-  // Handle day clicks with AI scheduling option
+  // Handle day clicks (simple create modal)
   const handleDayClick = (day) => {
     const clickedDate = format(day, 'yyyy-MM-dd');
-    const dayOfWeek = day.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    
-    // Only allow scheduling on weekdays
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      openCreateModal({
-        date: clickedDate
-      });
-      return;
-    }
-    
-    // Show options for weekdays
-    const dayName = format(day, 'EEEE, MMMM d');
-    const confirmMessage = `What would you like to do for ${dayName}?\n\n1. Create single lesson entry\n2. Generate AI schedule starting from this day\n\nClick "OK" for AI schedule, "Cancel" to create single entry.`;
-    
-    if (window.confirm(confirmMessage)) {
-      // User chose AI schedule
-      if (onGenerateAISchedule) {
-        onGenerateAISchedule(clickedDate);
-      } else {
-        alert('AI scheduling is not available. Please use the AI Schedule button.');
-      }
-    } else {
-      // User chose to create single entry
-      openCreateModal({
-        date: clickedDate
-      });
-    }
+    openCreateModal({ date: clickedDate });
   };
-
 
   // Calculate available time duration from a given slot
   const calculateAvailableTime = useCallback((day, timeSlot) => {
     const events = getEventsForDay(day);
     const slotTime = new Date(`2000-01-01T${timeSlot}`);
-    
+
     // Get day end time from preferences
-    const endHour = schedulePreferences?.preferred_end_time ? 
+    const endHour = schedulePreferences?.preferred_end_time ?
       parseInt(schedulePreferences.preferred_end_time.split(':')[0]) : 15;
-    const endMinute = schedulePreferences?.preferred_end_time ? 
+    const endMinute = schedulePreferences?.preferred_end_time ?
       parseInt(schedulePreferences.preferred_end_time.split(':')[1]) : 0;
     const dayEnd = new Date(`2000-01-01T${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`);
-    
+
     // Find the next event after this time slot
     let nextEventTime = dayEnd;
     events.forEach(event => {
       const eventTimeStr = event.startTime || format(new Date(event.start), 'HH:mm');
       const eventTime = new Date(`2000-01-01T${eventTimeStr}`);
-      
+
       if (eventTime > slotTime && eventTime < nextEventTime) {
         nextEventTime = eventTime;
       }
     });
-    
+
     // Calculate available minutes
     const availableMinutes = Math.floor((nextEventTime - slotTime) / (1000 * 60));
     return Math.max(0, availableMinutes);
   }, [getEventsForDay, schedulePreferences]);
 
-  // Enhanced time slot click handler with smart 15-minute increment suggestions
+  // Time slot click: if a lesson is selected, route to parent handler for DurationPicker; otherwise open generic create modal
   const handleTimeSlotClick = (day, timeSlot) => {
     if (isTimeSlotOccupied(day, timeSlot)) return;
-    
-    const availableMinutes = calculateAvailableTime(day, timeSlot);
-    
-    // Smart duration suggestions based on common lesson lengths and 15-minute increments
-    const commonDurations = [15, 30, 45, 60, 75, 90]; // Common lesson durations
-    let suggestedDuration = 30; // Default
-    
-    // Find the best fit duration that doesn't exceed available time
-    for (let i = commonDurations.length - 1; i >= 0; i--) {
-      if (commonDurations[i] <= availableMinutes) {
-        suggestedDuration = commonDurations[i];
-        break;
-      }
+    const dayStr = format(day, 'yyyy-MM-dd');
+    if (selectedLessonContainer) {
+      onCalendarSlotClick(dayStr, timeSlot);
+      return;
     }
-    
-    // Provide multiple duration options for the user
-    const durationOptions = commonDurations.filter(d => d <= availableMinutes);
-    
-    openCreateModal({
-      date: format(day, 'yyyy-MM-dd'),
-      time: timeSlot,
-      suggestedDuration: suggestedDuration,
-      availableMinutes: availableMinutes,
-      durationOptions: durationOptions,
-      smartSuggestion: availableMinutes !== suggestedDuration ? 
-        `${availableMinutes} minutes available. Suggested: ${suggestedDuration}min` : null
-    });
+    openCreateModal({ date: dayStr, time: timeSlot });
   };
 
   // Check if time slot is occupied
   const isTimeSlotOccupied = (day, timeSlot) => {
     const dayEvents = getEventsForDay(day);
     const slotTime = new Date(`2000-01-01T${timeSlot}`);
-    
+
     return dayEvents.some(event => {
       let eventTimeStr = event.startTime || format(new Date(event.start), 'HH:mm');
       eventTimeStr = eventTimeStr.length === 8 ? eventTimeStr.substring(0, 5) : eventTimeStr;
       const eventStartTime = new Date(`2000-01-01T${eventTimeStr}`);
       const eventDuration = event.duration || event.duration_minutes || 30;
-      
+
       // Calculate visual end time based on 15-minute increments
       const visualHeight = Math.ceil(eventDuration / 15);
       const visualDurationMinutes = visualHeight * 15; // Convert back to minutes for overlap calculation
       const eventEndTime = new Date(eventStartTime.getTime() + (visualDurationMinutes * 60000));
-      
+
       const slotEndTime = new Date(slotTime.getTime() + (15 * 60000)); // 15-minute slot
       return (slotTime < eventEndTime && slotEndTime > eventStartTime);
     });
@@ -494,8 +448,8 @@ export default function AdvancedScheduleCalendar({
       <button
         onClick={() => setViewType(VIEW_TYPES.WEEK)}
         className={`btn-icon ${
-          viewType === VIEW_TYPES.WEEK 
-            ? 'bg-blue-50 text-blue-700 border-blue-200' 
+          viewType === VIEW_TYPES.WEEK
+            ? 'bg-blue-50 text-blue-700 border-blue-200'
             : ''
         }`}
         title="Week view"
@@ -505,8 +459,8 @@ export default function AdvancedScheduleCalendar({
       <button
         onClick={() => setViewType(VIEW_TYPES.MULTI_WEEK)}
         className={`btn-icon ${
-          viewType === VIEW_TYPES.MULTI_WEEK 
-            ? 'bg-blue-50 text-blue-700 border-blue-200' 
+          viewType === VIEW_TYPES.MULTI_WEEK
+            ? 'bg-blue-50 text-blue-700 border-blue-200'
             : ''
         }`}
         title="Multi-week view"
@@ -516,8 +470,8 @@ export default function AdvancedScheduleCalendar({
       <button
         onClick={() => setViewType(VIEW_TYPES.MONTH)}
         className={`btn-icon ${
-          viewType === VIEW_TYPES.MONTH 
-            ? 'bg-blue-50 text-blue-700 border-blue-200' 
+          viewType === VIEW_TYPES.MONTH
+            ? 'bg-blue-50 text-blue-700 border-blue-200'
             : ''
         }`}
         title="Month view"
@@ -530,7 +484,7 @@ export default function AdvancedScheduleCalendar({
   // Render week selector for multi-week view - compact
   const renderWeekSelector = () => {
     if (viewType !== VIEW_TYPES.MULTI_WEEK) return null;
-    
+
     return (
       <div className="flex items-center gap-1">
         {[2, 3, 4].map(weeks => (
@@ -538,8 +492,8 @@ export default function AdvancedScheduleCalendar({
             key={weeks}
             onClick={() => setWeeksToShow(weeks)}
             className={`px-2 py-1 rounded-md text-sm font-medium transition-all ${
-              weeksToShow === weeks 
-                ? 'bg-blue-50 text-blue-700' 
+              weeksToShow === weeks
+                ? 'bg-blue-50 text-blue-700'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -604,7 +558,7 @@ export default function AdvancedScheduleCalendar({
             </div>
           </div>
         )}
-        
+
         {/* Enhanced success message */}
         {showSuccessMessage && (
           <div className="bg-gradient-to-r from-green-50/90 to-emerald-50/90 backdrop-blur-sm border border-green-200/60 rounded-xl p-3 mb-4 shadow-lg animate-fade-in">
@@ -616,7 +570,7 @@ export default function AdvancedScheduleCalendar({
             </div>
           </div>
         )}
-        
+
         {/* Enhanced local changes indicator */}
         {localChanges && (
           <div className="bg-gradient-to-r from-yellow-50/90 to-amber-50/90 backdrop-blur-sm border border-yellow-200/60 rounded-xl p-3 mb-4 shadow-lg">
@@ -648,11 +602,11 @@ export default function AdvancedScheduleCalendar({
           >
             <ChevronLeftIcon className="h-5 w-5 text-gray-600" />
           </button>
-          
+
           <h2 className="text-lg font-bold text-gray-800 min-w-[180px] text-center">
             {renderTitle()}
           </h2>
-          
+
           <button
             onClick={() => navigate(1)}
             className="p-2 hover:bg-gray-100/70 rounded-xl transition-all duration-200 hover:shadow-md"
@@ -661,7 +615,7 @@ export default function AdvancedScheduleCalendar({
             <ChevronRightIcon className="h-5 w-5 text-gray-600" />
           </button>
         </div>
-        
+
         <div className="flex items-center gap-3">
           {renderWeekSelector()}
           {renderViewSelector()}
@@ -685,7 +639,7 @@ export default function AdvancedScheduleCalendar({
 
       {/* Calendar Grid */}
       {viewType === VIEW_TYPES.WEEK && (
-        <WeekView 
+        <WeekView
           dateRange={dateRange}
           timeSlots={timeSlots}
           getEventsForDay={getEventsForDay}
@@ -701,7 +655,7 @@ export default function AdvancedScheduleCalendar({
       )}
 
       {viewType === VIEW_TYPES.MULTI_WEEK && (
-        <MultiWeekView 
+        <MultiWeekView
           dateRange={dateRange}
           getDayStats={getDayStats}
           getEventsForDay={getEventsForDay}
@@ -714,7 +668,7 @@ export default function AdvancedScheduleCalendar({
       )}
 
       {viewType === VIEW_TYPES.MONTH && (
-        <MonthView 
+        <MonthView
           dateRange={dateRange}
           currentDate={currentDate}
           getDayStats={getDayStats}
@@ -726,7 +680,7 @@ export default function AdvancedScheduleCalendar({
           allChildren={allChildren}
         />
       )}
-      
+
       {/* Drag Overlay */}
       <DragOverlay>
         {draggedEvent && (
@@ -746,9 +700,9 @@ export default function AdvancedScheduleCalendar({
 }
 
 // Draggable Schedule Event Component
-function DraggableScheduleEvent({ 
-  event, 
-  onEdit, 
+function DraggableScheduleEvent({
+  event,
+  onEdit,
   childSubjects = [],
   isOverlay = false,
   selectedChildrenIds = [],
@@ -761,7 +715,7 @@ function DraggableScheduleEvent({
     transform,
     transition,
     isDragging,
-  } = useSortable({ 
+  } = useSortable({
     id: event.id,
     data: {
       type: 'schedule-event',
@@ -783,9 +737,9 @@ function DraggableScheduleEvent({
   const actualHeightPx = Math.max(timeSlotHeight, (duration / 15) * timeSlotHeight); // Scale precisely with 15-min increments
   const height = Math.ceil(duration / 15); // Grid layout calculations based on 15-min slots
   const displayTitle = event.title || subject;
-  
+
   // Get child name if multiple children are selected
-  const childName = selectedChildrenIds.length > 1 ? 
+  const childName = selectedChildrenIds.length > 1 ?
     allChildren.find(child => child.id === event.child_id)?.name || '' : '';
 
   return (
@@ -797,11 +751,11 @@ function DraggableScheduleEvent({
     >
       <div
         className={`absolute inset-x-1 top-1 rounded-xl p-2 cursor-move transition-all duration-300 ease-out hover:shadow-2xl hover:scale-[1.02] border-2 z-10 ${
-          isDragging 
-            ? 'border-white/60 shadow-2xl ring-2 ring-white/50 scale-105' 
+          isDragging
+            ? 'border-white/60 shadow-2xl ring-2 ring-white/50 scale-105'
             : 'border-white/40 hover:border-white/60 shadow-lg'
         } ${getSubjectGradient(subject, childSubjects)}`}
-        style={{ 
+        style={{
           height: `${actualHeightPx - 8}px` // Allow proper spanning for longer events
         }}
         {...listeners}
@@ -832,7 +786,7 @@ function DraggableScheduleEvent({
                 </div>
               </div>
             </div>
-            
+
             {event.status === 'completed' && (
               <div className="p-1 bg-green-500/90 rounded-full shadow-sm">
                 <CheckIcon className="h-3 w-3 text-white" />
@@ -852,14 +806,14 @@ function DraggableScheduleEvent({
                 <div className={`font-bold text-sm mb-1 truncate ${getSubjectTextColor(subject, childSubjects)} ${event.status === 'completed' ? 'line-through opacity-70' : ''}`}>
                   {displayTitle}
                 </div>
-                
+
                 {/* Lesson title if available - Secondary info */}
                 {event.lesson?.title && event.lesson.title !== displayTitle && (
                   <div className={`text-xs font-semibold mb-1 line-clamp-2 ${getSubjectTextColor(subject, childSubjects)} opacity-90`}>
                     {event.lesson.title}
                   </div>
                 )}
-                
+
                 {/* Child name for multi-child view */}
                 {childName && (
                   <div className={`text-xs font-bold truncate bg-white/40 px-2 py-1 rounded-md mt-1 ${getSubjectTextColor(subject, childSubjects)}`}>
@@ -868,13 +822,13 @@ function DraggableScheduleEvent({
                 )}
               </div>
             </div>
-            
+
             {/* Bottom section with duration and completion */}
             <div className={`flex justify-between items-center mt-2 pt-2 border-t ${getSubjectTextColor(subject, childSubjects)} border-current opacity-20`}>
               <div className={`text-xs font-bold bg-white/40 px-2 py-1 rounded-md ${getSubjectTextColor(subject, childSubjects)} opacity-90`}>
                 {duration}m
               </div>
-              
+
               {event.status === 'completed' && (
                 <div className="p-1 bg-green-500/90 rounded-full shadow-sm">
                   <CheckIcon className="h-3 w-3 text-white" />
@@ -902,11 +856,11 @@ function DraggableScheduleEvent({
 }
 
 // Droppable Time Slot Component
-function DroppableTimeSlot({ 
+function DroppableTimeSlot({
   id,
-  day, 
-  timeSlot, 
-  isOccupied, 
+  day,
+  timeSlot,
+  isOccupied,
   children,
   onCreateNew,
   availableMinutes = null
@@ -914,7 +868,7 @@ function DroppableTimeSlot({
   const { setNodeRef, isOver } = useDroppable({
     id: id
   });
-  
+
   const handleClick = () => {
     if (!isOccupied && onCreateNew) {
       onCreateNew(day, timeSlot);
@@ -927,9 +881,9 @@ function DroppableTimeSlot({
     <div
       ref={setNodeRef}
       className={`group transition-all duration-300 ease-out ${
-        isOver && !isOccupied 
+        isOver && !isOccupied
           ? 'bg-gradient-to-br from-blue-100/80 to-blue-200/80 border-blue-400/60 shadow-inner backdrop-blur-sm' :
-        isOccupied 
+        isOccupied
           ? 'bg-transparent'
           : `cursor-pointer ${isWeekend ? 'hover:bg-gray-100/50' : 'hover:bg-blue-50/50 hover:shadow-sm'}`
       } ${isWeekend ? 'bg-gray-50/30' : 'bg-white/50'} border-r border-b border-gray-200/60 relative backdrop-blur-xs`}
@@ -946,7 +900,7 @@ function DroppableTimeSlot({
           </div>
         </div>
       )}
-      
+
       {/* Enhanced available time hint on hover for empty slots */}
       {!isOccupied && availableMinutes && availableMinutes < 60 && (
         <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-1 group-hover:translate-y-0">
@@ -955,20 +909,20 @@ function DroppableTimeSlot({
           </div>
         </div>
       )}
-      
+
       {children}
     </div>
   );
 }
 
 // Week View Component - Cleaner Design
-function WeekView({ 
-  dateRange, 
-  timeSlots, 
-  getEventsForDay, 
+function WeekView({
+  dateRange,
+  timeSlots,
+  getEventsForDay,
   getDayStats,
   handleTimeSlotClick,
-  handleDayClick, 
+  handleDayClick,
   openEditModal,
   childSubjects,
   selectedChildrenIds,
@@ -991,10 +945,10 @@ function WeekView({
           const isTodayDay = isToday(day);
           const dayOfWeek = day.getDay();
           const isClickableWeekday = dayOfWeek >= 1 && dayOfWeek <= 5; // Monday-Friday
-          
+
           return (
-            <div 
-              key={day.toString()} 
+            <div
+              key={day.toString()}
               className={`p-4 text-center border-b border-gray-200/60 transition-all duration-300 ease-out ${
                 isWeekend ? 'bg-gray-50/70' : 'bg-white/70'
               } ${
@@ -1033,7 +987,7 @@ function WeekView({
                 </div>
               ))}
             </div>
-  
+
             {/* Day columns */}
             {dateRange.days.map((day, dayIndex) => {
               const dayString = format(day, 'yyyy-MM-dd');
@@ -1041,7 +995,7 @@ function WeekView({
               const dayStats = getDayStats(day);
               const isWeekendDay = isWeekend(day);
               const isTodayDay = isToday(day);
-              
+
               return (
                 <div key={dayString} className="border-r border-gray-200/60 last:border-r-0">
 
@@ -1075,15 +1029,15 @@ function WeekView({
                       if (eventTimeStr && eventTimeStr.length === 8) {
                         eventTimeStr = eventTimeStr.substring(0, 5);
                       }
-                      
+
                       if (!eventTimeStr) return false;
-                      
+
                       const eventStartTime = new Date(`2000-01-01T${eventTimeStr}`);
                       const currentSlotTime = new Date(`2000-01-01T${timeSlot}`);
                       const eventDuration = event.duration || event.duration_minutes || 30;
                       const eventEndTime = new Date(eventStartTime.getTime() + (eventDuration * 60000));
                       const slotEndTime = new Date(currentSlotTime.getTime() + (15 * 60000));
-                      
+
                       return currentSlotTime < eventEndTime && slotEndTime > eventStartTime && eventTimeStr !== timeSlot;
                     });
 
@@ -1091,7 +1045,7 @@ function WeekView({
                       // Show the event starting here with proper height
                       const duration = eventStartingHere.duration || eventStartingHere.duration_minutes || 30;
                       const slotsSpanned = Math.ceil(duration / 15);
-                      
+
                       return (
                         <div key={timeSlot} className="relative" style={{ minHeight: '64px' }}>
                           <DraggableScheduleEvent
@@ -1136,13 +1090,12 @@ function WeekView({
   );
 }
 
-
 // Multi-Week View Component
-function MultiWeekView({ 
-  dateRange, 
-  getDayStats, 
+function MultiWeekView({
+  dateRange,
+  getDayStats,
   getEventsForDay,
-  handleDayClick, 
+  handleDayClick,
   openEditModal,
   childSubjects,
   selectedChildrenIds,
@@ -1165,10 +1118,10 @@ function MultiWeekView({
               const events = getEventsForDay(day);
               const isWeekend = dayIndex >= 5;
               const isTodayDay = isToday(day);
-              
+
               return (
-                <div 
-                  key={day.toString()} 
+                <div
+                  key={day.toString()}
                   className={`p-3 border-r border-gray-200 last:border-r-0 min-h-[120px] cursor-pointer transition-colors ${
                     isWeekend ? "bg-gray-50" : "bg-white hover:bg-blue-50"
                   } ${isTodayDay ? "bg-blue-100" : ""}`}
@@ -1216,13 +1169,13 @@ function MultiWeekView({
   );
 }
 
-// Month View Component  
-function MonthView({ 
-  dateRange, 
+// Month View Component
+function MonthView({
+  dateRange,
   currentDate,
-  getDayStats, 
+  getDayStats,
   getEventsForDay,
-  handleDayClick, 
+  handleDayClick,
   openEditModal,
   childSubjects,
   selectedChildrenIds,
@@ -1230,7 +1183,7 @@ function MonthView({
 }) {
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const weeks = [];
-  
+
   for (let i = 0; i < dateRange.days.length; i += 7) {
     weeks.push(dateRange.days.slice(i, i + 7));
   }
@@ -1252,10 +1205,10 @@ function MonthView({
             const isCurrentMonth = day.getMonth() === currentDate.getMonth();
             const isWeekend = dayIndex >= 5;
             const isTodayDay = isToday(day);
-            
+
             return (
-              <div 
-                key={day.toString()} 
+              <div
+                key={day.toString()}
                 className={`p-2 border-r border-b border-gray-200 last:border-r-0 min-h-[100px] cursor-pointer transition-colors ${
                   !isCurrentMonth ? "bg-gray-50 text-gray-400" :
                   isWeekend ? "bg-gray-50" : "bg-white hover:bg-blue-50"
@@ -1263,7 +1216,7 @@ function MonthView({
                 onClick={() => handleDayClick(day)}
               >
                 <div className={`text-sm font-semibold mb-1 ${
-                  isTodayDay ? "text-blue-800" : 
+                  isTodayDay ? "text-blue-800" :
                   !isCurrentMonth ? "text-gray-400" : "text-gray-900"
                 }`}>
                   {format(day, "d")}

@@ -4,12 +4,12 @@ import React from 'react';
 import { ExclamationTriangleIcon, SparklesIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import Button from './ui/Button';
 
-export default function UpgradePrompt({ 
-  feature, 
-  currentPlan, 
-  onUpgrade, 
+export default function UpgradePrompt({
+  feature,
+  currentPlan,
+  onUpgrade,
   onClose,
-  upgrading = false 
+  upgrading = false
 }) {
   const prompts = {
     ai: {
@@ -22,7 +22,7 @@ export default function UpgradePrompt({
     children: {
       icon: <UserGroupIcon className="h-16 w-16" style={{ color: 'var(--accent-yellow)' }} />,
       title: "Child Limit Reached",
-      description: currentPlan === 'free' 
+      description: currentPlan === 'free'
         ? "Upgrade to Family Plan to add up to 3 children with AI tutoring for all."
         : "Upgrade to Academy Plan to add up to 10 children.",
       buttonText: currentPlan === 'free' ? "Upgrade to Family Plan - $19/month" : "Upgrade to Academy Plan - $39/month",
@@ -38,7 +38,7 @@ export default function UpgradePrompt({
     materials: {
       icon: <ExclamationTriangleIcon className="h-16 w-16" style={{ color: 'var(--accent-yellow)' }} />,
       title: "Material Limit Reached",
-      description: currentPlan === 'free' 
+      description: currentPlan === 'free'
         ? "You've reached the 50 material limit. Add the AI Pack for 100 materials or upgrade to Family Plan for 500."
         : "You've reached your material limit. Upgrade for more storage.",
       buttonText: currentPlan === 'free' ? "Add AI Pack - $9.99/month" : "Upgrade Plan",

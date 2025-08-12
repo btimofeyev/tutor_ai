@@ -1,8 +1,8 @@
 // app/dashboard/components/ManualMaterialForm.js
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  DocumentPlusIcon, 
+import {
+  DocumentPlusIcon,
   ArrowPathIcon,
   BookOpenIcon,
   ClockIcon,
@@ -42,23 +42,23 @@ export default function ManualMaterialForm({
   childSubjectsForSelectedChild,
   onSubmit,
   savingMaterial,
-  
-  currentSubject,         
-  onSubjectChange,        
 
-  unitsForSelectedSubject,  
+  currentSubject,
+  onSubjectChange,
+
+  unitsForSelectedSubject,
   onCreateNewUnit,
 
-  selectedUnitInManualForm, 
-  onManualFormUnitChange, 
+  selectedUnitInManualForm,
+  onManualFormUnitChange,
 
-  lessonContainersForSelectedUnit, 
-  
-  selectedLessonContainer, 
-  onLessonContainerChange, 
+  lessonContainersForSelectedUnit,
 
-  onCreateNewLessonContainer, 
-  
+  selectedLessonContainer,
+  onLessonContainerChange,
+
+  onCreateNewLessonContainer,
+
   appContentTypes = QUICK_CONTENT_TYPES,
   appGradableContentTypes = [],
   selectedChild, // Add this prop to access child info
@@ -81,7 +81,7 @@ export default function ManualMaterialForm({
   useEffect(() => {
     if (currentSubject !== prevSubjectRef.current) {
       if (onManualFormUnitChange) {
-        onManualFormUnitChange(''); 
+        onManualFormUnitChange('');
       }
       prevSubjectRef.current = currentSubject;
     }
@@ -93,10 +93,10 @@ export default function ManualMaterialForm({
   // Effect to reset lesson container when this form's unit selection changes
   useEffect(() => {
     if (selectedUnitInManualForm !== prevUnitRefForForm.current) {
-      if (onLessonContainerChange) { 
-          onLessonContainerChange({ target: { value: '' } }); 
+      if (onLessonContainerChange) {
+          onLessonContainerChange({ target: { value: '' } });
       }
-      setIsCreatingLessonGroup(false); 
+      setIsCreatingLessonGroup(false);
       setNewLessonGroupTitle('');
       prevUnitRefForForm.current = selectedUnitInManualForm;
     }
@@ -126,7 +126,7 @@ export default function ManualMaterialForm({
   const handleUnitChangeInThisForm = (e) => {
     const newUnitId = e.target.value;
     if (onManualFormUnitChange) {
-        onManualFormUnitChange(newUnitId); 
+        onManualFormUnitChange(newUnitId);
     }
   };
 
@@ -135,7 +135,7 @@ export default function ManualMaterialForm({
     if (!formData.title.trim()) { alert('Please enter a title for the material.'); return; }
     if (!currentSubject) { alert('Please select a subject.'); return; }
     if (!selectedUnitInManualForm) { alert('Please select a unit.'); return; }
-    if (selectedUnitInManualForm === '__create_new__') { 
+    if (selectedUnitInManualForm === '__create_new__') {
         alert('Please click "Create" for the new unit first, then save the material.'); return;
     }
     if (!selectedLessonContainer) { alert('Please select a lesson group.'); return; }
@@ -147,12 +147,12 @@ export default function ManualMaterialForm({
     }
 
     const materialData = {
-      lesson_id: selectedLessonContainer, 
+      lesson_id: selectedLessonContainer,
       child_subject_id: currentSubject,
-      title: formData.title.trim(), 
+      title: formData.title.trim(),
       content_type: formData.content_type,
-      lesson_json: { 
-        title: formData.title.trim(), 
+      lesson_json: {
+        title: formData.title.trim(),
         created_manually: true,
         content_type_suggestion: formData.content_type,
         main_content_summary_or_extract: formData.description.trim() || 'Manually created material',
@@ -161,14 +161,14 @@ export default function ManualMaterialForm({
         estimated_completion_time_minutes: formData.estimated_time_minutes ? parseInt(formData.estimated_time_minutes) : null,
         difficulty_level_suggestion: formData.difficulty_level,
         page_count_or_length_indicator: "Manual entry",
-        tasks_or_questions: [], 
+        tasks_or_questions: [],
         total_possible_points_suggestion: formData.max_score ? parseInt(formData.max_score) : null,
         additional_notes: formData.notes.trim() || null,
       },
       grade_max_value: formData.max_score ? parseInt(formData.max_score) : null,
       due_date: formData.due_date || null,
       completed_at: formData.completed ? new Date().toISOString() : null,
-      unit_id: selectedUnitInManualForm 
+      unit_id: selectedUnitInManualForm
     };
 
     const result = await onSubmit(materialData);
@@ -178,8 +178,8 @@ export default function ManualMaterialForm({
         estimated_time_minutes: 30, learning_objectives: '', topics: '', due_date: '',
         max_score: '', completed: false, notes: ''
       });
-      if (onManualFormUnitChange) onManualFormUnitChange(''); 
-      if (onLessonContainerChange) onLessonContainerChange({ target: { value: '' } }); 
+      if (onManualFormUnitChange) onManualFormUnitChange('');
+      if (onLessonContainerChange) onLessonContainerChange({ target: { value: '' } });
       setNewLessonGroupTitle('');
       setIsCreatingLessonGroup(false);
     }
@@ -188,7 +188,7 @@ export default function ManualMaterialForm({
   const handleCreateNewUnit = async () => {
     if (!newUnitName.trim()) { alert("Please enter a name for the new unit."); return; }
     if (!currentSubject) { alert("A subject must be selected before creating a new unit."); return; }
-    
+
     const result = await onCreateNewUnit(newUnitName.trim(), currentSubject);
     if (result && result.success) {
         setNewUnitName('');
@@ -203,10 +203,10 @@ export default function ManualMaterialForm({
   const handleCreateNewLessonGroup = async () => {
     if (!newLessonGroupTitle.trim()) { alert("Please enter a title for the new lesson group."); return; }
     if (!selectedUnitInManualForm) { alert("A unit must be selected before creating a lesson group."); return; }
-    
-    const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim(), selectedUnitInManualForm); 
+
+    const result = await onCreateNewLessonContainer(newLessonGroupTitle.trim(), selectedUnitInManualForm);
     if (result && result.success) {
-        setNewLessonGroupTitle(''); 
+        setNewLessonGroupTitle('');
         // Set the new lesson group as selected
         if (result.data && onLessonContainerChange) {
           onLessonContainerChange({ target: { value: result.data.id } });
@@ -240,10 +240,10 @@ export default function ManualMaterialForm({
           <label htmlFor="manual-subject" className="block text-sm font-medium text-gray-900 mb-3">
             📚 Which subject is this for?
           </label>
-          <select 
-            id="manual-subject" 
-            value={currentSubject || ''} 
-            onChange={onSubjectChange} 
+          <select
+            id="manual-subject"
+            value={currentSubject || ''}
+            onChange={onSubjectChange}
             className="w-full p-3 border border-gray-300 rounded-lg text-lg"
             required
           >
@@ -261,15 +261,15 @@ export default function ManualMaterialForm({
           <label htmlFor="manual-title" className="block text-sm font-medium text-gray-900 mb-3">
             ✏️ What&apos;s the assignment called?
           </label>
-          <input 
-            type="text" 
-            id="manual-title" 
-            name="title" 
-            value={formData.title} 
-            onChange={handleInputChange} 
+          <input
+            type="text"
+            id="manual-title"
+            name="title"
+            value={formData.title}
+            onChange={handleInputChange}
             className="w-full p-3 border border-gray-300 rounded-lg text-lg"
-            placeholder="e.g., Read Chapter 5, Math Practice Problems" 
-            required 
+            placeholder="e.g., Read Chapter 5, Math Practice Problems"
+            required
           />
         </div>
 
@@ -325,15 +325,15 @@ export default function ManualMaterialForm({
         <div className="space-y-3 p-3 border border-blue-100 rounded-lg bg-blue-50/30">
           <div>
             <label htmlFor="manual-form-unit" className={commonLabelStyles}>Assign to Unit *</label>
-            <select 
-              id="manual-form-unit" 
+            <select
+              id="manual-form-unit"
               name="unit_id_manual_form_select"
               value={selectedUnitInManualForm || ''}
-              onChange={handleUnitChangeInThisForm} 
-              className={commonSelectStyles} 
-              disabled={!currentSubject} 
+              onChange={handleUnitChangeInThisForm}
+              className={commonSelectStyles}
+              disabled={!currentSubject}
               required
-            > 
+            >
               <option value="">-- Select a Unit --</option>
               <option value="__create_new__" className="font-medium text-accent-blue">+ Create New Unit</option>
               {(unitsForSelectedSubject || []).map(unit => (
@@ -349,21 +349,21 @@ export default function ManualMaterialForm({
             <div className="p-3 border border-dashed border-blue-300 rounded-md bg-blue-50/50 animate-fade-in">
               <label htmlFor="new-unit-manual" className={`${commonLabelStyles} text-accent-blue`}>New Unit Name *</label>
               <div className="flex gap-2 mt-1 items-center">
-                <input 
-                  type="text" 
-                  id="new-unit-manual" 
-                  value={newUnitName} 
-                  onChange={(e) => setNewUnitName(e.target.value)} 
-                  className={`${commonInputStyles} flex-1`} 
-                  placeholder="e.g., Unit 4: Geometry" 
-                  required={isCreatingUnit} 
+                <input
+                  type="text"
+                  id="new-unit-manual"
+                  value={newUnitName}
+                  onChange={(e) => setNewUnitName(e.target.value)}
+                  className={`${commonInputStyles} flex-1`}
+                  placeholder="e.g., Unit 4: Geometry"
+                  required={isCreatingUnit}
                 />
-                <Button 
-                  type="button" 
-                  variant="primary" 
-                  size="sm" 
-                  onClick={handleCreateNewUnit} 
-                  className="h-10 whitespace-nowrap" 
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={handleCreateNewUnit}
+                  className="h-10 whitespace-nowrap"
                   disabled={!newUnitName.trim() || savingMaterial}
                 >
                   <PlusIcon className="h-4 w-4 mr-1" /> Create
@@ -371,16 +371,16 @@ export default function ManualMaterialForm({
               </div>
             </div>
           )}
-          
+
           <div>
             <label htmlFor="manual-lesson-container" className={commonLabelStyles}>Lesson Group *</label>
-            <select 
-              id="manual-lesson-container" 
-              value={selectedLessonContainer || ''} 
-              onChange={onLessonContainerChange} 
-              className={commonSelectStyles} 
+            <select
+              id="manual-lesson-container"
+              value={selectedLessonContainer || ''}
+              onChange={onLessonContainerChange}
+              className={commonSelectStyles}
               required
-              disabled={!selectedUnitInManualForm || selectedUnitInManualForm === '__create_new__'} 
+              disabled={!selectedUnitInManualForm || selectedUnitInManualForm === '__create_new__'}
             >
               <option value="">-- Choose or Create Lesson Group --</option>
               <option value="__create_new__" className="font-medium text-accent-blue">+ Create New Lesson Group</option>
@@ -397,21 +397,21 @@ export default function ManualMaterialForm({
             <div className="p-3 border border-dashed border-blue-300 rounded-md bg-blue-50/50">
               <label htmlFor="new-manual-lesson-group" className={`${commonLabelStyles} text-accent-blue`}>New Lesson Group Title *</label>
               <div className="flex gap-2 mt-1 items-center">
-                <input 
-                  type="text" 
-                  id="new-manual-lesson-group" 
-                  value={newLessonGroupTitle} 
-                  onChange={(e) => setNewLessonGroupTitle(e.target.value)} 
-                  className={`${commonInputStyles} flex-1`} 
-                  placeholder="e.g., Week 3 Activities" 
-                  required={isCreatingLessonGroup} 
+                <input
+                  type="text"
+                  id="new-manual-lesson-group"
+                  value={newLessonGroupTitle}
+                  onChange={(e) => setNewLessonGroupTitle(e.target.value)}
+                  className={`${commonInputStyles} flex-1`}
+                  placeholder="e.g., Week 3 Activities"
+                  required={isCreatingLessonGroup}
                 />
-                <Button 
-                  type="button" 
-                  variant="primary" 
-                  size="sm" 
-                  onClick={handleCreateNewLessonGroup} 
-                  className="h-10 whitespace-nowrap" 
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={handleCreateNewLessonGroup}
+                  className="h-10 whitespace-nowrap"
                   disabled={!newLessonGroupTitle.trim() || savingMaterial}
                 >
                   <PlusIcon className="h-4 w-4 mr-1" /> Create
@@ -423,13 +423,13 @@ export default function ManualMaterialForm({
 
         <div>
           <label htmlFor="manual-description" className={commonLabelStyles}>Description</label>
-          <textarea 
-            id="manual-description" 
-            name="description" 
-            value={formData.description} 
-            onChange={handleInputChange} 
-            rows="3" 
-            className={commonInputStyles} 
+          <textarea
+            id="manual-description"
+            name="description"
+            value={formData.description}
+            onChange={handleInputChange}
+            rows="3"
+            className={commonInputStyles}
             placeholder="Brief description of what this material covers..."
           />
         </div>
@@ -440,11 +440,11 @@ export default function ManualMaterialForm({
               <AcademicCapIcon className="h-4 w-4 inline mr-1" />
               Difficulty Level
             </label>
-            <select 
-              id="manual-difficulty" 
-              name="difficulty_level" 
-              value={formData.difficulty_level} 
-              onChange={handleInputChange} 
+            <select
+              id="manual-difficulty"
+              name="difficulty_level"
+              value={formData.difficulty_level}
+              onChange={handleInputChange}
               className={commonSelectStyles}
             >
               {DIFFICULTY_LEVELS.map(level => (
@@ -459,11 +459,11 @@ export default function ManualMaterialForm({
               <ClockIcon className="h-4 w-4 inline mr-1" />
               Estimated Time
             </label>
-            <select 
-              id="manual-time" 
-              name="estimated_time_minutes" 
-              value={formData.estimated_time_minutes} 
-              onChange={handleInputChange} 
+            <select
+              id="manual-time"
+              name="estimated_time_minutes"
+              value={formData.estimated_time_minutes}
+              onChange={handleInputChange}
               className={commonSelectStyles}
             >
               {TIME_ESTIMATES.map(time => (
@@ -475,13 +475,13 @@ export default function ManualMaterialForm({
 
         <div>
           <label htmlFor="manual-objectives" className={commonLabelStyles}>Learning Objectives</label>
-          <textarea 
-            id="manual-objectives" 
-            name="learning_objectives" 
-            value={formData.learning_objectives} 
-            onChange={handleInputChange} 
-            rows="2" 
-            className={commonInputStyles} 
+          <textarea
+            id="manual-objectives"
+            name="learning_objectives"
+            value={formData.learning_objectives}
+            onChange={handleInputChange}
+            rows="2"
+            className={commonInputStyles}
             placeholder="One objective per line, e.g.
 Understand basic multiplication
 Solve word problems"
@@ -491,13 +491,13 @@ Solve word problems"
 
         <div>
           <label htmlFor="manual-topics" className={commonLabelStyles}>Topics & Keywords</label>
-          <input 
-            type="text" 
-            id="manual-topics" 
-            name="topics" 
-            value={formData.topics} 
-            onChange={handleInputChange} 
-            className={commonInputStyles} 
+          <input
+            type="text"
+            id="manual-topics"
+            name="topics"
+            value={formData.topics}
+            onChange={handleInputChange}
+            className={commonInputStyles}
             placeholder="multiplication, word problems (comma-separated)"
           />
         </div>
@@ -505,27 +505,27 @@ Solve word problems"
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="manual-due-date" className={commonLabelStyles}>Due Date</label>
-            <input 
-              type="date" 
-              id="manual-due-date" 
-              name="due_date" 
-              value={formData.due_date} 
-              onChange={handleInputChange} 
-              className={commonInputStyles} 
+            <input
+              type="date"
+              id="manual-due-date"
+              name="due_date"
+              value={formData.due_date}
+              onChange={handleInputChange}
+              className={commonInputStyles}
             />
           </div>
           {isGradableType && (
             <div>
               <label htmlFor="manual-max-score" className={commonLabelStyles}>Max Score/Points</label>
-              <input 
-                type="number" 
-                id="manual-max-score" 
-                name="max_score" 
-                value={formData.max_score} 
-                onChange={handleInputChange} 
-                className={commonInputStyles} 
-                placeholder="e.g., 100" 
-                min="1" 
+              <input
+                type="number"
+                id="manual-max-score"
+                name="max_score"
+                value={formData.max_score}
+                onChange={handleInputChange}
+                className={commonInputStyles}
+                placeholder="e.g., 100"
+                min="1"
               />
             </div>
           )}
@@ -533,35 +533,35 @@ Solve word problems"
 
         <div>
           <label htmlFor="manual-notes" className={commonLabelStyles}>Additional Notes</label>
-          <textarea 
-            id="manual-notes" 
-            name="notes" 
-            value={formData.notes} 
-            onChange={handleInputChange} 
-            rows="2" 
-            className={commonInputStyles} 
+          <textarea
+            id="manual-notes"
+            name="notes"
+            value={formData.notes}
+            onChange={handleInputChange}
+            rows="2"
+            className={commonInputStyles}
             placeholder="Any additional notes or instructions..."
           />
         </div>
 
         <div className="flex items-center">
-          <input 
-            type="checkbox" 
-            id="manual-completed" 
-            name="completed" 
-            checked={formData.completed} 
-            onChange={handleInputChange} 
-            className="h-4 w-4 text-accent-blue border-border-input rounded focus:ring-accent-blue" 
+          <input
+            type="checkbox"
+            id="manual-completed"
+            name="completed"
+            checked={formData.completed}
+            onChange={handleInputChange}
+            className="h-4 w-4 text-accent-blue border-border-input rounded focus:ring-accent-blue"
           />
           <label htmlFor="manual-completed" className="ml-2 block text-sm font-medium text-text-primary">
             Mark as completed
           </label>
         </div>
-        <Button 
-          type="submit" 
-          variant="primary" 
-          size="md" 
-          className="w-full" 
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          className="w-full"
           disabled={savingMaterial || !currentSubject || !selectedUnitInManualForm || (selectedUnitInManualForm === '__create_new__') || !selectedLessonContainer || (selectedLessonContainer === '__create_new__')}
         >
           {savingMaterial ? (

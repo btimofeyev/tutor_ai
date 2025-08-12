@@ -14,8 +14,8 @@ const QuickAccessItem = ({ lesson, onToggleComplete, onEdit, onDelete, type }) =
 
   const formatDueDate = (dateString) => {
     try {
-      return new Date(dateString + 'T00:00:00').toLocaleDateString(undefined, { 
-        month: 'short', 
+      return new Date(dateString + 'T00:00:00').toLocaleDateString(undefined, {
+        month: 'short',
         day: 'numeric',
         weekday: 'short'
       });
@@ -89,26 +89,26 @@ const QuickAccessItem = ({ lesson, onToggleComplete, onEdit, onDelete, type }) =
   );
 };
 
-export default function QuickAccessSection({ 
-  lessonsBySubject, 
-  onToggleComplete, 
+export default function QuickAccessSection({
+  lessonsBySubject,
+  onToggleComplete,
   onEdit,
   onDelete,
-  maxItems = 5 
+  maxItems = 5
 }) {
   const { overdueItems, upcomingItems } = useMemo(() => {
     const allLessons = Object.values(lessonsBySubject).flat();
-    
+
     const overdue = allLessons
       .filter(lesson => !lesson.completed_at && isDateOverdue(lesson.due_date))
       .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
       .slice(0, maxItems);
-    
+
     const upcoming = allLessons
       .filter(lesson => !lesson.completed_at && isDateDueSoon(lesson.due_date, 7) && !isDateOverdue(lesson.due_date))
       .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
       .slice(0, maxItems);
-    
+
     return {
       overdueItems: overdue,
       upcomingItems: upcoming
@@ -131,7 +131,7 @@ export default function QuickAccessSection({
           Important assignments and upcoming work for your child
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Overdue Items */}
         {overdueItems.length > 0 && (

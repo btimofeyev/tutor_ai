@@ -7,14 +7,14 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 // Event names for cross-instance communication
 const NOTES_EVENTS = {
   CREATED: 'parent_notes_created',
-  UPDATED: 'parent_notes_updated', 
+  UPDATED: 'parent_notes_updated',
   DELETED: 'parent_notes_deleted'
 };
 
 // Available colors for sticky notes
 const STICKY_NOTE_COLORS = [
   'yellow',
-  'blue', 
+  'blue',
   'pink',
   'green',
   'orange',
@@ -44,10 +44,10 @@ export const useParentNotes = (childId, isGlobal = false) => {
   const broadcastNoteChange = useCallback((eventType, data = {}) => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(eventType, {
-        detail: { 
-          childId, 
+        detail: {
+          childId,
           timestamp: Date.now(),
-          ...data 
+          ...data
         }
       }));
     }
@@ -56,7 +56,7 @@ export const useParentNotes = (childId, isGlobal = false) => {
   // Get cached notes
   const getCachedNotes = useCallback(() => {
     if (!childId) return null;
-    
+
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
@@ -79,7 +79,7 @@ export const useParentNotes = (childId, isGlobal = false) => {
   const cacheNotes = useCallback((notesData) => {
     // For child-specific notes, require childId
     if (!isGlobal && !childId) return;
-    
+
     try {
       const cacheData = {
         data: notesData,
@@ -114,20 +114,20 @@ export const useParentNotes = (childId, isGlobal = false) => {
 
     try {
       // Use appropriate endpoint based on isGlobal flag
-      const endpoint = isGlobal 
+      const endpoint = isGlobal
         ? '/children/global/notes'
         : `/children/${childId}/notes`;
-      
+
       const response = await api.get(endpoint);
       const notesData = response.data || [];
-      
+
       setNotes(notesData);
       cacheNotes(notesData);
       return notesData;
     } catch (err) {
       console.error('Error fetching parent notes:', err);
       setError(err.response?.data?.error || 'Failed to fetch notes');
-      
+
       // Try to use cached data on error
       const cachedNotes = getCachedNotes();
       if (cachedNotes) {
@@ -145,21 +145,21 @@ export const useParentNotes = (childId, isGlobal = false) => {
 
     try {
       // Use appropriate endpoint based on isGlobal flag
-      const endpoint = isGlobal 
+      const endpoint = isGlobal
         ? '/children/global/notes'
         : `/children/${childId}/notes`;
-        
+
       const response = await api.post(endpoint, noteData);
       const newNote = response.data;
-      
+
       // Optimistic update
       const updatedNotes = [...notes, newNote];
       setNotes(updatedNotes);
       cacheNotes(updatedNotes);
-      
+
       // Broadcast note creation to other hook instances
       broadcastNoteChange(NOTES_EVENTS.CREATED, { noteId: newNote.id, isGlobal });
-      
+
       return newNote;
     } catch (err) {
       console.error('Error creating note:', err);
@@ -175,23 +175,23 @@ export const useParentNotes = (childId, isGlobal = false) => {
 
     try {
       // Use appropriate endpoint based on isGlobal flag
-      const endpoint = isGlobal 
+      const endpoint = isGlobal
         ? `/children/global/notes/${noteId}`
         : `/children/${childId}/notes/${noteId}`;
-        
+
       const response = await api.put(endpoint, updateData);
       const updatedNote = response.data;
-      
+
       // Optimistic update
-      const updatedNotes = notes.map(note => 
+      const updatedNotes = notes.map(note =>
         note.id === noteId ? updatedNote : note
       );
       setNotes(updatedNotes);
       cacheNotes(updatedNotes);
-      
+
       // Broadcast note update to other hook instances
       broadcastNoteChange(NOTES_EVENTS.UPDATED, { noteId, isGlobal });
-      
+
       return updatedNote;
     } catch (err) {
       console.error('Error updating note:', err);
@@ -207,20 +207,20 @@ export const useParentNotes = (childId, isGlobal = false) => {
 
     try {
       // Use appropriate endpoint based on isGlobal flag
-      const endpoint = isGlobal 
+      const endpoint = isGlobal
         ? `/children/global/notes/${noteId}`
         : `/children/${childId}/notes/${noteId}`;
-        
+
       await api.delete(endpoint);
-      
+
       // Optimistic update
       const updatedNotes = notes.filter(note => note.id !== noteId);
       setNotes(updatedNotes);
       cacheNotes(updatedNotes);
-      
+
       // Broadcast note deletion to other hook instances
       broadcastNoteChange(NOTES_EVENTS.DELETED, { noteId, isGlobal });
-      
+
       return true;
     } catch (err) {
       console.error('Error deleting note:', err);
@@ -251,7 +251,7 @@ export const useParentNotes = (childId, isGlobal = false) => {
 
     const handleNoteChange = (event) => {
       const { childId: eventChildId, isGlobal: eventIsGlobal } = event.detail;
-      
+
       // Only refetch if the event matches our context (global vs child-specific)
       if (isGlobal && eventIsGlobal) {
         // Global note change

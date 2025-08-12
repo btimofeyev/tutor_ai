@@ -1,9 +1,9 @@
 // Custom hook for managing dashboard filters and sorting
 import { useState, useMemo } from 'react';
 import { FILTER_OPTIONS } from '../utils/dashboardConstants';
-import { 
-  filterLessonsByStatus, 
-  filterLessonsByContentType, 
+import {
+  filterLessonsByStatus,
+  filterLessonsByContentType,
   sortLessons,
   calculateGradeStats,
   calculateCompletionStats,
@@ -21,18 +21,18 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
   // Compute dashboard statistics
   const dashboardStats = useMemo(() => {
     if (!selectedChild || Object.keys(lessonsBySubject).length === 0) return {};
-    
+
     const stats = {};
     const subjectsForChild = childSubjects[selectedChild.id] || [];
-    
+
     subjectsForChild.forEach(subject => {
       const subjectLessons = lessonsBySubject[subject.child_subject_id] || [];
       const subjectWeights = gradeWeights[subject.child_subject_id] || [];
-      
+
       if (subjectLessons.length > 0) {
         const completionStats = calculateCompletionStats(subjectLessons);
         const gradeStats = calculateGradeStats(subjectLessons, subjectWeights);
-        
+
         stats[subject.child_subject_id] = {
           ...subject,
           completionPercent: completionStats.completionPercent,
@@ -43,39 +43,39 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
         };
       }
     });
-    
+
     return stats;
   }, [selectedChild, lessonsBySubject, gradeWeights, childSubjects]);
 
   // Compute filtered and sorted lessons
   const filteredAndSortedLessonsBySubject = useMemo(() => {
     if (Object.keys(lessonsBySubject).length === 0) return {};
-    
+
     const result = {};
-    
+
     for (const childSubjectId in lessonsBySubject) {
       let subjectLessons = [...(lessonsBySubject[childSubjectId] || [])];
-      
+
       // Apply search filter
       if (searchTerm.trim()) {
         const searchLower = searchTerm.toLowerCase();
-        subjectLessons = subjectLessons.filter(lesson => 
+        subjectLessons = subjectLessons.filter(lesson =>
           lesson.title?.toLowerCase().includes(searchLower) ||
           lesson.content_type?.toLowerCase().includes(searchLower) ||
           lesson.description?.toLowerCase().includes(searchLower)
         );
       }
-      
+
       // Apply filters
       subjectLessons = filterLessonsByStatus(subjectLessons, filterStatus);
       subjectLessons = filterLessonsByContentType(subjectLessons, filterContentType);
-      
+
       // Apply sorting
       subjectLessons = sortLessons(subjectLessons, sortBy);
-      
+
       result[childSubjectId] = subjectLessons;
     }
-    
+
     return result;
   }, [lessonsBySubject, filterStatus, filterContentType, sortBy, searchTerm]);
 
@@ -89,14 +89,14 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
     let totalWeight = 0;
     let dueSoonCount = 0;
     let overdueCount = 0;
-    
+
     subjectsForChild.forEach(subject => {
       const subjectLessons = lessonsBySubject[subject.child_subject_id] || [];
       const subjectWeights = gradeWeights[subject.child_subject_id] || [];
-      
+
       totalLessons += subjectLessons.length;
       completedLessons += subjectLessons.filter(lesson => lesson.completed_at).length;
-      
+
       // Calculate due soon and overdue counts (only for incomplete lessons)
       subjectLessons.forEach(lesson => {
         if (!lesson.completed_at && lesson.due_date) {
@@ -107,15 +107,15 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
           }
         }
       });
-      
-      const gradableItems = subjectLessons.filter(lesson => 
-        lesson.grade_value !== null && 
-        lesson.grade_max_value !== null && 
+
+      const gradableItems = subjectLessons.filter(lesson =>
+        lesson.grade_value !== null &&
+        lesson.grade_max_value !== null &&
         lesson.grade_max_value > 0
       );
-      
+
       totalGradableItems += gradableItems.length;
-      
+
       gradableItems.forEach(lesson => {
         const weight = subjectWeights.find(w => w.content_type === lesson.content_type)?.weight || 0;
         if (weight > 0) {
@@ -125,10 +125,10 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
         }
       });
     });
-    
+
     const overallCompletionPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
     const overallGradePercent = totalWeight > 0 ? Math.round((totalWeightedScore / totalWeight) * 100) / 100 : 0;
-    
+
     return {
       totalItems: totalLessons,
       completedItems: completedLessons,
@@ -161,15 +161,15 @@ export function useFiltersAndSorting(lessonsBySubject, gradeWeights, childSubjec
     setSortBy,
     searchTerm,
     setSearchTerm,
-    
+
     // Computed data
     dashboardStats,
     filteredAndSortedLessonsBySubject,
     totalStats,
-    
+
     // Actions
     resetFilters,
-    
+
     // Filter options (for dropdowns)
     filterOptions: FILTER_OPTIONS
   };

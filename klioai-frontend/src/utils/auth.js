@@ -72,7 +72,7 @@ class AuthService {
 
       const data = await response.json();
       const { tokens, child, sessionId } = data;
-      
+
       this.token = tokens.accessToken;
       this.refreshToken = tokens.refreshToken;
       this.child = child;
@@ -110,7 +110,7 @@ class AuthService {
 
       const data = await response.json();
       const { tokens } = data;
-      
+
       this.token = tokens.accessToken;
       this.refreshToken = tokens.refreshToken;
 
@@ -146,7 +146,7 @@ class AuthService {
       this.refreshToken = null;
       this.child = null;
       this.sessionId = null;
-      
+
       localStorage.removeItem('klio_access_token');
       localStorage.removeItem('klio_refresh_token');
       localStorage.removeItem('klio_session_id');

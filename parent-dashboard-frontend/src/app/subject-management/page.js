@@ -14,7 +14,7 @@ export default function SubjectsPage() {
   const [selectedChildName, setSelectedChildName] = useState('');
   const [allSubjects, setAllSubjects] = useState([]);
   const [assignedChildSubjects, setAssignedChildSubjects] = useState([]);
-  
+
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [loadingAllSubjects, setLoadingAllSubjects] = useState(true);
   const [loadingAssigned, setLoadingAssigned] = useState(false);
@@ -24,7 +24,7 @@ export default function SubjectsPage() {
   const [showAddSubjectForm, setShowAddSubjectForm] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState('');
   const [creatingSubject, setCreatingSubject] = useState(false);
-  
+
   // State for deletion modal
   const [deletingSubject, setDeletingSubject] = useState(null);
   const [subjectStats, setSubjectStats] = useState(null);
@@ -45,7 +45,7 @@ export default function SubjectsPage() {
       .then(res => setChildren(res.data || []))
       .catch(err => {})
       .finally(() => setLoadingChildren(false));
-    
+
     fetchAllSubjects(); // Initial fetch
   }, []);
 
@@ -54,7 +54,7 @@ export default function SubjectsPage() {
       setLoadingAssigned(true);
       const child = children.find(c => c.id === selectedChild);
       setSelectedChildName(child ? child.name : '');
-      
+
       // FIXED: Use new child-subjects endpoint
       api.get(`/child-subjects/child/${selectedChild}`)
         .then(res => setAssignedChildSubjects(res.data || []))
@@ -73,15 +73,15 @@ export default function SubjectsPage() {
     if (!selectedChild) return;
     setProcessingAction(true);
     try {
-      await api.post('/child-subjects/assign', { 
-        child_id: selectedChild, 
-        subject_id: subjectId 
+      await api.post('/child-subjects/assign', {
+        child_id: selectedChild,
+        subject_id: subjectId
       });
-      
+
       // Refresh assigned subjects list
       const res = await api.get(`/child-subjects/child/${selectedChild}`);
       setAssignedChildSubjects(res.data || []);
-      
+
       // Signal dashboard to refresh when user returns
       signalDashboardRefresh();
     } catch (error) {
@@ -98,18 +98,18 @@ export default function SubjectsPage() {
         api.get(`/units/subject/${childSubjectId}`),
         api.get(`/materials/subject/${childSubjectId}`)
       ]);
-      
+
       // Count lesson containers and materials more accurately
       let lessonContainerCount = 0;
       let materialsByLessonCount = 0;
       const units = unitsRes.data || [];
-      
+
       for (const unit of units) {
         try {
           const lessonsRes = await api.get(`/lesson-containers/unit/${unit.id}`);
           const lessonContainers = lessonsRes.data || [];
           lessonContainerCount += lessonContainers.length;
-          
+
           // Count materials in each lesson container
           for (const lessonContainer of lessonContainers) {
             try {
@@ -123,10 +123,10 @@ export default function SubjectsPage() {
           console.error('Error fetching lesson containers for unit:', unit.id, error);
         }
       }
-      
+
       // Use the total from the direct subject query as it includes all materials
       const totalMaterialCount = (allMaterialsRes.data || []).length;
-      
+
       return {
         units: units,
         materials: allMaterialsRes.data || [],
@@ -144,34 +144,34 @@ export default function SubjectsPage() {
 
   const handleUnassign = async (subject) => {
     if (!selectedChild) return;
-    
+
     // First check if subject has units/materials
     const stats = await checkSubjectStats(subject.child_subject_id);
     setSubjectStats(stats);
     setDeletingSubject(subject);
     setDeleteMode('check');
   };
-  
+
   const handleConfirmDelete = async () => {
     if (!deletingSubject || !selectedChild) return;
-    
+
     setProcessingAction(true);
     try {
       // Only allow unassigning if the subject is empty
-      await api.delete('/child-subjects/unassign', { 
-        data: { 
-          child_id: selectedChild, 
-          subject_id: deletingSubject.id 
-        } 
+      await api.delete('/child-subjects/unassign', {
+        data: {
+          child_id: selectedChild,
+          subject_id: deletingSubject.id
+        }
       });
-      
+
       // Refresh assigned subjects list
       const res = await api.get(`/child-subjects/child/${selectedChild}`);
       setAssignedChildSubjects(res.data || []);
-      
+
       // Signal dashboard to refresh when user returns
       signalDashboardRefresh();
-      
+
       // Close modal
       setDeletingSubject(null);
       setSubjectStats(null);
@@ -208,7 +208,7 @@ export default function SubjectsPage() {
       setCreatingSubject(false);
     }
   };
-  
+
   // FIXED: Compare using the original subject id, not the child_subject assignment id
   const availableSubjects = allSubjects.filter(
     subject => !assignedChildSubjects.some(assigned => assigned.id === subject.id)
@@ -224,14 +224,14 @@ export default function SubjectsPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumbs */}
-        <Breadcrumbs 
+        <Breadcrumbs
           items={[
             { label: "Dashboard", href: "/dashboard" },
             { label: "Subject Management" }
           ]}
           className="mb-6"
         />
-        
+
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-800">Manage Subjects</h1>
           <Link href="/dashboard" className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium">
@@ -255,7 +255,7 @@ export default function SubjectsPage() {
               <h2 className="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">
                 Assigned Subjects for <span className="text-blue-600">{selectedChildName}</span>
               </h2>
-              {loadingAssigned ? ( <p className="text-gray-500">Loading...</p> ) : 
+              {loadingAssigned ? ( <p className="text-gray-500">Loading...</p> ) :
                sortedAssignedSubjects.length > 0 ? (
                 <ul className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
                   {sortedAssignedSubjects.map(subject => (
@@ -279,7 +279,7 @@ export default function SubjectsPage() {
             <div className="bg-white shadow-xl rounded-lg p-6">
               <div className="flex justify-between items-center mb-4 border-b pb-2">
                 <h2 className="text-xl font-semibold text-gray-700">Available Subjects</h2>
-                <button 
+                <button
                     onClick={() => setShowAddSubjectForm(!showAddSubjectForm)}
                     className="flex items-center text-xs text-green-600 hover:text-green-800 font-medium p-1.5 rounded-md hover:bg-green-50 disabled:opacity-50 transition-colors"
                     title="Add a new subject to the system"
@@ -293,7 +293,7 @@ export default function SubjectsPage() {
                 <form onSubmit={handleCreateSubject} className="mb-6 p-4 bg-green-50 rounded-md space-y-3">
                   <div>
                     <label htmlFor="new-subject-name" className="block text-sm font-medium text-green-800">New Subject Name:</label>
-                    <input 
+                    <input
                       type="text"
                       id="new-subject-name"
                       value={newSubjectName}
@@ -311,7 +311,7 @@ export default function SubjectsPage() {
                 </form>
               )}
 
-              {loadingAllSubjects ? ( <p className="text-gray-500">Loading...</p> ) : 
+              {loadingAllSubjects ? ( <p className="text-gray-500">Loading...</p> ) :
                availableSubjects.length > 0 ? (
                 <ul className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
                   {availableSubjects.map(subject => (
@@ -339,7 +339,7 @@ export default function SubjectsPage() {
             </div>
         )}
       </div>
-      
+
       {/* Delete Subject Modal */}
       {deletingSubject && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -357,7 +357,7 @@ export default function SubjectsPage() {
                     Unassign {deletingSubject.name}?
                   </h3>
                 </div>
-                
+
                 {subjectStats && (subjectStats.unitCount > 0 || subjectStats.materialCount > 0) ? (
                   <>
                     <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -376,11 +376,11 @@ export default function SubjectsPage() {
                         )}
                       </ul>
                     </div>
-                    
+
                     <p className="text-sm text-gray-600 mb-4">
                       To unassign this subject, you need to first delete all its content from the dashboard.
                     </p>
-                    
+
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                       <p className="text-sm text-blue-800 font-semibold mb-2">
                         How to delete content:
@@ -388,7 +388,7 @@ export default function SubjectsPage() {
                       <div className="text-sm text-blue-700 space-y-2">
                         <div>
                           <p className="font-medium">To delete units:</p>
-                          <p className="ml-2">• Go to Dashboard → Find this subject → Click "Units" button → Use trash icon to delete units</p>
+                          <p className="ml-2">• Go to Dashboard → Find this subject → Click &quot;Units&quot; button → Use trash icon to delete units</p>
                         </div>
                         <div>
                           <p className="font-medium">To delete materials:</p>
@@ -400,7 +400,7 @@ export default function SubjectsPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-col space-y-2">
                       <Link
                         href="/dashboard"
@@ -424,7 +424,7 @@ export default function SubjectsPage() {
                     <p className="text-sm text-gray-600 mb-4">
                       This subject has no units or materials. You can safely unassign it.
                     </p>
-                    
+
                     <div className="flex space-x-3">
                       <button
                         onClick={handleConfirmDelete}

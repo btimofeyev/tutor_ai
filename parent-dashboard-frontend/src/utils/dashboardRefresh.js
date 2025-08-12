@@ -43,12 +43,12 @@ export function shouldRefreshBasedOnTime(lastVisibleTime, threshold = 5 * 60 * 1
  */
 export function isComingFromDataModifyingPage() {
   if (typeof document === 'undefined') return false;
-  
+
   const dataModifyingPages = [
     '/subject-management',
     '/subject-settings',
     '/schedule'
   ];
-  
+
   return dataModifyingPages.some(page => document.referrer.includes(page));
 }

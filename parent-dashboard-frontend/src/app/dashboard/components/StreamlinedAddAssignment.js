@@ -1,9 +1,9 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  DocumentArrowUpIcon, 
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  DocumentArrowUpIcon,
   CheckCircleIcon,
-  ArrowPathIcon, 
+  ArrowPathIcon,
   PlusIcon,
   XMarkIcon,
   SparklesIcon,
@@ -26,7 +26,7 @@ const CONTENT_TYPES = {
     isGradable: false
   },
   worksheet: {
-    label: 'Assignment', 
+    label: 'Assignment',
     description: 'Practice problems & homework',
     icon: '✏️',
     color: 'green',
@@ -78,20 +78,23 @@ export default function StreamlinedAddAssignment({
 }) {
   // Step management
   const [currentStep, setCurrentStep] = useState('hierarchy'); // 'hierarchy', 'details', 'processing', 'processing-started', 'complete'
-  
+
   // Hierarchy selection state
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState('');
   const [selectedLesson, setSelectedLesson] = useState('');
   const [selectedContentType, setSelectedContentType] = useState('');
-  
+
   // Chapters and lessons data
   const [chapters, setChapters] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [loadingChapters, setLoadingChapters] = useState(false);
   const [loadingLessons, setLoadingLessons] = useState(false);
-  
+
+  // Custom categories state
+  const [customCategories, setCustomCategories] = useState([]);
+
   // Details form state
   const [useAiMode, setUseAiMode] = useState(false);
   const [keyTermInput, setKeyTermInput] = useState('');
@@ -105,10 +108,40 @@ export default function StreamlinedAddAssignment({
     totalPoints: '',
     files: []
   });
-  
+
   // Processing state
   const [aiAnalysisResults, setAiAnalysisResults] = useState(null);
-  
+
+  // Create merged content types including custom categories
+  const allContentTypes = useMemo(() => {
+    const merged = { ...CONTENT_TYPES };
+
+    // Add custom categories with purple styling
+    customCategories.forEach(category => {
+      const categoryKey = `custom_${category.id}`;
+      merged[categoryKey] = {
+        label: category.category_name,
+        description: 'Custom grade category',
+        icon: '📝', // Custom categories get a default icon
+        color: 'purple',
+        isGradable: true, // Custom categories are always gradable
+        isCustom: true,
+        customId: category.id
+      };
+    });
+
+    return merged;
+  }, [customCategories]);
+
+  // Helper function to get the actual content type value to send to API
+  const getContentTypeValue = useCallback((selectedType) => {
+    const typeConfig = allContentTypes[selectedType];
+    if (typeConfig?.isCustom) {
+      return typeConfig.label; // For custom categories, use the category name
+    }
+    return selectedType; // For standard types, use the key as-is
+  }, [allContentTypes]);
+
   // Upload hook
   const {
     processUpload,
@@ -139,24 +172,40 @@ export default function StreamlinedAddAssignment({
     }));
   }, [useAiMode]);
 
+  // Fetch custom categories for the selected subject
+  const fetchCustomCategories = useCallback(async (subjectId) => {
+    if (!subjectId) {
+      setCustomCategories([]);
+      return;
+    }
+
+    try {
+      const response = await api.get(`/custom-categories/${subjectId}`);
+      setCustomCategories(response.data || []);
+    } catch (error) {
+      console.error('Error fetching custom categories:', error);
+      setCustomCategories([]);
+    }
+  }, []);
+
   // Fetch chapters when subject changes
   const fetchChapters = useCallback(async (subjectId) => {
     if (!subjectId) return;
-    
+
     setLoadingChapters(true);
     try {
       const response = await api.get(`/units/subject/${subjectId}`);
       const units = response.data || [];
-      
+
       const sortedUnits = units.sort((a, b) => {
         if (a.sequence_order !== b.sequence_order) {
           return (a.sequence_order || 0) - (b.sequence_order || 0);
         }
         return a.name.localeCompare(b.name);
       });
-      
+
       setChapters(sortedUnits);
-      
+
       // Auto-select first chapter if available
       if (sortedUnits.length > 0) {
         const firstChapter = sortedUnits[0];
@@ -176,21 +225,21 @@ export default function StreamlinedAddAssignment({
   // Fetch lessons when chapter changes
   const fetchLessons = useCallback(async (chapterId) => {
     if (!chapterId) return;
-    
+
     setLoadingLessons(true);
     try {
       const response = await api.get(`/lesson-containers/unit/${chapterId}`);
       const lessonContainers = response.data || [];
-      
+
       const sortedLessons = lessonContainers.sort((a, b) => {
         if (a.sequence_order !== b.sequence_order) {
           return (a.sequence_order || 0) - (b.sequence_order || 0);
         }
         return a.title.localeCompare(b.title);
       });
-      
+
       setLessons(sortedLessons);
-      
+
       // Auto-select first lesson if available
       if (sortedLessons.length > 0) {
         const firstLesson = sortedLessons[0];
@@ -214,9 +263,10 @@ export default function StreamlinedAddAssignment({
         setSelectedSubject(subject.name);
         setSelectedSubjectId(subject.child_subject_id);
         fetchChapters(subject.child_subject_id);
+        fetchCustomCategories(subject.child_subject_id);
       }
     }
-  }, [preSelectedSubject, childSubjects, selectedSubject, fetchChapters]);
+  }, [preSelectedSubject, childSubjects, selectedSubject, fetchChapters, fetchCustomCategories]);
 
   // Handle subject selection
   const handleSubjectChange = (subjectName) => {
@@ -225,9 +275,10 @@ export default function StreamlinedAddAssignment({
     setSelectedSubjectId(subject?.child_subject_id || null);
     setSelectedChapter('');
     setSelectedLesson('');
-    
+
     if (subject?.child_subject_id) {
       fetchChapters(subject.child_subject_id);
+      fetchCustomCategories(subject.child_subject_id);
     }
   };
 
@@ -242,15 +293,15 @@ export default function StreamlinedAddAssignment({
           description: `Auto-created chapter for new materials`,
           sequence_order: nextChapterNumber
         });
-        
+
         const newChapter = response.data;
-        setChapters(prev => [...prev, newChapter].sort((a, b) => 
+        setChapters(prev => [...prev, newChapter].sort((a, b) =>
           (a.sequence_order || 0) - (b.sequence_order || 0)
         ));
-        
+
         setSelectedChapter((newChapter.id && String(newChapter.id)) || '');
         setSelectedLesson('');
-        
+
         // Auto-create first lesson in new chapter
         const lessonResponse = await api.post('/lesson-containers', {
           unit_id: newChapter.id,
@@ -258,7 +309,7 @@ export default function StreamlinedAddAssignment({
           description: 'Auto-created lesson for new materials',
           sequence_order: 1
         });
-        
+
         const newLesson = lessonResponse.data;
         setLessons([newLesson]);
         setSelectedLesson((newLesson.id && String(newLesson.id)) || '');
@@ -283,12 +334,12 @@ export default function StreamlinedAddAssignment({
           description: 'Auto-created lesson for new materials',
           sequence_order: nextLessonNumber
         });
-        
+
         const newLesson = response.data;
-        setLessons(prev => [...prev, newLesson].sort((a, b) => 
+        setLessons(prev => [...prev, newLesson].sort((a, b) =>
           (a.sequence_order || 0) - (b.sequence_order || 0)
         ));
-        
+
         setSelectedLesson((newLesson.id && String(newLesson.id)) || '');
       } catch (error) {
         console.error('Error creating new lesson:', error);
@@ -302,7 +353,7 @@ export default function StreamlinedAddAssignment({
   const updateLearningObjective = (index, value) => {
     setFormData(prev => ({
       ...prev,
-      learningObjectives: prev.learningObjectives.map((obj, i) => 
+      learningObjectives: prev.learningObjectives.map((obj, i) =>
         i === index ? (value || '') : (obj || '')
       )
     }));
@@ -356,23 +407,24 @@ export default function StreamlinedAddAssignment({
       if (useAiMode && (formData.files || []).length > 0) {
         // AI Mode: Upload files for async analysis
         const uploadFormData = new FormData();
-        
+
         // Add the file
         uploadFormData.append('files', formData.files[0]);
-        
+
         // Add metadata
+        const actualContentType = getContentTypeValue(selectedContentType);
         uploadFormData.append('child_subject_id', selectedSubjectId);
-        uploadFormData.append('user_content_type', selectedContentType);
+        uploadFormData.append('user_content_type', actualContentType);
         uploadFormData.append('lesson_id', selectedLesson);
         uploadFormData.append('title', formData.title || formData.files[0].name.split('.')[0]);
-        uploadFormData.append('content_type', selectedContentType);
+        uploadFormData.append('content_type', actualContentType);
         uploadFormData.append('due_date', formData.dueDate || '');
-        
+
         // Use async upload endpoint
         const response = await api.post('/materials/upload-async', uploadFormData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
-        
+
         if (response.data.success) {
           // Material created, AI processing in background
           const materialTitle = formData.title || formData.files[0].name.split('.')[0];
@@ -383,14 +435,15 @@ export default function StreamlinedAddAssignment({
         }
       } else {
         // Manual Mode: Save with user-provided data
+        const actualContentType = getContentTypeValue(selectedContentType);
         const materialData = {
           lesson_id: selectedLesson,
           child_subject_id: selectedSubjectId,
           title: formData.title,
-          content_type: selectedContentType,
+          content_type: actualContentType,
           lesson_json: JSON.stringify({
             title: formData.title,
-            content_type: selectedContentType,
+            content_type: actualContentType,
             learning_objectives: (formData.learningObjectives || ['']).filter(obj => (obj || '').trim()),
             key_terms: formData.keyTerms || [],
             estimated_time_minutes: formData.estimatedTime,
@@ -399,15 +452,15 @@ export default function StreamlinedAddAssignment({
             examples: []
           }),
           due_date: formData.dueDate,
-          grade_max_value: CONTENT_TYPES[selectedContentType]?.isGradable ? parseInt(formData.totalPoints) : null,
-          material_relationship: selectedContentType === 'lesson' ? null : 
+          grade_max_value: allContentTypes[selectedContentType]?.isGradable ? parseInt(formData.totalPoints) : null,
+          material_relationship: selectedContentType === 'lesson' ? null :
             (selectedContentType === 'worksheet' ? 'worksheet_for' :
              selectedContentType === 'quiz' || selectedContentType === 'test' ? 'assignment_for' : 'supplement_for'),
           is_primary_lesson: selectedContentType === 'lesson'
         };
 
         const response = await api.post('/materials/save', materialData);
-        
+
         if (response.data) {
           setCurrentStep('complete');
         } else {
@@ -424,9 +477,9 @@ export default function StreamlinedAddAssignment({
   const handleAiApproval = async () => {
     // Check if this is the new structured format
     const isNewStructuredFormat = aiAnalysisResults.Objective && aiAnalysisResults.ai_model === 'gpt-4o-files-api';
-    
+
     let title, contentType;
-    
+
     if (isNewStructuredFormat) {
       // Extract title from new structured format
       title = aiAnalysisResults.Objective?.[0] || 'Educational Lesson';
@@ -434,9 +487,9 @@ export default function StreamlinedAddAssignment({
     } else {
       // Use old format extraction
       title = aiAnalysisResults.title || 'Untitled Material';
-      contentType = aiAnalysisResults.content_type || selectedContentType;
+      contentType = aiAnalysisResults.content_type || getContentTypeValue(selectedContentType);
     }
-    
+
     const saveData = {
       lesson_id: selectedLesson,
       child_subject_id: selectedSubjectId,
@@ -444,18 +497,18 @@ export default function StreamlinedAddAssignment({
       content_type: contentType,
       lesson_json: JSON.stringify(aiAnalysisResults),
       due_date: formData.dueDate,
-      grade_max_value: CONTENT_TYPES[selectedContentType]?.isGradable ? 
+      grade_max_value: allContentTypes[selectedContentType]?.isGradable ?
         parseInt(formData.totalPoints) || aiAnalysisResults?.total_possible_points_suggestion || null : null,
-      material_relationship: selectedContentType === 'lesson' ? null : 
+      material_relationship: selectedContentType === 'lesson' ? null :
         (selectedContentType === 'worksheet' ? 'worksheet_for' :
          selectedContentType === 'quiz' || selectedContentType === 'test' ? 'assignment_for' : 'supplement_for'),
       is_primary_lesson: selectedContentType === 'lesson'
     };
 
-    console.log('Saving AI analysis with data:', saveData);
+    // Saving AI analysis with validated data
 
     const result = await approveAiAnalysis(saveData);
-    
+
     if (result.success) {
       setCurrentStep('complete');
     }
@@ -465,12 +518,12 @@ export default function StreamlinedAddAssignment({
   const hierarchyComplete = selectedSubject && selectedChapter && selectedLesson && selectedContentType;
 
   // Check if details step is complete
-  const detailsComplete = useAiMode ? 
-    ((formData.files || []).length > 0 && 
-     (!CONTENT_TYPES[selectedContentType]?.isGradable || (formData.totalPoints || '').trim())) : 
-    ((formData.title || '').trim() && 
+  const detailsComplete = useAiMode ?
+    ((formData.files || []).length > 0 &&
+     (!allContentTypes[selectedContentType]?.isGradable || (formData.totalPoints || '').trim())) :
+    ((formData.title || '').trim() &&
      (formData.learningObjectives || ['']).some(obj => (obj || '').trim()) &&
-     (!CONTENT_TYPES[selectedContentType]?.isGradable || (formData.totalPoints || '').trim()));
+     (!allContentTypes[selectedContentType]?.isGradable || (formData.totalPoints || '').trim()));
 
   const inputClasses = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
   const labelClasses = "block text-sm font-medium text-gray-700 mb-2";
@@ -495,18 +548,18 @@ export default function StreamlinedAddAssignment({
           </div>
           <span className="ml-2 text-sm font-medium">Organization</span>
         </div>
-        
+
         <div className={`w-12 h-0.5 ${hierarchyComplete ? 'bg-green-600' : 'bg-gray-300'}`}></div>
-        
+
         <div className={`flex items-center ${currentStep === 'details' ? 'text-blue-600' : currentStep === 'processing' || currentStep === 'processing-started' || currentStep === 'review' || currentStep === 'complete' ? 'text-green-600' : 'text-gray-400'}`}>
           <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium ${currentStep === 'details' ? 'border-blue-600 bg-blue-50' : currentStep === 'processing' || currentStep === 'processing-started' || currentStep === 'review' || currentStep === 'complete' ? 'border-green-600 bg-green-50' : 'border-gray-300 bg-gray-50'}`}>
             {detailsComplete && (currentStep === 'processing' || currentStep === 'processing-started' || currentStep === 'review' || currentStep === 'complete') ? <CheckCircleIcon className="h-5 w-5" /> : '2'}
           </div>
           <span className="ml-2 text-sm font-medium">Details</span>
         </div>
-        
+
         <div className={`w-12 h-0.5 ${(currentStep === 'processing' || currentStep === 'processing-started' || currentStep === 'review' || currentStep === 'complete') ? 'bg-green-600' : 'bg-gray-300'}`}></div>
-        
+
         <div className={`flex items-center ${currentStep === 'complete' || currentStep === 'processing-started' ? 'text-green-600' : 'text-gray-400'}`}>
           <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium ${currentStep === 'complete' || currentStep === 'processing-started' ? 'border-green-600 bg-green-50' : 'border-gray-300 bg-gray-50'}`}>
             {currentStep === 'complete' || currentStep === 'processing-started' ? <CheckCircleIcon className="h-5 w-5" /> : '3'}
@@ -593,17 +646,20 @@ export default function StreamlinedAddAssignment({
             <div>
               <label className={labelClasses}>What type of content is this? *</label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {Object.entries(CONTENT_TYPES).map(([key, type]) => (
+                {Object.entries(allContentTypes).map(([key, type]) => (
                   <div
                     key={key}
                     onClick={() => setSelectedContentType(key)}
                     className={`cursor-pointer rounded-lg border-2 p-4 text-center transition-all ${
                       selectedContentType === key
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        ? (type.isCustom ? 'border-purple-500 bg-purple-50' : 'border-blue-500 bg-blue-50')
+                        : (type.isCustom ? 'border-purple-200 hover:border-purple-300 hover:bg-purple-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50')
                     }`}
                   >
-                    <div className="text-2xl mb-2">{type.icon}</div>
+                    <div className="text-2xl mb-2">
+                      {type.icon}
+                      {type.isCustom && <span className="ml-1 text-purple-600">✨</span>}
+                    </div>
                     <div className="font-medium text-gray-900 mb-1">{type.label}</div>
                     <div className="text-xs text-gray-600">{type.description}</div>
                     {type.isGradable && (
@@ -674,7 +730,7 @@ export default function StreamlinedAddAssignment({
               </button>
             </div>
             <p className="text-sm text-blue-700">
-              {useAiMode 
+              {useAiMode
                 ? 'Upload a file and let AI extract title, objectives, and key terms automatically'
                 : 'Fill in the details manually for quick creation'
               }
@@ -699,9 +755,9 @@ export default function StreamlinedAddAssignment({
                   </p>
                 )}
               </div>
-              
+
               {/* Total Points (for gradable content in AI mode) */}
-              {CONTENT_TYPES[selectedContentType]?.isGradable && (
+              {allContentTypes[selectedContentType]?.isGradable && (
                 <div>
                   <label className={labelClasses}>Total Points *</label>
                   <input
@@ -848,7 +904,7 @@ export default function StreamlinedAddAssignment({
               </div>
 
               {/* Total Points (for gradable content) */}
-              {CONTENT_TYPES[selectedContentType]?.isGradable && (
+              {allContentTypes[selectedContentType]?.isGradable && (
                 <div>
                   <label className={labelClasses}>Total Points *</label>
                   <input
@@ -970,7 +1026,7 @@ export default function StreamlinedAddAssignment({
             </Button>
           </div>
           <div className="mt-6 text-sm text-gray-500">
-            💡 You'll receive a notification when AI analysis completes
+            💡 You&apos;ll receive a notification when AI analysis completes
             {hasProcessingMaterials && (
               <div className="mt-2 flex items-center justify-center text-blue-600">
                 <div className="animate-pulse flex items-center">
@@ -1023,8 +1079,8 @@ export default function StreamlinedAddAssignment({
                     <div>
                       <strong>Lesson Introduction:</strong>
                       <div className="ml-4 mt-1 p-2 bg-gray-50 rounded">
-                        {typeof aiAnalysisResults.Introduction === 'object' ? 
-                          aiAnalysisResults.Introduction.Overview || JSON.stringify(aiAnalysisResults.Introduction, null, 2) : 
+                        {typeof aiAnalysisResults.Introduction === 'object' ?
+                          aiAnalysisResults.Introduction.Overview || JSON.stringify(aiAnalysisResults.Introduction, null, 2) :
                           aiAnalysisResults.Introduction}
                       </div>
                     </div>
@@ -1035,8 +1091,8 @@ export default function StreamlinedAddAssignment({
                     <div>
                       <strong>Theme/Topic:</strong>
                       <div className="ml-4 mt-1 p-2 bg-blue-50 rounded">
-                        {typeof aiAnalysisResults.ThemeInfo === 'object' ? 
-                          aiAnalysisResults.ThemeInfo.Discussion || JSON.stringify(aiAnalysisResults.ThemeInfo, null, 2) : 
+                        {typeof aiAnalysisResults.ThemeInfo === 'object' ?
+                          aiAnalysisResults.ThemeInfo.Discussion || JSON.stringify(aiAnalysisResults.ThemeInfo, null, 2) :
                           aiAnalysisResults.ThemeInfo}
                       </div>
                     </div>
@@ -1047,15 +1103,15 @@ export default function StreamlinedAddAssignment({
                     <div>
                       <strong>Main Content Concepts:</strong>
                       <div className="ml-4 mt-1 p-2 bg-green-50 rounded">
-                        {Array.isArray(aiAnalysisResults.TypesOfSentences) ? 
+                        {Array.isArray(aiAnalysisResults.TypesOfSentences) ?
                           aiAnalysisResults.TypesOfSentences.map((item, index) => (
                             <div key={index} className="mb-2">
-                              {typeof item === 'object' ? 
+                              {typeof item === 'object' ?
                                 Object.entries(item).map(([key, value]) => (
                                   <div key={key}><strong>{key}:</strong> {value}</div>
                                 )) : item}
                             </div>
-                          )) : 
+                          )) :
                           JSON.stringify(aiAnalysisResults.TypesOfSentences, null, 2)}
                       </div>
                     </div>
@@ -1113,8 +1169,8 @@ export default function StreamlinedAddAssignment({
                           </div>
                         ) : (
                           <div className="text-sm">
-                            {typeof aiAnalysisResults.IndependentPractice === 'string' 
-                              ? aiAnalysisResults.IndependentPractice 
+                            {typeof aiAnalysisResults.IndependentPractice === 'string'
+                              ? aiAnalysisResults.IndependentPractice
                               : JSON.stringify(aiAnalysisResults.IndependentPractice, null, 2)}
                           </div>
                         )}
@@ -1127,10 +1183,10 @@ export default function StreamlinedAddAssignment({
                     <div>
                       <strong>Teaching Guidance:</strong>
                       <ul className="list-disc list-inside ml-4 mt-1">
-                        {Array.isArray(aiAnalysisResults.TeacherForUnderstanding) ? 
+                        {Array.isArray(aiAnalysisResults.TeacherForUnderstanding) ?
                           aiAnalysisResults.TeacherForUnderstanding.map((guidance, index) => (
                             <li key={index}>{guidance}</li>
-                          )) : 
+                          )) :
                           <li>{aiAnalysisResults.TeacherForUnderstanding}</li>}
                       </ul>
                     </div>
@@ -1260,7 +1316,7 @@ export default function StreamlinedAddAssignment({
               )}
 
               {/* Tasks/Questions (fallback if problems_with_context not available) */}
-              {(!aiAnalysisResults.problems_with_context || aiAnalysisResults.problems_with_context.length === 0) && 
+              {(!aiAnalysisResults.problems_with_context || aiAnalysisResults.problems_with_context.length === 0) &&
                aiAnalysisResults.tasks_or_questions && aiAnalysisResults.tasks_or_questions.length > 0 && (
                 <div>
                   <strong>Tasks/Questions ({aiAnalysisResults.tasks_or_questions.length} items found):</strong>
@@ -1296,8 +1352,8 @@ export default function StreamlinedAddAssignment({
                 <div>
                   <strong>Answer Key Found:</strong>
                   <div className="mt-1 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                    {typeof aiAnalysisResults.answer_key === 'string' ? 
-                      aiAnalysisResults.answer_key : 
+                    {typeof aiAnalysisResults.answer_key === 'string' ?
+                      aiAnalysisResults.answer_key :
                       JSON.stringify(aiAnalysisResults.answer_key)
                     }
                   </div>
@@ -1305,9 +1361,9 @@ export default function StreamlinedAddAssignment({
               )}
 
               {/* Debug: Show raw analysis if something seems wrong AND it's not the new structured format */}
-              {!aiAnalysisResults.Objective && 
+              {!aiAnalysisResults.Objective &&
                !aiAnalysisResults.ai_model &&
-               (!aiAnalysisResults.problems_with_context || aiAnalysisResults.problems_with_context.length === 0) && 
+               (!aiAnalysisResults.problems_with_context || aiAnalysisResults.problems_with_context.length === 0) &&
                (!aiAnalysisResults.tasks_or_questions || aiAnalysisResults.tasks_or_questions.length === 0) && (
                 <details className="mt-4">
                   <summary className="cursor-pointer text-red-600 font-medium">⚠️ Raw AI Response (Debug)</summary>

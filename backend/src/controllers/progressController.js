@@ -48,7 +48,7 @@ exports.startPracticeSession = async (req, res) => {
 // Get child's lifetime progress stats
 exports.getLifetimeProgress = async (req, res) => {
   const child_id = req.child?.child_id;
-  
+
   if (!child_id) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -65,7 +65,7 @@ exports.getLifetimeProgress = async (req, res) => {
     // Check if we need to reset weekly count (new week started)
     const currentWeekStart = getCurrentWeekStart();
     let weeklyCorrect = child.weekly_correct || 0;
-    
+
     if (!child.week_start_date || child.week_start_date !== currentWeekStart) {
       // New week started, reset weekly count
       weeklyCorrect = 0;
@@ -100,7 +100,7 @@ exports.getLifetimeProgress = async (req, res) => {
 // Get child's achievement history (simplified - no gamification)
 exports.getAchievements = async (req, res) => {
   const child_id = req.child?.child_id;
-  
+
   if (!child_id) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -120,13 +120,13 @@ exports.getAchievements = async (req, res) => {
 // Record a problem attempt
 exports.recordProblemAttempt = async (req, res) => {
   const child_id = req.child?.child_id;
-  const { 
-    session_id, 
-    problem_text, 
-    is_correct, 
+  const {
+    session_id,
+    problem_text,
+    is_correct,
     student_work = null,
     problem_type = 'general',
-    time_spent_seconds = null 
+    time_spent_seconds = null
   } = req.body;
 
   if (!child_id) {

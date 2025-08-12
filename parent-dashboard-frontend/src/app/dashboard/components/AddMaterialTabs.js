@@ -1,7 +1,7 @@
 // app/dashboard/components/AddMaterialTabs.js
 'use client';
 import React, { useState, useMemo, useCallback } from 'react';
-import { 
+import {
   PhotoIcon,
   DocumentPlusIcon
 } from '@heroicons/react/24/outline';
@@ -14,21 +14,21 @@ export default function AddMaterialTabs(props) {
     selectedChild,
     onMaterialsAdded,
     onClose,
-    currentAddLessonSubject, 
-    onAddLessonSubjectChange, 
-    unitsForSelectedSubject,  
-    lessonsByUnit, 
+    currentAddLessonSubject,
+    onAddLessonSubjectChange,
+    unitsForSelectedSubject,
+    lessonsByUnit,
     setLessonsByUnit,
-    selectedLessonContainer,  
-    onLessonContainerChange,  
-    onCreateNewLessonContainer, 
+    selectedLessonContainer,
+    onLessonContainerChange,
+    onCreateNewLessonContainer,
     onCreateNewUnit,
     appContentTypes,
     appGradableContentTypes,
     onFormSubmit,
     onApprove,
     uploading,
-    savingLesson, 
+    savingLesson,
     lessonJsonForApproval,
     onUpdateLessonJsonField,
     lessonTitleForApproval,
@@ -45,7 +45,7 @@ export default function AddMaterialTabs(props) {
     onAddLessonUserContentTypeChange,
     onAddLessonFileChange,
     currentAddLessonFile,
-    lessonContainersForApprovalForm, 
+    lessonContainersForApprovalForm,
     onManualSubmit,
   } = props;
 
@@ -56,7 +56,6 @@ export default function AddMaterialTabs(props) {
   const activeTabStyles = "text-text-primary border-accent-yellow-darker-for-border font-semibold";
   const inactiveTabStyles = "text-text-secondary border-transparent hover:text-text-primary hover:border-gray-200";
 
-
   const lessonContainersForManualForm = useMemo(() => {
     if (!manualFormSelectedUnitId || !lessonsByUnit) return [];
     return lessonsByUnit[manualFormSelectedUnitId] || [];
@@ -65,13 +64,13 @@ export default function AddMaterialTabs(props) {
   const handleManualFormUnitChange = useCallback(async (unitId) => {
     const previousUnitId = manualFormSelectedUnitId;
     setManualFormSelectedUnitId(unitId);
-    
+
     if (unitId && (!lessonsByUnit[unitId] || !Array.isArray(lessonsByUnit[unitId]))) {
       try {
         const api = (await import('../../../utils/api')).default;
         const lessonsRes = await api.get(`/lesson-containers/unit/${unitId}`);
         const lessonContainers = lessonsRes.data || [];
-        
+
         if (setLessonsByUnit) {
           setLessonsByUnit(prev => ({
             ...prev,
@@ -87,9 +86,9 @@ export default function AddMaterialTabs(props) {
         }
       }
     }
-    
+
     if (unitId !== previousUnitId && onLessonContainerChange) {
-        onLessonContainerChange({ target: { value: '' } }); 
+        onLessonContainerChange({ target: { value: '' } });
     }
   }, [onLessonContainerChange, setLessonsByUnit, manualFormSelectedUnitId, lessonsByUnit]);
 
@@ -110,8 +109,8 @@ export default function AddMaterialTabs(props) {
         <button
           onClick={() => setActiveTab('upload')}
           className={`p-6 rounded-lg border-2 transition-all text-left hover:shadow-sm ${
-            activeTab === 'upload' 
-              ? 'border-blue-500 bg-blue-50' 
+            activeTab === 'upload'
+              ? 'border-blue-500 bg-blue-50'
               : 'border-gray-200 hover:border-blue-300'
           }`}
         >
@@ -123,12 +122,12 @@ export default function AddMaterialTabs(props) {
             Upload worksheets, PDFs, or documents. AI will help organize them.
           </p>
         </button>
-        
+
         <button
           onClick={() => setActiveTab('manual')}
           className={`p-6 rounded-lg border-2 transition-all text-left hover:shadow-sm ${
-            activeTab === 'manual' 
-              ? 'border-blue-500 bg-blue-50' 
+            activeTab === 'manual'
+              ? 'border-blue-500 bg-blue-50'
               : 'border-gray-200 hover:border-blue-300'
           }`}
         >
@@ -150,30 +149,30 @@ export default function AddMaterialTabs(props) {
           onClose={onClose}
         />
       )}
-      
+
       {activeTab === 'manual' && (
-        <ManualMaterialForm 
+        <ManualMaterialForm
           childSubjectsForSelectedChild={childSubjectsForSelectedChild}
-          currentSubject={currentAddLessonSubject} 
-          onSubjectChange={onAddLessonSubjectChange} 
-          
-          unitsForSelectedSubject={unitsForSelectedSubject} 
+          currentSubject={currentAddLessonSubject}
+          onSubjectChange={onAddLessonSubjectChange}
+
+          unitsForSelectedSubject={unitsForSelectedSubject}
           onCreateNewUnit={onCreateNewUnit}
-          
+
           selectedUnitInManualForm={manualFormSelectedUnitId}
-          onManualFormUnitChange={handleManualFormUnitChange} 
+          onManualFormUnitChange={handleManualFormUnitChange}
 
-          lessonContainersForSelectedUnit={lessonContainersForManualForm} 
-          
-          selectedLessonContainer={selectedLessonContainer} 
-          onLessonContainerChange={onLessonContainerChange} 
+          lessonContainersForSelectedUnit={lessonContainersForManualForm}
 
-          onCreateNewLessonContainer={(newTitle) => 
+          selectedLessonContainer={selectedLessonContainer}
+          onLessonContainerChange={onLessonContainerChange}
+
+          onCreateNewLessonContainer={(newTitle) =>
             onCreateNewLessonContainer(newTitle, manualFormSelectedUnitId)
           }
-          
+
           onSubmit={onManualSubmit}
-          savingMaterial={savingLesson} 
+          savingMaterial={savingLesson}
           appContentTypes={appContentTypes}
           appGradableContentTypes={appGradableContentTypes}
         />

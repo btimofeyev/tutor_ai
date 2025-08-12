@@ -3,13 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
-export default function ChildAccountDeleteModal({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
+export default function ChildAccountDeleteModal({
+  isOpen,
+  onClose,
+  onConfirm,
   child,
   childStats,
-  isDeleting = false 
+  isDeleting = false
 }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmationText, setConfirmationText] = useState('');
@@ -148,7 +148,7 @@ export default function ChildAccountDeleteModal({
             >
               Cancel
             </button>
-            
+
             {/* First step: Show Delete Account button */}
             {!showConfirm && (
               <button
@@ -160,7 +160,7 @@ export default function ChildAccountDeleteModal({
                 Delete Account
               </button>
             )}
-            
+
             {/* Second step: Show Confirm Delete button */}
             {showConfirm && (
               <button

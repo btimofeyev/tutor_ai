@@ -3,11 +3,11 @@ import React, { useState, useMemo, memo } from 'react';
 import PropTypes from 'prop-types';
 import Link from 'next/link';
 import Image from 'next/image'; // For the custom folder icon
-import { 
-    ChevronDownIcon, 
-    PlusCircleIcon, 
-    ListBulletIcon, 
-    ClockIcon, 
+import {
+    ChevronDownIcon,
+    PlusCircleIcon,
+    ListBulletIcon,
+    ClockIcon,
     AdjustmentsHorizontalIcon,
     PlusIcon,
     EyeIcon,
@@ -58,7 +58,7 @@ const SubjectCard = memo(function SubjectCard({
     onCreateLessonGroup,
     onAddMaterial
 }) {
-    const [isSubjectExpanded, setIsSubjectExpanded] = useState(true); // Subject card collapsible state
+    const [isSubjectExpanded, setIsSubjectExpanded] = useState(false); // Subject card collapsible state
     const [expandedUnits, setExpandedUnits] = useState({});
     const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
     const [expandedLessons, setExpandedLessons] = useState({}); // Track which lessons are expanded
@@ -83,12 +83,12 @@ const SubjectCard = memo(function SubjectCard({
         return lessons.filter(lesson => !lesson.lesson_id);
     }, [lessons, subject.child_subject_id]);
 
-    // Get next 3 lessons grouped by chapter
+    // Get next 3 incomplete lessons grouped by chapter
     const nextThreeByChapter = useMemo(() => {
         if (!subject.child_subject_id || !units.length) return [];
-        
+
         const allLessonContainers = [];
-        
+
         // Collect all lesson containers from all units, sorted by sequence
         for (const unit of units.sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.name.localeCompare(b.name))) {
             const lessonContainers = (lessonsByUnit[unit.id] || [])
@@ -100,42 +100,56 @@ const SubjectCard = memo(function SubjectCard({
                     lessonNumber: index + 1,
                     globalOrder: (unit.sequence_order || 0) * 1000 + (container.sequence_order || 0)
                 }));
-            
+
             allLessonContainers.push(...lessonContainers);
         }
-        
-        // Sort all lessons globally and take the first 3
+
+        // Sort all lessons globally
         const sortedLessons = allLessonContainers
-            .sort((a, b) => a.globalOrder - b.globalOrder)
-            .slice(0, 3);
-        
-        // Group lessons by chapter and add materials
-        const chapterGroups = {};
-        
-        sortedLessons.forEach(lesson => {
+            .sort((a, b) => a.globalOrder - b.globalOrder);
+
+        // Filter out 100% completed lessons and take the first 3 incomplete ones
+        const incompleteLessons = [];
+
+        for (const lesson of sortedLessons) {
             const allMaterials = lessons.filter(material => material.lesson_id === lesson.id);
-            
-            // Categorize materials by content type
-            const materialsByType = {
-                lessons: allMaterials.filter(m => m.content_type === 'lesson' || m.content_type === 'reading'),
-                worksheets: allMaterials.filter(m => m.content_type === 'worksheet' || m.content_type === 'assignment'),
-                quizzes: allMaterials.filter(m => m.content_type === 'quiz' || m.content_type === 'test'),
-                videos: allMaterials.filter(m => m.content_type === 'video'),
-                other: allMaterials.filter(m => !['lesson', 'reading', 'worksheet', 'assignment', 'quiz', 'test', 'video'].includes(m.content_type))
-            };
-            
-            const totalMaterials = allMaterials.length;
+
+            // Skip empty lessons (no materials)
+            if (allMaterials.length === 0) continue;
+
             const completedMaterials = allMaterials.filter(m => m.completed_at).length;
-            
-            const enrichedLesson = {
-                ...lesson,
-                materialsByType,
-                totalMaterials,
-                completedMaterials,
-                completionPercent: totalMaterials > 0 ? Math.round((completedMaterials / totalMaterials) * 100) : 0
-            };
-            
-            // Group by chapter (unit)
+            const completionPercent = Math.round((completedMaterials / allMaterials.length) * 100);
+
+            // Only include lessons that are not 100% complete
+            if (completionPercent < 100) {
+                // Categorize materials by content type
+                const materialsByType = {
+                    lessons: allMaterials.filter(m => m.content_type === 'lesson' || m.content_type === 'reading'),
+                    worksheets: allMaterials.filter(m => m.content_type === 'worksheet' || m.content_type === 'assignment'),
+                    quizzes: allMaterials.filter(m => m.content_type === 'quiz' || m.content_type === 'test'),
+                    videos: allMaterials.filter(m => m.content_type === 'video'),
+                    other: allMaterials.filter(m => !['lesson', 'reading', 'worksheet', 'assignment', 'quiz', 'test', 'video'].includes(m.content_type))
+                };
+
+                const enrichedLesson = {
+                    ...lesson,
+                    materialsByType,
+                    totalMaterials: allMaterials.length,
+                    completedMaterials,
+                    completionPercent
+                };
+
+                incompleteLessons.push(enrichedLesson);
+
+                // Stop when we have 3 incomplete lessons
+                if (incompleteLessons.length >= 3) break;
+            }
+        }
+
+        // Group lessons by chapter
+        const chapterGroups = {};
+
+        incompleteLessons.forEach(lesson => {
             if (!chapterGroups[lesson.unitId]) {
                 chapterGroups[lesson.unitId] = {
                     unitId: lesson.unitId,
@@ -143,9 +157,9 @@ const SubjectCard = memo(function SubjectCard({
                     lessons: []
                 };
             }
-            chapterGroups[lesson.unitId].lessons.push(enrichedLesson);
+            chapterGroups[lesson.unitId].lessons.push(lesson);
         });
-        
+
         return Object.values(chapterGroups);
     }, [lessons, subject.child_subject_id, units, lessonsByUnit]);
 
@@ -163,10 +177,10 @@ const SubjectCard = memo(function SubjectCard({
     const toggleUnitExpansion = (unitId) => setExpandedUnits(prev => ({ ...prev, [unitId]: !prev[unitId] }));
     const toggleLessonContainerExpansion = (lcId) => setExpandedLessonContainers(prev => ({ ...prev, [lcId]: !prev[lcId] }));
     const toggleLessonExpansion = (lessonId) => setExpandedLessons(prev => ({ ...prev, [lessonId]: !prev[lessonId] }));
-    
+
     const handleCreateLessonGroup = async (unitId) => {
         if (!newLessonGroupTitle.trim()) return;
-        
+
         if (bulkLessonGroupCount === 1) {
             // Single lesson group creation
             const result = await onCreateLessonGroup(unitId, newLessonGroupTitle.trim());
@@ -180,7 +194,7 @@ const SubjectCard = memo(function SubjectCard({
             try {
                 const baseName = newLessonGroupTitle.trim();
                 let successCount = 0;
-                
+
                 for (let i = 1; i <= bulkLessonGroupCount; i++) {
                     const title = `${baseName} ${i}`;
                     try {
@@ -197,7 +211,7 @@ const SubjectCard = memo(function SubjectCard({
                         // Continue with next lesson group even if one fails
                     }
                 }
-                
+
                 if (successCount === bulkLessonGroupCount) {
                     // All succeeded
                     setNewLessonGroupTitle("");
@@ -205,7 +219,6 @@ const SubjectCard = memo(function SubjectCard({
                     setBulkLessonGroupCount(1);
                 } else if (successCount > 0) {
                     // Partial success
-                    console.log(`Created ${successCount} out of ${bulkLessonGroupCount} lesson groups`);
                     setNewLessonGroupTitle("");
                     setCreatingLessonGroupForUnit(null);
                     setBulkLessonGroupCount(1);
@@ -218,13 +231,13 @@ const SubjectCard = memo(function SubjectCard({
             }
         }
     };
-    
+
     const ChevronIcon = ({ isExpanded }) => (
         <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
              <ChevronDownIcon className="h-5 w-5 text-gray-400" />
         </div>
     );
-    
+
     const renderLessonContainerMaterials = (lessonContainer, materials) => {
         // Use the new LessonGroupedMaterials component that fetches grouped data
         return (
@@ -256,8 +269,8 @@ const SubjectCard = memo(function SubjectCard({
                     <div className="flex-1 min-w-0">
                         <h4 className="text-base font-semibold text-gray-900">{unit.name}</h4>
                         <p className="text-sm text-gray-500">
-                            {lessonContainersInUnit.length === 0 
-                                ? "Click to add lesson groups" 
+                            {lessonContainersInUnit.length === 0
+                                ? "Click to add lesson groups"
                                 : `${lessonContainersInUnit.length} groups • ${allUnitMaterialsCount} items`
                             }
                         </p>
@@ -275,7 +288,7 @@ const SubjectCard = memo(function SubjectCard({
                                 {creatingLessonGroupForUnit === unit.id ? (
                                     <div>
                                         <h5 className="text-sm font-semibold text-green-800 mb-3">Create Lesson Groups for {unit.name}</h5>
-                                        
+
                                         <div className="space-y-3">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 <div>
@@ -309,7 +322,7 @@ const SubjectCard = memo(function SubjectCard({
                                                     </select>
                                                 </div>
                                             </div>
-                                            
+
                                             {bulkLessonGroupCount > 1 && (
                                                 <div className="bg-green-100 border border-green-300 rounded-lg p-2">
                                                     <p className="text-xs text-green-800 mb-1">
@@ -325,7 +338,7 @@ const SubjectCard = memo(function SubjectCard({
                                                     </div>
                                                 </div>
                                             )}
-                                            
+
                                             <div className="flex gap-2">
                                                 <button
                                                     onClick={() => handleCreateLessonGroup(unit.id)}
@@ -356,7 +369,7 @@ const SubjectCard = memo(function SubjectCard({
                                     </button>
                                 )}
                             </div>
-                            
+
                             {/* Existing Lesson Groups */}
                             {lessonContainersInUnit.length === 0 ? (
                                 <div className="text-center py-4 text-gray-500 text-sm italic">
@@ -380,7 +393,7 @@ const SubjectCard = memo(function SubjectCard({
             <div className="p-4 sm:p-6 bg-gradient-to-r from-gray-50/80 to-white">
                 <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
                     {/* Left Side: Title and Stats - Clickable to expand/collapse */}
-                    <button 
+                    <button
                         className="flex-1 min-w-[200px] text-left focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg -m-2 p-2"
                         onClick={() => setIsSubjectExpanded(!isSubjectExpanded)}
                     >
@@ -412,7 +425,7 @@ const SubjectCard = memo(function SubjectCard({
                                     <div className="flex items-center gap-2 bg-indigo-50 px-3 py-2 rounded-lg border border-indigo-200">
                                         <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
                                         <span className="text-indigo-800 font-semibold text-sm">
-                                            Grade Average: {subjectStats.avgGradePercent}% 
+                                            Grade Average: {subjectStats.avgGradePercent}%
                                             <span className="text-indigo-600 font-normal ml-1">
                                                 ({subjectStats.gradableItemsCount} graded)
                                             </span>
@@ -464,13 +477,13 @@ const SubjectCard = memo(function SubjectCard({
                                 <div className="flex items-center justify-between">
                                     <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                                         <ClockIcon className="h-5 w-5 text-blue-500" />
-                                        {chapter.unitName.toLowerCase().startsWith('chapter') ? 
-                                            chapter.unitName : 
+                                        {chapter.unitName.toLowerCase().startsWith('chapter') ?
+                                            chapter.unitName :
                                             `Chapter ${chapterIndex + 1}: ${chapter.unitName}`
                                         }
                                     </h4>
                                     {chapterIndex === 0 && (
-                                        <Link 
+                                        <Link
                                             href={`/subject/${subject.child_subject_id}`}
                                             className="inline-flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                                         >
@@ -479,7 +492,7 @@ const SubjectCard = memo(function SubjectCard({
                                         </Link>
                                     )}
                                 </div>
-                                    
+
                                     {/* Lessons in Chapter */}
                                     <div className="space-y-3">
                                         {chapter.lessons.map((lesson) => {
@@ -531,7 +544,7 @@ const SubjectCard = memo(function SubjectCard({
                                                             </div>
                                                         </div>
                                                     </button>
-                                        
+
                                         {/* Expandable Content */}
                                         <div className={`transition-all duration-300 ease-in-out ${
                                             isExpanded ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'
@@ -541,7 +554,7 @@ const SubjectCard = memo(function SubjectCard({
                                                     {/* Materials organized by type */}
                                                     {Object.entries(lesson.materialsByType).map(([type, materials]) => {
                                                         if (materials.length === 0) return null;
-                                                        
+
                                                         const typeConfig = {
                                                             lessons: { label: 'Lessons', icon: '📖', color: 'blue' },
                                                             worksheets: { label: 'Assignments', icon: '📝', color: 'green' },
@@ -549,9 +562,9 @@ const SubjectCard = memo(function SubjectCard({
                                                             videos: { label: 'Videos', icon: '🎥', color: 'purple' },
                                                             other: { label: 'Other', icon: '📁', color: 'gray' }
                                                         };
-                                                        
+
                                                         const config = typeConfig[type] || typeConfig.other;
-                                                        
+
                                                         return (
                                                             <div key={type} className="bg-white rounded-md border border-gray-100 p-2">
                                                                 <h6 className="text-xs font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
@@ -560,83 +573,25 @@ const SubjectCard = memo(function SubjectCard({
                                                                 </h6>
                                                                 <div className="space-y-1">
                                                                     {materials.map(material => (
-                                                                        <div key={material.id} className="group flex items-center justify-between text-xs bg-gray-50 hover:bg-blue-50 rounded p-1.5 transition-colors">
-                                                                            <div className="flex items-center flex-1 min-w-0">
-                                                                                {material.completed_at && (
-                                                                                    <CheckCircleIcon className="h-3 w-3 text-green-500 mr-1.5 flex-shrink-0" />
-                                                                                )}
-                                                                                <span className={`truncate mr-2 flex-1 ${
-                                                                                    material.completed_at ? 'text-gray-500 line-through' : 'text-gray-700'
-                                                                                }`}>
-                                                                                    {material.title}
-                                                                                </span>
-                                                                                {material.due_date && (
-                                                                                    <span className="text-orange-600 whitespace-nowrap mr-1 text-xs">
-                                                                                        {(() => {
-                                                                                            const dueDate = new Date(material.due_date + 'T00:00:00');
-                                                                                            const today = new Date();
-                                                                                            today.setHours(0, 0, 0, 0);
-                                                                                            const tomorrow = new Date(today);
-                                                                                            tomorrow.setDate(tomorrow.getDate() + 1);
-                                                                                            
-                                                                                            if (dueDate.getTime() === today.getTime()) return 'Today';
-                                                                                            if (dueDate.getTime() === tomorrow.getTime()) return 'Tomorrow';
-                                                                                            
-                                                                                            const diffTime = dueDate.getTime() - today.getTime();
-                                                                                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                                                                            
-                                                                                            if (diffDays > 0 && diffDays <= 7) return `${diffDays}d`;
-                                                                                            return dueDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                                                                                        })()}
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                            
-                                                                            {/* Action buttons - show on hover */}
-                                                                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                <button
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        onToggleComplete(material.id, !material.completed_at);
-                                                                                    }}
-                                                                                    className="p-0.5 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors"
-                                                                                    title={material.completed_at ? "Mark incomplete" : "Mark complete"}
-                                                                                >
-                                                                                    <CheckCircleIcon className="h-3 w-3" />
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        onOpenEditModal(material);
-                                                                                    }}
-                                                                                    className="p-0.5 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors"
-                                                                                    title="Edit material"
-                                                                                >
-                                                                                    <PencilIcon className="h-3 w-3" />
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        onDeleteMaterial(material);
-                                                                                    }}
-                                                                                    className="p-0.5 text-red-600 hover:text-red-700 hover:bg-red-100 rounded transition-colors"
-                                                                                    title="Delete material"
-                                                                                >
-                                                                                    <TrashIcon className="h-3 w-3" />
-                                                                                </button>
-                                                                            </div>
-                                                                        </div>
+                                                                        <MaterialListItem
+                                                                            key={material.id}
+                                                                            lesson={material}
+                                                                            onOpenEditModal={onOpenEditModal}
+                                                                            onToggleComplete={onToggleComplete}
+                                                                            onDeleteMaterial={onDeleteMaterial}
+                                                                            isCompact={true}
+                                                                        />
                                                                     ))}
                                                                 </div>
                                                             </div>
                                                         );
                                                     })}
-                                                    
+
                                                     {lesson.totalMaterials === 0 && (
                                                         <div className="text-center py-3 text-gray-500 text-sm">
                                                             <span className="text-lg mb-1 block">📝</span>
                                                             No materials yet
-                                                            <button 
+                                                            <button
                                                                 onClick={onAddMaterial}
                                                                 className="block mx-auto mt-1 text-blue-600 hover:text-blue-700 text-xs font-medium"
                                                             >
@@ -662,7 +617,7 @@ const SubjectCard = memo(function SubjectCard({
                                 <ClockIcon className="h-5 w-5 text-blue-500" />
                                 All Materials
                             </h4>
-                            <Link 
+                            <Link
                                 href={`/subject/${subject.child_subject_id}`}
                                 className="inline-flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                             >
@@ -670,7 +625,7 @@ const SubjectCard = memo(function SubjectCard({
                                 View All
                             </Link>
                         </div>
-                        
+
                         <div className="space-y-2">
                             {lessons.slice(0, 5).map(lesson => (
                                 <MaterialListItem
@@ -683,7 +638,7 @@ const SubjectCard = memo(function SubjectCard({
                                 />
                             ))}
                         </div>
-                        
+
                         {lessons.length > 5 && (
                             <div className="pt-2 border-t border-gray-100">
                                 <p className="text-sm text-gray-500 text-center">
@@ -703,7 +658,7 @@ const SubjectCard = memo(function SubjectCard({
                                 </div>
                                 <div>
                                     <p className="text-gray-700 text-sm font-medium">No upcoming work</p>
-                                    <Link 
+                                    <Link
                                         href={`/subject/${subject.child_subject_id}`}
                                         className="inline-flex items-center gap-1 mt-2 px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                                     >
@@ -716,7 +671,7 @@ const SubjectCard = memo(function SubjectCard({
                             <div className="space-y-3">
                                 <ListBulletIcon className="h-8 w-8 mx-auto text-gray-300" />
                                 <p className="text-gray-500 text-sm">No materials yet</p>
-                                <button 
+                                <button
                                     onClick={onAddMaterial}
                                     className="inline-flex items-center gap-1 px-3 py-1 text-sm text-sky-600 hover:text-sky-700 hover:bg-sky-50 rounded-lg transition-colors"
                                 >

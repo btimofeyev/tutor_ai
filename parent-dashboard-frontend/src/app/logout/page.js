@@ -29,10 +29,10 @@ export default function LogoutPage() {
         if (error) {
           console.error('Error signing out:', error);
         }
-        
+
         // Force redirect to home page
         router.push('/');
-        
+
         // Force page reload to clear any cached state
         setTimeout(() => {
           window.location.href = '/';

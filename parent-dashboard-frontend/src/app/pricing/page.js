@@ -5,13 +5,13 @@ import { useSession } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { 
-  CheckIcon, 
-  SparklesIcon, 
-  UserGroupIcon, 
+import {
+  CheckIcon,
+  SparklesIcon,
+  UserGroupIcon,
   AcademicCapIcon,
   ArrowRightIcon,
-  StarIcon 
+  StarIcon
 } from '@heroicons/react/24/outline';
 import Button from '../../components/ui/Button';
 import api from '../../utils/api';
@@ -60,7 +60,7 @@ export default function PricingPage() {
         success_url: `${window.location.origin}/dashboard?upgraded=true`,
         cancel_url: `${window.location.origin}/pricing`
       });
-      
+
       window.location.href = response.data.checkout_url;
     } catch (error) {
       alert('Failed to start upgrade process. Please try again.');
@@ -438,8 +438,8 @@ export default function PricingPage() {
               <ArrowRightIcon className="h-5 w-5 ml-2" />
             </Button>
           ) : !hasSubscription ? (
-            <Button 
-              variant="primary" 
+            <Button
+              variant="primary"
               size="lg"
               onClick={() => handleUpgrade(PRICE_IDS.klio_addon, 'klio_addon')}
               disabled={upgrading === 'klio_addon'}

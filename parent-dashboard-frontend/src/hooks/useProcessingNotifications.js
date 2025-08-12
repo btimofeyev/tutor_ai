@@ -16,7 +16,7 @@ export function useProcessingNotifications() {
   // Add material to processing queue
   const addProcessingMaterial = useCallback((materialId, title = 'Material') => {
     setProcessingMaterials(prev => new Set([...prev, materialId]));
-    
+
     // Store material info for later notification
     const materialInfo = { id: materialId, title };
     localStorage.setItem(`processing_${materialId}`, JSON.stringify(materialInfo));
@@ -29,7 +29,7 @@ export function useProcessingNotifications() {
       newSet.delete(materialId);
       return newSet;
     });
-    
+
     // Clean up localStorage
     localStorage.removeItem(`processing_${materialId}`);
     checkedMaterials.current.add(materialId);
@@ -40,26 +40,26 @@ export function useProcessingNotifications() {
     try {
       const response = await api.get(`/materials/status/${materialId}`);
       const status = response.data;
-      
+
       if (status.processing_status === 'completed') {
         // Get stored material info
         const storedInfo = localStorage.getItem(`processing_${materialId}`);
         const materialInfo = storedInfo ? JSON.parse(storedInfo) : { title: 'Material' };
-        
+
         showSuccess(`✨ AI analysis completed for "${materialInfo.title}"`);
         removeProcessingMaterial(materialId);
-        
+
         // Trigger global refresh event to update materials lists
         window.dispatchEvent(new CustomEvent('materialProcessingComplete', {
           detail: { materialId, materialInfo }
         }));
-        
+
         return true;
       } else if (status.processing_status === 'failed') {
         // Get stored material info
         const storedInfo = localStorage.getItem(`processing_${materialId}`);
         const materialInfo = storedInfo ? JSON.parse(storedInfo) : { title: 'Material' };
-        
+
         showError(`❌ AI analysis failed for "${materialInfo.title}"`);
         removeProcessingMaterial(materialId);
         return true;
@@ -72,7 +72,7 @@ export function useProcessingNotifications() {
         return true;
       }
     }
-    
+
     return false;
   }, [showSuccess, showError, removeProcessingMaterial]);
 
@@ -82,7 +82,7 @@ export function useProcessingNotifications() {
 
     const materialIds = Array.from(processingMaterials);
     const checkPromises = materialIds.map(id => checkMaterialStatus(id));
-    
+
     try {
       await Promise.allSettled(checkPromises);
     } catch (error) {
@@ -95,7 +95,7 @@ export function useProcessingNotifications() {
     if (processingMaterials.size > 0) {
       // Start polling every 10 seconds
       intervalRef.current = setInterval(pollProcessingStatus, 10000);
-      
+
       // Also check immediately
       pollProcessingStatus();
     } else {
@@ -126,7 +126,7 @@ export function useProcessingNotifications() {
         }
       }
     }
-    
+
     if (storedMaterials.length > 0) {
       setProcessingMaterials(new Set(storedMaterials));
     }

@@ -1,9 +1,9 @@
 // app/schedule/components/ScheduleTemplatesManager.js
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  PlusIcon, 
-  TrashIcon, 
+import {
+  PlusIcon,
+  TrashIcon,
   DocumentDuplicateIcon,
   ClockIcon,
   BookOpenIcon,
@@ -356,10 +356,10 @@ export default function ScheduleTemplatesManager({
         isDefault: false,
         createdAt: new Date().toISOString()
       };
-      
+
       const updatedTemplates = [...savedTemplates, newTemplate];
       localStorage.setItem(`schedule-templates-${childId}`, JSON.stringify(updatedTemplates));
-      
+
       await loadTemplates();
       return newTemplate;
     } catch (error) {
@@ -373,7 +373,7 @@ export default function ScheduleTemplatesManager({
       const savedTemplates = JSON.parse(localStorage.getItem(`schedule-templates-${childId}`) || '[]');
       const updatedTemplates = savedTemplates.filter(t => t.id !== templateId);
       localStorage.setItem(`schedule-templates-${childId}`, JSON.stringify(updatedTemplates));
-      
+
       await loadTemplates();
     } catch (error) {
       console.error('Error deleting template:', error);
@@ -389,7 +389,7 @@ export default function ScheduleTemplatesManager({
   });
 
   // Quick action templates for easy access
-  const quickActionTemplates = filteredTemplates.filter(t => 
+  const quickActionTemplates = filteredTemplates.filter(t =>
     ['morning-focus', 'balanced-daily', 'math-intensive', 'science-explorer'].includes(t.id)
   ).slice(0, 3);
 
@@ -520,7 +520,7 @@ export default function ScheduleTemplatesManager({
   const updateSessionInNewTemplate = (index, field, value) => {
     setNewTemplate(prev => ({
       ...prev,
-      sessions: prev.sessions.map((session, i) => 
+      sessions: prev.sessions.map((session, i) =>
         i === index ? { ...session, [field]: value } : session
       )
     }));
@@ -537,7 +537,7 @@ export default function ScheduleTemplatesManager({
     const totalMinutes = template.sessions.reduce((sum, session) => sum + session.duration, 0);
     const subjects = [...new Set(template.sessions.map(s => s.subject))].filter(Boolean);
     const days = [...new Set(template.sessions.map(s => s.day))];
-    
+
     return {
       totalHours: Math.round(totalMinutes / 60 * 10) / 10,
       subjects: subjects.length,
@@ -548,13 +548,13 @@ export default function ScheduleTemplatesManager({
 
   const renderTemplateCard = (template) => {
     const stats = getTemplateStats(template);
-    
+
     return (
       <div
         key={template.id}
         className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
-          selectedTemplate?.id === template.id 
-            ? 'border-blue-500 bg-blue-50' 
+          selectedTemplate?.id === template.id
+            ? 'border-blue-500 bg-blue-50'
             : 'border-gray-200 hover:border-gray-300'
         }`}
         onClick={() => setSelectedTemplate(template)}
@@ -578,9 +578,9 @@ export default function ScheduleTemplatesManager({
             </button>
           )}
         </div>
-        
+
         <p className="text-sm text-gray-600 mb-3">{template.description}</p>
-        
+
         <div className="flex items-center gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1">
             <ClockIcon className="h-3 w-3" />
@@ -604,12 +604,12 @@ export default function ScheduleTemplatesManager({
 
     const stats = getTemplateStats(selectedTemplate);
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    
+
     // Get the list of children this template will be applied to
     const targetChildren = selectedChildrenIds.length >= 1
       ? allChildren.filter(child => selectedChildrenIds.includes(child.id))
       : (childId ? allChildren.filter(child => child.id === childId) : []);
-    
+
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
@@ -624,9 +624,9 @@ export default function ScheduleTemplatesManager({
             </button>
           </div>
         </div>
-        
+
         <p className="text-sm text-gray-600">{selectedTemplate.description}</p>
-        
+
         {/* Show which children will be affected */}
         {targetChildren.length > 0 && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -641,7 +641,7 @@ export default function ScheduleTemplatesManager({
             </div>
           </div>
         )}
-        
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-gray-50 rounded-lg">
           <div className="text-center">
             <div className="text-lg font-bold text-blue-600">{stats.totalHours}h</div>
@@ -660,14 +660,14 @@ export default function ScheduleTemplatesManager({
             <div className="text-xs text-gray-500">Days</div>
           </div>
         </div>
-        
+
         <div className="space-y-2">
           <h5 className="font-medium text-gray-900">Weekly Schedule Preview</h5>
           <div className="grid gap-2">
             {days.map(day => {
               const daySessions = selectedTemplate.sessions.filter(s => s.day === day);
               if (daySessions.length === 0) return null;
-              
+
               return (
                 <div key={day} className="border border-gray-200 rounded p-3">
                   <div className="font-medium text-sm text-gray-700 mb-2 capitalize">
@@ -708,7 +708,7 @@ export default function ScheduleTemplatesManager({
             <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
-        
+
         <div className="grid grid-cols-1 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -722,7 +722,7 @@ export default function ScheduleTemplatesManager({
               placeholder="e.g., Morning Intensive"
             />
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Description
@@ -735,7 +735,7 @@ export default function ScheduleTemplatesManager({
               placeholder="Describe when and how this template should be used"
             />
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Category
@@ -751,7 +751,7 @@ export default function ScheduleTemplatesManager({
             </select>
           </div>
         </div>
-        
+
         <div>
           <div className="flex justify-between items-center mb-2">
             <h5 className="font-medium text-gray-900">Sessions</h5>
@@ -763,7 +763,7 @@ export default function ScheduleTemplatesManager({
               Add Session
             </button>
           </div>
-          
+
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {newTemplate.sessions.map((session, index) => (
               <div key={index} className="grid grid-cols-5 gap-2 items-center">
@@ -780,14 +780,14 @@ export default function ScheduleTemplatesManager({
                   <option value="saturday">Sat</option>
                   <option value="sunday">Sun</option>
                 </select>
-                
+
                 <input
                   type="time"
                   value={session.time}
                   onChange={(e) => updateSessionInNewTemplate(index, 'time', e.target.value)}
                   className="text-xs border border-gray-300 rounded px-2 py-1"
                 />
-                
+
                 <input
                   type="number"
                   value={session.duration}
@@ -798,7 +798,7 @@ export default function ScheduleTemplatesManager({
                   className="text-xs border border-gray-300 rounded px-2 py-1"
                   placeholder="30"
                 />
-                
+
                 <input
                   type="text"
                   value={session.subject}
@@ -806,7 +806,7 @@ export default function ScheduleTemplatesManager({
                   className="text-xs border border-gray-300 rounded px-2 py-1"
                   placeholder="Subject"
                 />
-                
+
                 <button
                   onClick={() => removeSessionFromNewTemplate(index)}
                   className="text-red-500 hover:text-red-700 p-1"
@@ -817,7 +817,7 @@ export default function ScheduleTemplatesManager({
             ))}
           </div>
         </div>
-        
+
         <div className="flex justify-end gap-2">
           <button
             onClick={() => setShowCreateForm(false)}
@@ -951,7 +951,7 @@ export default function ScheduleTemplatesManager({
                   ))}
                 </div>
               </div>
-              
+
               {/* Templates by Category */}
               {filteredTemplates.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
@@ -963,7 +963,7 @@ export default function ScheduleTemplatesManager({
                 Object.entries(TEMPLATE_CATEGORIES).map(([category, label]) => {
                   const categoryTemplates = filteredTemplates.filter(t => t.category === category);
                   if (categoryTemplates.length === 0) return null;
-                  
+
                   return (
                     <div key={category}>
                       <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
@@ -1130,7 +1130,7 @@ export default function ScheduleTemplatesManager({
                   Object.entries(TEMPLATE_CATEGORIES).map(([category, label]) => {
                     const categoryTemplates = filteredTemplates.filter(t => t.category === category);
                     if (categoryTemplates.length === 0) return null;
-                    
+
                     return (
                       <div key={category}>
                         <h5 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">

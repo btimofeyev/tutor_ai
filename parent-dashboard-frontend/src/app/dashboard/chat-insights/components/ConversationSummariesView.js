@@ -28,18 +28,18 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
     try {
       setLoading(true);
       setError('');
-      
+
       const params = new URLSearchParams({
         days: '14', // Show last 2 weeks
         status: filter
       });
-      
+
       if (selectedChild?.id) {
         params.append('childId', selectedChild.id);
       }
 
       const response = await api.get(`/parent/chat-insights?${params}`);
-      
+
       if (response.data.success) {
         setChatInsights(response.data.chatInsights || []);
       } else {
@@ -72,19 +72,19 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
     try {
       await api.post(`/parent/chat-insights/${summaryId}/mark-read`);
       showSuccess('Marked as read');
-      
+
       // Update local state to reflect the change
       setChatInsights(prev => prev.map(day => ({
         ...day,
-        summaries: day.summaries.map(summary => 
-          summary.id === summaryId 
+        summaries: day.summaries.map(summary =>
+          summary.id === summaryId
             ? { ...summary, status: 'read' }
             : summary
         )
-      })).filter(day => filter === 'all' || day.summaries.some(s => 
+      })).filter(day => filter === 'all' || day.summaries.some(s =>
         filter === 'read' ? s.status === 'read' : s.status === 'unread'
       )));
-      
+
     } catch (err) {
       console.error('Error marking as read:', err);
       showError('Failed to mark as read');
@@ -96,13 +96,13 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
     try {
       await api.delete(`/parent/chat-insights/${summaryId}`);
       showSuccess('Summary deleted');
-      
+
       // Remove from local state
       setChatInsights(prev => prev.map(day => ({
         ...day,
         summaries: day.summaries.filter(summary => summary.id !== summaryId)
       })).filter(day => day.summaries.length > 0));
-      
+
     } catch (err) {
       console.error('Error deleting summary:', err);
       showError('Failed to delete summary');
@@ -112,19 +112,19 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
   // Handle marking all as read
   const handleMarkAllAsRead = async () => {
     if (!window.confirm('Mark all summaries as read?')) return;
-    
+
     try {
       const payload = {};
       if (selectedChild?.id) {
         payload.childId = selectedChild.id;
       }
-      
+
       const response = await api.post('/parent/chat-insights/mark-all-read', payload);
       showSuccess(`Marked ${response.data.updatedCount} summaries as read`);
-      
+
       // Refresh the view
       fetchChatInsights();
-      
+
     } catch (err) {
       console.error('Error marking all as read:', err);
       showError('Failed to mark all as read');
@@ -143,20 +143,20 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
     const today = new Date();
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
     const oneWeekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    
+
     const todayStr = today.toISOString().split('T')[0];
     const yesterdayStr = yesterday.toISOString().split('T')[0];
-    
+
     const grouped = {
       today: [],
       yesterday: [],
       thisWeek: [],
       older: []
     };
-    
+
     chatInsights.forEach(dayData => {
       const date = new Date(dayData.date);
-      
+
       if (dayData.date === todayStr) {
         grouped.today = dayData.summaries;
       } else if (dayData.date === yesterdayStr) {
@@ -167,13 +167,13 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
         grouped.older.push(dayData);
       }
     });
-    
+
     setGroupedInsights(grouped);
   }, [chatInsights]);
 
   // Calculate total unread count
   const unreadCount = useMemo(() => {
-    return chatInsights.reduce((total, day) => 
+    return chatInsights.reduce((total, day) =>
       total + day.summaries.filter(s => s.status === 'unread').length, 0
     );
   }, [chatInsights]);
@@ -219,7 +219,7 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
             </span>
           )}
         </div>
-        
+
         <div className="flex items-center gap-2">
           {/* Filter Buttons */}
           <div className="flex rounded-lg border border-gray-200 overflow-hidden">
@@ -241,7 +241,7 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
               </button>
             ))}
           </div>
-          
+
           {/* Mark All Read Button */}
           {unreadCount > 0 && filter !== 'read' && (
             <button
@@ -268,7 +268,7 @@ export default function ConversationSummariesView({ selectedChild, refreshTrigge
               No conversation summaries found
             </h3>
             <p className="text-gray-600 mb-4">
-              {selectedChild 
+              {selectedChild
                 ? `${selectedChild.name} hasn't had any tutoring conversations recently`
                 : 'Your children haven&apos;t had any tutoring conversations recently'
               }

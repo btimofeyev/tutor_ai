@@ -1,12 +1,26 @@
-// backend/src/services/mcpClientWrapper.js - Smart wrapper that switches between local and HTTP
-const mcpClientLocal = require('./mcpClient');
-const mcpClientHttp = require('./mcpClientHttp');
+// backend/src/services/mcpClientWrapper.js - Unified MCP client with transport abstraction
+const MCPClientBase = require('./mcpClientBase');
+const StdioTransport = require('./transports/stdioTransport');
+const HttpTransport = require('./transports/httpTransport');
 
-// Determine which client to use based on environment
-const useHttpClient = !!process.env.MCP_SERVER_URL && !process.env.MCP_SERVER_URL.includes('localhost');
+// Transport factory function
+function createTransport() {
+  const useHttpTransport = !!process.env.MCP_SERVER_URL && !process.env.MCP_SERVER_URL.includes('localhost');
+  
+  if (useHttpTransport) {
+    console.log('🔧 MCP Client Mode: HTTP (Railway)');
+    console.log(`🔧 MCP Server URL: ${process.env.MCP_SERVER_URL}`);
+    return new HttpTransport();
+  } else {
+    console.log('🔧 MCP Client Mode: Local (StdioClientTransport)');
+    console.log('🔧 MCP Server URL: Local stdio connection');
+    return new StdioTransport();
+  }
+}
 
-console.log(`🔧 MCP Client Mode: ${useHttpClient ? 'HTTP (Railway)' : 'Local (StdioClientTransport)'}`);
-console.log(`🔧 MCP Server URL: ${process.env.MCP_SERVER_URL || 'Not set (using local)'}`);
+// Create unified client instance with appropriate transport
+const transport = createTransport();
+const mcpClient = new MCPClientBase(transport);
 
-// Export the appropriate client
-module.exports = useHttpClient ? mcpClientHttp : mcpClientLocal;
+// Export unified client
+module.exports = mcpClient;

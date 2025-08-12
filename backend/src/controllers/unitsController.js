@@ -212,7 +212,7 @@ exports.updateUnit = async (req, res) => {
       if (!trimmedName) {
         return res.status(400).json({ error: 'Unit name cannot be empty' });
       }
-      
+
       // Check for name conflicts (only if name is actually changing)
       if (trimmedName.toLowerCase() !== existingUnit.name.toLowerCase()) {
         const { data: existing } = await supabase
@@ -227,14 +227,14 @@ exports.updateUnit = async (req, res) => {
           return res.status(409).json({ error: 'Unit name already exists for this subject' });
         }
       }
-      
+
       updateData.name = trimmedName;
     }
-    
+
     if (description !== undefined) {
       updateData.description = description ? description.trim() : null;
     }
-    
+
     if (sequence_order !== undefined) {
       updateData.sequence_order = sequence_order;
     }
@@ -254,7 +254,7 @@ exports.updateUnit = async (req, res) => {
 
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Unit not found or not updated' });
-    
+
     res.json(data);
   } catch (error) {
     console.error('Error updating unit:', error);
@@ -266,8 +266,6 @@ exports.updateUnit = async (req, res) => {
 exports.deleteUnit = async (req, res) => {
   const parent_id = getParentId(req);
   const { unit_id } = req.params;
-
-  console.log('Deleting unit:', { parent_id, unit_id });
 
   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
   if (!unit_id) return res.status(400).json({ error: 'unit_id is required' });
@@ -289,8 +287,6 @@ exports.deleteUnit = async (req, res) => {
       .eq('id', unit_id)
       .maybeSingle();
 
-    console.log('Unit query result:', { unitData, fetchError });
-
     if (fetchError) throw fetchError;
     if (!unitData) return res.status(404).json({ error: 'Unit not found' });
 
@@ -305,31 +301,25 @@ exports.deleteUnit = async (req, res) => {
       .select('*', { count: 'exact', head: true })
       .eq('unit_id', unit_id);
 
-    console.log('Lessons count check:', { lessonsCount, countError });
-
     if (countError) {
       console.error('Error checking lessons count:', countError);
       // Continue with deletion if count check fails
     }
 
     if (lessonsCount > 0) {
-      console.log(`Unit has ${lessonsCount} lessons, cannot delete`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: `Cannot delete unit with ${lessonsCount} existing lessons. Delete lesson groups first or move them to another unit.`
       });
     }
 
     // Delete the unit
-    console.log('Proceeding with unit deletion');
     const { error: deleteError } = await supabase
       .from('units')
       .delete()
       .eq('id', unit_id);
 
-    console.log('Deletion result:', { deleteError });
-
     if (deleteError) throw deleteError;
-    res.json({ 
+    res.json({
       message: 'Unit deleted successfully',
       deleted_unit: {
         id: unitData.id,
@@ -406,9 +396,7 @@ exports.reorderUnits = async (req, res) => {
 exports.cascadeDeleteUnit = async (req, res) => {
   const parent_id = getParentId(req);
   const { unit_id } = req.params;
-  
-  console.log('Cascade deleting unit:', { parent_id, unit_id });
-  
+
   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
   if (!unit_id) return res.status(400).json({ error: 'unit_id is required' });
 
@@ -429,8 +417,6 @@ exports.cascadeDeleteUnit = async (req, res) => {
       .eq('id', unit_id)
       .maybeSingle();
 
-    console.log('Unit query result:', { unitData, fetchError });
-    
     if (fetchError) throw fetchError;
     if (!unitData) return res.status(404).json({ error: 'Unit not found' });
 
@@ -438,8 +424,6 @@ exports.cascadeDeleteUnit = async (req, res) => {
     if (unitData.child_subject.child.parent_id !== parent_id) {
       return res.status(403).json({ error: 'Access denied to this unit' });
     }
-
-    console.log('Starting cascade deletion process...');
 
     // Step 1: Get all lesson containers in this unit
     const { data: lessonContainers, error: lessonsError } = await supabase
@@ -451,8 +435,6 @@ exports.cascadeDeleteUnit = async (req, res) => {
       console.error('Error fetching lesson containers:', lessonsError);
       throw lessonsError;
     }
-
-    console.log(`Found ${lessonContainers?.length || 0} lesson containers to delete`);
 
     // Step 2: For each lesson container, delete all its materials first
     for (const lessonContainer of lessonContainers || []) {
@@ -467,8 +449,7 @@ exports.cascadeDeleteUnit = async (req, res) => {
           console.error(`Error deleting materials for lesson ${lessonContainer.id}:`, materialsDeleteError);
           // Continue with other lesson containers
         } else {
-          console.log(`Deleted materials for lesson container ${lessonContainer.id}`);
-        }
+          }
       } catch (error) {
         console.error(`Error processing materials for lesson container ${lessonContainer.id}:`, error);
         // Continue with other lesson containers
@@ -486,8 +467,7 @@ exports.cascadeDeleteUnit = async (req, res) => {
         console.error('Error deleting lesson containers:', lessonsDeleteError);
         throw lessonsDeleteError;
       } else {
-        console.log(`Deleted ${lessonContainers.length} lesson containers`);
-      }
+        }
     }
 
     // Step 4: Finally delete the unit itself
@@ -501,9 +481,7 @@ exports.cascadeDeleteUnit = async (req, res) => {
       throw deleteError;
     }
 
-    console.log('Unit cascade deletion completed successfully');
-
-    res.json({ 
+    res.json({
       message: 'Unit and all its contents deleted successfully',
       deletedItems: {
         unit: 1,

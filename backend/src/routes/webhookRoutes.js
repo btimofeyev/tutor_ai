@@ -19,8 +19,6 @@ router.post(
 
       // If you see this log, the 404 is happening before this handler is even reached.
       // But if the path is now correct, this log should appear.
-      console.log('Received webhook event:', event.type);
-
       try {
           switch (event.type) {
               case 'checkout.session.completed':
@@ -39,8 +37,7 @@ router.post(
                   await handlePaymentFailed(event.data.object);
                   break;
               default:
-                  console.log(`Unhandled event type: ${event.type}`);
-          }
+                  }
           res.json({ received: true });
       } catch (error) {
           console.error('Error processing webhook:', error);
@@ -64,10 +61,6 @@ async function handleCheckoutCompleted(session) {
   }
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  console.log(`Retrieved subscription ${subscription.id} in handleCheckoutCompleted. Status: ${subscription.status}`);
-  console.log('Raw current_period_start:', subscription.current_period_start);
-  console.log('Raw current_period_end:', subscription.current_period_end);
-
   const price_id = subscription.items.data[0].price.id;
   const priceToPlan = {
       'price_1RVZczD8TZAZUMMAQWokffCi': 'klio_addon',
@@ -110,14 +103,9 @@ async function handleCheckoutCompleted(session) {
   if (error) {
       console.error('Error saving subscription from checkout.session.completed:', error);
   } else {
-      console.log(`Subscription record created/updated for parent ${parent_id}: ${plan_type} from checkout.session.completed.`);
-  }
+      }
 }
 async function handleSubscriptionUpdated(subscription) {
-  console.log(`Handling customer.subscription.updated for sub ID: ${subscription.id}, status: ${subscription.status}`);
-  console.log('Raw current_period_start for update:', subscription.current_period_start);
-  console.log('Raw current_period_end for update:', subscription.current_period_end);
-
   let currentPeriodStartISO = null;
   if (subscription.current_period_start && typeof subscription.current_period_start === 'number') {
       currentPeriodStartISO = new Date(subscription.current_period_start * 1000).toISOString();
@@ -131,7 +119,7 @@ async function handleSubscriptionUpdated(subscription) {
   } else {
       console.warn(`Subscription ${subscription.id} (update event) missing or invalid current_period_end: ${subscription.current_period_end}.`);
   }
-  
+
   let plan_type;
   let stripe_price_id;
   if (subscription.items && subscription.items.data && subscription.items.data.length > 0) {
@@ -152,7 +140,7 @@ async function handleSubscriptionUpdated(subscription) {
       ...(stripe_price_id && { stripe_price_id: stripe_price_id }),
       updated_at: new Date().toISOString()
   };
-  
+
   Object.keys(updatePayload).forEach(key => updatePayload[key] === undefined && delete updatePayload[key]);
 
   const { error } = await supabase
@@ -163,42 +151,36 @@ async function handleSubscriptionUpdated(subscription) {
   if (error) {
       console.error('Error updating subscription from customer.subscription.updated:', error);
   } else {
-      console.log(`Subscription ${subscription.id} updated successfully via customer.subscription.updated.`);
-  }
+      }
 }
 
 async function handleSubscriptionDeleted(subscription) {
   const { error } = await supabase
       .from('parent_subscriptions')
       .update({
-          status: subscription.status, 
+          status: subscription.status,
           updated_at: new Date().toISOString(),
       })
       .eq('stripe_subscription_id', subscription.id);
 
   if (error) {
       console.error('Error updating subscription to deleted/canceled status:', error);
-  } else {
-      console.log(`Subscription ${subscription.id} status updated to ${subscription.status} (e.g., canceled).`);
   }
 }
 
 async function handlePaymentSucceeded(invoice) {
-  console.log(`Processing invoice.payment_succeeded for invoice ${invoice.id}, customer ${invoice.customer}`);
-
   if (!invoice.subscription) {
-      console.log(`Invoice ${invoice.id} is not for a subscription. Skipping subscription update.`);
       return;
   }
 
   const subscriptionId = invoice.subscription;
-  
+
   let subscriptionFromStripe;
   try {
       subscriptionFromStripe = await stripe.subscriptions.retrieve(subscriptionId);
   } catch (err) {
       console.error(`Failed to retrieve subscription ${subscriptionId} during invoice.payment_succeeded: ${err.message}`);
-      return; 
+      return;
   }
 
   let periodStart, periodEnd;
@@ -215,7 +197,6 @@ async function handlePaymentSucceeded(invoice) {
 
   if (!periodStart || !periodEnd || typeof periodStart !== 'number' || typeof periodEnd !== 'number') {
       console.error(`Invoice ${invoice.id} for subscription ${subscriptionId} is missing valid period_start or period_end. Cannot update period dates.`);
-      console.log(`Period values: start=${periodStart}, end=${periodEnd}`);
       periodStart = subscriptionFromStripe.current_period_start;
       periodEnd = subscriptionFromStripe.current_period_end;
       if (!periodStart || !periodEnd) {
@@ -223,7 +204,7 @@ async function handlePaymentSucceeded(invoice) {
           return;
       }
   }
-  
+
   const currentPeriodStartISO = new Date(periodStart * 1000).toISOString();
   const currentPeriodEndISO = new Date(periodEnd * 1000).toISOString();
 
@@ -238,11 +219,11 @@ async function handlePaymentSucceeded(invoice) {
   const { error } = await supabase
       .from('parent_subscriptions')
       .update({
-          status: subscriptionFromStripe.status, 
+          status: subscriptionFromStripe.status,
           current_period_start: currentPeriodStartISO,
           current_period_end: currentPeriodEndISO,
-          plan_type: plan_type, 
-          stripe_price_id: price_id, 
+          plan_type: plan_type,
+          stripe_price_id: price_id,
           updated_at: new Date().toISOString()
       })
       .eq('stripe_subscription_id', subscriptionId);
@@ -250,27 +231,24 @@ async function handlePaymentSucceeded(invoice) {
   if (error) {
       console.error(`Error updating subscription ${subscriptionId} from invoice.payment_succeeded:`, error);
   } else {
-      console.log(`Subscription ${subscriptionId} period and status updated from invoice.payment_succeeded. New status: ${subscriptionFromStripe.status}, Plan: ${plan_type}`);
-  }
+      }
 }
 
 async function handlePaymentFailed(invoice) {
-  console.log(`Payment failed for invoice ${invoice.id}, customer ${invoice.customer}.`);
   if (invoice.subscription) {
       try {
           const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
           const { error } = await supabase
               .from('parent_subscriptions')
               .update({
-                  status: subscription.status, 
+                  status: subscription.status,
                   updated_at: new Date().toISOString()
               })
               .eq('stripe_subscription_id', invoice.subscription);
           if (error) {
               console.error(`Error updating subscription status on payment failure for ${invoice.subscription}:`, error);
           } else {
-               console.log(`Subscription ${invoice.subscription} status updated to ${subscription.status} due to payment failure.`);
-          }
+               }
       } catch (e) {
           console.error(`Error fetching subscription ${invoice.subscription} on payment failure:`, e);
       }

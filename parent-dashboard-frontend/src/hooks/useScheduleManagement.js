@@ -8,7 +8,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   const [schedulePreferences, setSchedulePreferences] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
 
   // State for batch operations to prevent flickering
   const [batchMode, setBatchMode] = useState(false);
@@ -19,21 +18,20 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
 
-
   // Fetch schedule entries for a child
   const fetchScheduleEntries = useCallback(async (childId) => {
     if (!childId) return;
-    
+
     setLoading(true);
     try {
       const response = await api.get(`/schedule/${childId}`);
       setScheduleEntries(response.data || []);
       setError(null);
     } catch (err) {
-      
+
       // Don't clear existing entries if API fails - keep local state
       // This prevents losing locally created entries when the API is unavailable
-      
+
       // Only clear error for now, don't show scary messages
       setError(null);
     } finally {
@@ -44,7 +42,7 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   // Fetch schedule preferences for a child
   const fetchSchedulePreferences = useCallback(async (childId) => {
     if (!childId) return;
-    
+
     try {
       const response = await api.get(`/schedule/preferences/${childId}`);
       setSchedulePreferences(response.data);
@@ -65,14 +63,14 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   const createScheduleEntry = async (entryData) => {
     try {
       setLoading(true);
-      
+
       // Try API first, but fallback to local state if it fails
       try {
         const response = await api.post('/schedule', {
           ...entryData,
           child_id: childId
         });
-        
+
         // Add the new entry to the local state (skip if in batch mode)
         if (!batchMode) {
           setScheduleEntries(prev => [...prev, response.data]);
@@ -86,7 +84,7 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
           setError(errorMessage);
           return { success: false, error: errorMessage };
         }
-        
+
         // For other API errors, create a local entry as fallback
         const localEntry = {
           id: Date.now().toString(), // Simple ID generation
@@ -102,7 +100,7 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
-        
+
         // Add to local state (skip if in batch mode)
         if (!batchMode) {
           setScheduleEntries(prev => [...prev, localEntry]);
@@ -123,25 +121,24 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   const updateScheduleEntry = async (entryId, updateData, childIdParam) => {
     try {
       setLoading(true);
-      
+
       // Use provided childId or fall back to the current childId
       const targetChildId = childIdParam || childId;
-      
-      
+
       // Try API first, but fallback to local state if it fails
       try {
         const response = await api.put(`/schedule/${entryId}`, updateData);
-        
+
         // Update the entry in local state
-        setScheduleEntries(prev => 
+        setScheduleEntries(prev =>
           prev.map(entry => entry.id === entryId ? response.data : entry)
         );
         setError(null);
         return { success: true, data: response.data };
       } catch (apiError) {
-        
+
         // Update local entry if API fails
-        setScheduleEntries(prev => 
+        setScheduleEntries(prev =>
           prev.map(entry => {
             if (entry.id === entryId) {
               return {
@@ -169,17 +166,17 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   const deleteScheduleEntry = async (entryId) => {
     try {
       setLoading(true);
-      
+
       // Try API first, but fallback to local state if it fails
       try {
         await api.delete(`/schedule/${entryId}`);
-        
+
         // Remove the entry from local state
         setScheduleEntries(prev => prev.filter(entry => entry.id !== entryId));
         setError(null);
         return { success: true };
       } catch (apiError) {
-        
+
         // Remove from local state if API fails
         setScheduleEntries(prev => prev.filter(entry => entry.id !== entryId));
         setError(null);
@@ -215,7 +212,7 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   const generateAISchedule = async (options = {}) => {
     try {
       setLoading(true);
-      
+
       const {
         start_date = new Date().toISOString().split('T')[0], // Default to today
         days_to_schedule = 7,
@@ -289,10 +286,8 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
       // Add debug logging to catch any circular reference issues before they happen
       try {
         const testStringify = JSON.stringify(requestPayload);
-        console.log('AI Schedule Request Payload:', testStringify);
-      } catch (circularError) {
+        } catch (circularError) {
         console.error('Circular reference detected before API call:', circularError);
-        console.log('Request payload object:', requestPayload);
         throw new Error(`Cannot serialize request data: ${circularError.message}`);
       }
 
@@ -300,10 +295,10 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
 
       // Refresh the schedule entries to show the new AI-generated ones
       await fetchScheduleEntries(childId);
-      
+
       setError(null);
-      return { 
-        success: true, 
+      return {
+        success: true,
         data: response.data,
         message: response.data.message,
         entriesCreated: response.data.entries_created
@@ -317,16 +312,15 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     }
   };
 
-
   // Batch create multiple schedule entries (prevents individual refreshes)
   const createScheduleEntriesBatch = async (entriesData) => {
     try {
       setLoading(true);
       setBatchMode(true); // Enable batch mode to prevent individual state updates
-      
+
       const results = [];
       const successfulEntries = [];
-      
+
       // Create entries one by one but don't update state individually
       for (const entryData of entriesData) {
         try {
@@ -339,12 +333,12 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
           results.push({ success: false, error });
         }
       }
-      
+
       // Update state with all successful entries at once
       if (successfulEntries.length > 0) {
         setScheduleEntries(prev => [...prev, ...successfulEntries]);
       }
-      
+
       return {
         success: successfulEntries.length > 0,
         results,
@@ -367,27 +361,27 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
       // Extract material info from lesson container
       const lesson = entry.lesson;
       const materials = lesson?.materials || [];
-      
+
       // Sort materials consistently by title to ensure reproducible ordering
       const sortedMaterials = [...materials].sort((a, b) => {
         const titleA = a.title || '';
         const titleB = b.title || '';
         return titleA.localeCompare(titleB);
       });
-      
+
       // Try to get the specific material from metadata in notes
       let specificMaterial = null;
       let displayTitle;
       let materialMetadata = null;
-      
+
       try {
         if (entry.notes && typeof entry.notes === 'string' && entry.notes.startsWith('{')) {
           materialMetadata = JSON.parse(entry.notes);
-          
+
           if (materialMetadata.specific_material_id) {
             // Find the specific material that was scheduled
             specificMaterial = sortedMaterials.find(m => m.id === materialMetadata.specific_material_id);
-            
+
             if (specificMaterial) {
               displayTitle = `${entry.subject_name}: ${specificMaterial.title}`;
             } else if (materialMetadata.material_title) {
@@ -399,7 +393,7 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
       } catch (e) {
         // Failed to parse metadata, will use fallback logic
       }
-      
+
       // Fallback logic if no specific material found
       if (!displayTitle) {
         const firstMaterial = sortedMaterials[0]; // Take first material if multiple exist
@@ -414,9 +408,9 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
           displayTitle = entry.subject_name || 'Study Time';
         }
       }
-      
+
       const displayMaterial = specificMaterial || sortedMaterials[0]; // Use specific material or fallback to first
-      
+
       return {
         id: entry.id,
         title: displayTitle,
@@ -452,11 +446,11 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
   // Mark schedule entry as completed with sync notification
   const markEntryCompleted = async (entryId) => {
     const result = await updateScheduleEntry(entryId, { status: 'completed' });
-    
+
     // Show success message if materials were synced
     if (result.success && result.data?.synced_materials > 0) {
     }
-    
+
     return result;
   };
 
@@ -494,7 +488,6 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     setShowSettingsModal(false);
   };
 
-
   // Load data when childId changes
   useEffect(() => {
     if (childId) {
@@ -508,18 +501,17 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     scheduleEntries,
     schedulePreferences,
     calendarEvents: getCalendarEvents(),
-    
+
     // Loading states
     loading,
     error,
-    
+
     // Modal states
     showCreateModal,
     showEditModal,
     showSettingsModal,
     editingEntry,
 
-    
     // CRUD operations
     createScheduleEntry,
     createScheduleEntriesBatch,
@@ -528,11 +520,11 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     deleteScheduleEntry,
     updateSchedulePreferences,
     generateAISchedule,
-    
+
     // Status updates
     markEntryCompleted,
     markEntrySkipped,
-    
+
     // Modal controls
     openCreateModal,
     closeCreateModal,
@@ -540,7 +532,7 @@ export function useScheduleManagement(childId, subscriptionPermissions) {
     closeEditModal,
     openSettingsModal,
     closeSettingsModal,
-    
+
     // Refresh - only if we have API connectivity, otherwise keep local state
     refresh: () => {
       // Only refresh if we don't have local entries or if we want to sync with server

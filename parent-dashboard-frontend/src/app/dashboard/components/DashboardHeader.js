@@ -4,11 +4,11 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import Link from 'next/link';
 
-export default function DashboardHeader({ 
-  selectedChild, 
-  childrenList, 
+export default function DashboardHeader({
+  selectedChild,
+  childrenList,
   onChildSelect,
-  showChildSelector = true 
+  showChildSelector = true
 }) {
   return (
     <div className="bg-white border-b border-border-subtle p-4 sticky top-0 z-40">
@@ -23,7 +23,7 @@ export default function DashboardHeader({
             </div>
           )}
         </div>
-        
+
         <div className="flex items-center gap-4">
           {/* Desktop Child Selector */}
           {showChildSelector && childrenList && childrenList.length > 0 && (
@@ -45,7 +45,7 @@ export default function DashboardHeader({
               </select>
             </div>
           )}
-          
+
           {/* Logout Button */}
           <Link
             href="/logout"
@@ -56,7 +56,7 @@ export default function DashboardHeader({
           </Link>
         </div>
       </div>
-      
+
       {/* Mobile Child Selector */}
       {showChildSelector && childrenList && childrenList.length > 0 && (
         <div className="sm:hidden mt-4">

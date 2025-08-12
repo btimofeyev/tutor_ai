@@ -31,13 +31,13 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       const isDev = process.env.NODE_ENV === 'development';
-      
+
       return (
         <div className="min-h-screen bg-[var(--background-main)] flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-[var(--background-card)] rounded-[var(--radius-xl)] p-6 shadow-lg border border-[var(--border-subtle)] text-center">
             <div className="mb-4">
-              <FiAlertTriangle 
-                className="mx-auto text-[var(--accent-red)] mb-3" 
+              <FiAlertTriangle
+                className="mx-auto text-[var(--accent-red)] mb-3"
                 size={48}
                 aria-hidden="true"
               />
@@ -45,7 +45,7 @@ class ErrorBoundary extends React.Component {
                 Oops! Something went wrong
               </h1>
               <p className="text-[var(--text-secondary)] text-sm">
-                Don't worry - this happens sometimes. Let's try to get you back on track.
+                Don&apos;t worry - this happens sometimes. Let&apos;s try to get you back on track.
               </p>
             </div>
 
@@ -74,7 +74,7 @@ class ErrorBoundary extends React.Component {
                 <FiRefreshCw size={16} aria-hidden="true" />
                 <span>Try Again</span>
               </button>
-              
+
               <button
                 onClick={() => window.location.href = '/'}
                 className="w-full flex items-center justify-center space-x-2 bg-[var(--accent-yellow)] text-[var(--accent-yellow-text-on)] px-4 py-2.5 rounded-[var(--radius-lg)] hover:bg-[var(--accent-yellow-hover)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent-yellow)] focus-visible:ring-offset-2"

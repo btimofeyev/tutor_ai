@@ -62,10 +62,10 @@ CompletionToggle.displayName = 'CompletionToggle';
 
 const StatusBadge = React.memo(({ lesson, materialInfo }) => {
   const { processingMaterials } = useProcessingContext();
-  
+
   // Check if this material is currently being processed
   const isProcessing = processingMaterials.includes(String(lesson.id));
-  
+
   // Check if this material was recently processed (within last 24 hours)
   const isRecentlyProcessed = useMemo(() => {
     if (!lesson.processing_completed_at) return false;
@@ -74,7 +74,7 @@ const StatusBadge = React.memo(({ lesson, materialInfo }) => {
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     return completedTime > twentyFourHoursAgo;
   }, [lesson.processing_completed_at]);
-  
+
   // Show processing indicator if this material is being processed
   if (isProcessing) {
     return (
@@ -87,7 +87,7 @@ const StatusBadge = React.memo(({ lesson, materialInfo }) => {
       </div>
     );
   }
-  
+
   // Show NEW badge for recently processed materials (24 hours)
   if (isRecentlyProcessed && !materialInfo.isCompleted) {
     return (
@@ -100,7 +100,7 @@ const StatusBadge = React.memo(({ lesson, materialInfo }) => {
       </div>
     );
   }
-  
+
   // Check if this item has a grade (including grade of 0) and show it
   const hasGrade = lesson.grade_value !== null && lesson.grade_value !== undefined && lesson.grade_value !== '';
   if (hasGrade || (lesson.grade_value === 0 && materialInfo.hasMaxScore)) {
@@ -113,7 +113,7 @@ const StatusBadge = React.memo(({ lesson, materialInfo }) => {
       </div>
     );
   }
-  // For gradable items that are completed but don't have grades, show "Ready to Grade" 
+  // For gradable items that are completed but don't have grades, show "Ready to Grade"
   if (materialInfo.isCompleted && materialInfo.isGradable && materialInfo.hasMaxScore) {
     return (
       <span className="inline-flex items-center text-xs font-bold text-amber-700 bg-gradient-to-r from-amber-50 to-yellow-50 px-3 py-1.5 rounded-full border border-amber-200 shadow-sm">
@@ -123,14 +123,14 @@ const StatusBadge = React.memo(({ lesson, materialInfo }) => {
       </span>
     );
   }
-  
+
   // Show priority status for overdue or upcoming items
   if (!materialInfo.isCompleted && (materialInfo.isOverdue || materialInfo.isDueSoon)) {
     const isOverdue = materialInfo.isOverdue;
     return (
       <span className={`inline-flex items-center text-xs font-bold px-3 py-1.5 rounded-full border shadow-sm ${
-        isOverdue 
-          ? 'text-red-700 bg-gradient-to-r from-red-50 to-rose-50 border-red-200' 
+        isOverdue
+          ? 'text-red-700 bg-gradient-to-r from-red-50 to-rose-50 border-red-200'
           : 'text-orange-700 bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200'
       }`}>
         <span className="mr-1.5">{isOverdue ? '🚨' : '⏰'}</span>
@@ -150,27 +150,27 @@ const StatusBadge = React.memo(({ lesson, materialInfo }) => {
     );
   }
   if (lesson.due_date) {
-    const badgeConfig = materialInfo.isOverdue 
-      ? { 
-          gradient: 'bg-gradient-to-r from-red-100 to-rose-100', 
-          text: 'text-red-700', 
-          border: 'border-red-200/60', 
-          prefix: 'Overdue' 
+    const badgeConfig = materialInfo.isOverdue
+      ? {
+          gradient: 'bg-gradient-to-r from-red-100 to-rose-100',
+          text: 'text-red-700',
+          border: 'border-red-200/60',
+          prefix: 'Overdue'
         }
-      : materialInfo.isDueSoon 
-      ? { 
-          gradient: 'bg-gradient-to-r from-orange-100 to-amber-100', 
-          text: 'text-orange-700', 
-          border: 'border-orange-200/60', 
-          prefix: 'Due' 
+      : materialInfo.isDueSoon
+      ? {
+          gradient: 'bg-gradient-to-r from-orange-100 to-amber-100',
+          text: 'text-orange-700',
+          border: 'border-orange-200/60',
+          prefix: 'Due'
         }
-      : { 
-          gradient: 'bg-gradient-to-r from-gray-100 to-slate-100', 
-          text: 'text-gray-700', 
-          border: 'border-gray-200/60', 
-          prefix: 'Due' 
+      : {
+          gradient: 'bg-gradient-to-r from-gray-100 to-slate-100',
+          text: 'text-gray-700',
+          border: 'border-gray-200/60',
+          prefix: 'Due'
         };
-    
+
     return (
       <span className={`inline-flex items-center text-xs font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border shadow-sm ${badgeConfig.gradient} ${badgeConfig.text} ${badgeConfig.border}`}>
         <CalendarDaysIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1.5 sm:mr-2 flex-shrink-0" />
@@ -183,11 +183,11 @@ const StatusBadge = React.memo(({ lesson, materialInfo }) => {
 });
 StatusBadge.displayName = 'StatusBadge';
 
-export default function MaterialListItem({ 
-  lesson, 
-  onOpenEditModal, 
-  onToggleComplete, 
-  onDeleteMaterial, 
+export default function MaterialListItem({
+  lesson,
+  onOpenEditModal,
+  onToggleComplete,
+  onDeleteMaterial,
   isCompact = false,
   isSelectable = false,
   isSelected = false,
@@ -246,8 +246,8 @@ export default function MaterialListItem({
 
   const itemBaseClasses = "group flex items-center rounded-lg transition-all duration-200 hover:shadow-md";
   const itemPadding = isCompact ? "px-3 py-2" : "p-4";
-  const itemStateClasses = materialInfo.isCompleted 
-    ? "bg-gradient-to-r from-green-50/80 to-emerald-50/50 border border-green-200/60" 
+  const itemStateClasses = materialInfo.isCompleted
+    ? "bg-gradient-to-r from-green-50/80 to-emerald-50/50 border border-green-200/60"
     : "bg-white border border-gray-200/60 hover:border-blue-200";
 
   return (
@@ -264,7 +264,7 @@ export default function MaterialListItem({
           />
         </div>
       )}
-      
+
       <CompletionToggle
         isCompleted={materialInfo.isCompleted}
         isToggling={isToggling}
@@ -285,16 +285,16 @@ export default function MaterialListItem({
         <div className="flex items-center gap-2 ml-3 flex-shrink-0">
           <StatusBadge lesson={lesson} materialInfo={materialInfo} />
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button 
-              onClick={handleEditClick} 
-              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" 
+            <button
+              onClick={handleEditClick}
+              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               title="Edit assignment details"
             >
               <PencilSquareIcon className="h-4 w-4" />
             </button>
-            <button 
-              onClick={handleDeleteClick} 
-              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all" 
+            <button
+              onClick={handleDeleteClick}
+              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
               title="Remove assignment"
             >
               <TrashIcon className="h-4 w-4" />

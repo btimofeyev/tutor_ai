@@ -123,15 +123,14 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
       } catch (e) {
         return { success: false, error: "Invalid JSON in lesson data" };
       }
-      
-      const payload = { 
+
+      const payload = {
         ...editForm,
         grade_value: editForm.grade_value === '' ? null : editForm.grade_value,
         grade_max_value: editForm.grade_max_value === '' ? null : editForm.grade_max_value,
-        lesson_json: lesson_json_parsed 
+        lesson_json: lesson_json_parsed
       };
       delete payload.lesson_json_string;
-
 
       await api.put(`/materials/${editingLesson.id}`, payload);
       setEditingLesson(null);
@@ -151,16 +150,16 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
       if (gradeValue !== null) {
         payload.grade = gradeValue;
       }
-      
+
       const response = await api.put(`/materials/${materialId}/toggle-complete`, payload);
-      
+
       // Force refresh to get updated data
       if (refreshChildData) await refreshChildData(true);
       if (invalidateChildCache) {
         // Get child ID from the response or use a workaround
         // For now, we'll invalidate cache in the dashboard
       }
-      
+
       return { success: true, message: response.data.message || 'Status updated.', syncedEntries: response.data.synced_schedule_entries || 0 };
     } catch (error) {
       return { success: false, error: error.response?.data?.error || "Failed to toggle completion" };
@@ -176,7 +175,7 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
       return { success: false, error: error.response?.data?.error || "Failed to delete lesson" };
     }
   }, [refreshChildData]);
-  
+
   const createNewUnit = useCallback(async (name, childSubjectId) => {
     if (!name.trim() || !childSubjectId) return { success: false, error: 'Name and subject are required.' };
     try {
@@ -187,7 +186,7 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
         return { success: false, error: error.response?.data?.error || "Could not create unit." };
     }
   }, [refreshChildData]);
-  
+
   const createNewLessonContainer = useCallback(async (title, unitId) => {
     if (!title.trim() || !unitId) return { success: false, error: 'Title and unit are required.' };
     try {
@@ -198,7 +197,7 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
         return { success: false, error: error.response?.data?.error || "Could not create lesson group." };
     }
   }, [refreshChildData]);
-  
+
   const updateUnit = useCallback(async (unit) => {
     try {
         const { data } = await api.put(`/units/${unit.id}`, { name: unit.name, description: unit.description });
@@ -208,7 +207,7 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
         return { success: false, error: error.response?.data?.error || "Could not update unit." };
     }
   }, [refreshChildData]);
-  
+
   const deleteUnit = useCallback(async (unitId) => {
     try {
         await api.delete(`/units/${unitId}`);

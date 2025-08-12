@@ -7,9 +7,9 @@ import { format } from 'date-fns';
 const formInputStyles = "block w-full border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 rounded-md bg-white text-gray-900 placeholder-gray-500 shadow-sm text-sm px-3 py-2 relative z-10 schedule-select";
 const formLabelStyles = "block text-sm font-medium text-gray-900 mb-1";
 
-export default function EditScheduleEntryModal({ 
-  isOpen, 
-  onClose, 
+export default function EditScheduleEntryModal({
+  isOpen,
+  onClose,
   onSave,
   onDelete,
   scheduleEntry,
@@ -18,7 +18,7 @@ export default function EditScheduleEntryModal({
   lessonsBySubject = {},
   unitsBySubject = {},
   lessonsByUnit = {},
-  isSaving = false 
+  isSaving = false
 }) {
   // Form state
   const [formData, setFormData] = useState({
@@ -34,7 +34,7 @@ export default function EditScheduleEntryModal({
 
   const [errors, setErrors] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  
+
   // Material type filter state
   const [showAllMaterialTypes, setShowAllMaterialTypes] = useState(false);
 
@@ -60,15 +60,15 @@ export default function EditScheduleEntryModal({
   // Filter materials by content type
   const getFilteredMaterials = () => {
     if (!materials || materials.length === 0) return [];
-    
+
     if (showAllMaterialTypes) {
       return materials;
     }
-    
+
     // Only show lessons, readings, and videos by default
     return materials.filter(material => {
-      const isLesson = material.content_type === 'lesson' || 
-                      material.content_type === 'reading' || 
+      const isLesson = material.content_type === 'lesson' ||
+                      material.content_type === 'reading' ||
                       material.content_type === 'video';
       return isLesson;
     });
@@ -77,7 +77,7 @@ export default function EditScheduleEntryModal({
   // Handle input changes
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (name === 'is_material_based') {
       setFormData(prev => ({
         ...prev,
@@ -103,7 +103,7 @@ export default function EditScheduleEntryModal({
   const handleMaterialChange = (e) => {
     const materialId = e.target.value;
     const selectedMaterial = materials.find(m => m.id === materialId);
-    
+
     setFormData(prev => ({
       ...prev,
       material_id: materialId,
@@ -149,7 +149,7 @@ export default function EditScheduleEntryModal({
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -166,7 +166,7 @@ export default function EditScheduleEntryModal({
         status: formData.status
         // Don't include is_material_based - it's not a database field
       };
-      
+
       await onSave(scheduleEntry.id, cleanedData);
       onClose();
     } catch (error) {
@@ -341,10 +341,10 @@ export default function EditScheduleEntryModal({
                       <span className="text-[var(--text-secondary)]">Show assignments & reviews</span>
                     </label>
                   </div>
-                  
+
                   {getFilteredMaterials().length === 0 ? (
                     <div className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded border">
-                      {materials.length === 0 ? 
+                      {materials.length === 0 ?
                         'No materials uploaded yet. Add materials to your curriculum first, or uncheck the box above to schedule general study time.' :
                         'No lessons found. Try enabling "Show assignments & reviews" above.'
                       }
@@ -369,39 +369,39 @@ export default function EditScheduleEntryModal({
                             const typeA = typeOrder[a.content_type] || 99;
                             const typeB = typeOrder[b.content_type] || 99;
                             if (typeA !== typeB) return typeA - typeB;
-                            
+
                             const subjectA = a.subject_name || '';
                             const subjectB = b.subject_name || '';
                             if (subjectA !== subjectB) return subjectA.localeCompare(subjectB);
-                            
+
                             // Sort by created_at if available, otherwise by title
                             if (a.created_at && b.created_at) {
                               return new Date(a.created_at) - new Date(b.created_at);
                             }
-                            
+
                             const titleA = a.title || '';
                             const titleB = b.title || '';
                             return titleA.localeCompare(titleB);
                           })
                           .map((material, index) => {
-                            const typeLabel = material.content_type ? 
-                              material.content_type.charAt(0).toUpperCase() + material.content_type.slice(1).replace(/_/g, ' ') : 
+                            const typeLabel = material.content_type ?
+                              material.content_type.charAt(0).toUpperCase() + material.content_type.slice(1).replace(/_/g, ' ') :
                               'Unknown';
-                            
+
                             // Show actual lesson title with number for clarity
                             const subjectPrefix = material.subject_name ? `[${material.subject_name}] ` : '';
                             const lessonNumber = index + 1;
                             let displayTitle = material.title || 'Untitled';
-                            
+
                             // Clean up the title and truncate if too long
                             displayTitle = displayTitle.replace(/\(\)$/, '');
                             const maxLength = 30 - subjectPrefix.length;
                             if (displayTitle.length > maxLength) {
                               displayTitle = displayTitle.substring(0, maxLength - 3) + '...';
                             }
-                            
+
                             const fullDisplayTitle = `${lessonNumber}. ${displayTitle}`;
-                            
+
                             return (
                               <option key={material.id} value={material.id}>
                                 {subjectPrefix}{fullDisplayTitle} • {typeLabel}
@@ -411,7 +411,7 @@ export default function EditScheduleEntryModal({
                       </select>
                     </div>
                   )}
-                  
+
                   {errors.material_id && (
                     <p className="text-red-600 text-xs mt-1">{errors.material_id}</p>
                   )}

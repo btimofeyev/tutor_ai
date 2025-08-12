@@ -19,7 +19,7 @@ export default function SettingsPage() {
     // Load settings from localStorage
     const savedAutoSpeak = localStorage.getItem('klio_auto_speak');
     const savedTextSize = localStorage.getItem('klio_text_size');
-    
+
     if (savedAutoSpeak !== null) {
       setAutoSpeak(savedAutoSpeak !== 'false');
     }
@@ -69,7 +69,7 @@ export default function SettingsPage() {
               {/* Voice Settings */}
               <div className="border-b pb-6">
                 <h2 className="text-xl font-semibold text-gray-700 mb-4">🔊 Voice Settings</h2>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">Auto-read Klio&apos;s messages</p>
@@ -92,7 +92,7 @@ export default function SettingsPage() {
               {/* Display Settings */}
               <div className="border-b pb-6">
                 <h2 className="text-xl font-semibold text-gray-700 mb-4">👀 Display Settings</h2>
-                
+
                 <p className="font-medium mb-3">Text Size</p>
                 <div className="flex gap-3">
                   {['small', 'medium', 'large'].map((size) => (

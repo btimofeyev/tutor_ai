@@ -7,11 +7,11 @@ import Button from './ui/Button';
 import api from '../utils/api';
 import { PRICE_IDS } from '../utils/subscriptionConstants';
 
-export default function FeatureGate({ 
-  feature, 
-  children, 
+export default function FeatureGate({
+  feature,
+  children,
   fallback = null,
-  showUpgradePrompt = true 
+  showUpgradePrompt = true
 }) {
   const { permissions, planType } = useSubscription();
   const [showPrompt, setShowPrompt] = useState(false);
@@ -38,7 +38,7 @@ export default function FeatureGate({
         success_url: `${window.location.origin}${window.location.pathname}?upgraded=true`,
         cancel_url: window.location.href
       });
-      
+
       window.location.href = response.data.checkout_url;
     } catch (error) {
       alert('Failed to start upgrade process. Please try again.');

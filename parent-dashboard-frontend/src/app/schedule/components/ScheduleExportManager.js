@@ -1,8 +1,8 @@
 // app/schedule/components/ScheduleExportManager.js
 "use client";
 import { useState } from 'react';
-import { 
-  ShareIcon, 
+import {
+  ShareIcon,
   DocumentArrowDownIcon,
   EnvelopeIcon,
   LinkIcon,
@@ -100,7 +100,7 @@ export default function ScheduleExportManager({
   // Generate export content based on options
   const generateExportContent = () => {
     setIsGenerating(true);
-    
+
     try {
       const content = createExportContent();
       setGeneratedContent(content);
@@ -115,7 +115,7 @@ export default function ScheduleExportManager({
   const createExportContent = () => {
     const startDate = dateRange?.start || startOfWeek(new Date(), { weekStartsOn: 1 });
     const endDate = dateRange?.end || endOfWeek(new Date(), { weekStartsOn: 1 });
-    
+
     // Filter events based on date range
     const filteredEvents = calendarEvents.filter(event => {
       const eventDate = new Date(event.date || event.start);
@@ -145,7 +145,7 @@ export default function ScheduleExportManager({
     });
 
     const completedSessions = filteredEvents.filter(e => e.status === 'completed').length;
-    const completionRate = filteredEvents.length > 0 ? 
+    const completionRate = filteredEvents.length > 0 ?
       Math.round((completedSessions / filteredEvents.length) * 100) : 0;
 
     switch (exportOptions.format) {
@@ -159,7 +159,7 @@ export default function ScheduleExportManager({
           eventsByDate,
           totalSessions: filteredEvents.length
         });
-      
+
       case 'detailed':
         return createDetailedExport({
           childName,
@@ -168,7 +168,7 @@ export default function ScheduleExportManager({
           totalHours,
           completionRate
         });
-      
+
       case 'subject-specific':
         return createSubjectSpecificExport({
           childName,
@@ -177,7 +177,7 @@ export default function ScheduleExportManager({
           filteredEvents,
           totalHours
         });
-      
+
       default:
         return createSummaryExport({
           childName,
@@ -211,7 +211,7 @@ export default function ScheduleExportManager({
         },
         {
           title: 'Subject Focus Areas',
-          content: topSubjects.map(({ subject, hours }) => 
+          content: topSubjects.map(({ subject, hours }) =>
             `${subject}: ${hours} hours`
           )
         },
@@ -250,7 +250,7 @@ export default function ScheduleExportManager({
               const duration = event.duration || event.duration_minutes || 30;
               const status = event.status === 'completed' ? ' ✓' : '';
               const notes = exportOptions.includeNotes && event.notes ? ` - ${event.notes}` : '';
-              
+
               return `${time} - ${subject} (${duration}min)${status}${notes}`;
             })
         }))
@@ -261,16 +261,16 @@ export default function ScheduleExportManager({
 
   const createSubjectSpecificExport = ({ childName, dateRange, subjectBreakdown, filteredEvents, totalHours }) => {
     const subjectSections = Object.entries(subjectBreakdown).map(([subject, totalMinutes]) => {
-      const subjectEvents = filteredEvents.filter(e => 
+      const subjectEvents = filteredEvents.filter(e =>
         (e.base_subject_name || e.subject_name || e.title || 'Other') === subject
       );
-      
+
       const sessions = subjectEvents.map(event => {
         const date = format(new Date(event.date || event.start), 'MMM d');
         const time = event.startTime || event.start_time || format(new Date(event.start), 'HH:mm');
         const duration = event.duration || event.duration_minutes || 30;
         const status = event.status === 'completed' ? ' ✓' : '';
-        
+
         return `${date} at ${time} (${duration}min)${status}`;
       });
 
@@ -328,7 +328,7 @@ export default function ScheduleExportManager({
 
   const formatAsText = (content) => {
     let text = `${content.title}\n${content.subtitle}\n\n`;
-    
+
     content.sections.forEach(section => {
       text += `${section.title}\n`;
       text += ''.padEnd(section.title.length, '-') + '\n';
@@ -337,14 +337,14 @@ export default function ScheduleExportManager({
       });
       text += '\n';
     });
-    
+
     text += `\n${content.footer}`;
     return text;
   };
 
   const handleCopyToClipboard = () => {
     if (!generatedContent) return;
-    
+
     const text = formatAsText(generatedContent);
     navigator.clipboard.writeText(text).then(() => {
       // Show success feedback
@@ -450,9 +450,9 @@ export default function ScheduleExportManager({
                     <input
                       type="checkbox"
                       checked={exportOptions.includeCompleted}
-                      onChange={(e) => setExportOptions(prev => ({ 
-                        ...prev, 
-                        includeCompleted: e.target.checked 
+                      onChange={(e) => setExportOptions(prev => ({
+                        ...prev,
+                        includeCompleted: e.target.checked
                       }))}
                       className="mr-2"
                     />
@@ -462,9 +462,9 @@ export default function ScheduleExportManager({
                     <input
                       type="checkbox"
                       checked={exportOptions.includeNotes}
-                      onChange={(e) => setExportOptions(prev => ({ 
-                        ...prev, 
-                        includeNotes: e.target.checked 
+                      onChange={(e) => setExportOptions(prev => ({
+                        ...prev,
+                        includeNotes: e.target.checked
                       }))}
                       className="mr-2"
                     />
@@ -474,9 +474,9 @@ export default function ScheduleExportManager({
                     <input
                       type="checkbox"
                       checked={exportOptions.includeProgress}
-                      onChange={(e) => setExportOptions(prev => ({ 
-                        ...prev, 
-                        includeProgress: e.target.checked 
+                      onChange={(e) => setExportOptions(prev => ({
+                        ...prev,
+                        includeProgress: e.target.checked
                       }))}
                       className="mr-2"
                     />
@@ -547,7 +547,7 @@ export default function ScheduleExportManager({
                       {generatedContent.title}
                     </h1>
                     <p className="text-gray-600 mb-6">{generatedContent.subtitle}</p>
-                    
+
                     {generatedContent.sections.map((section, index) => (
                       <div key={index} className="mb-6">
                         <h2 className="text-lg font-semibold text-gray-800 mb-3">
@@ -562,7 +562,7 @@ export default function ScheduleExportManager({
                         </div>
                       </div>
                     ))}
-                    
+
                     <p className="text-sm text-gray-500 mt-6 pt-6 border-t border-gray-200">
                       {generatedContent.footer}
                     </p>

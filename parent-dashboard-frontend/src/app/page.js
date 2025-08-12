@@ -185,7 +185,7 @@ export default function LandingPage() {
               Get Started
             </Button>
           </div>
-          
+
           <div className="card p-6 text-center ring-2 ring-accent-blue relative">
             <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-accent-yellow text-text-primary px-3 py-1 rounded-full text-xs font-semibold">
               Most Popular
@@ -203,7 +203,7 @@ export default function LandingPage() {
               Add AI Tutoring
             </Button>
           </div>
-          
+
           <div className="card p-6 text-center">
             <h3 className="text-xl font-semibold text-text-primary mb-2">Family Plan</h3>
             <div className="text-3xl font-bold text-text-primary mb-4">$19<span className="text-base font-normal text-text-secondary">/mo</span></div>

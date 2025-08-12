@@ -4,91 +4,91 @@
 // Semantic color mapping for specific subjects with modern gradients
 export const SEMANTIC_SUBJECT_COLORS = {
   // Core Academic Subjects - Beautiful, modern colors
-  'Mathematics': { 
-    bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300', 
-    bgDark: 'bg-gradient-to-br from-blue-500 to-indigo-600', 
+  'Mathematics': {
+    bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300',
+    bgDark: 'bg-gradient-to-br from-blue-500 to-indigo-600',
     gradient: 'bg-gradient-to-br from-blue-100 to-blue-200',
     accent: 'blue', icon: '🔢', name: 'Mathematics'
   },
-  'Math': { 
-    bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300', 
-    bgDark: 'bg-gradient-to-br from-blue-500 to-indigo-600', 
+  'Math': {
+    bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300',
+    bgDark: 'bg-gradient-to-br from-blue-500 to-indigo-600',
     gradient: 'bg-gradient-to-br from-blue-100 to-blue-200',
     accent: 'blue', icon: '🔢', name: 'Mathematics'
   },
-  'English Language Arts': { 
-    bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300', 
-    bgDark: 'bg-gradient-to-br from-emerald-500 to-green-600', 
+  'English Language Arts': {
+    bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300',
+    bgDark: 'bg-gradient-to-br from-emerald-500 to-green-600',
     gradient: 'bg-gradient-to-br from-green-100 to-green-200',
     accent: 'green', icon: '📚', name: 'English Language Arts'
   },
-  'English': { 
-    bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300', 
-    bgDark: 'bg-gradient-to-br from-emerald-500 to-green-600', 
+  'English': {
+    bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300',
+    bgDark: 'bg-gradient-to-br from-emerald-500 to-green-600',
     gradient: 'bg-gradient-to-br from-green-100 to-green-200',
     accent: 'green', icon: '📚', name: 'English'
   },
-  'Science': { 
-    bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300', 
-    bgDark: 'bg-gradient-to-br from-purple-500 to-violet-600', 
+  'Science': {
+    bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300',
+    bgDark: 'bg-gradient-to-br from-purple-500 to-violet-600',
     gradient: 'bg-gradient-to-br from-purple-100 to-purple-200',
     accent: 'purple', icon: '🔬', name: 'Science'
   },
-  'Bible': { 
-    bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300', 
-    bgDark: 'bg-gradient-to-br from-amber-400 to-yellow-500', 
+  'Bible': {
+    bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300',
+    bgDark: 'bg-gradient-to-br from-amber-400 to-yellow-500',
     gradient: 'bg-gradient-to-br from-yellow-100 to-yellow-200',
     accent: 'yellow', icon: '✝️', name: 'Bible'
   },
-  'History': { 
-    bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300', 
-    bgDark: 'bg-gradient-to-br from-orange-500 to-amber-600', 
+  'History': {
+    bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300',
+    bgDark: 'bg-gradient-to-br from-orange-500 to-amber-600',
     gradient: 'bg-gradient-to-br from-amber-100 to-amber-200',
     accent: 'amber', icon: '🏛️', name: 'History'
   },
-  'Geography': { 
-    bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-300', 
-    bgDark: 'bg-gradient-to-br from-teal-500 to-cyan-600', 
+  'Geography': {
+    bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-300',
+    bgDark: 'bg-gradient-to-br from-teal-500 to-cyan-600',
     gradient: 'bg-gradient-to-br from-teal-100 to-teal-200',
     accent: 'teal', icon: '🌍', name: 'Geography'
   },
-  
-  // Creative & Arts Subjects - Soft, artistic colors 
-  'Art': { 
-    bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-300', 
-    bgDark: 'bg-gradient-to-br from-pink-400 to-rose-500', 
+
+  // Creative & Arts Subjects - Soft, artistic colors
+  'Art': {
+    bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-300',
+    bgDark: 'bg-gradient-to-br from-pink-400 to-rose-500',
     gradient: 'bg-gradient-to-br from-pink-100 to-pink-200',
     accent: 'pink', icon: '🎨', name: 'Art'
   },
-  'Music': { 
-    bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300', 
-    bgDark: 'bg-gradient-to-br from-indigo-500 to-purple-600', 
+  'Music': {
+    bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300',
+    bgDark: 'bg-gradient-to-br from-indigo-500 to-purple-600',
     gradient: 'bg-gradient-to-br from-indigo-100 to-indigo-200',
     accent: 'indigo', icon: '🎵', name: 'Music'
   },
-  'Literature': { 
-    bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-300', 
-    bgDark: 'bg-gradient-to-br from-rose-500 to-pink-600', 
+  'Literature': {
+    bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-300',
+    bgDark: 'bg-gradient-to-br from-rose-500 to-pink-600',
     gradient: 'bg-gradient-to-br from-rose-100 to-rose-200',
     accent: 'rose', icon: '📖', name: 'Literature'
   },
-  
+
   // Physical & Practical Subjects - Energetic, warm colors
-  'Physical Education': { 
-    bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300', 
-    bgDark: 'bg-gradient-to-br from-orange-500 to-red-500', 
+  'Physical Education': {
+    bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300',
+    bgDark: 'bg-gradient-to-br from-orange-500 to-red-500',
     gradient: 'bg-gradient-to-br from-orange-100 to-orange-200',
     accent: 'orange', icon: '⚽', name: 'Physical Education'
   },
-  'PE': { 
-    bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300', 
-    bgDark: 'bg-gradient-to-br from-orange-500 to-red-500', 
+  'PE': {
+    bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300',
+    bgDark: 'bg-gradient-to-br from-orange-500 to-red-500',
     gradient: 'bg-gradient-to-br from-orange-100 to-orange-200',
     accent: 'orange', icon: '⚽', name: 'Physical Education'
   },
-  'Foreign Language': { 
-    bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-300', 
-    bgDark: 'bg-gradient-to-br from-sky-500 to-cyan-600', 
+  'Foreign Language': {
+    bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-300',
+    bgDark: 'bg-gradient-to-br from-sky-500 to-cyan-600',
     gradient: 'bg-gradient-to-br from-cyan-100 to-cyan-200',
     accent: 'cyan', icon: '🌐', name: 'Foreign Language'
   }
@@ -128,11 +128,11 @@ const GENERIC_SUBJECT_COLORS = {
  * @param {Array} childSubjects - Array of child's subjects
  * @returns {Object} Color object with bg, text, border, gradient classes and icon
  */
-export function getSubjectColor(subjectName, childSubjects) {
+export function getSubjectColor(subjectName, childSubjects = []) {
   // Handle the case where subjectName might be like "Bible: Lesson 3"
   // Extract just the subject part before the colon
   const baseSubjectName = subjectName?.split(':')[0]?.trim() || subjectName;
-  
+
   // 1. First check semantic subject colors (priority mapping)
   if (SEMANTIC_SUBJECT_COLORS[baseSubjectName]) {
     return SEMANTIC_SUBJECT_COLORS[baseSubjectName];
@@ -140,23 +140,24 @@ export function getSubjectColor(subjectName, childSubjects) {
   if (SEMANTIC_SUBJECT_COLORS[subjectName]) {
     return SEMANTIC_SUBJECT_COLORS[subjectName];
   }
-  
+
   // 2. Try to find subject by matching various name formats in child subjects
-  const subjectIndex = childSubjects.findIndex(s => {
+  // Ensure childSubjects is an array before calling findIndex
+  const subjectIndex = Array.isArray(childSubjects) ? childSubjects.findIndex(s => {
     const displayName = s.custom_subject_name_override || s.subject?.name || s.name;
     const baseName = s.subject?.name || s.name;
-    
+
     // Check multiple matching strategies
-    return displayName === baseSubjectName || 
+    return displayName === baseSubjectName ||
            baseName === baseSubjectName ||
            displayName === subjectName ||
            baseName === subjectName;
-  });
-  
+  }) : -1;
+
   if (subjectIndex !== -1) {
     return SUBJECT_COLORS[subjectIndex % SUBJECT_COLORS.length];
   }
-  
+
   // 3. Check for predefined generic subject colors
   if (GENERIC_SUBJECT_COLORS[subjectName]) {
     return GENERIC_SUBJECT_COLORS[subjectName];
@@ -164,11 +165,11 @@ export function getSubjectColor(subjectName, childSubjects) {
   if (GENERIC_SUBJECT_COLORS[baseSubjectName]) {
     return GENERIC_SUBJECT_COLORS[baseSubjectName];
   }
-  
+
   // 4. Enhanced fallback - use a pleasant default color
-  return { 
-    bg: 'bg-neutral-100', text: 'text-neutral-800', border: 'border-neutral-300', 
-    name: 'Neutral', bgDark: 'bg-gradient-to-br from-neutral-400 to-neutral-600', 
+  return {
+    bg: 'bg-neutral-100', text: 'text-neutral-800', border: 'border-neutral-300',
+    name: 'Neutral', bgDark: 'bg-gradient-to-br from-neutral-400 to-neutral-600',
     gradient: 'bg-gradient-to-br from-neutral-100 to-neutral-200',
     accent: 'neutral', icon: '📄'
   };
@@ -183,7 +184,6 @@ export function getSubjectColor(subjectName, childSubjects) {
 export function getSubjectTextColor(subjectName, childSubjects) {
   return getSubjectColor(subjectName, childSubjects).text;
 }
-
 
 /**
  * Get darker background color class for better contrast (used in calendar events)
@@ -225,7 +225,6 @@ export function getSubjectAccent(subjectName, childSubjects) {
   return getSubjectColor(subjectName, childSubjects).accent || 'neutral';
 }
 
-
 // Additional colors for child differentiation when multiple children are shown
 const CHILD_VARIATIONS = [
   { opacity: 'opacity-100', border: 'border-2', name: 'Full' },
@@ -242,11 +241,11 @@ const CHILD_VARIATIONS = [
  * @param {Array} allChildren - Array of all children for consistent child ordering
  * @returns {Object} Style object with colors and variations
  */
-export function getMultiChildSubjectStyle(subjectName, childId, childSubjects, allChildren) {
+export function getMultiChildSubjectStyle(subjectName, childId, childSubjects = [], allChildren = []) {
   const baseColor = getSubjectColor(subjectName, childSubjects);
-  const childIndex = allChildren.findIndex(child => child.id === childId);
-  const childVariation = CHILD_VARIATIONS[childIndex % CHILD_VARIATIONS.length];
-  
+  const childIndex = Array.isArray(allChildren) ? allChildren.findIndex(child => child.id === childId) : -1;
+  const childVariation = CHILD_VARIATIONS[Math.max(0, childIndex) % CHILD_VARIATIONS.length];
+
   return {
     ...baseColor,
     opacity: childVariation.opacity,
@@ -282,4 +281,40 @@ export function getGenericSubjectColors() {
  */
 export function hasGenericSubjectColor(subjectName) {
   return GENERIC_SUBJECT_COLORS.hasOwnProperty(subjectName);
+}
+
+// Color mapping for Chart.js - convert accent colors to actual CSS colors
+const CHART_COLORS = {
+  blue: '#3B82F6',
+  green: '#10B981',
+  purple: '#8B5CF6',
+  yellow: '#F59E0B',
+  amber: '#F59E0B',
+  teal: '#14B8A6',
+  pink: '#EC4899',
+  indigo: '#6366F1',
+  rose: '#F43F5E',
+  orange: '#F97316',
+  cyan: '#06B6D4',
+  slate: '#64748B',
+  red: '#EF4444',
+  emerald: '#10B981',
+  sky: '#0EA5E9',
+  violet: '#8B5CF6',
+  fuchsia: '#D946EF',
+  lime: '#84CC16',
+  neutral: '#737373',
+  gray: '#6B7280'
+};
+
+/**
+ * Get Chart.js compatible color string for a subject
+ * @param {string} subjectName - Name of the subject
+ * @param {Array} childSubjects - Array of child's subjects
+ * @returns {string} Valid CSS color string for Chart.js
+ */
+export function getSubjectChartColor(subjectName, childSubjects = []) {
+  const colorObj = getSubjectColor(subjectName, childSubjects);
+  const accent = colorObj.accent || 'neutral';
+  return CHART_COLORS[accent] || CHART_COLORS.neutral;
 }

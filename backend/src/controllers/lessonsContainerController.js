@@ -70,9 +70,7 @@ exports.createLessonContainer = async (req, res) => {
   const parent_id = getParentId(req);
   const { unit_id, title, lesson_number, description, sequence_order } = req.body;
 
-  // console.log('Creating lesson container:', { parent_id, unit_id, title, lesson_number, description, sequence_order });
-
-  if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
+  // if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
   if (!unit_id || !title) {
     return res.status(400).json({ error: 'unit_id and title are required' });
   }
@@ -270,7 +268,7 @@ exports.updateLessonContainer = async (req, res) => {
       if (!trimmedTitle) {
         return res.status(400).json({ error: 'Lesson title cannot be empty' });
       }
-      
+
       // Check for title conflicts (only if title is actually changing)
       if (trimmedTitle.toLowerCase() !== existingLesson.title.toLowerCase()) {
         const { data: existing } = await supabase
@@ -285,18 +283,18 @@ exports.updateLessonContainer = async (req, res) => {
           return res.status(409).json({ error: 'Lesson title already exists in this unit' });
         }
       }
-      
+
       updateData.title = trimmedTitle;
     }
-    
+
     if (lesson_number !== undefined) {
       updateData.lesson_number = lesson_number ? lesson_number.trim() : null;
     }
-    
+
     if (description !== undefined) {
       updateData.description = description ? description.trim() : null;
     }
-    
+
     if (sequence_order !== undefined) {
       updateData.sequence_order = sequence_order;
     }
@@ -316,7 +314,7 @@ exports.updateLessonContainer = async (req, res) => {
 
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Lesson container not found or not updated' });
-    
+
     res.json(data);
   } catch (error) {
     console.error('Error updating lesson container:', error);
@@ -367,7 +365,7 @@ exports.deleteLessonContainer = async (req, res) => {
       .eq('lesson_id', lesson_id);
 
     if (materialsCount > 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: `Cannot delete lesson container with ${materialsCount} existing materials. Delete materials first or move them to another lesson.`
       });
     }
@@ -379,7 +377,7 @@ exports.deleteLessonContainer = async (req, res) => {
       .eq('id', lesson_id);
 
     if (error) throw error;
-    res.json({ 
+    res.json({
       message: 'Lesson container deleted successfully',
       deleted_lesson: {
         id: lessonData.id,
@@ -449,5 +447,78 @@ exports.reorderLessonContainers = async (req, res) => {
   } catch (error) {
     console.error('Error reordering lesson containers:', error);
     res.status(500).json({ error: error.message || 'Failed to reorder lesson containers' });
+  }
+};
+
+// Mark lesson container as complete (mark all materials as complete)
+exports.completeLessonContainer = async (req, res) => {
+  const parent_id = getParentId(req);
+  const { lesson_id } = req.params;
+  const { child_id } = req.body;
+
+  if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
+  if (!lesson_id) return res.status(400).json({ error: 'lesson_id is required' });
+  if (!child_id) return res.status(400).json({ error: 'child_id is required' });
+
+  try {
+    // Verify parent owns the lesson container
+    const isOwner = await verifyLessonOwnership(parent_id, lesson_id);
+    if (!isOwner) {
+      return res.status(403).json({ error: 'Access denied to this lesson container' });
+    }
+
+    // Verify the child belongs to the parent
+    const { data: childData, error: childError } = await supabase
+      .from('children')
+      .select('id')
+      .eq('id', child_id)
+      .eq('parent_id', parent_id)
+      .single();
+
+    if (childError || !childData) {
+      return res.status(403).json({ error: 'Access denied to this child' });
+    }
+
+    // Get all materials for this lesson container that are not yet completed
+    const { data: materials, error: materialsError } = await supabase
+      .from('materials')
+      .select('id, completed_at')
+      .eq('lesson_id', lesson_id)
+      .is('completed_at', null);
+
+    if (materialsError) throw materialsError;
+
+    if (!materials || materials.length === 0) {
+      return res.json({
+        message: 'All materials in this lesson container are already completed',
+        completed_count: 0
+      });
+    }
+
+    // Mark all incomplete materials as completed
+    const completedAt = new Date().toISOString();
+    const materialIds = materials.map(m => m.id);
+
+    const { data: updatedMaterials, error: updateError } = await supabase
+      .from('materials')
+      .update({
+        completed_at: completedAt,
+        completion_method: 'schedule_completion'
+      })
+      .in('id', materialIds)
+      .select('id, title, completed_at');
+
+    if (updateError) throw updateError;
+
+    res.json({
+      message: `Lesson container completed successfully. ${materialIds.length} materials marked as complete.`,
+      lesson_id: lesson_id,
+      completed_count: materialIds.length,
+      completed_materials: updatedMaterials || []
+    });
+
+  } catch (error) {
+    console.error('Error completing lesson container:', error);
+    res.status(500).json({ error: error.message || 'Failed to complete lesson container' });
   }
 };

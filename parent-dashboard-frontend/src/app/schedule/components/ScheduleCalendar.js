@@ -6,20 +6,21 @@ import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, CalendarDaysIcon, CheckIco
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
 import { getSubjectColor, getSubjectDarkBgColor, getSubjectTextColor, getMultiChildSubjectStyle, getChildVariation } from '../../../utils/subjectColors';
 
-export default function ScheduleCalendar({ 
-  childId, 
-  selectedChildrenIds = [], 
+export default function ScheduleCalendar({
+  childId,
+  selectedChildrenIds = [],
   allChildren = [],
-  subscriptionPermissions, 
-  scheduleManagement, 
-  childSubjects = [] 
+  subscriptionPermissions,
+  scheduleManagement,
+  childSubjects = [],
+  density = 'comfortable'
 }) {
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 })); // Start on Monday
-  
+
   // Use schedule management from props or create our own
   // Always call the hook to satisfy React rules
   const fallbackScheduleManagement = useScheduleManagement(childId, subscriptionPermissions);
-  
+
   // Use provided management or fallback
   const {
     calendarEvents,
@@ -28,7 +29,7 @@ export default function ScheduleCalendar({
     openCreateModal,
     openEditModal
   } = scheduleManagement ?? fallbackScheduleManagement;
-  
+
   // No sample events - use real data only
 
   // Generate week days
@@ -52,7 +53,7 @@ export default function ScheduleCalendar({
   const getEventsForDay = (day) => {
     const dayString = format(day, 'yyyy-MM-dd');
     const events = calendarEvents || [];
-    
+
     return events.filter(event => {
       if (event.date) {
         return event.date === dayString;
@@ -69,22 +70,22 @@ export default function ScheduleCalendar({
   const isTimeSlotOccupied = (day, timeSlot) => {
     const dayEvents = getEventsForDay(day);
     const slotTime = new Date(`2000-01-01T${timeSlot}`);
-    
+
     return dayEvents.some(event => {
       let eventTimeStr = event.startTime || format(new Date(event.start), 'HH:mm');
       // Normalize time format - remove seconds if present
       eventTimeStr = eventTimeStr.length === 8 ? eventTimeStr.substring(0, 5) : eventTimeStr;
       const eventStartTime = new Date(`2000-01-01T${eventTimeStr}`);
       const eventDuration = event.duration || event.duration_minutes || 30;
-      
+
       // Calculate visual end time based on how we display the event
       const visualHeight = getEventHeight(eventDuration);
       const visualDurationMinutes = visualHeight * 30; // Convert back to minutes for overlap calculation
       const eventEndTime = new Date(eventStartTime.getTime() + (visualDurationMinutes * 60000));
-      
+
       // Check if this time slot falls within an existing event's visual duration
       const slotEndTime = new Date(slotTime.getTime() + (30 * 60000)); // 30-minute slot
-      
+
       // Slot is occupied if it overlaps with an existing event's visual space
       return (slotTime < eventEndTime && slotEndTime > eventStartTime);
     });
@@ -109,12 +110,12 @@ export default function ScheduleCalendar({
   const getEventDisplayInfo = (event, timeSlot) => {
     let eventTime = event.startTime || format(new Date(event.start), 'HH:mm');
     eventTime = eventTime.length === 8 ? eventTime.substring(0, 5) : eventTime;
-    
+
     if (eventTime !== timeSlot) return null;
-    
+
     const duration = event.duration || event.duration_minutes || 30;
     const height = getEventHeight(duration);
-    
+
     return {
       height,
       duration
@@ -173,7 +174,6 @@ export default function ScheduleCalendar({
     setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }));
   };
 
-
   return (
     <div className="p-6">
       {/* Week Navigation */}
@@ -185,11 +185,11 @@ export default function ScheduleCalendar({
           >
             <ChevronLeftIcon className="h-5 w-5" />
           </button>
-          
+
           <h2 className="text-xl font-semibold text-text-primary">
             Week of {format(currentWeek, 'MMM d, yyyy')}
           </h2>
-          
+
           <button
             onClick={nextWeek}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -197,7 +197,7 @@ export default function ScheduleCalendar({
             <ChevronRightIcon className="h-5 w-5" />
           </button>
         </div>
-        
+
         <div className="flex gap-2">
           <button
             onClick={goToToday}
@@ -221,7 +221,7 @@ export default function ScheduleCalendar({
           Loading schedule...
         </div>
       )}
-      
+
       {!loading && calendarEvents.length === 0 && (
         <div className="text-center py-8 bg-slate-50 rounded-lg border border-gray-200 mb-4">
           <div className="text-slate-700 mb-2">
@@ -257,14 +257,14 @@ export default function ScheduleCalendar({
         </div>
 
         {/* Time Slots and Events */}
-        <div className="min-h-[calc(100vh-450px)] max-h-[calc(100vh-350px)] overflow-y-auto calendar-scroll">
+        <div className="min-h-[calc(100vh-350px)] max-h-[calc(100vh-180px)] overflow-y-auto calendar-scroll">
           {timeSlots.map((timeSlot, index) => (
-            <div key={timeSlot} className={`grid grid-cols-8 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-25'}`}>
+            <div key={timeSlot} className={`grid grid-cols-8 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-25'}`} style={{ minHeight: density === 'compact' ? '40px' : '80px' }}>
               {/* Time Label */}
               <div className="p-4 bg-slate-50 text-sm text-gray-500 font-medium">
                 {format(new Date(`2000-01-01T${timeSlot}`), 'h:mm a')}
               </div>
-              
+
               {/* Day Columns */}
               {weekDays.map((day, dayIndex) => {
                 const isOccupied = isTimeSlotOccupied(day, timeSlot);
@@ -277,7 +277,7 @@ export default function ScheduleCalendar({
                     className={`relative transition-colors ${
                       !isOccupied ? 'hover:bg-blue-25 cursor-pointer' : ''
                     } ${dayIndex !== weekDays.length - 1 ? 'border-r border-gray-100' : ''}`}
-                    style={{ minHeight: '80px' }}
+                    style={{ minHeight: density === 'compact' ? '40px' : '80px' }}
                     onClick={() => {
                       if (!isOccupied) {
                         openCreateModal({
@@ -295,14 +295,14 @@ export default function ScheduleCalendar({
                         }}
                         className={`
                           absolute inset-x-0 top-0 mx-2 rounded-lg cursor-pointer hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow-lg
-                          ${getSubjectEventColor(eventStartingHere.subject, eventStartingHere.childId)} 
+                          ${getSubjectEventColor(eventStartingHere.subject, eventStartingHere.childId)}
                           ${getSubjectEventTextColor(eventStartingHere.subject, eventStartingHere.childId)}
                           ${getSubjectEventBorder(eventStartingHere.subject, eventStartingHere.childId)}
                           ${eventStartingHere.status === 'completed' ? 'opacity-70' : ''}
                           text-xs p-3 z-10
                         `}
                         style={{
-                          height: `${getEventHeight(eventStartingHere.duration || eventStartingHere.duration_minutes || 30) * 80 - 4}px`, // Account for margin
+                          height: `${getEventHeight(eventStartingHere.duration || eventStartingHere.duration_minutes || 30) * (density === 'compact' ? 40 : 80) - 4}px`,
                         }}
                       >
 {/* Different layouts based on duration */}
@@ -317,7 +317,7 @@ export default function ScheduleCalendar({
                                 {eventStartingHere.duration || eventStartingHere.duration_minutes || 30}m
                               </div>
                             </div>
-                            
+
                             {/* Completion Toggle Button */}
                             <button
                               onClick={(e) => {
@@ -325,7 +325,7 @@ export default function ScheduleCalendar({
                                 const entryChildId = eventStartingHere.childId || eventStartingHere.originalEntry?.child_id;
                                 if (eventStartingHere.status === 'completed') {
                                   scheduleManagement.updateScheduleEntry(
-                                    eventStartingHere.originalEntry?.id || eventStartingHere.id, 
+                                    eventStartingHere.originalEntry?.id || eventStartingHere.id,
                                     { status: 'scheduled' },
                                     entryChildId
                                   );
@@ -337,8 +337,8 @@ export default function ScheduleCalendar({
                                 }
                               }}
                               className={`p-1 rounded-full transition-all duration-200 hover:scale-110 shadow-lg border ${
-                                eventStartingHere.status === 'completed' 
-                                  ? 'bg-green-50 text-green-700 border-green-300 shadow-green-200' 
+                                eventStartingHere.status === 'completed'
+                                  ? 'bg-green-50 text-green-700 border-green-300 shadow-green-200'
                                   : 'bg-white hover:bg-green-50 text-gray-600 hover:text-green-700 border-gray-300 hover:border-green-300'
                               }`}
                               title={eventStartingHere.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
@@ -355,14 +355,14 @@ export default function ScheduleCalendar({
                               <div className={`font-semibold text-xs mb-2 truncate ${eventStartingHere.status === 'completed' ? 'line-through' : ''}`}>
                                 {eventStartingHere.title}
                               </div>
-                              
+
                               {/* Lesson title if available - Secondary info */}
                               {eventStartingHere.lesson?.title && eventStartingHere.lesson.title !== eventStartingHere.title && (
                                 <div className="text-xs opacity-90 mb-1 line-clamp-2">
                                   {eventStartingHere.lesson.title}
                                 </div>
                               )}
-                              
+
                               {/* Child name for multi-child view */}
                               {selectedChildrenIds.length > 1 && (
                                 <div className="text-xs opacity-80 truncate">
@@ -370,13 +370,13 @@ export default function ScheduleCalendar({
                                 </div>
                               )}
                             </div>
-                            
+
                             {/* Bottom section with duration and completion */}
                             <div className="flex justify-between items-center mt-2">
                               <div className="text-xs opacity-75">
                                 {eventStartingHere.duration || eventStartingHere.duration_minutes || 30}m
                               </div>
-                              
+
                               {/* Completion Toggle Button */}
                               <button
                                 onClick={(e) => {
@@ -384,7 +384,7 @@ export default function ScheduleCalendar({
                                   const entryChildId = eventStartingHere.childId || eventStartingHere.originalEntry?.child_id;
                                   if (eventStartingHere.status === 'completed') {
                                     scheduleManagement.updateScheduleEntry(
-                                      eventStartingHere.originalEntry?.id || eventStartingHere.id, 
+                                      eventStartingHere.originalEntry?.id || eventStartingHere.id,
                                       { status: 'scheduled' },
                                       entryChildId
                                     );
@@ -396,8 +396,8 @@ export default function ScheduleCalendar({
                                   }
                                 }}
                                 className={`p-1.5 rounded-full transition-all duration-200 hover:scale-110 shadow-lg border ${
-                                  eventStartingHere.status === 'completed' 
-                                    ? 'bg-green-50 text-green-700 border-green-300 shadow-green-200' 
+                                  eventStartingHere.status === 'completed'
+                                    ? 'bg-green-50 text-green-700 border-green-300 shadow-green-200'
                                     : 'bg-white hover:bg-green-50 text-gray-600 hover:text-green-700 border-gray-300 hover:border-green-300'
                                 }`}
                                 title={eventStartingHere.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
@@ -442,7 +442,7 @@ export default function ScheduleCalendar({
                     })}
                 </div>
               </div>
-              
+
               {/* Subject colors */}
               <div>
                 <h5 className="text-xs font-medium text-gray-600 mb-2">Subject Colors:</h5>
@@ -461,7 +461,7 @@ export default function ScheduleCalendar({
             </div>
           </div>
         ) : (
-          // Single child legend  
+          // Single child legend
           <div>
             <h4 className="text-sm font-semibold text-gray-700 mb-3">Subject Colors</h4>
             <div className="flex flex-wrap gap-4 text-sm">
@@ -477,7 +477,7 @@ export default function ScheduleCalendar({
             </div>
           </div>
         )}
-        
+
         {/* Always show completed status */}
         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
           <div className="w-4 h-4 bg-gray-300 rounded-lg opacity-60"></div>

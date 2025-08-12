@@ -10,15 +10,15 @@ export function ToastProvider({ children }) {
   const addToast = useCallback((message, type = 'info', duration = 5000) => {
     const id = Date.now() + Math.random();
     const toast = { id, message, type, duration };
-    
+
     setToasts(prev => [...prev, toast]);
-    
+
     if (duration > 0) {
       setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== id));
       }, duration);
     }
-    
+
     return id;
   }, []);
 

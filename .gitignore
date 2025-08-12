@@ -20,8 +20,11 @@ pnpm-debug.log*
 
 # Environment variables
 .env
-.env.*.local
+.env.*
 .env.local
+.env.production
+.env.development
+!.env.example
 
 # Coverage reports
 coverage/
@@ -40,3 +43,9 @@ Thumbs.db
 
 # Misc packaging files
 *.tgz
+
+# Playwright MCP
+playwright-output/
+playwright-videos/
+playwright-profile/
+*.trace.zip

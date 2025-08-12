@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
-import { 
-  XMarkIcon, 
+import {
+  XMarkIcon,
   PencilSquareIcon,
   BookOpenIcon,
   ClockIcon,
@@ -22,13 +22,13 @@ export default function LessonViewModal({
 
   const lessonJson = lesson.lesson_json || {};
   const isCompleted = !!lesson.completed_at;
-  
+
   // Check if this is the new structured lesson format from AI
   const isStructuredFormat = lessonJson.Objective && lessonJson.ai_model === 'gpt-4o-files-api';
-  
+
   const handleToggleComplete = async () => {
     if (!onToggleComplete) return;
-    
+
     setIsToggling(true);
     try {
       await onToggleComplete(lesson.id, !isCompleted);
@@ -49,7 +49,7 @@ export default function LessonViewModal({
       return new Date(dateString + 'T00:00:00').toLocaleDateString(undefined, {
         weekday: 'long',
         year: 'numeric',
-        month: 'long', 
+        month: 'long',
         day: 'numeric'
       });
     } catch {
@@ -70,20 +70,20 @@ export default function LessonViewModal({
                 <CheckCircleIcon className="h-6 w-6 text-green-500" />
               )}
             </div>
-            
+
             <div className="flex items-center gap-4 text-sm text-gray-600">
               <span className="inline-flex items-center gap-1">
                 <AcademicCapIcon className="h-4 w-4" />
                 {formatContentType(lesson.content_type)}
               </span>
-              
+
               {lesson.due_date && (
                 <span className="inline-flex items-center gap-1">
                   <ClockIcon className="h-4 w-4" />
                   Due: {formatDueDate(lesson.due_date)}
                 </span>
               )}
-              
+
               {lessonJson.estimated_time_minutes && (
                 <span className="inline-flex items-center gap-1">
                   <ClockIcon className="h-4 w-4" />
@@ -92,7 +92,7 @@ export default function LessonViewModal({
               )}
             </div>
           </div>
-          
+
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
             <XMarkIcon className="h-6 w-6" />
           </button>
@@ -123,8 +123,8 @@ export default function LessonViewModal({
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h3 className="font-semibold text-gray-900 mb-3">Lesson Introduction</h3>
                   <div className="text-gray-700">
-                    {typeof lessonJson.Introduction === 'object' ? 
-                      lessonJson.Introduction.Overview || JSON.stringify(lessonJson.Introduction, null, 2) : 
+                    {typeof lessonJson.Introduction === 'object' ?
+                      lessonJson.Introduction.Overview || JSON.stringify(lessonJson.Introduction, null, 2) :
                       lessonJson.Introduction}
                   </div>
                 </div>
@@ -135,8 +135,8 @@ export default function LessonViewModal({
                 <div className="bg-indigo-50 rounded-lg p-4">
                   <h3 className="font-semibold text-indigo-900 mb-3">Theme & Topic</h3>
                   <div className="text-indigo-800">
-                    {typeof lessonJson.ThemeInfo === 'object' ? 
-                      lessonJson.ThemeInfo.Discussion || JSON.stringify(lessonJson.ThemeInfo, null, 2) : 
+                    {typeof lessonJson.ThemeInfo === 'object' ?
+                      lessonJson.ThemeInfo.Discussion || JSON.stringify(lessonJson.ThemeInfo, null, 2) :
                       lessonJson.ThemeInfo}
                   </div>
                 </div>
@@ -147,17 +147,17 @@ export default function LessonViewModal({
                 <div className="bg-green-50 rounded-lg p-4">
                   <h3 className="font-semibold text-green-900 mb-3">Main Content Concepts</h3>
                   <div className="text-green-800">
-                    {Array.isArray(lessonJson.TypesOfSentences) ? 
+                    {Array.isArray(lessonJson.TypesOfSentences) ?
                       lessonJson.TypesOfSentences.map((item, index) => (
                         <div key={index} className="mb-3 last:mb-0">
-                          {typeof item === 'object' ? 
+                          {typeof item === 'object' ?
                             Object.entries(item).map(([key, value]) => (
                               <div key={key} className="mb-1">
                                 <strong>{key}:</strong> {value}
                               </div>
                             )) : item}
                         </div>
-                      )) : 
+                      )) :
                       <pre className="whitespace-pre-wrap text-sm">{JSON.stringify(lessonJson.TypesOfSentences, null, 2)}</pre>}
                   </div>
                 </div>
@@ -234,10 +234,10 @@ export default function LessonViewModal({
                 <div className="bg-orange-50 rounded-lg p-4">
                   <h3 className="font-semibold text-orange-900 mb-3">Teaching Guidance</h3>
                   <ul className="list-disc list-inside space-y-1 text-orange-800">
-                    {Array.isArray(lessonJson.TeacherForUnderstanding) ? 
+                    {Array.isArray(lessonJson.TeacherForUnderstanding) ?
                       lessonJson.TeacherForUnderstanding.map((guidance, index) => (
                         <li key={index}>{guidance}</li>
-                      )) : 
+                      )) :
                       <li>{lessonJson.TeacherForUnderstanding}</li>}
                   </ul>
                 </div>
@@ -387,14 +387,14 @@ export default function LessonViewModal({
               <CheckCircleIcon className="h-4 w-4" />
               {isToggling ? 'Updating...' : isCompleted ? 'Mark Incomplete' : 'Mark Complete'}
             </Button>
-            
+
             {lesson.grade_max_value && !lesson.grade_value && isCompleted && (
               <span className="text-sm text-orange-600 font-medium">
                 Needs grading
               </span>
             )}
           </div>
-          
+
           <div className="flex items-center gap-3">
             <Button onClick={onClose} variant="secondary">
               Close

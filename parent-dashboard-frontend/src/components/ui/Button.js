@@ -34,7 +34,7 @@ const Button = React.forwardRef(
       outline: 'bg-transparent border-2 border-border-input text-text-secondary hover:bg-gray-100 hover:text-text-primary focus:ring-border-input',
       ghost: 'bg-transparent text-text-secondary hover:bg-gray-100 hover:text-text-primary focus:ring-border-input',
     };
-    
+
     const disabledStyles = disabled ? 'opacity-50 cursor-not-allowed' : '';
 
     const combinedClassName = `${baseStyles} ${sizeClasses[size]} ${variantStyles[variant]} ${disabledStyles} ${className}`;

@@ -6,14 +6,14 @@ import { XMarkIcon, Cog6ToothIcon, ClockIcon, CheckIcon } from '@heroicons/react
 const formInputStyles = "block w-full border-[var(--border-input)] focus:outline-none focus:ring-1 focus:ring-[var(--border-input-focus)] focus:border-[var(--border-input-focus)] rounded-[var(--radius-md)] bg-background-card text-text-primary placeholder-text-tertiary shadow-sm text-sm px-3 py-2";
 const formLabelStyles = "block text-sm font-medium text-[var(--text-primary)] mb-1";
 
-export default function ScheduleSettingsModal({ 
-  isOpen, 
-  onClose, 
+export default function ScheduleSettingsModal({
+  isOpen,
+  onClose,
   onSave,
   schedulePreferences = {},
   childName = 'Student',
   childSubjects = [],
-  isSaving = false 
+  isSaving = false
 }) {
   // Form state
   const [formData, setFormData] = useState({
@@ -34,13 +34,13 @@ export default function ScheduleSettingsModal({
       // Initialize subject frequencies with defaults
       const subjectFrequencies = {};
       childSubjects.forEach(subject => {
-        subjectFrequencies[subject.child_subject_id] = 
+        subjectFrequencies[subject.child_subject_id] =
           schedulePreferences.subject_frequencies?.[subject.child_subject_id] || 3; // Default 3 times per week
       });
 
       setFormData({
         preferred_start_time: schedulePreferences.preferred_start_time || '09:00',
-        preferred_end_time: schedulePreferences.preferred_end_time || '15:00', 
+        preferred_end_time: schedulePreferences.preferred_end_time || '15:00',
         max_daily_study_minutes: schedulePreferences.max_daily_study_minutes || 240,
         break_duration_minutes: schedulePreferences.break_duration_minutes || 15,
         difficult_subjects_morning: schedulePreferences.difficult_subjects_morning !== false,
@@ -54,7 +54,7 @@ export default function ScheduleSettingsModal({
   // Handle input changes
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : (type === 'number' ? parseInt(value) || 0 : value)
@@ -103,7 +103,7 @@ export default function ScheduleSettingsModal({
     if (formData.preferred_start_time && formData.preferred_end_time) {
       const startTime = new Date(`1970-01-01T${formData.preferred_start_time}`);
       const endTime = new Date(`1970-01-01T${formData.preferred_end_time}`);
-      
+
       if (endTime <= startTime) {
         newErrors.preferred_end_time = 'End time must be after start time';
       }
@@ -128,13 +128,24 @@ export default function ScheduleSettingsModal({
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     try {
-      await onSave(formData);
+      // Only send the fields that the database supports
+      const dataToSave = {
+        preferred_start_time: formData.preferred_start_time,
+        preferred_end_time: formData.preferred_end_time,
+        max_daily_study_minutes: formData.max_daily_study_minutes,
+        break_duration_minutes: formData.break_duration_minutes,
+        difficult_subjects_morning: formData.difficult_subjects_morning,
+        study_days: formData.study_days
+        // Note: subject_frequencies is not saved to database yet
+      };
+
+      await onSave(dataToSave);
       onClose();
     } catch (error) {
       setErrors({ submit: 'Failed to save preferences. Please try again.' });
@@ -200,7 +211,7 @@ export default function ScheduleSettingsModal({
                 <ClockIcon className="h-4 w-4" />
                 Study Time Window
               </h4>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="preferred_start_time" className={formLabelStyles}>
@@ -213,6 +224,7 @@ export default function ScheduleSettingsModal({
                     value={formData.preferred_start_time}
                     onChange={handleInputChange}
                     className={formInputStyles}
+                    step="1800"
                     required
                   />
                   {errors.preferred_start_time && (
@@ -231,6 +243,7 @@ export default function ScheduleSettingsModal({
                     value={formData.preferred_end_time}
                     onChange={handleInputChange}
                     className={formInputStyles}
+                    step="1800"
                     required
                   />
                   {errors.preferred_end_time && (
@@ -238,9 +251,9 @@ export default function ScheduleSettingsModal({
                   )}
                 </div>
               </div>
-              
+
               <p className="text-xs text-[var(--text-secondary)] mt-2">
-                This defines the general time window when study sessions are preferred.
+                The calendar will automatically adjust to show only your selected time range. You can set times in 30-minute increments (e.g., 8:00, 8:30, 9:00).
               </p>
             </div>
 
@@ -249,7 +262,7 @@ export default function ScheduleSettingsModal({
               <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
                 Daily Study Limits
               </h4>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="max_daily_study_minutes" className={formLabelStyles}>
@@ -302,11 +315,11 @@ export default function ScheduleSettingsModal({
               <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
                 Study Days
               </h4>
-              
+
               <p className="text-sm text-[var(--text-secondary)] mb-3">
                 Select which days of the week are available for scheduling study sessions.
               </p>
-              
+
               <div className="grid grid-cols-2 gap-2">
                 {weekDays.map(day => (
                   <label key={day.value} className="flex items-center gap-2 p-2 rounded hover:bg-[var(--background-card)] cursor-pointer">
@@ -320,7 +333,7 @@ export default function ScheduleSettingsModal({
                   </label>
                 ))}
               </div>
-              
+
               {errors.study_days && (
                 <p className="text-red-600 text-xs mt-2">{errors.study_days}</p>
               )}
@@ -332,11 +345,11 @@ export default function ScheduleSettingsModal({
                 <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
                   Subject Frequency Preferences
                 </h4>
-                
+
                 <p className="text-sm text-[var(--text-secondary)] mb-4">
                   Set how many days per week you want to schedule each subject. This helps the AI create a balanced weekly schedule that matches your teaching preferences.
                 </p>
-                
+
                 <div className="space-y-3">
                   {childSubjects.map(subject => (
                     <div key={subject.child_subject_id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
@@ -365,10 +378,10 @@ export default function ScheduleSettingsModal({
                     </div>
                   ))}
                 </div>
-                
+
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <p className="text-xs text-blue-800">
-                    <span className="font-medium">Tip:</span> Higher frequency subjects (4-5 days) will be prioritized for the best time slots. 
+                    <span className="font-medium">Tip:</span> Higher frequency subjects (4-5 days) will be prioritized for the best time slots.
                     For example, if you set Math to 5 days and Art to 2 days, Math will get the morning slots when focus is highest.
                   </p>
                 </div>
@@ -380,7 +393,7 @@ export default function ScheduleSettingsModal({
               <h4 className="text-md font-medium text-[var(--text-primary)] mb-3">
                 Learning Preferences
               </h4>
-              
+
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -394,7 +407,7 @@ export default function ScheduleSettingsModal({
                   Prioritize difficult subjects in the morning
                 </label>
               </div>
-              
+
               <p className="text-xs text-[var(--text-secondary)] mt-2 ml-6">
                 When enabled, AI scheduling will place challenging subjects like Math and Science earlier in the day when focus is typically highest.
               </p>

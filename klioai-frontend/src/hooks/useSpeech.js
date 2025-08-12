@@ -15,8 +15,8 @@ export function useSpeech() {
     const loadVoices = () => {
       const availableVoices = window.speechSynthesis.getVoices();
       // Prefer child-friendly voices
-      const preferredVoices = availableVoices.filter(voice => 
-        voice.lang.startsWith('en') && 
+      const preferredVoices = availableVoices.filter(voice =>
+        voice.lang.startsWith('en') &&
         (voice.name.includes('Female') || voice.name.includes('Child') || voice.name.includes('Samantha'))
       );
       setVoices(preferredVoices.length > 0 ? preferredVoices : availableVoices);
@@ -35,7 +35,7 @@ export function useSpeech() {
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    
+
     // Set voice properties for child-friendly speech
     utterance.rate = 0.9; // Slightly slower for children
     utterance.pitch = 1.1; // Slightly higher pitch

@@ -5,12 +5,12 @@ import PropTypes from 'prop-types';
 import { XMarkIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 
-export default function BatchEditModal({ 
-  isOpen, 
-  onClose, 
-  selectedItems, 
+export default function BatchEditModal({
+  isOpen,
+  onClose,
+  selectedItems,
   onSave,
-  isLoading = false 
+  isLoading = false
 }) {
   const [batchChanges, setBatchChanges] = useState({
     due_date: '',
@@ -32,19 +32,19 @@ export default function BatchEditModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     // Only include fields that have been changed
     const changes = {};
     if (batchChanges.due_date) changes.due_date = batchChanges.due_date;
     if (batchChanges.content_type) changes.content_type = batchChanges.content_type;
     if (batchChanges.grade_max_value) changes.grade_max_value = batchChanges.grade_max_value;
     if (batchChanges.completed !== null) changes.completed = batchChanges.completed;
-    
+
     if (Object.keys(changes).length === 0) {
       alert('Please make at least one change.');
       return;
     }
-    
+
     onSave(selectedItems, changes);
   };
 
@@ -74,7 +74,7 @@ export default function BatchEditModal({
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Due Date */}
           <div>
@@ -144,7 +144,7 @@ export default function BatchEditModal({
                 type="button"
                 onClick={() => setBatchChanges(prev => ({ ...prev, completed: null }))}
                 className={`p-2 text-sm rounded-lg border-2 transition-colors ${
-                  batchChanges.completed === null 
+                  batchChanges.completed === null
                     ? 'border-blue-500 bg-blue-50 text-blue-900'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -156,7 +156,7 @@ export default function BatchEditModal({
                 type="button"
                 onClick={() => setBatchChanges(prev => ({ ...prev, completed: true }))}
                 className={`p-2 text-sm rounded-lg border-2 transition-colors ${
-                  batchChanges.completed === true 
+                  batchChanges.completed === true
                     ? 'border-green-500 bg-green-50 text-green-900'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -168,7 +168,7 @@ export default function BatchEditModal({
                 type="button"
                 onClick={() => setBatchChanges(prev => ({ ...prev, completed: false }))}
                 className={`p-2 text-sm rounded-lg border-2 transition-colors ${
-                  batchChanges.completed === false 
+                  batchChanges.completed === false
                     ? 'border-orange-500 bg-orange-50 text-orange-900'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -178,7 +178,7 @@ export default function BatchEditModal({
               </button>
             </div>
           </div>
-          
+
           <div className="flex justify-end space-x-3 pt-4">
             <Button
               type="button"

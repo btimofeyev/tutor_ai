@@ -8,32 +8,32 @@ export function useChildrenData(session) {
   // Children state
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
-  
+
   // Child-specific data with caching
   const [childSubjects, setChildSubjects] = useState({});
   const [lessonsByUnit, setLessonsByUnit] = useState({});
   const [lessonsBySubject, setLessonsBySubject] = useState({});
   const [gradeWeights, setGradeWeights] = useState({});
   const [unitsBySubject, setUnitsBySubject] = useState({});
-  
+
   // Cache metadata to track data freshness
   const [childDataCache, setChildDataCache] = useState({});
   const [lastFetchTime, setLastFetchTime] = useState({});
-  
+
   // Loading states
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingChildData, setLoadingChildData] = useState(false);
-  
+
   // Track if initial child selection has been done
   const [hasAutoSelectedChild, setHasAutoSelectedChild] = useState(false);
-  
+
   // Cache expiry time (5 minutes)
-  const CACHE_EXPIRY_MS = 5 * 60 * 1000;
-  
+  const CACHE_EXPIRY_MS = 30 * 1000; // 30 seconds instead of 5 minutes
+
   // localStorage keys
   const STORAGE_PREFIX = 'tutor_ai_dashboard_';
   const getStorageKey = (childId, dataType) => `${STORAGE_PREFIX}${childId}_${dataType}`;
-  
+
   // Save data to localStorage
   const saveToStorage = useCallback((childId, data) => {
     if (typeof window === 'undefined') return;
@@ -46,23 +46,23 @@ export function useChildrenData(session) {
     } catch (error) {
     }
   }, []);
-  
+
   // Load data from localStorage
   const loadFromStorage = useCallback((childId) => {
     if (typeof window === 'undefined') return null;
     try {
       const stored = localStorage.getItem(getStorageKey(childId, 'data'));
       if (!stored) return null;
-      
+
       const data = JSON.parse(stored);
       if (!data.timestamp) return null;
-      
+
       // Check if data is still fresh
       if (Date.now() - data.timestamp > CACHE_EXPIRY_MS) {
         localStorage.removeItem(getStorageKey(childId, 'data'));
         return null;
       }
-      
+
       return data;
     } catch (error) {
       return null;
@@ -77,12 +77,12 @@ export function useChildrenData(session) {
   // Fetch children data
   const fetchChildren = useCallback(async () => {
     if (!session) return;
-    
+
     try {
       const response = await api.get('/children');
       const childrenData = response.data || [];
       setChildren(childrenData);
-      
+
       // Auto-select first child if none selected (handled in separate useEffect)
     } catch (error) {
       setChildren([]);
@@ -101,73 +101,73 @@ export function useChildrenData(session) {
   // Fetch child-specific data when child is selected
   const refreshChildSpecificData = useCallback(async (forceRefresh = false) => {
     if (!selectedChild?.id || !session) return;
-    
+
     // First, try to load from localStorage
     if (!forceRefresh) {
       const storedData = loadFromStorage(selectedChild.id);
       if (storedData) {
-        
+
         // Apply stored data
         setChildSubjects(prev => ({ ...prev, [selectedChild.id]: storedData.subjects || [] }));
         setUnitsBySubject(prev => ({ ...prev, ...storedData.unitsBySubject }));
         setLessonsByUnit(prev => ({ ...prev, ...storedData.lessonsByUnit }));
         setLessonsBySubject(prev => ({ ...prev, ...storedData.lessonsBySubject }));
         setGradeWeights(prev => ({ ...prev, ...storedData.gradeWeights }));
-        
+
         // Update cache metadata
         setChildDataCache(prev => ({ ...prev, [selectedChild.id]: true }));
         setLastFetchTime(prev => ({ ...prev, [selectedChild.id]: storedData.timestamp }));
-        
+
         return;
       }
     }
-    
+
     // Check if we have fresh cached data and don't need to refetch
     if (!forceRefresh && isCacheValid(selectedChild.id) && childDataCache[selectedChild.id]) {
       return;
     }
-    
+
     setLoadingChildData(true);
-    
+
     try {
       // Fetch child subjects
       const childSubjectsRes = await api.get(`/child-subjects/child/${selectedChild.id}`);
       const subjects = childSubjectsRes.data || [];
       setChildSubjects(prev => ({ ...prev, [selectedChild.id]: subjects }));
-      
+
       // Initialize data structures for each subject
       // Clear existing data for the current child's subjects first
       const currentChildSubjects = childSubjects[selectedChild.id] || [];
       const currentChildSubjectIds = currentChildSubjects.map(s => s.child_subject_id);
-      
+
       const newLessonsByUnit = { ...lessonsByUnit };
       const newLessonsBySubject = { ...lessonsBySubject };
       const newGradeWeights = { ...gradeWeights };
       const newUnitsBySubject = { ...unitsBySubject };
-      
+
       // Clear data for current child's subjects to prevent stale data
       currentChildSubjectIds.forEach(subjectId => {
         delete newLessonsBySubject[subjectId];
         delete newGradeWeights[subjectId];
         delete newUnitsBySubject[subjectId];
       });
-      
+
       // Create all API calls for parallel execution
       const subjectPromises = subjects.map(async (subject) => {
         if (!subject.child_subject_id) return null;
-        
+
         try {
           // Fetch units, materials, and weights in parallel for each subject
           const [unitsRes, materialsRes, weightsRes] = await Promise.all([
             api.get(`/units/subject/${subject.child_subject_id}`),
-            api.get(`/materials/subject/${subject.child_subject_id}`),
+            api.get(`/materials/subject/${subject.child_subject_id}?t=${Date.now()}`),
             api.get(`/weights/${subject.child_subject_id}`)
           ]);
-          
+
           const units = unitsRes.data || [];
           const materials = materialsRes.data || [];
           const weights = weightsRes.data || [...defaultWeightsForNewSubject];
-          
+
           // Fetch lesson containers for all units in parallel
           const lessonContainerPromises = units.map(async (unit) => {
             try {
@@ -177,15 +177,15 @@ export function useChildrenData(session) {
               return { unitId: unit.id, lessons: [] };
             }
           });
-          
+
           const lessonContainerResults = await Promise.all(lessonContainerPromises);
-          
+
           // Process materials to ensure they have proper subject names
           const materialsWithSubject = materials.map(material => ({
             ...material,
             subject_name: material.subject_name || subject.name
           }));
-          
+
           return {
             subjectId: subject.child_subject_id,
             subjectName: subject.name,
@@ -194,7 +194,7 @@ export function useChildrenData(session) {
             weights,
             lessonContainers: lessonContainerResults
           };
-          
+
         } catch (err) {
           return {
             subjectId: subject.child_subject_id,
@@ -206,30 +206,30 @@ export function useChildrenData(session) {
           };
         }
       });
-      
+
       // Wait for all subject data to load in parallel
       const subjectResults = await Promise.all(subjectPromises);
-      
+
       // Update state with all results
       subjectResults.forEach(result => {
         if (result) {
           newUnitsBySubject[result.subjectId] = result.units;
           newLessonsBySubject[result.subjectId] = result.materials;
           newGradeWeights[result.subjectId] = result.weights;
-          
+
           // Update lesson containers by unit
           result.lessonContainers.forEach(({ unitId, lessons }) => {
             newLessonsByUnit[unitId] = lessons;
           });
         }
       });
-      
+
       // Update all state at once
       setUnitsBySubject(newUnitsBySubject);
       setLessonsByUnit(newLessonsByUnit);
       setLessonsBySubject(newLessonsBySubject);
       setGradeWeights(newGradeWeights);
-      
+
       // Save to localStorage
       const dataToStore = {
         subjects,
@@ -239,11 +239,11 @@ export function useChildrenData(session) {
         gradeWeights: newGradeWeights
       };
       saveToStorage(selectedChild.id, dataToStore);
-      
+
       // Update cache metadata
       setChildDataCache(prev => ({ ...prev, [selectedChild.id]: true }));
       setLastFetchTime(prev => ({ ...prev, [selectedChild.id]: Date.now() }));
-      
+
     } catch (error) {
     } finally {
       setLoadingChildData(false);
@@ -255,21 +255,21 @@ export function useChildrenData(session) {
     try {
       const response = await api.post('/children', childData);
       const newChild = response.data;
-      
+
       // Refresh children list
       await fetchChildren();
-      
+
       // Select the new child
       if (newChild) {
         setSelectedChild(newChild);
       }
-      
+
       return { success: true, child: newChild };
     } catch (error) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: error.response?.data?.error || "Failed to add child",
-        code: error.response?.data?.code 
+        code: error.response?.data?.code
       };
     }
   }, [fetchChildren]);
@@ -285,9 +285,9 @@ export function useChildrenData(session) {
   useEffect(() => {
     if (children.length > 0 && !selectedChild && !hasAutoSelectedChild) {
       // Check if there's a persisted selectedChild ID from sessionStorage
-      const persistedChildId = typeof window !== 'undefined' ? 
+      const persistedChildId = typeof window !== 'undefined' ?
         sessionStorage.getItem('tutor_ai_selected_child_id') : null;
-      
+
       if (persistedChildId) {
         // Try to find the persisted child in the current children list
         const persistedChild = children.find(child => child.id.toString() === persistedChildId);
@@ -297,7 +297,7 @@ export function useChildrenData(session) {
           return;
         }
       }
-      
+
       // Fallback to first child if no valid persisted child found
       setSelectedChild(children[0]);
       setHasAutoSelectedChild(true);
@@ -308,7 +308,7 @@ export function useChildrenData(session) {
   const invalidateChildCache = useCallback((childId) => {
     setChildDataCache(prev => ({ ...prev, [childId]: false }));
     setLastFetchTime(prev => ({ ...prev, [childId]: 0 }));
-    
+
     // Clear localStorage as well
     if (typeof window !== 'undefined') {
       try {
@@ -322,20 +322,20 @@ export function useChildrenData(session) {
   const deleteChild = useCallback(async (childId) => {
     try {
       const response = await api.delete(`/children/${childId}`);
-      
+
       // Clear the child's cached data
       invalidateChildCache(childId);
-      
+
       // Clear all cached data to ensure no orphaned lessons
       clearOrphanedCache();
-      
+
       // Clear all state related to the deleted child
       setChildSubjects(prev => {
         const newState = { ...prev };
         delete newState[childId];
         return newState;
       });
-      
+
       setLessonsBySubject(prev => {
         const newState = { ...prev };
         // Remove any lessons that might be associated with deleted child's subjects
@@ -345,37 +345,35 @@ export function useChildrenData(session) {
         });
         return {};
       });
-      
+
       setLessonsByUnit(prev => ({})); // Clear all lesson unit associations
       setUnitsBySubject(prev => ({})); // Clear all unit associations
       setGradeWeights(prev => ({})); // Clear all grade weights
-      
+
       // Refresh children list
       await fetchChildren();
-      
+
       // Get updated children list to perform cleanup
       const remainingChildren = children.filter(child => child.id !== childId);
-      
+
       // Perform comprehensive data cleanup
       const cleanupResult = await performDataCleanup(remainingChildren);
-      console.log('Data cleanup completed:', cleanupResult);
-      
       // If the deleted child was selected, select the first remaining child or null
       if (selectedChild?.id === childId) {
         setSelectedChild(remainingChildren.length > 0 ? remainingChildren[0] : null);
       }
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         message: response.data.message || 'Child deleted successfully',
         deleted_child: response.data.deleted_child,
         cleanup: cleanupResult
       };
     } catch (error) {
       console.error('Delete child error:', error.response?.data);
-      return { 
-        success: false, 
-        error: error.response?.data?.error || error.response?.data?.message || "Failed to delete child" 
+      return {
+        success: false,
+        error: error.response?.data?.error || error.response?.data?.message || "Failed to delete child"
       };
     }
   }, [selectedChild, children, fetchChildren, invalidateChildCache]);
@@ -407,7 +405,7 @@ export function useChildrenData(session) {
     children,
     selectedChild,
     setSelectedChild: setSelectedChildWithPersistence,
-    
+
     // Child-specific data
     childSubjects,
     lessonsByUnit,
@@ -416,11 +414,11 @@ export function useChildrenData(session) {
     gradeWeights,
     unitsBySubject,
     setUnitsBySubject,
-    
+
     // Loading states
     loadingInitial,
     loadingChildData,
-    
+
     // Add child form
     showAddChild,
     setShowAddChild,
@@ -428,17 +426,17 @@ export function useChildrenData(session) {
     setNewChildName,
     newChildGrade,
     setNewChildGrade,
-    
+
     // Actions
     handleAddChild,
     deleteChild,
     refreshChildSpecificData,
     fetchChildren,
     invalidateChildCache,
-    
+
     // Cache utilities
     isCacheValid,
-    
+
     // Computed values
     assignedSubjectsForCurrentChild: childSubjects[selectedChild?.id] || []
   };

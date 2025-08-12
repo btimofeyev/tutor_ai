@@ -8,12 +8,12 @@ export const focusManagement = {
     const focusableElements = container.querySelectorAll(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
-    
+
     if (focusableElements.length === 0) return;
-    
+
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
-    
+
     const handleTabKey = (e) => {
       if (e.key === 'Tab') {
         if (e.shiftKey && document.activeElement === firstElement) {
@@ -24,22 +24,22 @@ export const focusManagement = {
           firstElement.focus();
         }
       }
-      
+
       if (e.key === 'Escape') {
         const closeButton = container.querySelector('[data-close-modal]');
         if (closeButton) closeButton.click();
       }
     };
-    
+
     container.addEventListener('keydown', handleTabKey);
     firstElement.focus();
-    
+
     // Return cleanup function
     return () => {
       container.removeEventListener('keydown', handleTabKey);
     };
   },
-  
+
   // Focus first error in a form
   focusFirstError: (formContainer) => {
     const firstError = formContainer.querySelector('[aria-invalid="true"], .error-field');
@@ -48,7 +48,7 @@ export const focusManagement = {
       firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   },
-  
+
   // Restore focus to a previous element
   restoreFocus: (previousElement) => {
     if (previousElement && typeof previousElement.focus === 'function') {
@@ -69,19 +69,19 @@ export const ariaLabels = {
     };
     return statusMap[status] || `${item} status: ${status}`;
   },
-  
+
   // Generate ARIA label for progress indicators
   progress: (completed, total, itemType = 'items') => {
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     return `Progress: ${completed} of ${total} ${itemType} completed (${percentage}%)`;
   },
-  
+
   // Generate ARIA label for interactive buttons
   actionButton: (action, target, additionalContext = '') => {
     const context = additionalContext ? ` ${additionalContext}` : '';
     return `${action} ${target}${context}`;
   },
-  
+
   // Generate ARIA label for form fields
   formField: (fieldName, required = false, helpText = '') => {
     let label = fieldName;
@@ -100,25 +100,25 @@ export const announcements = {
     announcement.setAttribute('aria-atomic', 'true');
     announcement.className = 'sr-only';
     announcement.textContent = message;
-    
+
     document.body.appendChild(announcement);
-    
+
     // Remove after announcement is made
     setTimeout(() => {
       document.body.removeChild(announcement);
     }, 1000);
   },
-  
+
   // Announce loading states
   loading: (action = 'Loading') => {
     announcements.announce(`${action}. Please wait.`, 'assertive');
   },
-  
+
   // Announce completion of actions
   success: (action = 'Action') => {
     announcements.announce(`${action} completed successfully.`, 'polite');
   },
-  
+
   // Announce errors
   error: (message) => {
     announcements.announce(`Error: ${message}`, 'assertive');
@@ -129,16 +129,16 @@ export const announcements = {
 export const keyboardNav = {
   // Handle common keyboard patterns
   handleKeyDown: (e, handlers = {}) => {
-    const { 
-      onEnter, 
-      onSpace, 
-      onEscape, 
-      onArrowUp, 
-      onArrowDown, 
-      onArrowLeft, 
-      onArrowRight 
+    const {
+      onEnter,
+      onSpace,
+      onEscape,
+      onArrowUp,
+      onArrowDown,
+      onArrowLeft,
+      onArrowRight
     } = handlers;
-    
+
     switch (e.key) {
       case 'Enter':
         if (onEnter) {
@@ -192,13 +192,13 @@ export const colorA11y = {
   statusText: (status) => {
     const statusMap = {
       complete: '✓ Complete',
-      incomplete: '○ Incomplete', 
+      incomplete: '○ Incomplete',
       overdue: '⚠ Overdue',
       dueSoon: '⏰ Due Soon'
     };
     return statusMap[status] || status;
   },
-  
+
   // Generate icon alternatives for colors
   statusIcon: (status) => {
     const iconMap = {
@@ -218,12 +218,12 @@ export const semanticHelpers = {
     const validLevels = [1, 2, 3, 4, 5, 6];
     return validLevels.includes(level) ? `h${level}` : 'h2';
   },
-  
+
   // Generate ARIA roles for custom components
   role: (componentType) => {
     const roleMap = {
       button: 'button',
-      link: 'link', 
+      link: 'link',
       tab: 'tab',
       tabpanel: 'tabpanel',
       dialog: 'dialog',
@@ -239,13 +239,13 @@ export const semanticHelpers = {
 export const formA11y = {
   // Generate comprehensive form field props
   fieldProps: (fieldName, options = {}) => {
-    const { 
-      required = false, 
-      invalid = false, 
-      helpText = '', 
-      errorMessage = '' 
+    const {
+      required = false,
+      invalid = false,
+      helpText = '',
+      errorMessage = ''
     } = options;
-    
+
     const id = `field-${fieldName.toLowerCase().replace(/\s+/g, '-')}`;
     const props = {
       id,
@@ -253,26 +253,26 @@ export const formA11y = {
       'aria-required': required,
       'aria-invalid': invalid
     };
-    
+
     if (helpText) {
       props['aria-describedby'] = `${id}-help`;
     }
-    
+
     if (invalid && errorMessage) {
       props['aria-describedby'] = `${id}-error`;
     }
-    
+
     return props;
   },
-  
+
   // Generate error message props
   errorProps: (fieldName) => ({
     id: `field-${fieldName.toLowerCase().replace(/\s+/g, '-')}-error`,
     role: 'alert',
     'aria-atomic': 'true'
   }),
-  
-  // Generate help text props  
+
+  // Generate help text props
   helpProps: (fieldName) => ({
     id: `field-${fieldName.toLowerCase().replace(/\s+/g, '-')}-help`
   })

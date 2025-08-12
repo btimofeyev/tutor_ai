@@ -17,5 +17,4 @@ router.put('/:id', subjectsController.updateSubject);
 // Delete a subject
 router.delete('/:id', subjectsController.deleteSubject);
 
-
 module.exports = router;

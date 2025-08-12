@@ -26,7 +26,7 @@ exports.getWeightsForChildSubject = async (req, res) => {
             content_type: ct,
             weight: weightsMap.has(ct) ? parseFloat(weightsMap.get(ct)) : (["test", "quiz", "worksheet", "review"].includes(ct) ? 0.25 : 0.00) // Default for gradable types
         }));
-        
+
         // Normalize if sum > 1 and any defaults were applied (or always normalize/validate on save)
         // For now, just return what's there or defaults. Validation on save is crucial.
 
@@ -57,9 +57,6 @@ exports.saveWeightsForChildSubject = async (req, res) => {
         totalWeight += w.weight;
     }
     // For now, we won't strictly enforce sum to 1, but good practice.
-    // console.log("Total weight submitted:", totalWeight);
-
-
     try {
         // Optional: Add ownership check
 
@@ -118,8 +115,8 @@ exports.getCombinedWeightsForChildSubject = async (req, res) => {
         // Process standard weights
         const standardWeightsMap = new Map(standardWeights.map(item => [item.content_type, item.weight]));
         contentTypesArray.forEach(ct => {
-            combinedWeights.standard[ct] = standardWeightsMap.has(ct) ? 
-                parseFloat(standardWeightsMap.get(ct)) : 
+            combinedWeights.standard[ct] = standardWeightsMap.has(ct) ?
+                parseFloat(standardWeightsMap.get(ct)) :
                 (["test", "quiz", "worksheet", "review"].includes(ct) ? 0.25 : 0.00);
         });
 

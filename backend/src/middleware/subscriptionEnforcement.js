@@ -39,19 +39,19 @@ async function getChildrenCount(parentId) {
 function getPlanPermissions(subscription) {
   const planType = subscription?.plan_type;
   const hasActiveSubscription = subscription && subscription.status === 'active';
-  
+
   return {
     // Plan info
     isFreePlan: !hasActiveSubscription,
     hasAIAddon: hasActiveSubscription && planType === 'klio_addon',
     isFamilyPlan: hasActiveSubscription && planType === 'family',
     isAcademyPlan: hasActiveSubscription && planType === 'academy',
-    
+
     // Feature permissions
     hasAIAccess: hasActiveSubscription && ['klio_addon', 'family', 'academy'].includes(planType),
     hasChildLogin: hasActiveSubscription && ['klio_addon', 'family', 'academy'].includes(planType),
     hasAdvancedFeatures: hasActiveSubscription && ['family', 'academy'].includes(planType),
-    
+
     // Limits
     maxChildren: planType === 'academy' ? 10 : planType === 'family' ? 3 : 1,
   };
@@ -60,7 +60,7 @@ function getPlanPermissions(subscription) {
 // Middleware to enforce child limits
 exports.enforceChildLimit = async (req, res, next) => {
   const parentId = req.header('x-parent-id');
-  
+
   if (!parentId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -72,9 +72,9 @@ exports.enforceChildLimit = async (req, res, next) => {
     ]);
 
     const permissions = getPlanPermissions(subscription);
-    
+
     if (childrenCount >= permissions.maxChildren) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: `Plan limit reached: ${permissions.maxChildren} child${permissions.maxChildren !== 1 ? 'ren' : ''} maximum`,
         code: 'CHILD_LIMIT_EXCEEDED',
         currentPlan: subscription?.plan_type || 'free',
@@ -87,7 +87,7 @@ exports.enforceChildLimit = async (req, res, next) => {
     req.subscription = subscription;
     req.permissions = permissions;
     req.childrenCount = childrenCount;
-    
+
     next();
   } catch (error) {
     console.error('Error in child limit enforcement:', error);
@@ -99,14 +99,14 @@ exports.enforceChildLimit = async (req, res, next) => {
 exports.enforceAIAccess = async (req, res, next) => {
   const parentId = req.header('x-parent-id');
   const childId = req.child?.child_id; // For child auth routes
-  
+
   if (!parentId && !childId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
     let actualParentId = parentId;
-    
+
     // If this is a child request, get the parent ID
     if (childId && !parentId) {
       const { data: child } = await supabase
@@ -114,7 +114,7 @@ exports.enforceAIAccess = async (req, res, next) => {
         .select('parent_id')
         .eq('id', childId)
         .single();
-      
+
       actualParentId = child?.parent_id;
     }
 
@@ -124,9 +124,9 @@ exports.enforceAIAccess = async (req, res, next) => {
 
     const subscription = await getParentSubscription(actualParentId);
     const permissions = getPlanPermissions(subscription);
-    
+
     if (!permissions.hasAIAccess) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'AI features not available on your current plan',
         code: 'AI_ACCESS_REQUIRED',
         currentPlan: subscription?.plan_type || 'free',
@@ -146,7 +146,7 @@ exports.enforceAIAccess = async (req, res, next) => {
 // Middleware to enforce child login access
 exports.enforceChildLoginAccess = async (req, res, next) => {
   const parentId = req.header('x-parent-id');
-  
+
   if (!parentId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -154,9 +154,9 @@ exports.enforceChildLoginAccess = async (req, res, next) => {
   try {
     const subscription = await getParentSubscription(parentId);
     const permissions = getPlanPermissions(subscription);
-    
+
     if (!permissions.hasChildLogin) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Child login accounts not available on your current plan',
         code: 'CHILD_LOGIN_ACCESS_REQUIRED',
         currentPlan: subscription?.plan_type || 'free',
@@ -180,7 +180,7 @@ exports.checkSubscription = async (parentId) => {
   const subscription = await getParentSubscription(parentId);
   const permissions = getPlanPermissions(subscription);
   const childrenCount = await getChildrenCount(parentId);
-  
+
   return {
     subscription,
     permissions,

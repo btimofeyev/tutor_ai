@@ -18,14 +18,14 @@ import { useToast } from "../../hooks/useToast";
 import { useModalManagement } from "../../hooks/useModalManagement";
 import { useDashboardHandlers } from "../../hooks/useDashboardHandlers";
 import { PRICE_IDS } from "../../utils/subscriptionConstants";
-import { 
+import {
   APP_CONTENT_TYPES,
   APP_GRADABLE_CONTENT_TYPES
 } from "../../utils/dashboardConstants";
 
 // Shared styles and utilities
-import { 
-  modalBackdropStyles, 
+import {
+  modalBackdropStyles,
   modalContainerStyles,
   modalCloseButtonStyles,
   formInputStyles,
@@ -40,6 +40,7 @@ import StudentHeader from "./components/StudentHeader";
 import ParentNotesSection from "./components/ParentNotesSection";
 import SubjectCard from "./components/SubjectCard";
 import TodayOverview from "./components/TodayOverview";
+import NeedsGradingSection from "./components/NeedsGradingSection";
 import DashboardFilters from "./components/DashboardFilters";
 import BatchActionsBar from "./components/BatchActionsBar";
 import Button from "../../components/ui/Button";
@@ -74,7 +75,6 @@ import {
   ListBulletIcon
 } from "@heroicons/react/24/outline";
 
-
 function DashboardPageContent() {
   const session = useSession();
   const router = useRouter();
@@ -92,18 +92,17 @@ function DashboardPageContent() {
   const childrenData = useChildrenData(session);
   const materialManagement = useMaterialManagement(childrenData.refreshChildSpecificData, childrenData.invalidateChildCache);
   const filtersAndSorting = useFiltersAndSorting(
-    childrenData.lessonsBySubject, 
-    childrenData.gradeWeights, 
-    childrenData.childSubjects, 
+    childrenData.lessonsBySubject,
+    childrenData.gradeWeights,
+    childrenData.childSubjects,
     childrenData.selectedChild
   );
   const { showSuccess, showError, showWarning } = useToast();
   const modalManagement = useModalManagement();
-  
+
   // Batch operations state (declare before hooks that need them)
   const [selectedMaterials, setSelectedMaterials] = useState(new Set());
-  
-  
+
   // Dashboard handlers hook
   const dashboardHandlers = useDashboardHandlers({
     childrenData,
@@ -130,13 +129,13 @@ function DashboardPageContent() {
   // Find lesson containers for the editing material
   const editingMaterialLessonContainers = useMemo(() => {
     if (!materialManagement.editingLesson || !materialManagement.editForm) return [];
-    
+
     // Get all lesson containers for the material's subject
     const subjectId = materialManagement.editForm.child_subject_id;
     if (subjectId) {
       const allLessonContainers = [];
       const subjectUnits = childrenData.unitsBySubject[subjectId] || [];
-      
+
       // Collect all lesson containers from all units in this subject
       for (const unit of subjectUnits) {
         const unitLessonContainers = childrenData.lessonsByUnit[unit.id] || [];
@@ -148,17 +147,17 @@ function DashboardPageContent() {
         }));
         allLessonContainers.push(...containersWithUnitInfo);
       }
-      
+
       // Sort by unit name then lesson container title
       allLessonContainers.sort((a, b) => {
         const unitCompare = a.unitName.localeCompare(b.unitName);
         if (unitCompare !== 0) return unitCompare;
         return a.title.localeCompare(b.title);
       });
-      
+
       return allLessonContainers;
     }
-    
+
     return [];
   }, [materialManagement.editingLesson, materialManagement.editForm, childrenData.lessonsByUnit, childrenData.unitsBySubject]);
 
@@ -185,19 +184,19 @@ function DashboardPageContent() {
   // Only refresh data when returning from subject management or after long absence
   useEffect(() => {
     let lastVisibleTime = Date.now();
-    
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && childrenData.selectedChild?.id) {
         const timeSinceLastVisible = Date.now() - lastVisibleTime;
         const REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes
-        
+
         // Only refresh if user was away for more than 5 minutes or if coming from data-modifying pages
         const needsTimeBasedRefresh = shouldRefreshBasedOnTime(lastVisibleTime, REFRESH_THRESHOLD);
         const needsSignalBasedRefresh = checkAndClearRefreshSignal();
         const comingFromDataModifyingPage = isComingFromDataModifyingPage();
-        
+
         const shouldRefresh = needsTimeBasedRefresh || needsSignalBasedRefresh || comingFromDataModifyingPage;
-        
+
         if (shouldRefresh) {
           childrenData.invalidateChildCache(childrenData.selectedChild.id);
           childrenData.refreshChildSpecificData(true);
@@ -222,7 +221,6 @@ function DashboardPageContent() {
     }
   }, [childrenData.selectedChild?.id]);
 
-
   useEffect(() => {
     materialManagement.setSelectedLessonContainer("");
   }, [materialManagement.lessonJsonForApproval?.unit_id, materialManagement.setSelectedLessonContainer]);
@@ -231,8 +229,8 @@ function DashboardPageContent() {
   useEffect(() => {
     const handleProcessingComplete = (event) => {
       const { materialId, materialInfo } = event.detail;
-      console.log(`Material processing completed: ${materialId}`, materialInfo);
-      
+      // Material processing completed for ${materialId}
+
       // Refresh child data to update materials list with new title
       if (childrenData.selectedChild?.id) {
         childrenData.invalidateChildCache(childrenData.selectedChild.id);
@@ -241,7 +239,7 @@ function DashboardPageContent() {
     };
 
     window.addEventListener('materialProcessingComplete', handleProcessingComplete);
-    
+
     return () => {
       window.removeEventListener('materialProcessingComplete', handleProcessingComplete);
     };
@@ -310,7 +308,7 @@ function DashboardPageContent() {
 
   // Computed data for the add form
   const currentUnitsForAddFormSubject = materialManagement.addLessonSubject && childrenData.selectedChild && childrenData.childSubjects[childrenData.selectedChild.id]
-    ? childrenData.unitsBySubject[materialManagement.addLessonSubject] || [] 
+    ? childrenData.unitsBySubject[materialManagement.addLessonSubject] || []
     : [];
 
   // Get selected materials data
@@ -322,11 +320,11 @@ function DashboardPageContent() {
   // Filter lessons to show only the current child's lessons
   const currentChildLessonsBySubject = useMemo(() => {
     if (!childrenData.selectedChild) return {};
-    
+
     // Get subjects for the current child
     const currentChildSubjects = childrenData.childSubjects[childrenData.selectedChild.id] || [];
     const currentChildSubjectIds = currentChildSubjects.map(subject => subject.child_subject_id);
-    
+
     // Filter lessonsBySubject to include only current child's subjects
     const filteredLessons = {};
     currentChildSubjectIds.forEach(subjectId => {
@@ -334,7 +332,7 @@ function DashboardPageContent() {
         filteredLessons[subjectId] = childrenData.lessonsBySubject[subjectId];
       }
     });
-    
+
     return filteredLessons;
   }, [childrenData.selectedChild?.id, childrenData.childSubjects, childrenData.lessonsBySubject]);
 
@@ -347,7 +345,7 @@ function DashboardPageContent() {
       </div>
     );
   }
-  
+
   // If no session user, don't render anything (redirect will happen in useEffect)
   if (!session?.user) return null;
 
@@ -379,7 +377,7 @@ function DashboardPageContent() {
       <div className="flex-1 flex flex-col overflow-y-auto p-3 sm:p-6 lg:p-10">
         {/* Mobile Header - only visible on mobile/tablet */}
         <div className="lg:hidden mb-4">
-          <DashboardHeader 
+          <DashboardHeader
             selectedChild={childrenData.selectedChild}
             childrenList={childrenData.children}
             onChildSelect={childrenData.setSelectedChild}
@@ -416,7 +414,7 @@ function DashboardPageContent() {
                 </Link>
               </div>
             </div>
-            
+
             {/* Mobile Child Selector */}
             {childrenData.children.length > 0 && (
               <div>
@@ -448,9 +446,9 @@ function DashboardPageContent() {
           dashboardStats={totalStats}
           onAddMaterial={() => modalManagement.openAddMaterialModal()}
         />
-        
+
         {childrenData.selectedChild && (
-          <Breadcrumbs 
+          <Breadcrumbs
             items={[
               { label: "Dashboard", href: "/dashboard" },
               { label: `${childrenData.selectedChild.name}'s Learning` }
@@ -474,11 +472,11 @@ function DashboardPageContent() {
 
         {childrenData.selectedChild && (
           <DashboardErrorBoundary>
-            
-            {/* Combined Today's Focus and Quick Notes Section */}
+
+            {/* Combined Today's Focus, Needs Grading, and Quick Notes Section */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
-              {/* Today's Focus - Takes up 2/3 on large screens */}
-              <div className="xl:col-span-2">
+              {/* Today's Focus - Takes up 1/3 on large screens */}
+              <div className="xl:col-span-1">
                 <TodayOverview
                   key={childrenData.selectedChild?.id}
                   lessonsBySubject={currentChildLessonsBySubject}
@@ -489,15 +487,25 @@ function DashboardPageContent() {
                   maxItems={6}
                 />
               </div>
-              
+
+              {/* Needs Grading Section - Takes up 1/3 on large screens */}
+              <div className="xl:col-span-1">
+                <NeedsGradingSection
+                  lessonsBySubject={currentChildLessonsBySubject}
+                  onQuickGrade={handleGradeSubmit}
+                  onOpenGradeModal={modalManagement.openGradeModal}
+                  isGrading={modalManagement.isSubmittingGrade}
+                />
+              </div>
+
               {/* Quick Notes - Takes up 1/3 on large screens */}
               <div className="xl:col-span-1">
-                <ParentNotesSection 
+                <ParentNotesSection
                   selectedChild={childrenData.selectedChild}
                 />
               </div>
             </div>
-            
+
             {/* DashboardFilters removed for now */}
             {childrenData.loadingChildData ? (
               <div className="space-y-4">
@@ -508,7 +516,7 @@ function DashboardPageContent() {
               </div>
             ) : (
               <div className="mt-0">
-                <DashboardContentHeader 
+                <DashboardContentHeader
                   childName={childrenData.selectedChild.name}
                 />
                 {assignedSubjectsForCurrentChild.length === 0 ? (
@@ -666,7 +674,7 @@ function DashboardPageContent() {
           isSaving={modalManagement.isSavingCredentials}
         />
       )}
-      
+
       {modalManagement.showUpgradePrompt && (
         <UpgradePrompt
           isOpen={modalManagement.showUpgradePrompt}

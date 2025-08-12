@@ -20,7 +20,7 @@ exports.listSubjects = async (req, res) => {
 // Add a new subject
 exports.addSubject = async (req, res) => {
   const { name, description, is_predefined } = req.body;
-  
+
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Subject name is required' });
   }
@@ -97,7 +97,7 @@ exports.updateSubject = async (req, res) => {
 
     if (error) return res.status(400).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Subject not found' });
-    
+
     res.json(data);
   } catch (error) {
     console.error('Error updating subject:', error);
@@ -119,8 +119,8 @@ exports.deleteSubject = async (req, res) => {
       .eq('subject_id', id);
 
     if (count > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete subject that is assigned to children' 
+      return res.status(400).json({
+        error: 'Cannot delete subject that is assigned to children'
       });
     }
 

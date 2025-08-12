@@ -3,9 +3,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  ArrowLeftIcon, 
-  MagnifyingGlassIcon, 
+import {
+  ArrowLeftIcon,
+  MagnifyingGlassIcon,
   FunnelIcon,
   CheckIcon,
   XMarkIcon,
@@ -28,12 +28,12 @@ import { signalDashboardRefresh } from "../../../utils/dashboardRefresh";
 import StreamlinedAddAssignment from "../../dashboard/components/StreamlinedAddAssignment";
 import EditMaterialModal from "../../dashboard/components/EditMaterialModal";
 import MaterialDeleteModal from "../../dashboard/components/MaterialDeleteModal";
-import { 
-  modalBackdropStyles, 
+import {
+  modalBackdropStyles,
   modalContainerStyles,
   modalCloseButtonStyles
 } from '../../../utils/dashboardStyles';
-import { 
+import {
   APP_CONTENT_TYPES,
   APP_GRADABLE_CONTENT_TYPES
 } from '../../../utils/dashboardConstants';
@@ -51,7 +51,7 @@ export default function SubjectPage() {
   const router = useRouter();
   const params = useParams();
   const childSubjectId = params.child_subject_id;
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
@@ -61,7 +61,7 @@ export default function SubjectPage() {
   const materialManagement = useMaterialManagement(childrenData.refreshChildSpecificData, childrenData.invalidateChildCache);
   const modalManagement = useModalManagement();
   const { showSuccess, showError } = useToast();
-  
+
   const dashboardHandlers = useDashboardHandlers({
     childrenData,
     materialManagement,
@@ -97,36 +97,22 @@ export default function SubjectPage() {
   // Organize materials by chapters (units) and lessons (lesson containers)
   const organizedChapters = useMemo(() => {
     if (!childSubjectId || !subjectUnits.length) return [];
-    
+
     // Debug logging - can be removed later
-    console.log('Debug - Subject Lessons:', subjectLessons);
-    console.log('Debug - Subject Units:', subjectUnits);
-    console.log('Debug - Lessons by Unit:', childrenData.lessonsByUnit);
-    
     const chaptersWithMaterials = subjectUnits
       .sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.name.localeCompare(b.name))
       .map((unit, index) => {
         const lessonContainers = childrenData.lessonsByUnit[unit.id] || [];
-        console.log(`Debug - Unit ${unit.name} (ID: ${unit.id}) has lesson containers:`, lessonContainers);
-        
+
         // Sort lesson containers and get materials for each
         const organizedLessons = lessonContainers
           .sort((a, b) => (a.sequence_order || 0) - (b.sequence_order || 0) || a.title.localeCompare(b.title))
           .map((lessonContainer, lessonIndex) => {
             // Get materials for this lesson container using lesson_id field
-            const materialsForLesson = subjectLessons.filter(lesson => 
+            const materialsForLesson = subjectLessons.filter(lesson =>
               lesson.lesson_id === lessonContainer.id
             );
-            
-            console.log(`Debug - Lesson Container ${lessonContainer.title} (ID: ${lessonContainer.id}) has materials:`, materialsForLesson);
-            if (lessonIndex === 0) { // Only log once to avoid spam
-              console.log('Debug - Materials lesson_id values:', subjectLessons.map(l => ({ 
-                id: l.id, 
-                title: l.title, 
-                lesson_id: l.lesson_id
-              })));
-            }
-            
+
             return {
               ...lessonContainer,
               materials: materialsForLesson.sort((a, b) => {
@@ -137,23 +123,19 @@ export default function SubjectPage() {
               })
             };
           });
-        
-        // Log organized lessons for this unit
-        console.log(`Debug - Unit ${unit.name} organized lessons:`, organizedLessons);
 
+        // Log organized lessons for this unit
         return {
           ...unit,
           chapterNumber: index + 1,
           lessons: organizedLessons,
           totalMaterials: organizedLessons.reduce((sum, lesson) => sum + lesson.materials.length, 0),
-          completedMaterials: organizedLessons.reduce((sum, lesson) => 
+          completedMaterials: organizedLessons.reduce((sum, lesson) =>
             sum + lesson.materials.filter(material => material.completed_at).length, 0
           )
         };
       });
-    
-    console.log('Debug - Final organized chapters:', chaptersWithMaterials);
-    
+
     return chaptersWithMaterials;
   }, [childSubjectId, subjectUnits, childrenData.lessonsByUnit, subjectLessons]);
 
@@ -173,16 +155,16 @@ export default function SubjectPage() {
         // Apply filter
         switch (selectedFilter) {
           case 'upcoming':
-            filteredMaterials = filteredMaterials.filter(material => 
-              !material.completed_at && 
-              material.due_date && 
+            filteredMaterials = filteredMaterials.filter(material =>
+              !material.completed_at &&
+              material.due_date &&
               new Date(material.due_date + 'T00:00:00') >= today
             );
             break;
           case 'overdue':
-            filteredMaterials = filteredMaterials.filter(material => 
-              !material.completed_at && 
-              material.due_date && 
+            filteredMaterials = filteredMaterials.filter(material =>
+              !material.completed_at &&
+              material.due_date &&
               new Date(material.due_date + 'T00:00:00') < today
             );
             break;
@@ -201,7 +183,7 @@ export default function SubjectPage() {
         // Apply search
         if (searchTerm) {
           const term = searchTerm.toLowerCase();
-          filteredMaterials = filteredMaterials.filter(material => 
+          filteredMaterials = filteredMaterials.filter(material =>
             material.title.toLowerCase().includes(term) ||
             material.description?.toLowerCase().includes(term) ||
             material.content_type?.toLowerCase().includes(term)
@@ -218,7 +200,7 @@ export default function SubjectPage() {
         ...chapter,
         lessons: filteredLessons,
         totalMaterials: filteredLessons.reduce((sum, lesson) => sum + lesson.materials.length, 0),
-        completedMaterials: filteredLessons.reduce((sum, lesson) => 
+        completedMaterials: filteredLessons.reduce((sum, lesson) =>
           sum + lesson.materials.filter(material => material.completed_at).length, 0
         )
       };
@@ -228,23 +210,23 @@ export default function SubjectPage() {
   // Legacy filter for fallback view
   const filteredLessons = useMemo(() => {
     let filtered = [...subjectLessons];
-    
+
     // Apply filter
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     switch (selectedFilter) {
       case 'upcoming':
-        filtered = filtered.filter(lesson => 
-          !lesson.completed_at && 
-          lesson.due_date && 
+        filtered = filtered.filter(lesson =>
+          !lesson.completed_at &&
+          lesson.due_date &&
           new Date(lesson.due_date + 'T00:00:00') >= today
         );
         break;
       case 'overdue':
-        filtered = filtered.filter(lesson => 
-          !lesson.completed_at && 
-          lesson.due_date && 
+        filtered = filtered.filter(lesson =>
+          !lesson.completed_at &&
+          lesson.due_date &&
           new Date(lesson.due_date + 'T00:00:00') < today
         );
         break;
@@ -259,29 +241,56 @@ export default function SubjectPage() {
         // No filtering
         break;
     }
-    
+
     // Apply search
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(lesson => 
+      filtered = filtered.filter(lesson =>
         lesson.title.toLowerCase().includes(term) ||
         lesson.description?.toLowerCase().includes(term) ||
         lesson.content_type?.toLowerCase().includes(term)
       );
     }
-    
+
     return filtered;
   }, [subjectLessons, selectedFilter, searchTerm]);
 
   // Subject statistics
   const subjectStats = useMemo(() => {
     if (subjectLessons.length === 0) return { total: 0, completed: 0, percentage: 0 };
-    
+
     const completed = subjectLessons.filter(lesson => lesson.completed_at).length;
     const total = subjectLessons.length;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-    
-    return { total, completed, percentage };
+
+    // Calculate grade average for gradable items with grades
+    const gradableItems = subjectLessons.filter(lesson =>
+      APP_GRADABLE_CONTENT_TYPES.includes(lesson.content_type) &&
+      lesson.grade_value !== null &&
+      lesson.grade_value !== undefined &&
+      lesson.grade_value !== '' &&
+      lesson.grade_max_value &&
+      lesson.grade_max_value !== null &&
+      lesson.grade_max_value !== undefined &&
+      lesson.grade_max_value !== ''
+    );
+
+    let avgGradePercent = null;
+    let gradableItemsCount = 0;
+
+    if (gradableItems.length > 0) {
+      let totalPercentage = 0;
+      gradableItemsCount = gradableItems.length;
+
+      gradableItems.forEach(item => {
+        const gradePercent = (parseFloat(item.grade_value) / parseFloat(item.grade_max_value)) * 100;
+        totalPercentage += gradePercent;
+      });
+
+      avgGradePercent = Math.round(totalPercentage / gradableItemsCount);
+    }
+
+    return { total, completed, percentage, avgGradePercent, gradableItemsCount };
   }, [subjectLessons]);
 
   // Redirect to dashboard if no session
@@ -294,13 +303,13 @@ export default function SubjectPage() {
   // Set selected child based on subject
   useEffect(() => {
     if (!currentSubject || !childrenData.children.length) return;
-    
+
     // Find the child that owns this subject
     const owningChild = childrenData.children.find(child => {
       const childSubjects = childrenData.childSubjects[child.id] || [];
       return childSubjects.some(subject => subject.child_subject_id === childSubjectId);
     });
-    
+
     if (owningChild && (!childrenData.selectedChild || childrenData.selectedChild.id !== owningChild.id)) {
       childrenData.setSelectedChild(owningChild);
     }
@@ -339,41 +348,40 @@ export default function SubjectPage() {
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="py-4">
-            <Breadcrumbs 
+            <Breadcrumbs
               items={[
                 { label: "Dashboard", href: "/dashboard" },
                 { label: currentSubject.name }
               ]}
               className="mb-4"
             />
-            
+
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="flex items-center gap-4">
-                <Link 
+                <Link
                   href="/dashboard"
                   className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   <ArrowLeftIcon className="h-5 w-5" />
                 </Link>
-                
+
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900">{currentSubject.name}</h1>
                   <p className="text-gray-600 mt-1">
                     {childrenData.selectedChild?.name}&apos;s Materials
                   </p>
                 </div>
-                
+
                 {subjectStats.total > 0 && (
-                  <div className="hidden sm:flex items-center">
-                    <CompletionPieChart 
-                      completed={subjectStats.completed} 
-                      total={subjectStats.total} 
-                      size="small"
+                  <div className="hidden sm:flex items-center h-16 w-16">
+                    <CompletionPieChart
+                      completed={subjectStats.completed}
+                      total={subjectStats.total}
                     />
                   </div>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <Link
                   href={`/subject-settings/${childSubjectId}`}
@@ -382,7 +390,7 @@ export default function SubjectPage() {
                   <AdjustmentsHorizontalIcon className="h-4 w-4" />
                   Settings
                 </Link>
-                
+
                 <button
                   onClick={() => modalManagement.openAddMaterialModal()}
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
@@ -422,6 +430,14 @@ export default function SubjectPage() {
                 {organizedChapters.reduce((sum, chapter) => sum + chapter.lessons.length, 0)} lessons
               </span>
             </div>
+            {subjectStats.avgGradePercent !== null && subjectStats.gradableItemsCount > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 bg-indigo-500 rounded-full"></span>
+                <span className="text-gray-600">
+                  {subjectStats.avgGradePercent}% average grade ({subjectStats.gradableItemsCount} graded)
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -449,7 +465,7 @@ export default function SubjectPage() {
                 </button>
               )}
             </div>
-            
+
             {/* Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -464,7 +480,7 @@ export default function SubjectPage() {
               )}
             </button>
           </div>
-          
+
           {/* Filter Options */}
           {showFilters && (
             <div className="mt-4 pt-4 border-t border-gray-200">
@@ -521,13 +537,13 @@ export default function SubjectPage() {
                 )}
               </div>
             )}
-            
+
             {filteredChapters.map(chapter => (
               <div key={chapter.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 {/* Chapter Header */}
                 <div className={`px-6 py-4 border-b border-gray-200 ${
-                  chapter.isUnassigned 
-                    ? 'bg-gradient-to-r from-orange-50 to-amber-50' 
+                  chapter.isUnassigned
+                    ? 'bg-gradient-to-r from-orange-50 to-amber-50'
                     : 'bg-gradient-to-r from-blue-50 to-indigo-50'
                 }`}>
                   <div className="flex items-center justify-between">
@@ -535,9 +551,9 @@ export default function SubjectPage() {
                       <BookOpenIcon className={`h-6 w-6 ${chapter.isUnassigned ? 'text-orange-600' : 'text-blue-600'}`} />
                       <div>
                         <h2 className="text-xl font-bold text-gray-900">
-                          {chapter.isUnassigned ? chapter.name : 
-                            chapter.name.toLowerCase().startsWith('chapter') ? 
-                              chapter.name : 
+                          {chapter.isUnassigned ? chapter.name :
+                            chapter.name.toLowerCase().startsWith('chapter') ?
+                              chapter.name :
                               `Chapter ${chapter.chapterNumber}: ${chapter.name}`
                           }
                         </h2>
@@ -574,9 +590,9 @@ export default function SubjectPage() {
                           <div className="flex items-center gap-2">
                             <DocumentTextIcon className={`h-5 w-5 ${lesson.isUnassigned ? 'text-orange-600' : 'text-indigo-600'}`} />
                             <h3 className={`text-lg font-semibold ${lesson.isUnassigned ? 'text-orange-800' : 'text-gray-800'}`}>
-                              {lesson.isUnassigned ? lesson.title : 
-                                lesson.title.toLowerCase().startsWith('lesson') ? 
-                                  lesson.title : 
+                              {lesson.isUnassigned ? lesson.title :
+                                lesson.title.toLowerCase().startsWith('lesson') ?
+                                  lesson.title :
                                   `Lesson ${lessonIndex + 1}: ${lesson.title}`
                               }
                             </h3>
@@ -598,7 +614,7 @@ export default function SubjectPage() {
                                 <MaterialListItem
                                   lesson={material}
                                   onOpenEditModal={dashboardHandlers.handleOpenEditModal}
-                                  onToggleComplete={dashboardHandlers.handleToggleLessonComplete}
+                                  onToggleComplete={dashboardHandlers.handleToggleLessonCompleteEnhanced}
                                   onDeleteMaterial={dashboardHandlers.handleDeleteMaterial}
                                 />
                               </div>
@@ -642,7 +658,7 @@ export default function SubjectPage() {
                   <MaterialListItem
                     lesson={lesson}
                     onOpenEditModal={dashboardHandlers.handleOpenEditModal}
-                    onToggleComplete={dashboardHandlers.handleToggleLessonComplete}
+                    onToggleComplete={dashboardHandlers.handleToggleLessonCompleteEnhanced}
                     onDeleteMaterial={dashboardHandlers.handleDeleteMaterial}
                   />
                 </div>
@@ -722,6 +738,7 @@ export default function SubjectPage() {
           appGradableContentTypes={APP_GRADABLE_CONTENT_TYPES}
           unitsForSubject={childrenData.unitsBySubject[materialManagement.editForm?.child_subject_id] || []}
           lessonContainersForSubject={[]} // Will need to populate this if needed
+          subjectId={materialManagement.editForm?.child_subject_id}
         />
       )}
 

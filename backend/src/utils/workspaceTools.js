@@ -6,7 +6,7 @@ const SUBJECT_CONTENT_TYPES = {
     evaluation_type: "binary" // correct/incorrect
   },
   science: {
-    workspace_type: "science_investigation", 
+    workspace_type: "science_investigation",
     content_types: ["hypothesis", "experiment_step", "observation", "data_collection", "conclusion", "lab_safety"],
     evaluation_type: "rubric" // multi-criteria
   },
@@ -21,7 +21,7 @@ const SUBJECT_CONTENT_TYPES = {
     evaluation_type: "rubric" // multi-criteria
   },
   "social studies": {
-    workspace_type: "social_investigation", 
+    workspace_type: "social_investigation",
     content_types: ["map_analysis", "civic_scenario", "cultural_comparison", "government_structure", "economics"],
     evaluation_type: "evidence_based" // reasoning assessment
   }
@@ -42,7 +42,7 @@ const WORKSPACE_TOOLS = [
             description: "The subject for this workspace"
           },
           workspace_type: {
-            type: "string", 
+            type: "string",
             enum: ["math_problems", "science_investigation", "history_analysis", "language_practice", "social_investigation"],
             description: "Type of workspace to create based on subject"
           },
@@ -57,7 +57,7 @@ const WORKSPACE_TOOLS = [
               type: "object",
               properties: {
                 text: {
-                  type: "string", 
+                  type: "string",
                   description: "The content text (problem, question, prompt, or instruction)"
                 },
                 type: {
@@ -69,7 +69,7 @@ const WORKSPACE_TOOLS = [
                   description: "Helpful hint or guidance for this content item"
                 },
                 difficulty: {
-                  type: "string", 
+                  type: "string",
                   enum: ["easy", "medium", "hard"],
                   description: "Difficulty level"
                 },
@@ -114,7 +114,7 @@ const WORKSPACE_TOOLS = [
   {
     type: "function",
     function: {
-      name: "create_math_workspace", 
+      name: "create_math_workspace",
       description: "Create a math workspace (legacy function - use create_subject_workspace for new implementations)",
       parameters: {
         type: "object",
@@ -130,7 +130,7 @@ const WORKSPACE_TOOLS = [
               type: "object",
               properties: {
                 text: {
-                  type: "string", 
+                  type: "string",
                   description: "The math problem text (e.g., '4 × 2/3')"
                 },
                 type: {
@@ -143,7 +143,7 @@ const WORKSPACE_TOOLS = [
                   description: "Helpful hint for solving this problem"
                 },
                 difficulty: {
-                  type: "string", 
+                  type: "string",
                   enum: ["easy", "medium", "hard"],
                   description: "Difficulty level"
                 }
@@ -161,7 +161,7 @@ const WORKSPACE_TOOLS = [
     }
   },
   {
-    type: "function", 
+    type: "function",
     function: {
       name: "add_content_to_workspace",
       description: "Add more content to the existing workspace without resetting progress",
@@ -175,14 +175,14 @@ const WORKSPACE_TOOLS = [
               type: "object",
               properties: {
                 text: { type: "string" },
-                type: { 
+                type: {
                   type: "string",
                   description: "Content type - varies by subject"
                 },
                 hint: { type: "string" },
                 difficulty: {
                   type: "string",
-                  enum: ["easy", "medium", "hard"] 
+                  enum: ["easy", "medium", "hard"]
                 },
                 reading_passage: {
                   type: "string",
@@ -202,7 +202,7 @@ const WORKSPACE_TOOLS = [
     }
   },
   {
-    type: "function", 
+    type: "function",
     function: {
       name: "add_problems_to_workspace",
       description: "Add math problems to workspace (legacy function - use add_content_to_workspace for new implementations)",
@@ -216,14 +216,14 @@ const WORKSPACE_TOOLS = [
               type: "object",
               properties: {
                 text: { type: "string" },
-                type: { 
+                type: {
                   type: "string",
                   enum: ["addition", "subtraction", "multiplication", "division", "fractions", "decimals", "word_problem"]
                 },
                 hint: { type: "string" },
                 difficulty: {
                   type: "string",
-                  enum: ["easy", "medium", "hard"] 
+                  enum: ["easy", "medium", "hard"]
                 }
               },
               required: ["text", "type", "hint"]
@@ -252,7 +252,7 @@ const WORKSPACE_TOOLS = [
             description: "Evaluation result appropriate for the content type"
           },
           feedback: {
-            type: "string", 
+            type: "string",
             description: "Specific feedback message for the student"
           },
           rubric_scores: {
@@ -282,7 +282,7 @@ const WORKSPACE_TOOLS = [
                 enum: ["strong", "adequate", "weak", "insufficient"]
               },
               reasoning_quality: {
-                type: "string", 
+                type: "string",
                 enum: ["excellent", "good", "developing", "needs_support"]
               },
               suggestions: {
@@ -309,7 +309,7 @@ const WORKSPACE_TOOLS = [
             description: "Index of the problem to mark correct (0-based)"
           },
           feedback: {
-            type: "string", 
+            type: "string",
             description: "Positive feedback message for the student"
           }
         },
@@ -320,7 +320,7 @@ const WORKSPACE_TOOLS = [
   {
     type: "function",
     function: {
-      name: "mark_problem_incorrect", 
+      name: "mark_problem_incorrect",
       description: "Mark a math problem as incorrect (legacy function - use evaluate_content_item for new implementations)",
       parameters: {
         type: "object",
@@ -371,7 +371,7 @@ const WORKSPACE_TOOLS = [
                   description: "The specific question to guide student thinking"
                 },
                 hint: {
-                  type: "string", 
+                  type: "string",
                   description: "Optional hint to help student if they're stuck"
                 }
               },
@@ -420,19 +420,19 @@ const WORKSPACE_TOOLS = [
   }
 ];
 
-module.exports = { 
-  WORKSPACE_TOOLS, 
+module.exports = {
+  WORKSPACE_TOOLS,
   SUBJECT_CONTENT_TYPES,
-  
+
   // Helper functions for subject detection and workspace type mapping
   getWorkspaceTypeForSubject: (subject) => {
     return SUBJECT_CONTENT_TYPES[subject]?.workspace_type || 'math_problems';
   },
-  
+
   getContentTypesForSubject: (subject) => {
     return SUBJECT_CONTENT_TYPES[subject]?.content_types || ['general'];
   },
-  
+
   getEvaluationTypeForSubject: (subject) => {
     return SUBJECT_CONTENT_TYPES[subject]?.evaluation_type || 'binary';
   },
@@ -440,16 +440,16 @@ module.exports = {
   // Subject detection from MCP materials
   detectSubjectFromMaterial: (materialData) => {
     if (!materialData || !materialData.material) return 'math';
-    
+
     const subject = materialData.material.subject?.toLowerCase();
     const title = materialData.material.title?.toLowerCase() || '';
     const contentType = materialData.material.content_type?.toLowerCase() || '';
-    
+
     // Direct subject mapping
     if (SUBJECT_CONTENT_TYPES[subject]) {
       return subject;
     }
-    
+
     // Keyword-based detection
     if (title.includes('science') || title.includes('lab') || title.includes('experiment')) {
       return 'science';
@@ -457,14 +457,14 @@ module.exports = {
     if (title.includes('history') || title.includes('civil war') || title.includes('revolution')) {
       return 'history';
     }
-    if (title.includes('english') || title.includes('reading') || title.includes('writing') || 
+    if (title.includes('english') || title.includes('reading') || title.includes('writing') ||
         title.includes('language arts') || title.includes('literature')) {
       return 'language arts';
     }
     if (title.includes('social') || title.includes('government') || title.includes('civic')) {
       return 'social studies';
     }
-    
+
     // Default to math if no other subject detected
     return 'math';
   },
@@ -473,14 +473,14 @@ module.exports = {
   generateWorkspaceFromMaterial: function(materialData, maxItems = 5) {
     const subject = module.exports.detectSubjectFromMaterial(materialData);
     const workspaceType = module.exports.getWorkspaceTypeForSubject(subject);
-    
+
     if (!materialData.questions || materialData.questions.length === 0) {
       return null;
     }
 
     const content = materialData.questions.slice(0, maxItems).map((question, index) => {
       const contentType = module.exports.inferContentTypeFromQuestion(question, subject);
-      
+
       return {
         text: question.toString().replace(/^\d+\.\s*/, ''), // Remove question numbering
         type: contentType,
@@ -505,7 +505,7 @@ module.exports = {
   // Helper to infer content type from question text
   inferContentTypeFromQuestion: function(questionText, subject) {
     const text = questionText.toLowerCase();
-    
+
     switch (subject) {
       case 'math':
         if (text.includes('+') || text.includes('add')) return 'addition';
@@ -514,21 +514,21 @@ module.exports = {
         if (text.includes('÷') || text.includes('/') || text.includes('divide')) return 'division';
         if (text.includes('fraction') || text.includes('/')) return 'fractions';
         return 'word_problem';
-        
+
       case 'science':
         if (text.includes('hypothesis') || text.includes('predict')) return 'hypothesis';
         if (text.includes('observe') || text.includes('record')) return 'observation';
         if (text.includes('step') || text.includes('procedure')) return 'experiment_step';
         if (text.includes('conclude') || text.includes('explain')) return 'conclusion';
         return 'observation';
-        
+
       case 'history':
         if (text.includes('when') || text.includes('date') || text.includes('year')) return 'timeline_event';
         if (text.includes('why') || text.includes('cause') || text.includes('effect')) return 'cause_effect';
         if (text.includes('compare') || text.includes('contrast')) return 'compare_contrast';
         if (text.includes('source') || text.includes('document')) return 'primary_source';
         return 'historical_thinking';
-        
+
       case 'language arts':
         if (text.includes('read') || text.includes('passage') || text.includes('comprehension')) return 'reading_comprehension';
         if (text.includes('story') || text.includes('creative') || text.includes('imagination') || text.includes('character')) return 'creative_writing';
@@ -540,14 +540,14 @@ module.exports = {
         if (text.includes('grammar') || text.includes('sentence')) return 'grammar';
         if (text.includes('vocabulary') || text.includes('word') || text.includes('meaning')) return 'vocabulary';
         return 'reading_comprehension';
-        
+
       case 'social studies':
         if (text.includes('map') || text.includes('location')) return 'map_analysis';
         if (text.includes('government') || text.includes('democracy')) return 'civic_scenario';
         if (text.includes('culture') || text.includes('society')) return 'cultural_comparison';
         if (text.includes('economy') || text.includes('trade')) return 'economics';
         return 'civic_scenario';
-        
+
       default:
         return 'general';
     }
@@ -598,7 +598,7 @@ module.exports = {
         government_structure: "Consider how power is distributed and decisions are made"
       }
     };
-    
+
     return hintMap[subject]?.[contentType] || "Take your time and think through this step by step!";
   },
 
@@ -709,7 +709,7 @@ module.exports = {
   generateAdaptiveContent: function(subject, completedContent, performanceData, targetCount = 3) {
     const contentTypes = this.getContentTypesForSubject(subject);
     const evaluationType = this.getEvaluationTypeForSubject(subject);
-    
+
     // Analyze performance by content type
     const performanceByType = {};
     completedContent.forEach((content, index) => {
@@ -722,7 +722,7 @@ module.exports = {
 
     // Determine what to practice next
     const nextContent = [];
-    
+
     // Prioritize content types that need more practice
     const strugglingTypes = Object.entries(performanceByType)
       .filter(([type, performances]) => {
@@ -733,13 +733,13 @@ module.exports = {
 
     // Generate content focusing on struggling areas
     let contentToGenerate = targetCount;
-    
+
     if (strugglingTypes.length > 0) {
       strugglingTypes.forEach(type => {
         if (contentToGenerate > 0) {
           const accuracy = performanceByType[type].filter(p => p).length / performanceByType[type].length;
           const difficulty = accuracy < 0.5 ? 'easy' : 'medium';
-          
+
           nextContent.push({
             type: type,
             difficulty: difficulty,
@@ -756,7 +756,7 @@ module.exports = {
       const randomType = contentTypes[Math.floor(Math.random() * contentTypes.length)];
       const recentPerformance = performanceData.slice(-5); // Last 5 attempts
       const adaptedDifficulty = this.adaptDifficulty('medium', recentPerformance);
-      
+
       nextContent.push({
         type: randomType,
         difficulty: adaptedDifficulty,
@@ -772,7 +772,7 @@ module.exports = {
   // Suggest complementary activities from other subjects
   suggestComplementaryActivities: function(currentSubject, topic, completedActivities = []) {
     const suggestions = [];
-    
+
     // Define cross-curricular activity suggestions
     const activityMap = {
       math: {
@@ -804,7 +804,7 @@ module.exports = {
     };
 
     const currentActivities = activityMap[currentSubject] || {};
-    
+
     for (const [activityTopic, activities] of Object.entries(currentActivities)) {
       if (topic.toLowerCase().includes(activityTopic)) {
         suggestions.push(...activities);

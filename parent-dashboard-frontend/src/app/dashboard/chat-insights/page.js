@@ -7,7 +7,7 @@ import ConversationSummariesView from './components/ConversationSummariesView';
 import { useChildrenData } from '../../../hooks/useChildrenData';
 import { useSubscription } from '../../../hooks/useSubscription';
 import { useSession } from '@supabase/auth-helpers-react';
-import { 
+import {
   ChatBubbleLeftRightIcon,
   InformationCircleIcon,
   Cog6ToothIcon
@@ -17,7 +17,7 @@ export default function ChatInsightsPage() {
   const session = useSession();
   const subscription = useSubscription();
   const childrenData = useChildrenData(session, subscription.subscription, subscription.permissions);
-  
+
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
@@ -27,13 +27,13 @@ export default function ChatInsightsPage() {
     const updateTime = () => {
       setCurrentTime(new Date().toLocaleTimeString());
     };
-    
+
     // Set initial time
     updateTime();
-    
+
     // Update time every minute
     const interval = setInterval(updateTime, 60000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -89,7 +89,7 @@ export default function ChatInsightsPage() {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
               {/* Info Button */}
               <button
@@ -99,7 +99,7 @@ export default function ChatInsightsPage() {
               >
                 <InformationCircleIcon className="h-5 w-5" />
               </button>
-              
+
               {/* Refresh Button */}
               <button
                 onClick={refreshInsights}

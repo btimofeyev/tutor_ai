@@ -60,7 +60,7 @@ export function useSubscription() {
   const getRemainingChildSlots = () => {
     return Math.max(0, permissions.maxChildren - children.length);
   };
-  
+
   const getUpgradeMessage = (feature) => {
     const messages = {
     ai: hasActiveSubscription
@@ -72,7 +72,6 @@ export function useSubscription() {
     };
     return messages[feature] || "Upgrade your plan to access this feature";
   };
-
 
   return {
     subscription,

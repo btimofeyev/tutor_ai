@@ -21,4 +21,7 @@ router.delete('/:lesson_id', lessonsContainerController.deleteLessonContainer);
 // Reorder lesson containers (bulk update sequence_order)
 router.patch('/reorder', lessonsContainerController.reorderLessonContainers);
 
+// Mark lesson container as complete (complete all materials)
+router.post('/:lesson_id/complete', lessonsContainerController.completeLessonContainer);
+
 module.exports = router;

@@ -14,7 +14,7 @@ function getParentId(req) {
 exports.getNotes = async (req, res) => {
   const parent_id = getParentId(req);
   const { child_id } = req.params;
-  
+
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
   if (!child_id) return res.status(400).json({ error: 'Missing child_id' });
 
@@ -29,7 +29,7 @@ exports.getNotes = async (req, res) => {
         .order('created_at', { ascending: true });
 
       if (error) return res.status(400).json({ error: error.message });
-      
+
       return res.json(notes || []);
     }
 
@@ -54,7 +54,7 @@ exports.getNotes = async (req, res) => {
       .order('created_at', { ascending: true });
 
     if (error) return res.status(400).json({ error: error.message });
-    
+
     res.json(notes || []);
   } catch (error) {
     console.error('Error fetching parent notes:', error);
@@ -67,7 +67,7 @@ exports.createNote = async (req, res) => {
   const parent_id = getParentId(req);
   const { child_id } = req.params;
   const { note_text, color, position_x, position_y } = req.body;
-  
+
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
   if (!child_id) return res.status(400).json({ error: 'Missing child_id' });
   if (!note_text || !note_text.trim()) return res.status(400).json({ error: 'Note text is required' });
@@ -89,7 +89,7 @@ exports.createNote = async (req, res) => {
         .single();
 
       if (error) return res.status(400).json({ error: error.message });
-      
+
       return res.status(201).json(note);
     }
 
@@ -120,7 +120,7 @@ exports.createNote = async (req, res) => {
       .single();
 
     if (error) return res.status(400).json({ error: error.message });
-    
+
     res.status(201).json(note);
   } catch (error) {
     console.error('Error creating parent note:', error);
@@ -133,7 +133,7 @@ exports.updateNote = async (req, res) => {
   const parent_id = getParentId(req);
   const { child_id, note_id } = req.params;
   const { note_text, color, position_x, position_y } = req.body;
-  
+
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
   if (!child_id) return res.status(400).json({ error: 'Missing child_id' });
   if (!note_id) return res.status(400).json({ error: 'Missing note_id' });
@@ -171,7 +171,7 @@ exports.updateNote = async (req, res) => {
         .single();
 
       if (error) return res.status(400).json({ error: error.message });
-      
+
       return res.json(updatedNote);
     }
 
@@ -205,7 +205,7 @@ exports.updateNote = async (req, res) => {
       .single();
 
     if (error) return res.status(400).json({ error: error.message });
-    
+
     res.json(updatedNote);
   } catch (error) {
     console.error('Error updating parent note:', error);
@@ -217,7 +217,7 @@ exports.updateNote = async (req, res) => {
 exports.deleteNote = async (req, res) => {
   const parent_id = getParentId(req);
   const { child_id, note_id } = req.params;
-  
+
   if (!parent_id) return res.status(401).json({ error: 'Missing parent_id' });
   if (!child_id) return res.status(400).json({ error: 'Missing child_id' });
   if (!note_id) return res.status(400).json({ error: 'Missing note_id' });
@@ -245,8 +245,8 @@ exports.deleteNote = async (req, res) => {
         .eq('id', note_id);
 
       if (error) return res.status(400).json({ error: error.message });
-      
-      return res.json({ 
+
+      return res.json({
         message: 'Note deleted successfully',
         deleted_note: existingNote
       });
@@ -272,8 +272,8 @@ exports.deleteNote = async (req, res) => {
       .eq('id', note_id);
 
     if (error) return res.status(400).json({ error: error.message });
-    
-    res.json({ 
+
+    res.json({
       message: 'Note deleted successfully',
       deleted_note: existingNote
     });

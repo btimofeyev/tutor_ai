@@ -1,7 +1,7 @@
 // app/schedule/components/EnhancedScheduleManager.js
 "use client";
 import { useState, useEffect } from 'react';
-import { 
+import {
   CalendarDaysIcon,
   Cog6ToothIcon,
   DocumentDuplicateIcon,
@@ -20,16 +20,20 @@ export default function EnhancedScheduleManager({
   childSubjects = [],
   schedulePreferences = {},
   scheduleManagement,
-  onGenerateAISchedule
+  onGenerateAISchedule,
+  selectedLessonContainer = null,
+  onCalendarSlotClick = () => {},
+  density = 'comfortable',
+  onToggleDensity = () => {}
 }) {
   const [activeView, setActiveView] = useState('advanced'); // advanced, dragdrop
   const [showTemplates, setShowTemplates] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [applyingTemplate, setApplyingTemplate] = useState(false);
-  
+
   // Always call the hook to satisfy React rules
   const fallbackScheduleManagement = useScheduleManagement(childId, subscriptionPermissions);
-  
+
   // Use provided schedule management or create our own
   const finalScheduleManagement = scheduleManagement ?? fallbackScheduleManagement;
   const { calendarEvents, loading, error, refresh, refreshEvents } = finalScheduleManagement;
@@ -42,30 +46,30 @@ export default function EnhancedScheduleManager({
     let currentTime = originalTime;
     let attempts = 0;
     const maxAttempts = 20; // Prevent infinite loops
-    
+
     while (attempts < maxAttempts) {
       const timeConflict = existingEntries.some(entry => {
         if (entry.scheduled_date !== date) return false;
-        
+
         const entryStart = new Date(`1970-01-01T${entry.start_time}`);
         const entryEnd = new Date(entryStart.getTime() + (entry.duration_minutes * 60000));
         const newStart = new Date(`1970-01-01T${currentTime}`);
         const newEnd = new Date(newStart.getTime() + (duration * 60000));
-        
+
         return (newStart < entryEnd && newEnd > entryStart);
       });
-      
+
       if (!timeConflict) {
         return currentTime;
       }
-      
+
       // Move to next time slot
       const timeDate = new Date(`1970-01-01T${currentTime}`);
       timeDate.setMinutes(timeDate.getMinutes() + increment);
       currentTime = timeDate.toTimeString().substring(0, 5);
       attempts++;
     }
-    
+
     return originalTime; // Fallback to original time if no slot found
   };
 
@@ -78,22 +82,20 @@ export default function EnhancedScheduleManager({
 
     try {
       setApplyingTemplate(true);
-      
+
       // Give UI time to show loading skeleton
       await new Promise(resolve => setTimeout(resolve, 150));
-      
-      
+
       // Determine which children to apply the template to
-      const targetChildIds = selectedChildrenIds.length >= 1 
-        ? selectedChildrenIds 
+      const targetChildIds = selectedChildrenIds.length >= 1
+        ? selectedChildrenIds
         : (childId ? [childId] : []);
-      
+
       if (targetChildIds.length === 0) {
         alert('No children selected. Please select at least one child.');
         return { success: false, entriesCreated: 0 };
       }
-      
-      
+
       // Get existing schedule entries to check for conflicts
       let existingEntries = [];
       if (calendarEvents && calendarEvents.length > 0) {
@@ -104,22 +106,22 @@ export default function EnhancedScheduleManager({
           child_id: event.child_id
         })).filter(entry => entry.scheduled_date && entry.start_time);
       }
-      
+
       // Keep track of all created entries across children to avoid conflicts
       const allCreatedEntries = [...existingEntries];
       const allResults = [];
       let totalSuccessfulEntries = 0;
       let totalFailedEntries = 0;
-      
+
       // Prepare all entries for batch creation
       const allEntriesToCreate = [];
-      
+
       for (const targetChildId of targetChildIds) {
-        
+
         // Convert template sessions to actual schedule entries for this child
         const scheduleEntries = template.sessions.map(session => {
           const scheduledDate = calculateDateForDay(startDate, session.day);
-          
+
           // Find next available time slot considering all previously created entries
           const availableTime = findNextAvailableTimeSlot(
             session.time,
@@ -127,7 +129,7 @@ export default function EnhancedScheduleManager({
             scheduledDate,
             allCreatedEntries
           );
-          
+
           const entryData = {
             subject_name: session.subject,
             scheduled_date: scheduledDate,
@@ -137,7 +139,7 @@ export default function EnhancedScheduleManager({
             created_by: 'parent',
             notes: `Applied from template: ${template.name}${availableTime !== session.time ? ` (adjusted from ${session.time})` : ''}`
           };
-          
+
           // Add to tracking list to prevent future conflicts
           allCreatedEntries.push({
             scheduled_date: scheduledDate,
@@ -145,15 +147,15 @@ export default function EnhancedScheduleManager({
             duration_minutes: session.duration,
             child_id: targetChildId
           });
-          
+
           return { entryData, targetChildId };
         });
-        
+
         allEntriesToCreate.push(...scheduleEntries);
       }
 
       // Use batch create to prevent individual refreshes
-      
+
       let batchResult;
       if (selectedChildrenIds.length >= 1) {
         // Multi-child batch create
@@ -163,7 +165,7 @@ export default function EnhancedScheduleManager({
         const entriesData = allEntriesToCreate.map(item => item.entryData);
         batchResult = await finalScheduleManagement.createScheduleEntriesBatch(entriesData);
       }
-      
+
       if (batchResult.success) {
         totalSuccessfulEntries = batchResult.entriesCreated;
         totalFailedEntries = batchResult.entriesFailed;
@@ -175,24 +177,23 @@ export default function EnhancedScheduleManager({
       const totalChildren = targetChildIds.length;
       const totalEntriesAttempted = template.sessions.length * totalChildren;
 
-      
       // Note: No explicit refresh needed - batch create automatically updates the state
-      
+
       if (totalSuccessfulEntries > 0) {
-        const message = totalChildren > 1 
+        const message = totalChildren > 1
           ? `Template applied successfully! Created ${totalSuccessfulEntries} schedule entries across ${totalChildren} children.${totalFailedEntries > 0 ? ` (${totalFailedEntries} entries failed to create)` : ''}`
           : `Template applied successfully! Created ${totalSuccessfulEntries} schedule entries.${totalFailedEntries > 0 ? ` (${totalFailedEntries} entries failed to create)` : ''}`;
-        
+
         // Switch to calendar view to show the results
         if (activeView === 'templates') {
           setActiveView('advanced');
         }
-        
+
         alert(message);
       } else {
         alert(`Failed to apply template. All ${totalEntriesAttempted} entries failed to create. Please check for scheduling conflicts or try again.`);
       }
-      
+
       return { success: totalSuccessfulEntries > 0, entriesCreated: totalSuccessfulEntries };
     } catch (error) {
       console.error('Failed to apply template:', error);
@@ -200,7 +201,7 @@ export default function EnhancedScheduleManager({
       throw error;
     } finally {
       setApplyingTemplate(false);
-      
+
       // Force a calendar refresh after state reset
       setTimeout(() => {
         const refreshFunction = refresh || refreshEvents;
@@ -217,15 +218,15 @@ export default function EnhancedScheduleManager({
       monday: 1, tuesday: 2, wednesday: 3, thursday: 4,
       friday: 5, saturday: 6, sunday: 0
     };
-    
+
     const startDay = new Date(startDate);
     const targetDay = days[dayName.toLowerCase()];
     const currentDay = startDay.getDay();
-    
+
     const dayDifference = (targetDay - currentDay + 7) % 7;
     const targetDate = new Date(startDay);
     targetDate.setDate(startDate.getDate() + dayDifference);
-    
+
     return targetDate.toISOString().split('T')[0];
   };
 
@@ -246,11 +247,11 @@ export default function EnhancedScheduleManager({
       calendarEvents.forEach(event => {
         const date = new Date(event.start || event.date);
         const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-        
+
         if (!sessionsByDay[dayName]) {
           sessionsByDay[dayName] = [];
         }
-        
+
         sessionsByDay[dayName].push({
           day: dayName,
           time: event.startTime || event.start_time || format(date, 'HH:mm'),
@@ -261,7 +262,7 @@ export default function EnhancedScheduleManager({
 
       // Flatten sessions
       const sessions = Object.values(sessionsByDay).flat();
-      
+
       // Create template object
       const template = {
         name: templateName,
@@ -272,14 +273,13 @@ export default function EnhancedScheduleManager({
         children_count: selectedChildrenIds.length || 1
       };
 
-      
       // Switch to templates view and trigger save
       setActiveView('templates');
       setShowTemplates(true);
-      
+
       // You could also directly save here if you want immediate save
       alert(`Template "${templateName}" will be available in the Templates section.`);
-      
+
     } catch (error) {
       console.error('Failed to save template:', error);
       alert('Failed to save template. Please try again.');
@@ -290,13 +290,12 @@ export default function EnhancedScheduleManager({
   const handleGeneratePDF = async (exportContent, options = {}) => {
     try {
       // Handle multiple children selection
-      const selectedChildren = selectedChildrenIds.length >= 1 
+      const selectedChildren = selectedChildrenIds.length >= 1
         ? allChildren.filter(child => selectedChildrenIds.includes(child.id))
         : [allChildren.find(c => c.id === childId)].filter(Boolean);
-      
+
       const childNames = selectedChildren.map(child => child.name).join(', ');
-      
-      
+
       const scheduleData = {
         events: calendarEvents || [],
         childName: childNames || 'Student',
@@ -350,67 +349,64 @@ export default function EnhancedScheduleManager({
     </div>
   );
 
-  // Render action buttons - enhanced styling
+  // Render action buttons - clean styling
   const renderActionButtons = () => (
-    <div className="flex items-center gap-3">
-      {/* Quick Save as Template button - show in calendar view */}
+    <div className="flex items-center gap-2">
+      {/* Density toggle */}
+      <button
+        onClick={onToggleDensity}
+        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+          density === 'compact'
+            ? 'bg-blue-100 text-blue-700'
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        }`}
+        title={`Switch to ${density === 'compact' ? 'comfortable' : 'compact'} view`}
+      >
+        {density === 'compact' ? 'Compact' : 'Standard'}
+      </button>
+
+      {/* Save template */}
       {activeView === 'advanced' && (
         <button
           onClick={() => handleSaveAsTemplate()}
-          className="btn-yellow"
-          title="Save current schedule as template"
+          className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+          title="Save as template"
         >
-          <DocumentDuplicateIcon className="h-4 w-4" />
-          Save as Template
+          💾 Save
         </button>
       )}
-      
-      {/* More menu dropdown - enhanced styling */}
+
+      {/* More menu */}
       <div className="relative">
         <button
           onClick={() => setShowMoreMenu(!showMoreMenu)}
-          className="p-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 hover:text-gray-900 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 border border-gray-300"
+          className="px-3 py-1.5 text-sm text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
           title="More options"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-          </svg>
+          ⋯
         </button>
-        
+
         {showMoreMenu && (
-          <div className="absolute right-0 mt-3 w-52 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 backdrop-blur-sm">
-            <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
-              Quick Actions
-            </div>
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
             <button
               onClick={() => {
                 handleGeneratePDF(null, { format: 'daily' });
                 setShowMoreMenu(false);
               }}
-              className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:text-blue-800 transition-all duration-150 flex items-center gap-3"
+              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-3"
             >
-              <div className="p-1 bg-blue-100 rounded-md">
-                <PrinterIcon className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <div className="font-medium">Print PDF</div>
-                <div className="text-xs text-gray-500">Export schedule</div>
-              </div>
+              <PrinterIcon className="h-4 w-4 text-gray-500" />
+              <span>Export PDF</span>
             </button>
             <button
               onClick={() => {
                 finalScheduleManagement.openSettingsModal();
                 setShowMoreMenu(false);
               }}
-              className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100 hover:text-purple-800 transition-all duration-150 flex items-center gap-3"
+              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-3"
             >
-              <div className="p-1 bg-purple-100 rounded-md">
-                <Cog6ToothIcon className="h-4 w-4 text-purple-600" />
-              </div>
-              <div>
-                <div className="font-medium">Schedule Settings</div>
-                <div className="text-xs text-gray-500">Configure preferences</div>
-              </div>
+              <Cog6ToothIcon className="h-4 w-4 text-gray-500" />
+              <span>Settings</span>
             </button>
           </div>
         )}
@@ -452,7 +448,7 @@ export default function EnhancedScheduleManager({
             <span className="font-medium">Error loading schedule</span>
           </div>
           <p className="text-red-600 text-sm mt-1">{error.message}</p>
-          <button 
+          <button
             onClick={() => {
               const refreshFunction = refresh || refreshEvents;
               if (refreshFunction) refreshFunction();
@@ -467,50 +463,34 @@ export default function EnhancedScheduleManager({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Enhanced Header with Current View Display */}
-      <div className="bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col">
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                {activeView === 'advanced' && (
-                  <>
-                    <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg">
-                      <CalendarDaysIcon className="h-6 w-6 text-white" />
-                    </div>
-                    Smart Schedule Calendar
-                  </>
-                )}
-                {activeView === 'templates' && (
-                  <>
-                    <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg shadow-lg">
-                      <DocumentDuplicateIcon className="h-6 w-6 text-white" />
-                    </div>
-                    Schedule Templates
-                  </>
-                )}
-              </h1>
-              <p className="text-sm text-gray-600 ml-14">
-                {activeView === 'advanced' && 'AI-powered calendar with drag-and-drop organization'}
-                {activeView === 'templates' && 'Create and apply schedule templates to save time'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {renderActionButtons()}
+    <div className="flex flex-col h-full min-h-0">
+      {/* Clean header */}
+        <div className="flex justify-between items-center px-3 py-2 bg-white border border-gray-200 rounded-lg mb-3">
+        <div className="flex items-center gap-2">
+          {/* View selector */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-md p-1">
+            <button
+              onClick={() => setActiveView('advanced')}
+              className={`px-3 py-1.5 text-sm rounded transition-colors ${activeView === 'advanced' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}
+            >
+              📅 Calendar
+            </button>
+            <button
+              onClick={() => setActiveView('templates')}
+              className={`px-3 py-1.5 text-sm rounded transition-colors ${activeView === 'templates' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}
+            >
+              📋 Templates
+            </button>
           </div>
         </div>
-        
-        {/* Navigation Tabs */}
-        <div className="flex justify-center">
-          {renderViewSelector()}
+        <div className="flex items-center gap-2">
+          {renderActionButtons()}
         </div>
       </div>
 
-      {/* Main calendar view */}
+      {/* Main calendar view - optimized to balance with header content */}
       {activeView === 'advanced' && (
-        <>
+        <div className="flex-1 min-h-0 flex flex-col" style={{ minHeight: 'calc(100vh - 100px)' }}>
           {applyingTemplate ? (
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <div className="animate-pulse space-y-4">
@@ -522,14 +502,14 @@ export default function EnhancedScheduleManager({
                     <div className="h-8 bg-gray-200 rounded w-16"></div>
                   </div>
                 </div>
-                
+
                 {/* Week days header */}
                 <div className="grid grid-cols-7 gap-2 mb-4">
                   {Array.from({ length: 7 }).map((_, i) => (
                     <div key={i} className="h-8 bg-gray-200 rounded"></div>
                   ))}
                 </div>
-                
+
                 {/* Calendar grid skeleton */}
                 <div className="grid grid-cols-7 gap-2">
                   {Array.from({ length: 35 }).map((_, i) => (
@@ -544,7 +524,7 @@ export default function EnhancedScheduleManager({
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Loading indicator */}
                 <div className="text-center py-4">
                   <div className="inline-flex items-center gap-2 text-blue-600">
@@ -556,7 +536,7 @@ export default function EnhancedScheduleManager({
             </div>
           ) : (
             <AdvancedScheduleCalendar
-              key={`calendar-${selectedChildrenIds.join('-') || childId}`}
+              key={`calendar-${selectedChildrenIds.join('-') || childId}-${schedulePreferences?.preferred_start_time || '09:00'}-${schedulePreferences?.preferred_end_time || '15:00'}`}
               childId={childId}
               selectedChildrenIds={selectedChildrenIds}
               allChildren={allChildren}
@@ -565,22 +545,21 @@ export default function EnhancedScheduleManager({
               childSubjects={childSubjects}
               schedulePreferences={schedulePreferences}
               onGenerateAISchedule={onGenerateAISchedule}
+              selectedLessonContainer={selectedLessonContainer}
+              onCalendarSlotClick={onCalendarSlotClick}
+              density={density}
             />
           )}
-        </>
+        </div>
       )}
 
-
       {activeView === 'templates' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
           {applyingTemplate ? (
-            <div className="text-center py-12">
-              <div className="mx-auto mb-4 w-16 h-16 relative">
-                <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-pulse"></div>
-                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-              </div>
+            <div className="text-center py-8">
+              <div className="mx-auto mb-4 w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Applying Template</h3>
-              <p className="text-gray-600">Creating schedule entries... You&apos;ll be redirected to the calendar view when complete.</p>
+              <p className="text-gray-600">Creating schedule entries...</p>
             </div>
           ) : (
             <ScheduleTemplatesManager
@@ -613,7 +592,6 @@ export default function EnhancedScheduleManager({
           isApplying={applyingTemplate}
         />
       )}
-
 
     </div>
   );

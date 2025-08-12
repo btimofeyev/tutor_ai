@@ -11,12 +11,12 @@ import StudentSidebar from "../dashboard/components/StudentSidebar";
 import StudentHeader from "../dashboard/components/StudentHeader";
 
 // Schedule-specific components
-import ScheduleCalendar from "./components/ScheduleCalendar";
-import EnhancedScheduleManager from "./components/EnhancedScheduleManager";
+import SmartScheduler from "./components/SmartScheduler";
 import ScheduleSettingsModal from "./components/ScheduleSettingsModal";
 import CreateScheduleEntryModal from "./components/CreateScheduleEntryModal";
 import EditScheduleEntryModal from "./components/EditScheduleEntryModal";
-import AIScheduleConfigModal from "./components/AIScheduleConfigModal";
+import DurationPicker from "./components/DurationPicker";
+// import AIScheduleConfigModal from "./components/AIScheduleConfigModal"; // DISABLED
 import { useScheduleManagement } from "../../hooks/useScheduleManagement";
 import { useMultiChildScheduleManagement } from "../../hooks/useMultiChildScheduleManagement";
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
@@ -28,9 +28,22 @@ export default function SchedulePage() {
 
   // Multi-child selection state
   const [selectedChildrenIds, setSelectedChildrenIds] = useState([]);
-  
-  // AI Schedule Modal state
-  const [showAIScheduleModal, setShowAIScheduleModal] = useState(false);
+
+  // Sidebar visibility state
+  const [showSubjectsSidebar, setShowSubjectsSidebar] = useState(true);
+
+  // Selected lesson container for scheduling
+  const [selectedLessonContainer, setSelectedLessonContainer] = useState(null);
+
+  // Duration picker state
+  const [showDurationPicker, setShowDurationPicker] = useState(false);
+  const [pendingSchedule, setPendingSchedule] = useState(null);
+
+  // AI Schedule Modal state - DISABLED
+  // const [showAIScheduleModal, setShowAIScheduleModal] = useState(false);
+
+  // UI density: 'comfortable' | 'compact'
+  const [density, setDensity] = useState('comfortable');
 
   // Use existing hooks for consistency
   const {
@@ -43,7 +56,7 @@ export default function SchedulePage() {
 
   // Schedule management - use multi-child when multiple children selected
   const singleChildScheduleManagement = useScheduleManagement(
-    childrenData.selectedChild?.id, 
+    childrenData.selectedChild?.id,
     subscriptionPermissions
   );
 
@@ -54,8 +67,8 @@ export default function SchedulePage() {
   );
 
   // Always use multi-child management when using checkboxes, even for single child
-  const scheduleManagement = selectedChildrenIds.length >= 1 
-    ? multiChildScheduleManagement 
+  const scheduleManagement = selectedChildrenIds.length >= 1
+    ? multiChildScheduleManagement
     : singleChildScheduleManagement;
 
   // Helper function to safely get entries count
@@ -99,7 +112,7 @@ export default function SchedulePage() {
   // Handle creating new schedule entries
   const handleCreateEntry = async (entryData, targetChildId) => {
     const isMultiChild = selectedChildrenIds.length >= 1;
-    
+
     if (isMultiChild) {
       const result = await multiChildScheduleManagement.createScheduleEntry(entryData, targetChildId);
       return result;
@@ -124,26 +137,103 @@ export default function SchedulePage() {
   // Handle saving schedule preferences
   const handleSavePreferences = async (preferencesData) => {
     const isMultiChild = selectedChildrenIds.length >= 1;
-    
+
     if (isMultiChild) {
       // For multi-child, we need to determine which child to save preferences for
       // For now, we'll save to the first selected child or the currently selected child
       const targetChildId = childrenData.selectedChild?.id || selectedChildrenIds[0];
       const result = await multiChildScheduleManagement.updateSchedulePreferences(preferencesData, targetChildId);
+      // Force refresh of preferences and schedule data
+      if (result.success) {
+        // Wait a moment for the backend to process
+        setTimeout(() => {
+          multiChildScheduleManagement.refresh();
+        }, 100);
+      }
       return result;
     } else {
       const result = await singleChildScheduleManagement.updateSchedulePreferences(preferencesData);
+      // Force refresh of preferences and schedule data
+      if (result.success) {
+        // Wait a moment for the backend to process
+        setTimeout(() => {
+          singleChildScheduleManagement.refresh();
+        }, 100);
+      }
       return result;
     }
+  };
+
+  // Handle lesson container selection from sidebar
+  const handleLessonContainerSelect = (lessonContainer, subject) => {
+    setSelectedLessonContainer({ lessonContainer, subject });
+  };
+
+  // Handle calendar slot click when lesson container is selected
+  const handleCalendarSlotClick = async (dayStr, timeStr) => {
+    if (!selectedLessonContainer) return;
+
+    // Store the pending schedule info and show duration picker
+    setPendingSchedule({
+      dayStr,
+      timeStr,
+      lessonContainer: selectedLessonContainer
+    });
+    setShowDurationPicker(true);
+  };
+
+  // Handle duration confirmation from picker
+  const handleDurationConfirm = async (duration) => {
+    if (!pendingSchedule) return;
+
+    try {
+      // Create schedule entry data
+      const entryData = {
+        subject_name: pendingSchedule.lessonContainer.subject.custom_subject_name_override || pendingSchedule.lessonContainer.subject.name,
+        scheduled_date: pendingSchedule.dayStr,
+        start_time: pendingSchedule.timeStr,
+        duration_minutes: duration,
+        status: 'scheduled',
+        created_by: 'parent',
+        lesson_container_id: pendingSchedule.lessonContainer.lessonContainer.id,
+        notes: JSON.stringify({
+          lesson_container_id: pendingSchedule.lessonContainer.lessonContainer.id,
+          lesson_container_title: pendingSchedule.lessonContainer.lessonContainer.title,
+          total_materials: pendingSchedule.lessonContainer.lessonContainer.totalMaterials,
+          completed_materials: pendingSchedule.lessonContainer.lessonContainer.completedMaterials,
+          progress_percentage: pendingSchedule.lessonContainer.lessonContainer.progressPercentage,
+          created_from_click: true,
+          type: 'lesson_container'
+        })
+      };
+
+      const result = await handleCreateEntry(entryData, childrenData.selectedChild?.id);
+
+      if (result) {
+        // Clear states after successful scheduling
+        setSelectedLessonContainer(null);
+        setShowDurationPicker(false);
+        setPendingSchedule(null);
+      }
+    } catch (error) {
+      console.error('Failed to create schedule entry from click:', error);
+      alert('Failed to schedule the lesson. Please try again.');
+    }
+  };
+
+  // Handle duration picker cancel
+  const handleDurationCancel = () => {
+    setShowDurationPicker(false);
+    setPendingSchedule(null);
   };
 
   // Handle clearing entire schedule
   const handleClearSchedule = async () => {
     const isMultiChild = selectedChildrenIds.length >= 1;
-    const confirmMessage = isMultiChild 
+    const confirmMessage = isMultiChild
       ? 'Are you sure you want to delete all scheduled entries for the selected children? This action cannot be undone.'
       : 'Are you sure you want to delete all scheduled entries? This action cannot be undone.';
-    
+
     if (window.confirm(confirmMessage)) {
       if (isMultiChild) {
         // Clear entries for all selected children
@@ -167,7 +257,7 @@ export default function SchedulePage() {
   const getDefaultStartDate = () => {
     const today = new Date();
     const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    
+
     // If it's a weekday, use today; otherwise use next Monday
     if (dayOfWeek >= 1 && dayOfWeek <= 5) {
       return today.toISOString().split('T')[0];
@@ -180,87 +270,40 @@ export default function SchedulePage() {
     }
   };
 
-  // Handle opening AI Schedule configuration modal
-  const handleOpenAIScheduleModal = () => {
-    setShowAIScheduleModal(true);
-  };
+  // Handle opening AI Schedule configuration modal - DISABLED
+  // const handleOpenAIScheduleModal = () => {
+  //   setShowAIScheduleModal(true);
+  // };
 
-  // Handle AI schedule generation with configuration
-  const handleGenerateAIScheduleWithConfig = async (schedulingConfig) => {
-    const isMultiChild = selectedChildrenIds.length >= 1;
-    
-    // Get current preferences to pass to AI - ensure it's serializable
-    const rawPreferences = isMultiChild 
-      ? (multiChildScheduleManagement.schedulePreferences[childrenData.selectedChild?.id] || multiChildScheduleManagement.schedulePreferences[selectedChildrenIds[0]] || {})
-      : singleChildScheduleManagement.schedulePreferences;
-    
-    // Merge configuration with existing preferences
-    const enhancedPreferences = {
-      // Base preferences
-      preferred_start_time: rawPreferences?.preferred_start_time || '09:00',
-      preferred_end_time: rawPreferences?.preferred_end_time || '15:00',
-      max_daily_study_minutes: rawPreferences?.max_daily_study_minutes || 240,
-      break_duration_minutes: rawPreferences?.break_duration_minutes || 15,
-      difficult_subjects_morning: rawPreferences?.difficult_subjects_morning !== false,
-      study_days: rawPreferences?.study_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-      
-      // AI Configuration from modal
-      subject_frequencies: schedulingConfig.subjectFrequencies,
-      study_intensity: schedulingConfig.studyIntensity,
-      prioritize_urgent: schedulingConfig.prioritizeUrgent,
-      difficulty_distribution: schedulingConfig.difficultyDistribution,
-      session_length_preference: schedulingConfig.sessionLength,
-      coordination_mode: schedulingConfig.coordination,
-      ai_reasoning_enabled: true
-    };
+  // Handle AI schedule generation with configuration - DISABLED
+  // const handleGenerateAIScheduleWithConfig = async (schedulingConfig) => {
+  //   // AI scheduling functionality disabled
+  // };
 
-    try {
-      setShowAIScheduleModal(false); // Close modal
-      
-      const result = isMultiChild 
-        ? await multiChildScheduleManagement.generateAISchedule({
-            start_date: schedulingConfig.startDate,
-            days_to_schedule: schedulingConfig.totalDaysToSchedule,
-            preferences: enhancedPreferences
-          })
-        : await singleChildScheduleManagement.generateAISchedule({
-            start_date: schedulingConfig.startDate,
-            days_to_schedule: schedulingConfig.totalDaysToSchedule,
-            preferences: enhancedPreferences
-          });
-
-      if (result.success) {
-        alert(result.message || `Successfully created ${result.entriesCreated} AI-generated schedule entries!`);
-      } else {
-        alert(result.error || 'Failed to generate AI schedule. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error generating AI schedule:', error.message || error);
-      alert(`Failed to generate AI schedule: ${error.message || 'Please check your materials and preferences.'}`);
-    }
-  };
-
-  // Legacy function for compatibility (now opens modal)
-  const handleGenerateAISchedule = async (customStartDate = null) => {
-    handleOpenAIScheduleModal();
-  };
-
+  // Legacy function for compatibility - DISABLED
+  // const handleGenerateAISchedule = async (customStartDate = null) => {
+  //   // AI scheduling functionality disabled
+  // };
 
   // Get assigned subjects for the current child or all selected children
-  const assignedSubjectsForCurrentChild = childrenData.selectedChild 
+  const assignedSubjectsForCurrentChild = childrenData.selectedChild
     ? childrenData.childSubjects[childrenData.selectedChild.id] || []
     : [];
 
+  // Debug: Log current preferences being passed to calendar
+  const currentPreferences = selectedChildrenIds.length >= 1
+    ? (multiChildScheduleManagement.schedulePreferences[childrenData.selectedChild?.id] || multiChildScheduleManagement.schedulePreferences[selectedChildrenIds[0]] || {})
+    : singleChildScheduleManagement.schedulePreferences;
   // Get all subjects for selected children (for AI scheduling)
   const allSubjectsForSelectedChildren = selectedChildrenIds.length >= 1
     ? selectedChildrenIds.reduce((allSubjects, childId) => {
         const childSubjects = childrenData.childSubjects[childId] || [];
-        
+
         // Combine subjects, avoiding duplicates by subject name
         childSubjects.forEach(subject => {
           const subjectName = subject.custom_subject_name_override || subject.name;
-          
-          if (subjectName && !allSubjects.some(s => 
+
+          if (subjectName && !allSubjects.some(s =>
             (s.custom_subject_name_override || s.name) === subjectName
           )) {
             allSubjects.push(subject);
@@ -276,9 +319,9 @@ export default function SchedulePage() {
     : [];
 
   return (
-    <div className="flex h-screen bg-background-main overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-64 flex-shrink-0 bg-background-card border-r border-border-subtle shadow-lg">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Clean Sidebar */}
+      <div className="w-52 flex-shrink-0 bg-white border-r border-gray-200 shadow-sm h-full">
         <StudentSidebar
           childrenList={childrenData.children}
           selectedChild={childrenData.selectedChild}
@@ -297,130 +340,36 @@ export default function SchedulePage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-
-        {/* Schedule Content */}
-        <div className="flex-1 p-6 overflow-auto">
-          {!childrenData.selectedChild ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-text-secondary italic text-xl text-center">
+      <div className="flex-1 flex flex-col overflow-hidden h-full">
+        {!childrenData.selectedChild ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center p-8">
+              <div className="text-4xl mb-4">📅</div>
+              <div className="text-gray-600 text-lg font-medium">
                 {childrenData.children.length > 0
-                  ? "Select a student to view their schedule."
-                  : "No students found. Please add a student to begin."}
+                  ? "Select a student to view their schedule"
+                  : "No students found. Please add a student to begin"}
               </div>
             </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Breadcrumbs */}
-              <Breadcrumbs 
-                items={[
-                  { label: "Dashboard", href: "/dashboard" },
-                  { label: "Schedule" }
-                ]}
-              />
-              
-              {/* Clean Schedule Header */}
-              <div className="flex flex-col gap-4">
-                <div className="flex justify-between items-center">
-                  <h1 className="text-xl font-semibold text-text-primary">
-                    {childrenData.selectedChild?.name}&apos;s Schedule
-                  </h1>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => handleOpenAIScheduleModal()}
-                      className="btn-primary"
-                      disabled={scheduleManagement.loading}
-                    >
-                      {scheduleManagement.loading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          Generating...
-                        </>
-                      ) : (
-                        <>🧠 Configure AI Schedule</>
-                      )}
-                    </button>
-                    
-                    <button 
-                      onClick={scheduleManagement.openSettingsModal}
-                      className="btn-secondary"
-                    >
-                      <Cog6ToothIcon className="h-4 w-4" />
-                      Settings
-                    </button>
-                    
-                    {getTotalEntriesCount() > 0 && (
-                      <button 
-                        onClick={handleClearSchedule}
-                        className="btn-secondary"
-                      >
-                        Clear All
-                      </button>
-                    )}
-                    
-                  </div>
-                </div>
-
-                {/* Child Schedule Filter */}
-                {childrenData.children.length > 1 && (
-                  <div className="bg-white rounded-lg border border-gray-200 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-wrap gap-2">
-                        <span className="text-sm font-medium text-gray-600 self-center mr-2">Show schedules for:</span>
-                        {childrenData.children.map((child) => (
-                          <label key={child.id} className="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={selectedChildrenIds.includes(child.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedChildrenIds(prev => [...prev, child.id]);
-                                } else {
-                                  setSelectedChildrenIds(prev => prev.filter(id => id !== child.id));
-                                }
-                              }}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm font-medium text-gray-700">{child.name}</span>
-                            <span className="text-xs text-gray-400">G{child.grade}</span>
-                          </label>
-                        ))}
-                      </div>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => setSelectedChildrenIds(childrenData.children.map(c => c.id))}
-                          className="text-xs px-2 py-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        >
-                          Show All
-                        </button>
-                        <button
-                          onClick={() => setSelectedChildrenIds([])}
-                          className="text-xs px-2 py-1 text-gray-600 hover:bg-gray-50 rounded transition-colors"
-                        >
-                          Hide All
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Enhanced Calendar View */}
-              <div className="bg-background-card rounded-xl shadow-sm">
-                <EnhancedScheduleManager 
-                  childId={selectedChildrenIds.length >= 1 ? selectedChildrenIds[0] : childrenData.selectedChild?.id}
-                  selectedChildrenIds={selectedChildrenIds}
-                  allChildren={childrenData.children}
-                  subscriptionPermissions={subscriptionPermissions}
-                  childSubjects={allSubjectsForSelectedChildren}
-                  schedulePreferences={scheduleManagement.schedulePreferences}
-                  scheduleManagement={scheduleManagement}
-                  onGenerateAISchedule={handleGenerateAISchedule}
-                />
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <SmartScheduler
+            childId={selectedChildrenIds.length >= 1 ? selectedChildrenIds[0] : childrenData.selectedChild?.id}
+            selectedChildrenIds={selectedChildrenIds}
+            allChildren={childrenData.children}
+            subscriptionPermissions={subscriptionPermissions}
+            scheduleManagement={scheduleManagement}
+            childSubjects={allSubjectsForSelectedChildren}
+            schedulePreferences={currentPreferences}
+            onGenerateAISchedule={null}
+            selectedLessonContainer={selectedLessonContainer}
+            onCalendarSlotClick={handleCalendarSlotClick}
+            density={density}
+            lessonsBySubject={childrenData.lessonsBySubject}
+            unitsBySubject={childrenData.unitsBySubject}
+            lessonsByUnit={childrenData.lessonsByUnit}
+          />
+        )}
       </div>
 
       {/* Create Schedule Entry Modal */}
@@ -460,18 +409,14 @@ export default function SchedulePage() {
         isOpen={scheduleManagement.showSettingsModal}
         onClose={scheduleManagement.closeSettingsModal}
         onSave={handleSavePreferences}
-        schedulePreferences={
-          selectedChildrenIds.length >= 1 
-            ? (multiChildScheduleManagement.schedulePreferences[childrenData.selectedChild?.id] || multiChildScheduleManagement.schedulePreferences[selectedChildrenIds[0]] || {})
-            : singleChildScheduleManagement.schedulePreferences
-        }
+        schedulePreferences={currentPreferences}
         childName={childrenData.selectedChild?.name}
         childSubjects={allSubjectsForSelectedChildren}
         isSaving={scheduleManagement.loading}
       />
 
-      {/* AI Schedule Configuration Modal */}
-      <AIScheduleConfigModal
+      {/* AI Schedule Configuration Modal - DISABLED */}
+      {/* <AIScheduleConfigModal
         isOpen={showAIScheduleModal}
         onClose={() => setShowAIScheduleModal(false)}
         onGenerate={handleGenerateAIScheduleWithConfig}
@@ -479,7 +424,20 @@ export default function SchedulePage() {
         selectedChildrenIds={selectedChildrenIds}
         allChildren={childrenData.children}
         isGenerating={scheduleManagement.loading}
-      />
+      /> */}
+
+      {/* Duration Picker Modal */}
+      {showDurationPicker && pendingSchedule && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <DurationPicker
+            lessonTitle={pendingSchedule.lessonContainer.lessonContainer.title}
+            onDurationChange={() => {}}
+            onConfirm={handleDurationConfirm}
+            onCancel={handleDurationCancel}
+            initialDuration={30}
+          />
+        </div>
+      )}
 
     </div>
   );

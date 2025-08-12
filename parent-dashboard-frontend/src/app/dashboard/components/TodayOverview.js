@@ -2,12 +2,12 @@
 'use client';
 import React, { useMemo, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { 
-  ExclamationTriangleIcon, 
-  ClockIcon, 
+import {
+  ExclamationTriangleIcon,
+  ClockIcon,
   CalendarDaysIcon,
   CheckCircleIcon as CheckOutlineIcon,
-  PlayIcon 
+  PlayIcon
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckSolidIcon } from '@heroicons/react/24/solid';
 import { isDateOverdue, isDateDueSoon } from '../../../utils/dashboardHelpers';
@@ -107,13 +107,13 @@ TodayOverviewItem.propTypes = {
   onToggleComplete: PropTypes.func.isRequired
 };
 
-export default function TodayOverview({ 
-  lessonsBySubject, 
+export default function TodayOverview({
+  lessonsBySubject,
   selectedChild,
-  onToggleComplete, 
+  onToggleComplete,
   onEdit,
   onDelete,
-  maxItems = 6 
+  maxItems = 6
 }) {
   const [todayScheduleItems, setTodayScheduleItems] = useState([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
@@ -128,14 +128,14 @@ export default function TodayOverview({
         // Use the correct API endpoint structure (baseURL already includes /api)
         const response = await api.get(`/schedule/${selectedChild.id}`);
         const allScheduleItems = response.data || [];
-        
+
         // Filter for today's items using the correct field name
         const today = new Date().toISOString().split('T')[0];
         const todayItems = allScheduleItems.filter(item => {
           if (!item.scheduled_date) return false;
           return item.scheduled_date === today;
         });
-        
+
         setTodayScheduleItems(todayItems);
       } catch (error) {
         // If schedule API fails, just show assignments without schedule integration
@@ -153,23 +153,23 @@ export default function TodayOverview({
     const allLessons = Object.values(lessonsBySubject).flat();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     // Get all incomplete lessons with due dates (filter out assignments - those are for students)
-    const incompleteWithDueDates = allLessons.filter(lesson => 
-      !lesson.completed_at && 
+    const incompleteWithDueDates = allLessons.filter(lesson =>
+      !lesson.completed_at &&
       lesson.due_date &&
       !APP_GRADABLE_CONTENT_TYPES.includes(lesson.content_type) // Exclude assignments
     );
-    
+
     // Add urgency info to each item
     const itemsWithUrgency = incompleteWithDueDates.map(lesson => {
       const dueDate = new Date(lesson.due_date + 'T00:00:00');
       dueDate.setHours(0, 0, 0, 0);
       const daysDiff = Math.floor((dueDate - today) / (1000 * 60 * 60 * 24));
-      
+
       let type = 'future';
       let urgencyScore = 1000 + daysDiff; // Default for future items
-      
+
       if (daysDiff < 0) {
         type = 'overdue';
         urgencyScore = daysDiff; // Negative number, so most overdue will be most negative
@@ -186,7 +186,7 @@ export default function TodayOverview({
         type = 'this-week';
         urgencyScore = 10 + daysDiff;
       }
-      
+
       return {
         ...lesson,
         type,
@@ -194,7 +194,7 @@ export default function TodayOverview({
         daysUntilDue: daysDiff
       };
     });
-    
+
     // Sort by urgency (most urgent first)
     const sortedByUrgency = itemsWithUrgency.sort((a, b) => {
       // First sort by urgency score (lower is more urgent)
@@ -204,13 +204,13 @@ export default function TodayOverview({
       // Then by title for items with same urgency
       return a.title.localeCompare(b.title);
     });
-    
+
     // Show only top 3 most urgent lessons for parents to work through
     const upcomingWork = sortedByUrgency.slice(0, 3);
-    
+
     // Today's schedule items (if any)
-    const todaySchedule = todayScheduleItems.map(item => ({ 
-      ...item, 
+    const todaySchedule = todayScheduleItems.map(item => ({
+      ...item,
       type: 'scheduled',
       urgencyScore: -1 // Schedule items always show first
     })).sort((a, b) => {
@@ -229,10 +229,10 @@ export default function TodayOverview({
     return null;
   }
 
-  const todayDate = new Date().toLocaleDateString(undefined, { 
-    weekday: 'long', 
-    month: 'long', 
-    day: 'numeric' 
+  const todayDate = new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric'
   });
 
   return (
@@ -256,7 +256,7 @@ export default function TodayOverview({
           )}
         </p>
       </div>
-      
+
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
         {/* Today's Schedule (if any) */}
         {todaySchedule.length > 0 && (
@@ -295,7 +295,7 @@ export default function TodayOverview({
               {upcomingWork.length} items
             </span>
           </div>
-          
+
           <div className="space-y-2">
             {upcomingWork.map((item, index) => (
               <TodayOverviewItem
@@ -306,7 +306,7 @@ export default function TodayOverview({
               />
             ))}
           </div>
-          
+
           {/* Show indicator if there are more items */}
           {totalIncompleteItems > upcomingWork.length && (
             <div className="mt-3 text-center text-sm text-gray-500">

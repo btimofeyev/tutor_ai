@@ -1,7 +1,7 @@
 // Simple Workspace - Like a teacher's whiteboard
 import React, { useState, useEffect, forwardRef, useImperativeHandle, memo, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   FiX, FiSend, FiEdit3, FiCheckCircle, FiRotateCcw, FiAward, FiStar, FiZap
 } from 'react-icons/fi';
 
@@ -35,7 +35,7 @@ const AchievementNotification = ({ achievement, show, onClose }) => (
             <p className="text-sm opacity-90">{achievement.description}</p>
             <p className="text-xs font-semibold">+{achievement.points} points!</p>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="text-white hover:text-yellow-200 transition-colors"
           >
@@ -50,7 +50,7 @@ const AchievementNotification = ({ achievement, show, onClose }) => (
 // Creative Writing Tools Component
 const CreativeWritingToolkit = ({ toolkit, onSendToChat }) => {
   const [responses, setResponses] = useState({});
-  
+
   const handleResponseChange = (questionId, value) => {
     setResponses(prev => ({
       ...prev,
@@ -60,7 +60,7 @@ const CreativeWritingToolkit = ({ toolkit, onSendToChat }) => {
 
   const sendResponse = (questionId, question, response) => {
     if (!response.trim()) return;
-    
+
     const message = `Here's my response to "${question}":\n\n${response}`;
     onSendToChat(message);
   };
@@ -73,7 +73,7 @@ const CreativeWritingToolkit = ({ toolkit, onSendToChat }) => {
           <FiStar className="mr-2" />
           {toolkit.brainstorming_section.title}
         </h3>
-        
+
         <div className="space-y-4">
           {toolkit.brainstorming_section.questions.map((q, index) => (
             <div key={q.id} className="bg-white rounded-lg p-4 border border-purple-200">
@@ -86,7 +86,7 @@ const CreativeWritingToolkit = ({ toolkit, onSendToChat }) => {
                   <p className="text-sm text-gray-600 mt-1 italic">💡 {q.hint}</p>
                 )}
               </div>
-              
+
               <div className="flex gap-2">
                 <textarea
                   value={responses[q.id] || ''}
@@ -114,7 +114,7 @@ const CreativeWritingToolkit = ({ toolkit, onSendToChat }) => {
             <FiEdit3 className="mr-2" />
             {section.section_name}
           </h3>
-          
+
           <div className="space-y-3">
             {section.prompts.map((prompt, promptIndex) => (
               <div key={prompt.id} className="bg-white rounded-lg p-3 border border-blue-200">
@@ -139,7 +139,7 @@ const CreativeWritingToolkit = ({ toolkit, onSendToChat }) => {
           </div>
         </div>
       ))}
-      
+
       {/* Progress Indicator */}
       <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-lg border-2 border-green-200 p-4">
         <h3 className="font-bold text-green-800 mb-2 flex items-center">
@@ -147,7 +147,7 @@ const CreativeWritingToolkit = ({ toolkit, onSendToChat }) => {
           Your Progress
         </h3>
         <div className="bg-white rounded-full h-4 overflow-hidden">
-          <div 
+          <div
             className="bg-gradient-to-r from-green-500 to-teal-500 h-full transition-all duration-500"
             style={{ width: `${(toolkit.progress.completed / toolkit.progress.total_questions) * 100}%` }}
           />
@@ -208,10 +208,10 @@ const getItemLabel = (subject, itemNumber) => {
 };
 
 // ProblemItem Component - Separated to fix hooks issue
-const ProblemItem = memo(({ 
-  problem, 
-  index, 
-  status, 
+const ProblemItem = memo(function ProblemItem({
+  problem,
+  index,
+  status,
   workspaceContent,
   workNotes,
   feedbacks,
@@ -229,7 +229,7 @@ const ProblemItem = memo(({
   setWorkNotes,
   onInteraction,
   setFeedback
-}) => {
+}) {
   // Now useMemo is called at the component level, not inside a map
   const { bgColor, borderClass } = useMemo(() => {
     switch (status) {
@@ -251,12 +251,12 @@ const ProblemItem = memo(({
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
-      animate={{ 
-        opacity: 1, 
+      animate={{
+        opacity: 1,
         y: 0,
         backgroundColor: bgColor
       }}
-      transition={{ 
+      transition={{
         delay: index * 0.05,
         type: "tween",
         duration: 0.3
@@ -353,7 +353,7 @@ const ProblemItem = memo(({
           {feedbacks[problem.id] && <div className="mt-2 text-sm">{feedbacks[problem.id]}</div>}
         </div>
       )}
-      
+
       {status === 'good' && (
         <div className="p-3 bg-blue-100 border border-blue-300 rounded-lg text-blue-800">
           <FiStar className="inline-block mr-2" />
@@ -361,7 +361,7 @@ const ProblemItem = memo(({
           {feedbacks[problem.id] && <div className="mt-2 text-sm">{feedbacks[problem.id]}</div>}
         </div>
       )}
-      
+
       {status === 'correct' && (
         <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-green-800">
           <FiCheckCircle className="inline-block mr-2" />
@@ -369,7 +369,7 @@ const ProblemItem = memo(({
           {feedbacks[problem.id] && <div className="mt-2 text-sm">{feedbacks[problem.id]}</div>}
         </div>
       )}
-      
+
       {status === 'needs_improvement' && (
         <div className="p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-yellow-800">
           <div className="flex items-start justify-between">
@@ -388,7 +388,7 @@ const ProblemItem = memo(({
           </div>
         </div>
       )}
-      
+
       {status === 'incorrect' && (
         <div className="p-3 bg-red-100 border border-red-300 rounded-lg text-red-800">
           <div className="flex items-start justify-between">
@@ -427,10 +427,10 @@ const ProblemItem = memo(({
           <strong className="text-blue-600">💡 Hint:</strong> {problem.hint}
         </motion.div>
       )}
-      
+
       {/* Adaptive Encouragement based on student profile */}
-      {studentProfile?.response_patterns?.tends_to_give_up && 
-       status === 'pending' && 
+      {studentProfile?.response_patterns?.tends_to_give_up &&
+       status === 'pending' &&
        workNotes[problem.id]?.length > 10 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -440,9 +440,9 @@ const ProblemItem = memo(({
           <strong className="text-green-600">🌟 You&apos;re doing great!</strong> Keep working through it step by step!
         </motion.div>
       )}
-      
+
       {/* Challenge encouragement for confident students */}
-      {studentProfile?.confidence_level === 'high' && 
+      {studentProfile?.confidence_level === 'high' &&
        status === 'correct' && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -456,14 +456,14 @@ const ProblemItem = memo(({
   );
 });
 
-const SimpleWorkspace = forwardRef(function SimpleWorkspace({ 
-  workspaceContent, 
-  isExpanded, 
-  onClose, 
-  onSendToChat, 
+const SimpleWorkspace = forwardRef(function SimpleWorkspace({
+  workspaceContent,
+  isExpanded,
+  onClose,
+  onSendToChat,
   onInteraction,
   studentProfile,
-  adaptiveData 
+  adaptiveData
 }, ref) {
   const [problems, setProblems] = useState([]);
   const [workNotes, setWorkNotes] = useState({});
@@ -481,7 +481,7 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
     markProblemIncorrect: (problemId) => markProblemIncorrect(problemId)
   }));
 
-  // Initialize workspace when content changes  
+  // Initialize workspace when content changes
   useEffect(() => {
     // Handle creative writing toolkit differently
     if (workspaceContent?.type === 'creative_writing_toolkit') {
@@ -491,21 +491,21 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
       setFeedbacks({});
       return;
     }
-    
+
     // Handle both new subject workspaces (content) and legacy math workspaces (problems)
     const items = workspaceContent?.content || workspaceContent?.problems;
-    
+
     if (workspaceContent && items?.length > 0) {
-      
+
       setProblems(items);
-      
+
       // Set initial states
       const initialStates = {};
       items.forEach(item => {
         initialStates[item.id] = item.status || 'pending';
       });
       setProblemStates(initialStates);
-      
+
       // Clear work notes and feedbacks
       setWorkNotes({});
       setFeedbacks({});
@@ -515,19 +515,19 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
   // Send work to chat for checking - memoized for better performance
   const sendWorkToChat = useCallback((problemIndex, problemText, workNote) => {
     if (!workNote.trim()) return;
-    
+
     // Track interaction for auto-collapse timing
     if (onInteraction) onInteraction();
-    
+
     const problem = problems[problemIndex];
     const message = `Can you check my work on Problem ${problemIndex + 1}?\n\nProblem: ${problemText}\nMy work: ${workNote}\n\n[Problem Index: ${problemIndex}]`;
-    
+
     // Set problem to checking state
     setProblemStates(prev => ({
       ...prev,
       [problem.id]: 'checking'
     }));
-    
+
     if (onSendToChat) {
       onSendToChat(message);
     }
@@ -541,7 +541,7 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
     }));
   };
 
-  // Mark problem as incorrect  
+  // Mark problem as incorrect
   const markProblemIncorrect = (problemId) => {
     setProblemStates(prev => ({
       ...prev,
@@ -594,27 +594,27 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
     if ('speechSynthesis' in window) {
       // Stop any ongoing speech
       window.speechSynthesis.cancel();
-      
+
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.voice = window.speechSynthesis.getVoices().find(voice => voice.name === selectedVoice) || null;
       utterance.rate = 0.9;
       utterance.pitch = 1;
-      
+
       utterance.onstart = () => {
         setIsSpeaking(true);
         setCurrentSpeakingId(id);
       };
-      
+
       utterance.onend = () => {
         setIsSpeaking(false);
         setCurrentSpeakingId(null);
       };
-      
+
       utterance.onerror = () => {
         setIsSpeaking(false);
         setCurrentSpeakingId(null);
       };
-      
+
       window.speechSynthesis.speak(utterance);
     }
   };
@@ -631,7 +631,7 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
   // Get status indicator with optimized animations
   const getStatusIndicator = useCallback((problemId) => {
     const state = problemStates[problemId];
-    
+
     const StatusIcon = ({ children, color = "text-gray-400" }) => (
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
@@ -642,7 +642,7 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
         {children}
       </motion.div>
     );
-    
+
     switch (state) {
       case 'excellent':
         return (
@@ -702,12 +702,12 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
     return (
       <>
         {/* Achievement Notification */}
-        <AchievementNotification 
+        <AchievementNotification
           achievement={currentAchievement}
           show={showAchievement}
           onClose={() => setShowAchievement(false)}
         />
-        
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -732,9 +732,9 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
 
           {/* Creative Writing Toolkit Content */}
           <div className="flex-1 p-4 overflow-y-auto">
-            <CreativeWritingToolkit 
-              toolkit={workspaceContent} 
-              onSendToChat={onSendToChat} 
+            <CreativeWritingToolkit
+              toolkit={workspaceContent}
+              onSendToChat={onSendToChat}
             />
           </div>
         </motion.div>
@@ -749,12 +749,12 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
   return (
     <>
       {/* Achievement Notification */}
-      <AchievementNotification 
+      <AchievementNotification
         achievement={currentAchievement}
         show={showAchievement}
         onClose={() => setShowAchievement(false)}
       />
-      
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -782,14 +782,14 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
       {/* Problems */}
       <div className="flex-1 p-3 sm:p-4 overflow-y-auto overscroll-behavior-contain">
         {/* Creative Writing Tools - Only for actual creative writing activities */}
-        {workspaceContent.subject === 'language arts' && 
+        {workspaceContent.subject === 'language arts' &&
          problems.some(problem => ['creative_writing', 'story_elements', 'brainstorming', 'writing_prompt'].includes(problem.type)) && (
           <CreativeWritingTools onSendToChat={onSendToChat} />
         )}
-        
+
         {problems.map((problem, index) => {
           const status = problemStates[problem.id];
-          
+
           return (
             <ProblemItem
               key={problem.id}
@@ -817,7 +817,7 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
           );
         })}
       </div>
-      
+
       {/* Simple CSS for loading dots */}
       <style jsx>{`
         .loading-dots {
@@ -836,7 +836,7 @@ const SimpleWorkspace = forwardRef(function SimpleWorkspace({
         .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
         .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
         .loading-dots span:nth-child(3) { animation-delay: 0s; }
-        
+
         @keyframes loading-dots {
           0%, 80%, 100% { transform: scale(0); }
           40% { transform: scale(1); }

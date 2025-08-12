@@ -45,7 +45,7 @@ export default function ChatInput({ onSendMessage, isLoading }) {
       startListening();
     }
   };
-  
+
   useEffect(() => {
     // Focus input after voice input stops and there's a transcript
     if (!isListening && transcript && inputRef.current) {
@@ -65,7 +65,6 @@ export default function ChatInput({ onSendMessage, isLoading }) {
   const sendButtonActive = `bg-[var(--accent-blue)] hover:bg-[var(--accent-blue-hover)]`;
   const sendButtonDisabled = `bg-[var(--accent-blue)]/40 cursor-not-allowed`;
 
-
   return (
     <form onSubmit={handleSubmit} className="w-full">
         <div className="flex items-end space-x-2 sm:space-x-3 relative pb-1">
@@ -74,8 +73,8 @@ export default function ChatInput({ onSendMessage, isLoading }) {
             type="button"
             onClick={handleVoiceToggle}
             disabled={isLoading} // Disable if main send is loading, or add separate voice loading state
-            className={`${voiceButtonBase} 
-              ${isListening 
+            className={`${voiceButtonBase}
+              ${isListening
                 ? voiceButtonActive
                 : voiceButtonInactive
               } disabled:opacity-60 disabled:cursor-not-allowed disabled:!bg-[var(--border-subtle)] disabled:!text-[var(--text-tertiary)] disabled:hover:!bg-[var(--border-subtle)] touch-manipulation`} // More specific disabled style
@@ -122,13 +121,13 @@ export default function ChatInput({ onSendMessage, isLoading }) {
               </div>
             )}
           </div>
-          
+
           {/* Send Button - Themed */}
           <button
             type="submit"
             disabled={isLoading || !message.trim()}
             className={`${sendButtonBase}
-              ${isLoading || !message.trim() 
+              ${isLoading || !message.trim()
                 ? sendButtonDisabled
                 : sendButtonActive
               } touch-manipulation

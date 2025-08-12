@@ -104,7 +104,7 @@ export default function SubjectSettingsPage() {
     const [error, setError] = useState('');
     const [selectedPreset, setSelectedPreset] = useState(null);
     const [showPresets, setShowPresets] = useState(false);
-    
+
     // Custom categories state
     const [customCategories, setCustomCategories] = useState([]);
     const [showCustomCategories, setShowCustomCategories] = useState(false);
@@ -123,17 +123,17 @@ export default function SubjectSettingsPage() {
                 api.get(`/weights/${childSubjectId}`),
                 api.get(`/custom-categories/${childSubjectId}`)
             ]);
-            
+
             // Set custom categories
             setCustomCategories(customCategoriesRes.data || []);
-            
+
             // Fetch subject and child info for context
             try {
                 const [childrenRes, subjectsRes] = await Promise.all([
                     api.get('/children'),
                     api.get('/subjects')
                 ]);
-                
+
                 // Find the child and subject based on the child_subject_id
                 const childSubject = weightsRes.data.find(w => w.child_subject_id == childSubjectId);
                 if (childSubject) {
@@ -149,16 +149,16 @@ export default function SubjectSettingsPage() {
                 setSubjectName('Selected Subject');
                 setChildName('Student');
             }
-            
+
             // Convert weights to percentage format
             const weightsMap = {};
             weightsRes.data.forEach(w => {
                 weightsMap[w.content_type] = Math.round(parseFloat(w.weight) * 100);
             });
-            
+
             // Check if we have any existing weights
             const hasExistingWeights = weightsRes.data.length > 0 && weightsRes.data.some(w => parseFloat(w.weight) > 0);
-            
+
             if (!hasExistingWeights) {
                 // Initialize with default balanced weights that add up to 100%
                 const defaultWeights = {
@@ -196,12 +196,12 @@ export default function SubjectSettingsPage() {
     const handleWeightChange = (contentType, value) => {
         const newValue = parseInt(value) || 0;
         if (newValue < 0 || newValue > 100) return;
-        
+
         setWeights(prev => ({
             ...prev,
             [contentType]: newValue
         }));
-        
+
         // Clear preset selection when manually adjusting
         setSelectedPreset(null);
     };
@@ -221,15 +221,15 @@ export default function SubjectSettingsPage() {
     const autoBalance = () => {
         const activeTypes = Object.entries(weights).filter(([_, weight]) => weight > 0);
         if (activeTypes.length === 0) return;
-        
+
         const equalWeight = Math.floor(100 / activeTypes.length);
         const remainder = 100 - (equalWeight * activeTypes.length);
-        
+
         const newWeights = { ...weights };
         activeTypes.forEach(([type, _], index) => {
             newWeights[type] = equalWeight + (index < remainder ? 1 : 0);
         });
-        
+
         setWeights(newWeights);
         setSelectedPreset(null);
     };
@@ -256,7 +256,7 @@ export default function SubjectSettingsPage() {
     const handleUpdateCategory = async (categoryId, updates) => {
         try {
             const response = await api.put(`/custom-categories/category/${categoryId}`, updates);
-            setCustomCategories(customCategories.map(cat => 
+            setCustomCategories(customCategories.map(cat =>
                 cat.id === categoryId ? response.data : cat
             ));
         } catch (error) {
@@ -301,9 +301,9 @@ export default function SubjectSettingsPage() {
                 content_type,
                 weight: percentage / 100
             }));
-            
+
             await api.post(`/weights/${childSubjectId}`, { weights: weightsArray });
-            
+
             // Show success and redirect
             router.push('/dashboard');
         } catch (err) {
@@ -339,7 +339,7 @@ export default function SubjectSettingsPage() {
                             </Link>
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-900">Grade Weights</h1>
-                                <p className="text-sm text-gray-600">{childName}'s {subjectName}</p>
+                                <p className="text-sm text-gray-600">{childName}&apos;s {subjectName}</p>
                             </div>
                         </div>
                     </div>
@@ -365,7 +365,7 @@ export default function SubjectSettingsPage() {
                             {showPresets ? 'Hide' : 'Show'} Presets
                         </button>
                     </div>
-                    
+
                     {showPresets && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {gradingPresets.map((preset) => (
@@ -398,7 +398,7 @@ export default function SubjectSettingsPage() {
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900">Custom Assignment Categories</h2>
-                            <p className="text-sm text-gray-600 mt-1">Create subject-specific assignment types like "Book Reports" or "Lab Reports"</p>
+                            <p className="text-sm text-gray-600 mt-1">Create subject-specific assignment types like &quot;Book Reports&quot; or &quot;Lab Reports&quot;</p>
                         </div>
                         <button
                             type="button"
@@ -408,7 +408,7 @@ export default function SubjectSettingsPage() {
                             {showCustomCategories ? 'Hide' : 'Show'} Custom Categories
                         </button>
                     </div>
-                    
+
                     {showCustomCategories && (
                         <div className="space-y-4">
                             {/* Add New Category Form */}
@@ -464,7 +464,7 @@ export default function SubjectSettingsPage() {
                                                         <span className="text-sm text-gray-500 ml-2">Custom Category</span>
                                                     </div>
                                                 </div>
-                                                
+
                                                 <div className="flex items-center space-x-4">
                                                     <input
                                                         type="range"
@@ -532,7 +532,7 @@ export default function SubjectSettingsPage() {
                             {allPossibleContentTypes.map((contentType) => {
                                 const weight = weights[contentType] || 0;
                                 const isActive = weight > 0;
-                                
+
                                 return (
                                     <div
                                         key={contentType}
@@ -545,7 +545,7 @@ export default function SubjectSettingsPage() {
                                                 <div className={`${isActive ? 'text-gray-700' : 'text-gray-400'}`}>
                                                     {contentTypeIcons[contentType]}
                                                 </div>
-                                                <label 
+                                                <label
                                                     htmlFor={`weight-${contentType}`}
                                                     className={`font-medium ${
                                                         isActive ? 'text-gray-900' : 'text-gray-500'
@@ -554,7 +554,7 @@ export default function SubjectSettingsPage() {
                                                     {formatContentTypeName(contentType)}
                                                 </label>
                                             </div>
-                                            
+
                                             <div className="flex items-center space-x-4">
                                                 <input
                                                     type="range"

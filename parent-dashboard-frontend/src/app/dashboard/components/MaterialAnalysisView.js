@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { 
+import {
   SparklesIcon,
   PencilIcon,
   CheckIcon,
@@ -11,9 +11,9 @@ import {
  * Rich, editable view of AI analysis results for materials
  * Reusable component for both upload review and material editing
  */
-export default function MaterialAnalysisView({ 
-  analysisData, 
-  isEditable = false, 
+export default function MaterialAnalysisView({
+  analysisData,
+  isEditable = false,
   onDataChange,
   className = ""
 }) {
@@ -44,14 +44,14 @@ export default function MaterialAnalysisView({
 
   const saveEdit = () => {
     if (!editingField || !onDataChange) return;
-    
+
     let newValue = tempValue;
-    
+
     // Handle array fields
     if (['learning_objectives', 'key_terms', 'subject_keywords_or_subtopics', 'prerequisites'].includes(editingField)) {
       newValue = tempValue.split('\n').map(item => item.trim()).filter(Boolean);
     }
-    
+
     onDataChange(editingField, newValue);
     setEditingField(null);
     setTempValue('');
@@ -66,7 +66,7 @@ export default function MaterialAnalysisView({
   const EditableField = ({ fieldName, label, value, isArray = false, isLarge = false }) => {
     const isEditing = editingField === fieldName;
     const displayValue = isArray ? (Array.isArray(value) ? value : []).join('\n') : (value || '');
-    
+
     if (isEditing) {
       return (
         <div>
@@ -144,7 +144,7 @@ export default function MaterialAnalysisView({
           </span>
         )}
       </div>
-      
+
       <div className="space-y-4 text-sm max-h-96 overflow-y-auto">
         {isNewStructuredFormat ? (
           // New structured lesson format
@@ -177,8 +177,8 @@ export default function MaterialAnalysisView({
               <div>
                 <strong>Lesson Introduction:</strong>
                 <div className="ml-4 mt-1 p-2 bg-gray-50 rounded">
-                  {typeof analysis.Introduction === 'object' ? 
-                    analysis.Introduction.Overview || JSON.stringify(analysis.Introduction, null, 2) : 
+                  {typeof analysis.Introduction === 'object' ?
+                    analysis.Introduction.Overview || JSON.stringify(analysis.Introduction, null, 2) :
                     analysis.Introduction}
                 </div>
               </div>
@@ -189,8 +189,8 @@ export default function MaterialAnalysisView({
               <div>
                 <strong>Theme/Topic:</strong>
                 <div className="ml-4 mt-1 p-2 bg-blue-50 rounded">
-                  {typeof analysis.ThemeInfo === 'object' ? 
-                    analysis.ThemeInfo.Discussion || JSON.stringify(analysis.ThemeInfo, null, 2) : 
+                  {typeof analysis.ThemeInfo === 'object' ?
+                    analysis.ThemeInfo.Discussion || JSON.stringify(analysis.ThemeInfo, null, 2) :
                     analysis.ThemeInfo}
                 </div>
               </div>
@@ -201,15 +201,15 @@ export default function MaterialAnalysisView({
               <div>
                 <strong>Main Content Concepts:</strong>
                 <div className="ml-4 mt-1 p-2 bg-green-50 rounded">
-                  {Array.isArray(analysis.TypesOfSentences) ? 
+                  {Array.isArray(analysis.TypesOfSentences) ?
                     analysis.TypesOfSentences.map((item, index) => (
                       <div key={index} className="mb-2">
-                        {typeof item === 'object' ? 
+                        {typeof item === 'object' ?
                           Object.entries(item).map(([key, value]) => (
                             <div key={key}><strong>{key}:</strong> {value}</div>
                           )) : item}
                       </div>
-                    )) : 
+                    )) :
                     JSON.stringify(analysis.TypesOfSentences, null, 2)}
                 </div>
               </div>
@@ -225,7 +225,7 @@ export default function MaterialAnalysisView({
                       <p className="mb-2 font-medium">Practice Sentences:</p>
                       {analysis.GuidedPractice.Exercises.map((exercise, index) => (
                         <div key={index} className="mb-1">
-                          <span className="text-blue-600">"{exercise.Sentence}"</span> - <em>{exercise.Type}</em>
+                          <span className="text-blue-600">&quot;{exercise.Sentence}&quot;</span> - <em>{exercise.Type}</em>
                         </div>
                       ))}
                     </div>
@@ -247,15 +247,15 @@ export default function MaterialAnalysisView({
                       <div className="space-y-1">
                         {analysis.IndependentPractice.Exercises.map((exercise, index) => (
                           <div key={index} className="text-sm">
-                            <span className="text-purple-600">"{exercise.Sentence}"</span> - <em>{exercise.Type}</em>
+                            <span className="text-purple-600">&quot;{exercise.Sentence}&quot;</span> - <em>{exercise.Type}</em>
                           </div>
                         ))}
                       </div>
                     </div>
                   ) : (
                     <div className="text-sm">
-                      {typeof analysis.IndependentPractice === 'string' 
-                        ? analysis.IndependentPractice 
+                      {typeof analysis.IndependentPractice === 'string'
+                        ? analysis.IndependentPractice
                         : JSON.stringify(analysis.IndependentPractice, null, 2)}
                     </div>
                   )}
@@ -400,7 +400,7 @@ export default function MaterialAnalysisView({
             )}
 
             {/* Tasks/Questions (fallback if problems_with_context not available) */}
-            {(!analysis.problems_with_context || analysis.problems_with_context.length === 0) && 
+            {(!analysis.problems_with_context || analysis.problems_with_context.length === 0) &&
              analysis.tasks_or_questions && analysis.tasks_or_questions.length > 0 && (
               <EditableField
                 fieldName="tasks_or_questions"
@@ -437,8 +437,8 @@ export default function MaterialAnalysisView({
               <div>
                 <strong>Answer Key Found:</strong>
                 <div className="mt-1 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                  {typeof analysis.answer_key === 'string' ? 
-                    analysis.answer_key : 
+                  {typeof analysis.answer_key === 'string' ?
+                    analysis.answer_key :
                     JSON.stringify(analysis.answer_key)
                   }
                 </div>

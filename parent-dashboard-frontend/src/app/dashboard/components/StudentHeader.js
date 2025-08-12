@@ -13,7 +13,7 @@ import { useParentNotes } from "../../../hooks/useParentNotes";
 const colorVariants = {
   blue: {
     bg: 'bg-blue-50',
-    text: 'text-blue-600', 
+    text: 'text-blue-600',
     textBold: 'text-blue-700'
   },
   orange: {
@@ -36,7 +36,7 @@ const colorVariants = {
 const StudentHeader = memo(function StudentHeader({ selectedChild, dashboardStats, onAddMaterial }) {
   // Use the global database notes hook (not child-specific)
   const { notes: dbNotes, createNote, deleteNote, updateNote } = useParentNotes(null, true);
-  
+
   // Local state for header-specific functionality
   const [newNoteText, setNewNoteText] = useState("");
 
@@ -44,11 +44,11 @@ const StudentHeader = memo(function StudentHeader({ selectedChild, dashboardStat
   const addNote = async () => {
     if (newNoteText.trim()) {
       try {
-        // Always try to save to database first  
+        // Always try to save to database first
         // Get random color for variety
         const colors = ['yellow', 'blue', 'pink', 'green', 'orange', 'purple'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
-        
+
         await createNote({
           note_text: newNoteText.trim(),
           color: randomColor
@@ -79,21 +79,21 @@ const StudentHeader = memo(function StudentHeader({ selectedChild, dashboardStat
 
   // Calculate progress and stats
   const progressPercent = dashboardStats.totalItems > 0 ? dashboardStats.overallCompletionPercent : 0;
-  const currentDate = new Date().toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    month: 'short', 
-    day: 'numeric' 
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric'
   });
-  
+
   // Calculate weekly progress (this would ideally come from props)
   const weeklyProgress = Math.min(100, Math.round(progressPercent + 10)); // Simplified calculation
-  
+
   return (
     <header className="mb-4 relative">
       {/* Sticky Note Container */}
       <div className="sticky-note-container">
         <div className="sticky-note">
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 h-full">
             {/* Left Section - Student Overview */}
             <div className="space-y-1">
@@ -199,7 +199,7 @@ const StudentHeader = memo(function StudentHeader({ selectedChild, dashboardStat
         .sticky-note-container {
           position: relative;
         }
-        
+
         .sticky-note {
           background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
           border: 1px solid #f59e0b;
@@ -207,28 +207,27 @@ const StudentHeader = memo(function StudentHeader({ selectedChild, dashboardStat
           padding: 16px;
           min-height: 80px;
           transform: rotate(0deg);
-          box-shadow: 
+          box-shadow:
             0 2px 4px rgba(0,0,0,0.1),
             0 4px 8px rgba(0,0,0,0.05),
             inset 0 1px 0 rgba(255,255,255,0.3);
           position: relative;
           transition: transform 0.2s ease;
         }
-        
+
         .sticky-note:hover {
           transform: rotate(0deg);
-          box-shadow: 
+          box-shadow:
             0 4px 8px rgba(0,0,0,0.15),
             0 8px 16px rgba(0,0,0,0.1),
             inset 0 1px 0 rgba(255,255,255,0.3);
         }
-        
-        
+
         .sticky-note-title {
           font-family: 'Comic Sans MS', cursive, sans-serif;
           color: #374151;
         }
-        
+
         .sticky-note-loading {
           background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
           border: 1px solid #f59e0b;
@@ -237,7 +236,7 @@ const StudentHeader = memo(function StudentHeader({ selectedChild, dashboardStat
           min-height: 80px;
           transform: rotate(-0.5deg);
         }
-        
+
         @media (max-width: 768px) {
           .sticky-note {
             transform: rotate(0deg);

@@ -2,15 +2,15 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import ProtectedRoute from '../../components/ProtectedRoute'; 
-import Sidebar from '../../components/Sidebar'; 
+import ProtectedRoute from '../../components/ProtectedRoute';
+import Sidebar from '../../components/Sidebar';
 import ChatHeader from '../../components/ChatHeader';
-import ChatMessage from '../../components/ChatMessage'; 
+import ChatMessage from '../../components/ChatMessage';
 import ChatInput from '../../components/ChatInput';
-import SuggestionBubbles from '../../components/SuggestionBubbles'; 
+import SuggestionBubbles from '../../components/SuggestionBubbles';
 import LessonContextBar from '../../components/LessonContextBar';
 import SimpleWorkspace from '../../components/SimpleWorkspace';
-import { useAuth } from '../../contexts/AuthContext'; 
+import { useAuth } from '../../contexts/AuthContext';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import PaywallOverlay from '../../components/PaywallOverlay';
 import { chatService } from '../../utils/chatService';
@@ -18,9 +18,9 @@ import { analyzeKlioResponse } from '../../utils/workspaceProgress';
 import { WorkspaceActionProcessor } from '../../utils/workspaceActionProcessor';
 
 const INITIAL_SUGGESTIONS = [
-  "Can you help me with my homework? 📚", 
-  "Let's practice math problems! 🧮", 
-  "Tell me a fun fact! ☀️", 
+  "Can you help me with my homework? 📚",
+  "Let's practice math problems! 🧮",
+  "Tell me a fun fact! ☀️",
   "Can we play a learning game? 🎮"
 ];
 
@@ -37,31 +37,31 @@ export default function ChatPage() {
   const [isKlioTyping, setIsKlioTyping] = useState(false);
   const [currentTopic, setCurrentTopic] = useState("General Conversation");
   const [currentLessonContext, setCurrentLessonContext] = useState(null);
-  
+
   // Learning stats state
   const [learningStats, setLearningStats] = useState({
     streak: 0,
     todaysPracticeCount: 0,
     totalCorrectAnswers: 0
   });
-  
+
   // Workspace state
   const [workspaceContent, setWorkspaceContent] = useState(null);
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(false);
   const workspaceRef = useRef(null); // Reference to workspace component
-  
+
   // 🧠 NEW: Adaptive Intelligence State - Focus on tutoring quality
   const [adaptiveData, setAdaptiveData] = useState(null);
   const [studentProfile, setStudentProfile] = useState(null);
   const [dynamicSuggestions, setDynamicSuggestions] = useState([]);
-  
+
   // 🎯 Enhanced Workspace State
   const [workspaceActivity, setWorkspaceActivity] = useState(Date.now());
   const [workspacePreferences, setWorkspacePreferences] = useState({
     autoCollapse: true,
     preferredSize: 'adaptive'
   });
-  
+
   // Add workspace action processor
   const workspaceActionProcessorRef = useRef(null);
   const currentChildIdRef = useRef(null);
@@ -102,11 +102,11 @@ export default function ChatPage() {
   // Load initial messages - FIXED: child-specific storage
   useEffect(() => {
     if (!child?.id) return; // Wait for child data
-    
+
     const childSpecificKey = `klio_chat_history_${child.id}`;
     const savedMessages = sessionStorage.getItem(childSpecificKey);
     let initialMessages = [];
-    
+
     if (savedMessages) {
       try {
         const parsed = JSON.parse(savedMessages);
@@ -124,7 +124,7 @@ export default function ChatPage() {
         timestamp: new Date().toISOString()
       }];
     }
-    
+
     setMessages(initialMessages);
     setShowSuggestions(initialMessages.length <= 1);
   }, [child?.name, child?.id]);
@@ -137,7 +137,7 @@ export default function ChatPage() {
           chatService.getSuggestions(),
           fetchLearningStats()
         ]);
-        
+
         setSuggestions(suggestionsData.suggestions || INITIAL_SUGGESTIONS);
         if (statsData) setLearningStats(statsData);
       } catch (error) {
@@ -145,7 +145,7 @@ export default function ChatPage() {
         setSuggestions(INITIAL_SUGGESTIONS);
       }
     };
-    
+
     if (child?.id) {
       fetchInitialData();
     }
@@ -159,7 +159,7 @@ export default function ChatPage() {
           'Authorization': `Bearer ${localStorage.getItem('klio_access_token')}`
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         return {
@@ -185,12 +185,12 @@ export default function ChatPage() {
   // Auto-scroll to bottom
   useEffect(() => {
     if (!chatContainerRef.current) return;
-    
+
     const { scrollHeight, clientHeight, scrollTop } = chatContainerRef.current;
     const isScrolledToBottom = scrollHeight - clientHeight <= scrollTop + 150;
     const lastMessage = messages[messages.length - 1];
-    const shouldScroll = isScrolledToBottom || 
-                        (lastMessage && lastMessage.role === 'klio') || 
+    const shouldScroll = isScrolledToBottom ||
+                        (lastMessage && lastMessage.role === 'klio') ||
                         isKlioTyping;
 
     if (shouldScroll) {
@@ -202,14 +202,14 @@ export default function ChatPage() {
 
   // LEGACY: Handle workspace content for backward compatibility
   const handleSendToWorkspace = (message, structuredContent = null) => {
-    
+
     // For function calling, this is mostly used for manual workspace creation
     const problems = [];
-    
+
     // Look for simple patterns like "7 + 5" or "What is 7 + 5?"
     const simplePattern = /what\s+is\s+(\d+\s*[\+\-\*×÷\/]\s*\d+)/gi;
     const matches = message.content.match(simplePattern);
-    
+
     if (matches) {
       matches.forEach((match, index) => {
         const cleanMatch = match.replace(/what\s+is\s+/i, '').trim();
@@ -245,7 +245,7 @@ export default function ChatPage() {
     const checkInactivity = () => {
       const timeSinceActivity = Date.now() - workspaceActivity;
       const inactivityThreshold = studentProfile?.confidence_level === 'low' ? 180000 : 300000; // 3-5 minutes
-      
+
       if (timeSinceActivity > inactivityThreshold && !isWorkspaceExpanded) {
         setWorkspaceContent(null);
       }
@@ -260,19 +260,18 @@ export default function ChatPage() {
     setWorkspaceActivity(Date.now());
   };
 
-
   const handleSendMessage = async (messageText) => {
     if (!messageText.trim() || isLoading) return;
-    
+
     setShowSuggestions(false);
-    
+
     const userMessage = {
       id: `msg-${Date.now()}-child`,
       role: 'child',
       content: messageText,
       timestamp: new Date().toISOString(),
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
     setIsKlioTyping(true);
     setIsLoading(true);
@@ -286,10 +285,10 @@ export default function ChatPage() {
       // 🧠 Process Adaptive Intelligence Data - Focus on tutoring quality
       if (response.adaptiveIntelligence) {
         // Apply adaptive intelligence to UI
-        
+
         setAdaptiveData(response.adaptiveIntelligence);
         setStudentProfile(response.adaptiveIntelligence.studentProfile);
-        
+
         // Update dynamic suggestions based on student profile and needs
         if (response.adaptiveIntelligence.contextualSuggestions) {
           setDynamicSuggestions(response.adaptiveIntelligence.contextualSuggestions);
@@ -308,7 +307,7 @@ export default function ChatPage() {
         // NEW: Store adaptive intelligence data
         adaptiveIntelligence: response.adaptiveIntelligence || null,
       };
-      
+
       setMessages(prev => [...prev, klioMessage]);
 
       // Handle lesson context
@@ -318,14 +317,14 @@ export default function ChatPage() {
 
       // ENHANCED: Process function calling workspace actions
       if (response.workspaceActions && response.workspaceActions.length > 0) {
-        
+
         const processor = workspaceActionProcessorRef.current;
         if (processor) {
           const updatedWorkspace = processor.processWorkspaceActions(
             response.workspaceActions,
             response.currentWorkspace
           );
-          
+
           // Update learning stats if any problems were marked correct
           const correctActions = response.workspaceActions.filter(action => action.action === 'mark_correct') || [];
           if (correctActions.length > 0) {
@@ -334,7 +333,7 @@ export default function ChatPage() {
               if (stats) setLearningStats(stats);
             });
           }
-          
+
         }
       } else {
       }
@@ -371,24 +370,24 @@ export default function ChatPage() {
   // New Chat function - clears current chat and starts fresh
   const handleNewChat = () => {
     if (!child?.id) return;
-    
+
     const welcomeMessage = {
       id: 'welcome-new',
       role: 'klio',
       content: `Hi ${child.name}! 👋 Ready for a new learning session? What would you like to explore today?`,
       timestamp: new Date().toISOString()
     };
-    
+
     setMessages([welcomeMessage]);
     setShowSuggestions(true);
     setCurrentTopic("General Conversation");
     setCurrentLessonContext(null);
     setWorkspaceContent(null);
-    
+
     // Clear child-specific storage
     const childSpecificKey = `klio_chat_history_${child.id}`;
     sessionStorage.setItem(childSpecificKey, JSON.stringify([welcomeMessage]));
-    
+
   };
 
   const handleClearChat = () => {
@@ -424,12 +423,12 @@ export default function ChatPage() {
   // 🧠 Adaptive workspace sizing based on student confidence and needs
   const getAdaptiveWorkspaceSize = () => {
     if (!workspaceContent) return { chat: 'w-full', workspace: 'w-1/2' };
-    
+
     // Always use half-and-half layout when workspace is expanded
     if (isWorkspaceExpanded) {
       return { chat: 'w-1/2', workspace: 'w-1/2' };
     }
-    
+
     // When workspace is collapsed, give full width to chat
     return { chat: 'w-full', workspace: 'w-1/2' };
   };
@@ -451,7 +450,7 @@ export default function ChatPage() {
         </div>
 
         <main className={`flex-1 flex flex-col bg-[var(--background-card)] overflow-hidden transition-all duration-300 ${workspaceContent && isWorkspaceExpanded ? chatWidth : 'w-full'}`}>
-          <ChatHeader 
+          <ChatHeader
             learningStreak={learningStats.streak}
             todaysPracticeCount={learningStats.todaysPracticeCount}
             hasWorkspace={!!workspaceContent}
@@ -467,8 +466,8 @@ export default function ChatPage() {
             />
           )}
 
-          <div 
-            ref={chatContainerRef} 
+          <div
+            ref={chatContainerRef}
             className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 bg-[var(--background-main)]"
             role="log"
             aria-label="Chat conversation"
@@ -508,7 +507,7 @@ export default function ChatPage() {
             )}
             <div ref={messagesEndRef} className="h-1" aria-hidden="true"/>
           </div>
-          
+
           {showSuggestions && (suggestions.length > 0 || dynamicSuggestions.length > 0) && (
              <div className="w-full flex justify-center px-3 sm:px-4 md:px-6 pb-2 pt-1 border-t border-[var(--border-subtle)] bg-[var(--background-card)]">
                 <div className="max-w-3xl w-full">
@@ -523,7 +522,6 @@ export default function ChatPage() {
             </div>
           )}
 
-
           <div className="bg-[var(--background-card)] p-3 sm:p-4 border-t border-[var(--border-subtle)] safe-area-inset-bottom">
             <div className="max-w-3xl mx-auto">
                 <ChatInput
@@ -536,31 +534,31 @@ export default function ChatPage() {
 
         <AnimatePresence mode="wait">
           {workspaceContent && (
-            <motion.div 
-              initial={{ 
-                x: '100%', 
+            <motion.div
+              initial={{
+                x: '100%',
                 opacity: 0,
                 scale: 0.95
               }}
-              animate={{ 
-                x: isWorkspaceExpanded ? 0 : '100%', 
+              animate={{
+                x: isWorkspaceExpanded ? 0 : '100%',
                 opacity: isWorkspaceExpanded ? 1 : 0,
                 scale: isWorkspaceExpanded ? 1 : 0.95
               }}
-              exit={{ 
-                x: '100%', 
+              exit={{
+                x: '100%',
                 opacity: 0,
                 scale: 0.95
               }}
-              transition={{ 
-                type: 'spring', 
-                stiffness: 200, 
+              transition={{
+                type: 'spring',
+                stiffness: 200,
                 damping: 25,
                 duration: 0.4
               }}
               className={`${workspaceWidth} bg-[var(--background-card)] border-l-2 border-[var(--accent-blue)] transition-all duration-500 ease-in-out shadow-xl`}
             >
-              <SimpleWorkspace 
+              <SimpleWorkspace
                 workspaceContent={workspaceContent}
                 isExpanded={isWorkspaceExpanded}
                 onClose={() => setWorkspaceContent(null)}

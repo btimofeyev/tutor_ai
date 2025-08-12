@@ -39,7 +39,7 @@ export default function SignupPage() {
         </h2>
         <Auth
           supabaseClient={supabase}
-          appearance={{ 
+          appearance={{
             theme: ThemeMinimal,
             variables: {
               default: {

@@ -1,8 +1,29 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(
+// Service role client - USE SPARINGLY, only for admin operations
+const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
 );
 
-module.exports = supabase;
+// Anon client - Respects RLS policies, safer for most operations
+const supabasePublic = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+// Log usage warning
+if (process.env.NODE_ENV !== 'test') {
+  console.warn('🔒 SECURITY: Using service role client. Ensure RLS policies are properly configured.');
+}
+
+// Export admin client as default for backward compatibility, but encourage using specific clients
+module.exports = supabaseAdmin;
+module.exports.supabaseAdmin = supabaseAdmin;
+module.exports.supabasePublic = supabasePublic;

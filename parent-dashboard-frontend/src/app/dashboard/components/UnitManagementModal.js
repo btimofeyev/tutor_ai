@@ -4,10 +4,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { 
-  XMarkIcon, 
-  PlusCircleIcon, 
-  PencilIcon, 
+import {
+  XMarkIcon,
+  PlusCircleIcon,
+  PencilIcon,
   TrashIcon,
   ListBulletIcon,
   PlusIcon
@@ -51,7 +51,7 @@ export default function UnitManagementModal({
     if (isOpen) {
       // Store the currently focused element
       previousFocusRef.current = document.activeElement;
-      
+
       // Set up focus trap when modal opens
       if (modalRef.current) {
         const cleanup = focusManagement.trapFocus(modalRef.current);
@@ -66,23 +66,23 @@ export default function UnitManagementModal({
   if (!isOpen || !managingUnitsForSubject) return null;
 
   return (
-    <div 
-      className={modalBackdropStyles} 
+    <div
+      className={modalBackdropStyles}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
-      <div 
+      <div
         ref={modalRef}
-        className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden border border-gray-200" 
+        className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className={modalHeaderStyles}>
           <div className="flex items-center justify-between">
             <div>
-              <h2 
+              <h2
                 id="modal-title"
                 className="text-xl font-bold text-gray-900"
               >
@@ -112,7 +112,7 @@ export default function UnitManagementModal({
                 <PlusCircleIcon className="h-5 w-5 text-blue-600 mr-2" />
                 Add New Chapters
               </h3>
-              
+
               {/* Bulk Creation Form */}
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -147,7 +147,7 @@ export default function UnitManagementModal({
                     </select>
                   </div>
                 </div>
-                
+
                 {bulkUnitCount > 1 && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <p className="text-sm text-blue-800 mb-2">
@@ -163,12 +163,12 @@ export default function UnitManagementModal({
                     </div>
                   </div>
                 )}
-                
+
                 <button
                   onClick={onBulkAddUnits}
                   type="button"
-                  style={{ 
-                    backgroundColor: 'var(--accent-yellow)', 
+                  style={{
+                    backgroundColor: 'var(--accent-yellow)',
                     color: 'var(--text-primary)',
                     border: '1px solid transparent',
                     borderRadius: 'var(--radius-md)',
@@ -193,7 +193,7 @@ export default function UnitManagementModal({
               <span className="mr-2">📋</span>
               Current Chapters ({currentSubjectUnitsInModal.length})
             </h3>
-            
+
             {currentSubjectUnitsInModal.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-gray-400 text-6xl mb-4">📚</div>
@@ -315,7 +315,7 @@ export default function UnitManagementModal({
                           </button>
                         </div>
                       </div>
-                      
+
                       {/* Lesson Groups Section */}
                       {expandedUnitsInModal[unit.id] && (
                         <div className="mt-4 pt-4 border-t border-gray-200">
@@ -329,7 +329,7 @@ export default function UnitManagementModal({
                               Add Group
                             </button>
                           </div>
-                          
+
                           {/* Add New Lesson Group Form */}
                           {creatingLessonGroupForUnit === unit.id && (
                             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -360,7 +360,7 @@ export default function UnitManagementModal({
                               </div>
                             </div>
                           )}
-                          
+
                           {/* Existing Lesson Groups */}
                           <div className="space-y-2">
                             {(childrenData.lessonsByUnit[unit.id] || []).length === 0 ? (

@@ -3,7 +3,7 @@
 import React from 'react';
 
 export const SkeletonLine = ({ width = "100%", height = "16px", className = "" }) => (
-  <div 
+  <div
     className={`bg-gray-200 rounded animate-pulse ${className}`}
     style={{ width, height }}
   />
@@ -22,7 +22,7 @@ export const SubjectCardSkeleton = () => (
       <SkeletonLine width="200px" height="24px" />
       <SkeletonLine width="80px" height="20px" />
     </div>
-    
+
     {/* Stats */}
     <div className="flex gap-6">
       <div className="space-y-1">
@@ -38,7 +38,7 @@ export const SubjectCardSkeleton = () => (
         <SkeletonLine width="45px" height="16px" />
       </div>
     </div>
-    
+
     {/* Units */}
     <div className="space-y-3">
       {[1, 2, 3].map(i => (
@@ -67,7 +67,7 @@ export const CurriculumSkeletonLoader = () => (
       <SkeletonLine width="200px" height="28px" />
       <SkeletonLine width="120px" height="36px" />
     </div>
-    
+
     {[1, 2, 3].map(i => (
       <SubjectCardSkeleton key={i} />
     ))}

@@ -19,7 +19,7 @@ const DashboardFilters = memo(function DashboardFilters({
   setSearchTerm
 }) {
   return (
-    <section 
+    <section
       className={`my-6 ${cardStyles} p-4`}
       role="search"
       aria-label="Filter and sort assignments"
@@ -59,7 +59,7 @@ const DashboardFilters = memo(function DashboardFilters({
           </div>
         </div>
       )} */}
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
         <div>
           <label
@@ -69,8 +69,8 @@ const DashboardFilters = memo(function DashboardFilters({
             Show Me
           </label>
           <select
-            {...formA11y.fieldProps('Status Filter', { 
-              helpText: 'Filter assignments by completion status' 
+            {...formA11y.fieldProps('Status Filter', {
+              helpText: 'Filter assignments by completion status'
             })}
             id="filterStatus"
             value={filterStatus}
@@ -96,8 +96,8 @@ const DashboardFilters = memo(function DashboardFilters({
             Type of Work
           </label>
           <select
-            {...formA11y.fieldProps('Content Type Filter', { 
-              helpText: 'Filter assignments by type of work' 
+            {...formA11y.fieldProps('Content Type Filter', {
+              helpText: 'Filter assignments by type of work'
             })}
             id="filterContentType"
             value={filterContentType}
@@ -121,8 +121,8 @@ const DashboardFilters = memo(function DashboardFilters({
             Order By
           </label>
           <select
-            {...formA11y.fieldProps('Sort Order', { 
-              helpText: 'Sort assignments by different criteria' 
+            {...formA11y.fieldProps('Sort Order', {
+              helpText: 'Sort assignments by different criteria'
             })}
             id="sortBy"
             value={sortBy}

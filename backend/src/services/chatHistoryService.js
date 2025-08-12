@@ -1,9 +1,10 @@
 // Enhanced Chat History Service with Summarization and Cleanup
 const supabase = require('../utils/supabaseClient');
 const OpenAI = require('openai');
+const keyManager = require('../utils/secureKeys');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: keyManager.getOpenAIKey(),
 });
 
 class ChatHistoryService {

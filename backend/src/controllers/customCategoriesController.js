@@ -181,8 +181,8 @@ exports.deleteCustomCategory = async (req, res) => {
         if (checkError) throw checkError;
 
         if (materialsUsing && materialsUsing.length > 0) {
-            return res.status(400).json({ 
-                error: 'Cannot delete category that is being used by materials. Please reassign or delete those materials first.' 
+            return res.status(400).json({
+                error: 'Cannot delete category that is being used by materials. Please reassign or delete those materials first.'
             });
         }
 

@@ -73,7 +73,7 @@ export default function QuickActions({ onActionClick, isVisible = true }) {
             Choose what you&apos;d like to work on
           </span>
         </div>
-        
+
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           {QUICK_ACTIONS.map((action, index) => (
             <motion.button

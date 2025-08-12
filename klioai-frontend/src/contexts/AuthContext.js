@@ -22,7 +22,7 @@ export function AuthProvider({ children }) {
       try {
         if (authService.isAuthenticated()) {
           setChild(authService.getChild());
-          
+
           // Validate session with backend (optional validation)
           try {
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/child/session`, {

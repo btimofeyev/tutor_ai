@@ -5,6 +5,7 @@ import { SparklesIcon, UserGroupIcon, AcademicCapIcon, ArrowRightIcon } from '@h
 import Button from './ui/Button';
 import api from '../utils/api';
 import { PRICE_IDS } from '../utils/subscriptionConstants';
+import { ComingSoonBadge } from './ComingSoonOverlay';
 
 export default function SubscriptionManager({
   childrenList = [], // Represents the list of children, used for childCount
@@ -149,13 +150,14 @@ export default function SubscriptionManager({
 
             <div className="space-y-1">
               <Button
-                variant="primaryGradient"
+                variant="secondary"
                 size="sm"
-                onClick={() => handleUpgrade(PRICE_IDS.klio_addon)}
-                disabled={upgrading}
-                className="w-full !text-xs !py-1.5"
+                onClick={() => {}} // Disabled
+                disabled={true}
+                className="w-full !text-xs !py-1.5 opacity-60 cursor-not-allowed"
+                title="AI Pack is currently in development"
               >
-                <SparklesIcon className="h-3.5 w-3.5 mr-1"/> Add AI Pack
+                <SparklesIcon className="h-3.5 w-3.5 mr-1"/> AI Pack (Coming Soon)
               </Button>
               <Button
                 variant="secondary"
@@ -228,16 +230,42 @@ export default function SubscriptionManager({
             <SparklesIcon className="h-12 w-12 text-accent-blue mx-auto mb-4" />
             <h3 className="text-xl font-semibold mb-2">Unlock Klio AI Features</h3>
             <p className="text-text-secondary mb-4">
-              {childCount <= 1 ? "Add AI tutoring to your current student." : "Upgrade to Family for AI and more children."}
+              {childCount <= 1 ? (
+                <>
+                  AI tutoring features are coming soon! Meanwhile, upgrade to Family Plan for multiple children and advanced features.
+                </>
+              ) : (
+                "Upgrade to Family for more children and advanced features."
+              )}
             </p>
             <div className="flex gap-2 justify-center">
-              <Button
-                variant="primary"
-                onClick={() => handleUpgrade(childCount <= 1 ? PRICE_IDS.klio_addon : PRICE_IDS.family)}
-                disabled={upgrading}
-              >
-                {childCount <= 1 ? "Add Klio AI Pack" : "Upgrade to Family Plan"}
-              </Button>
+              {childCount <= 1 ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    disabled={true}
+                    className="opacity-60 cursor-not-allowed"
+                    title="AI features are currently in development"
+                  >
+                    Klio AI Pack (Coming Soon)
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() => handleUpgrade(PRICE_IDS.family)}
+                    disabled={upgrading}
+                  >
+                    Upgrade to Family Plan
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="primary"
+                  onClick={() => handleUpgrade(PRICE_IDS.family)}
+                  disabled={upgrading}
+                >
+                  Upgrade to Family Plan
+                </Button>
+              )}
               <Button as="link" href="/pricing" variant="outline">Compare Plans</Button>
             </div>
           </div>

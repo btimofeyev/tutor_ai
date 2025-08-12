@@ -15,6 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Button from '../../components/ui/Button';
 import api from '../../utils/api';
+import { ComingSoonBadge } from '../../components/ComingSoonOverlay';
 
 const PRICE_IDS = {
   klio_addon: 'price_1RVZczD8TZAZUMMAQWokffCi',
@@ -123,12 +124,13 @@ export default function PricingPage() {
       limitations: [
         'Still limited to 1 child'
       ],
-      buttonText: 'Add AI Tutoring',
-      buttonAction: () => handleUpgrade(PRICE_IDS.klio_addon, 'klio_addon'),
+      buttonText: 'Coming Soon',
+      buttonAction: null, // Disabled for now
       highlighted: false,
-      available: true,
+      available: false, // Mark as unavailable
       popular: true,
-      isAddOn: true
+      isAddOn: true,
+      isComingSoon: true // New flag for coming soon features
     },
     {
       name: 'Family Plan',
@@ -310,10 +312,14 @@ export default function PricingPage() {
               >
                 {plan.isAddOn && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <div className="bg-accent-blue text-text-primary px-3 py-1 rounded-full text-xs font-semibold flex items-center">
-                      <SparklesIcon className="h-3 w-3 mr-1" />
-                      Add-On Pack
-                    </div>
+                    {plan.isComingSoon ? (
+                      <ComingSoonBadge className="px-3 py-1" />
+                    ) : (
+                      <div className="bg-accent-blue text-text-primary px-3 py-1 rounded-full text-xs font-semibold flex items-center">
+                        <SparklesIcon className="h-3 w-3 mr-1" />
+                        Add-On Pack
+                      </div>
+                    )}
                   </div>
                 )}
                 {plan.popular && !plan.isAddOn && (
@@ -337,6 +343,11 @@ export default function PricingPage() {
                     )}
                   </div>
                   <p className="text-sm text-text-secondary">{plan.description}</p>
+                  {plan.isComingSoon && (
+                    <p className="text-xs text-blue-600 mt-2 font-medium">
+                      🚀 Currently in development - launching soon!
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex-grow mb-6">

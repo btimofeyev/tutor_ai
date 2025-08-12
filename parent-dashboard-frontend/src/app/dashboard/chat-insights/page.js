@@ -7,6 +7,7 @@ import ConversationSummariesView from './components/ConversationSummariesView';
 import { useChildrenData } from '../../../hooks/useChildrenData';
 import { useSubscription } from '../../../hooks/useSubscription';
 import { useSession } from '@supabase/auth-helpers-react';
+import { ComingSoonBanner } from '../../../components/ComingSoonOverlay';
 import {
   ChatBubbleLeftRightIcon,
   InformationCircleIcon,
@@ -135,13 +136,21 @@ export default function ChatInsightsPage() {
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-7xl mx-auto">
-            {/* Loading State */}
-            {childrenData.loading && (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="ml-3 text-gray-600">Loading children data...</span>
-              </div>
-            )}
+            
+            {/* Coming Soon Banner */}
+            <ComingSoonBanner 
+              message="Chat Insights are currently in development! This feature will provide daily summaries of your child's AI tutoring conversations, learning progress, and suggested action items. Coming soon with the launch of Klio AI tutoring."
+              className="mb-6"
+            />
+            {/* Preview Content - Disabled */}
+            <div className="opacity-30 pointer-events-none">
+              {/* Loading State */}
+              {childrenData.loading && (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <span className="ml-3 text-gray-600">Loading children data...</span>
+                </div>
+              )}
 
             {/* Error State */}
             {childrenData.error && (
@@ -184,6 +193,7 @@ export default function ChatInsightsPage() {
                 refreshTrigger={refreshTrigger}
               />
             )}
+            </div>
           </div>
         </div>
 

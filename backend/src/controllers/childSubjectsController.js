@@ -196,7 +196,7 @@ exports.unassignSubjectFromChild = ResponseHelpers.asyncHandler(async (req, res)
 
 // Unassign by child_subject_id (alternative endpoint)
 exports.unassignByChildSubjectId = async (req, res) => {
-  const parent_id = getParentId(req);
+  const parent_id = ControllerHelpers.getParentId(req);
   const { child_subject_id } = req.params;
 
   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
@@ -245,7 +245,7 @@ exports.unassignByChildSubjectId = async (req, res) => {
 
 // List all assigned subjects for a child
 exports.listSubjectsForChild = async (req, res) => {
-  const parent_id = getParentId(req);
+  const parent_id = ControllerHelpers.getParentId(req);
   const { child_id } = req.params;
 
   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
@@ -253,7 +253,7 @@ exports.listSubjectsForChild = async (req, res) => {
 
   try {
     // Verify parent owns the child
-    const ownsChild = await verifyChildOwnership(parent_id, child_id);
+    const ownsChild = await ControllerHelpers.verifyChildOwnership(parent_id, child_id);
     if (!ownsChild) {
       return res.status(403).json({ error: 'Access denied to this child' });
     }
@@ -297,7 +297,7 @@ exports.listSubjectsForChild = async (req, res) => {
 
 // Update custom subject name override
 exports.updateCustomSubjectName = async (req, res) => {
-  const parent_id = getParentId(req);
+  const parent_id = ControllerHelpers.getParentId(req);
   const { child_subject_id } = req.params;
   const { custom_subject_name_override } = req.body;
 
@@ -347,7 +347,7 @@ exports.updateCustomSubjectName = async (req, res) => {
 
 // Get child subject details (used by subject settings page)
 exports.getChildSubjectDetails = async (req, res) => {
-  const parent_id = getParentId(req);
+  const parent_id = ControllerHelpers.getParentId(req);
   const { child_subject_id } = req.params;
 
   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });

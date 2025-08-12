@@ -1,6 +1,7 @@
 // app/dashboard/components/ChildLoginSettingsModal.js
 'use client';
 import React from 'react';
+import ComingSoonOverlay from '../../../components/ComingSoonOverlay';
 
 export default function ChildLoginSettingsModal({
   child, // The child object being edited
@@ -25,7 +26,7 @@ export default function ChildLoginSettingsModal({
       <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md relative">
         <button
             onClick={onClose}
-            className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-2xl p-1 rounded-full hover:bg-gray-100"
+            className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-2xl p-1 rounded-full hover:bg-gray-100 z-10"
             aria-label="Close modal"
         >
             × {/* Or <XMarkIcon className="h-6 w-6" /> */}
@@ -33,10 +34,19 @@ export default function ChildLoginSettingsModal({
         <h3 className="text-xl font-semibold mb-1 text-gray-800">Login Settings</h3>
         <p className="text-sm text-gray-500 mb-4">For <span className="font-medium text-blue-600">{child.name}</span></p>
 
-        {errorMsg && <p className="text-red-600 text-sm mb-3 p-2 bg-red-50 rounded">{errorMsg}</p>}
-        {successMsg && <p className="text-green-600 text-sm mb-3 p-2 bg-green-50 rounded">{successMsg}</p>}
+        {/* Coming Soon Overlay */}
+        <ComingSoonOverlay
+          title="Child Login Coming Soon!"
+          message={`We're building a secure login system for ${child.name}. This feature will allow your child to access their personalized learning dashboard with their own credentials.`}
+          iconType="rocket"
+        />
 
-        <div className="space-y-5">
+        {/* Hidden original content - will be enabled when feature is ready */}
+        <div className="opacity-20 pointer-events-none">
+          {errorMsg && <p className="text-red-600 text-sm mb-3 p-2 bg-red-50 rounded">{errorMsg}</p>}
+          {successMsg && <p className="text-green-600 text-sm mb-3 p-2 bg-green-50 rounded">{successMsg}</p>}
+
+          <div className="space-y-5">
           {/* Username Section */}
           <div className="p-3 border rounded-md">
             <label htmlFor="childUsername" className="block text-sm font-medium text-gray-700">Username</label>
@@ -94,8 +104,9 @@ export default function ChildLoginSettingsModal({
               {isSaving ? "Saving PIN..." : (child.access_pin_hash ? "Update PIN" : "Set PIN")}
             </button>
           </div>
+          </div>
+          {/* <button onClick={onClose} className="mt-6 w-full text-sm text-gray-600 hover:text-gray-800 py-2 bg-gray-100 rounded-md">Close</button> */}
         </div>
-        {/* <button onClick={onClose} className="mt-6 w-full text-sm text-gray-600 hover:text-gray-800 py-2 bg-gray-100 rounded-md">Close</button> */}
       </div>
     </div>
   );

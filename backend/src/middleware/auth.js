@@ -1,4 +1,4 @@
-const supabase = require('../utils/supabaseClient');
+const { supabasePublic } = require('../utils/supabaseClient');
 
 /**
  * Middleware to authenticate a parent user.
@@ -16,8 +16,8 @@ const authenticateParent = async (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
-    // Verify the token with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Verify the token with Supabase using the public client
+    const { data: { user }, error } = await supabasePublic.auth.getUser(token);
 
     if (error || !user) {
       console.error('Authentication error:', error);

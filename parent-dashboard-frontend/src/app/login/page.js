@@ -45,19 +45,23 @@ export default function LoginPage() {
             variables: {
               default: {
                 colors: {
-                  brand: 'var(--accent-blue)',
-                  brandAccent: 'var(--accent-blue-hover, #A1D4EE)',
-                  defaultButtonBackground: 'var(--accent-blue)',
-                  defaultButtonBackgroundHover: 'var(--accent-blue-hover, #A1D4EE)',
-                  inputBackground: 'var(--background-card)',
-                  inputBorder: 'var(--border-input)',
-                  inputBorderHover: 'var(--border-input)',
-                  inputBorderFocus: 'var(--accent-blue)',
-                  inputText: 'var(--text-primary)',
-                  inputLabelText: 'var(--text-secondary)',
-                  inputPlaceholder: 'var(--text-tertiary)',
-                  messageText: 'var(--text-secondary)',
-                  messageTextDanger: '#FF3B30', // Accent red
+                  brand: '#3b82f6',
+                  brandAccent: '#2563eb',
+                  brandButtonText: 'white',
+                  defaultButtonBackground: '#3b82f6',
+                  defaultButtonBackgroundHover: '#2563eb', 
+                  defaultButtonText: 'white',
+                  defaultButtonBorder: '#3b82f6',
+                  defaultButtonBorderHover: '#2563eb',
+                  inputBackground: '#ffffff',
+                  inputBorder: '#d1d5db',
+                  inputBorderHover: '#d1d5db',
+                  inputBorderFocus: '#3b82f6',
+                  inputText: '#374151',
+                  inputLabelText: '#6b7280',
+                  inputPlaceholder: '#9ca3af',
+                  messageText: '#6b7280',
+                  messageTextDanger: '#ef4444'
                 },
                 fonts: {
                   bodyFont: 'var(--font-main)',

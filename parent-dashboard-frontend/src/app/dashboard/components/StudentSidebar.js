@@ -303,17 +303,7 @@ export default function StudentSidebar({
         )}
       </div>
 
-      <div className="p-4 border-t border-border-subtle mt-auto space-y-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDataCleanup}
-          disabled={isCleaningData}
-          className="w-full text-xs !text-orange-600 hover:!bg-orange-50"
-          title="Clean up orphaned lessons and refresh data"
-        >
-          {isCleaningData ? '🔄 Cleaning...' : '🧹 Clean Data'}
-        </Button>
+      <div className="p-4 border-t border-border-subtle mt-auto">
         <Button
           as="link"
           href="/logout"

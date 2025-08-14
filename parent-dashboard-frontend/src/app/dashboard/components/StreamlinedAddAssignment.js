@@ -10,7 +10,8 @@ import {
   PencilIcon,
   HashtagIcon,
   ClockIcon,
-  CalendarIcon
+  CalendarIcon,
+  CameraIcon
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
 import api from '../../../utils/api';
@@ -740,19 +741,48 @@ export default function StreamlinedAddAssignment({
           {useAiMode ? (
             /* AI Mode: File Upload */
             <div className="space-y-4">
-              <div>
-                <label className={labelClasses}>Upload Assignment File *</label>
-                <input
-                  type="file"
-                  onChange={handleFileChange}
-                  className={inputClasses}
-                  accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif"
-                  required
-                />
+              <div className="space-y-3">
+                {/* Mobile Camera Button */}
+                <div className="sm:hidden">
+                  <label className="flex flex-col items-center justify-center w-full p-6 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors bg-gray-50 hover:bg-gray-100">
+                    <CameraIcon className="h-10 w-10 mb-3 text-gray-400" />
+                    <span className="text-lg font-medium text-gray-900 mb-1">Take Photo</span>
+                    <span className="text-sm text-gray-500">Capture assignment with camera</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {/* Desktop File Upload + Mobile Alternative */}
+                <div>
+                  <label className={labelClasses}>
+                    <span className="hidden sm:inline">Upload Assignment File *</span>
+                    <span className="sm:hidden">Or Choose File *</span>
+                  </label>
+                  <input
+                    type="file"
+                    onChange={handleFileChange}
+                    className={inputClasses}
+                    accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif"
+                    required
+                  />
+                </div>
+
+                {/* File Preview */}
                 {(formData.files || []).length > 0 && (
-                  <p className="text-sm text-gray-600 mt-2">
-                    Selected: {(formData.files || [])[0]?.name}
-                  </p>
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm font-medium text-green-800 mb-1">
+                      ✓ File Selected
+                    </p>
+                    <p className="text-sm text-green-700">
+                      {(formData.files || [])[0]?.name}
+                    </p>
+                  </div>
                 )}
               </div>
 

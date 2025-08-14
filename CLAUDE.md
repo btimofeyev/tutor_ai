@@ -73,13 +73,10 @@ NEXT_PUBLIC_API_URL=https://klioai.com/api
 ```bash
 cd /root/klioai/backend
 npm install                    # Install dependencies
-npm start                     # Start development server (local development)
-npm run dev                   # Alternative development command
-
-# PM2 commands are for PRODUCTION ONLY:
-pm2 start src/server.js --name klioai  # Start with PM2 (PRODUCTION)
-pm2 logs klioai               # View logs (PRODUCTION)
-pm2 restart klioai            # Restart service (PRODUCTION)
+npm start                     # Start development server
+pm2 start src/server.js --name klioai  # Start with PM2
+pm2 logs klioai               # View logs
+pm2 restart klioai            # Restart service
 ```
 
 ### Frontend Applications

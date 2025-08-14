@@ -54,7 +54,6 @@ import DashboardHeader from "./components/DashboardHeader";
 import { LoadingStateCard, NoChildSelectedCard, NoSubjectsCard } from "./components/EmptyStateCard";
 import DashboardContentHeader from "./components/DashboardContentHeader";
 import SubjectsList from "./components/SubjectsList";
-import DashboardModals from "./components/DashboardModals";
 
 // Modal Components
 import UnitManagementModal from "./components/UnitManagementModal";

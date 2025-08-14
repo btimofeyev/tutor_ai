@@ -47,10 +47,11 @@ export default function LoginPage() {
                 colors: {
                   brand: '#3b82f6',
                   brandAccent: '#2563eb',
-                  brandButtonText: 'white',
+                  brandButtonText: '#ffffff',
+                  brandButtonBackground: '#3b82f6',
                   defaultButtonBackground: '#3b82f6',
                   defaultButtonBackgroundHover: '#2563eb', 
-                  defaultButtonText: 'white',
+                  defaultButtonText: '#ffffff',
                   defaultButtonBorder: '#3b82f6',
                   defaultButtonBorderHover: '#2563eb',
                   inputBackground: '#ffffff',

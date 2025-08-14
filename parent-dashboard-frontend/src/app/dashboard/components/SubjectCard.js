@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo, memo } from 'react';
+import React, { useState, useMemo, memo, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import Link from 'next/link';
 import Image from 'next/image'; // For the custom folder icon
@@ -58,13 +58,47 @@ const SubjectCard = memo(function SubjectCard({
     onCreateLessonGroup,
     onAddMaterial
 }) {
-    const [isSubjectExpanded, setIsSubjectExpanded] = useState(false); // Subject card collapsible state
-    const [expandedUnits, setExpandedUnits] = useState({});
-    const [expandedLessonContainers, setExpandedLessonContainers] = useState({});
-    const [expandedLessons, setExpandedLessons] = useState({}); // Track which lessons are expanded
+    // Generate storage key for this specific subject
+    const storageKey = `subjectCard_expansion_${subject.child_subject_id}`;
+    
+    // Load saved expansion states from localStorage
+    const loadExpansionState = () => {
+        if (typeof window === 'undefined') return {};
+        try {
+            const saved = localStorage.getItem(storageKey);
+            return saved ? JSON.parse(saved) : {};
+        } catch (e) {
+            return {};
+        }
+    };
+    
+    // Initialize states with saved values
+    const savedState = loadExpansionState();
+    const [isSubjectExpanded, setIsSubjectExpanded] = useState(savedState.isSubjectExpanded || false);
+    const [expandedUnits, setExpandedUnits] = useState(savedState.expandedUnits || {});
+    const [expandedLessonContainers, setExpandedLessonContainers] = useState(savedState.expandedLessonContainers || {});
+    const [expandedLessons, setExpandedLessons] = useState(savedState.expandedLessons || {});
     const [creatingLessonGroupForUnit, setCreatingLessonGroupForUnit] = useState(null);
     const [newLessonGroupTitle, setNewLessonGroupTitle] = useState("");
     const [bulkLessonGroupCount, setBulkLessonGroupCount] = useState(1);
+    
+    // Save expansion state to localStorage whenever it changes
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        const stateToSave = {
+            isSubjectExpanded,
+            expandedUnits,
+            expandedLessonContainers,
+            expandedLessons
+        };
+        
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+        } catch (e) {
+            // Silently fail if localStorage is full
+        }
+    }, [isSubjectExpanded, expandedUnits, expandedLessonContainers, expandedLessons, storageKey]);
 
     const upcomingDueItems = useMemo(() => {
         if (!subject.child_subject_id) return [];

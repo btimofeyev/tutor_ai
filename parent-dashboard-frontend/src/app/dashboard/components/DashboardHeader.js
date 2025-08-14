@@ -31,7 +31,7 @@ export default function DashboardHeader({
               <select
                 value={selectedChild?.id || ''}
                 onChange={(e) => {
-                  const child = childrenList.find(c => c.id === parseInt(e.target.value));
+                  const child = childrenList.find(c => c.id.toString() === e.target.value);
                   onChildSelect(child);
                 }}
                 className="p-2 border border-border-subtle rounded-lg bg-white text-text-primary text-sm"
@@ -66,7 +66,7 @@ export default function DashboardHeader({
           <select
             value={selectedChild?.id || ''}
             onChange={(e) => {
-              const child = childrenList.find(c => c.id === parseInt(e.target.value));
+              const child = childrenList.find(c => c.id.toString() === e.target.value);
               onChildSelect(child);
             }}
             className="w-full p-3 border border-border-subtle rounded-lg bg-white text-text-primary"

@@ -411,6 +411,7 @@ export function useChildrenData(session) {
     lessonsByUnit,
     setLessonsByUnit,
     lessonsBySubject,
+    setLessonsBySubject,
     gradeWeights,
     unitsBySubject,
     setUnitsBySubject,

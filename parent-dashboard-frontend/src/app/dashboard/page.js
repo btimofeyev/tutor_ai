@@ -424,7 +424,7 @@ function DashboardPageContent() {
                 <select
                   value={childrenData.selectedChild?.id || ''}
                   onChange={(e) => {
-                    const child = childrenData.children.find(c => c.id === parseInt(e.target.value));
+                    const child = childrenData.children.find(c => c.id.toString() === e.target.value);
                     childrenData.setSelectedChild(child);
                   }}
                   className="w-full p-3 border border-border-subtle rounded-lg bg-white text-text-primary"

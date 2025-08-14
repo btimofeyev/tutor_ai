@@ -31,15 +31,31 @@ if (process.env.NODE_ENV === 'development') {
 // Request interceptor for authentication
 api.interceptors.request.use(async config => {
   const supabase = createClientComponentClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-  if (session?.access_token) {
+  // If session error or no session, try to refresh
+  if (sessionError || !session) {
+    console.log('No valid session, attempting refresh...');
+    const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+    
+    if (newSession?.access_token) {
+      config.headers['Authorization'] = `Bearer ${newSession.access_token}`;
+      
+      // Keep the x-parent-id header for legacy compatibility if needed
+      if (newSession?.user?.id) {
+        config.headers['x-parent-id'] = newSession.user.id;
+      }
+    } else if (refreshError) {
+      console.error('Failed to refresh session:', refreshError);
+      // Don't reject here, let the request go through and handle 401 in response interceptor
+    }
+  } else if (session?.access_token) {
     config.headers['Authorization'] = `Bearer ${session.access_token}`;
-  }
-
-  // Keep the x-parent-id header for legacy compatibility if needed
-  if (session?.user?.id) {
-    config.headers['x-parent-id'] = session.user.id;
+    
+    // Keep the x-parent-id header for legacy compatibility if needed
+    if (session?.user?.id) {
+      config.headers['x-parent-id'] = session.user.id;
+    }
   }
 
   return config;
@@ -52,15 +68,43 @@ api.interceptors.request.use(async config => {
 // Response interceptor for error handling
 api.interceptors.response.use(
   response => response,
-  error => {
+  async error => {
+    const originalRequest = error.config;
+    
     // Handle common HTTP errors
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
 
-      if (status === 401) {
-        console.warn('Authentication failed. Redirecting to login...');
-        // Could trigger logout or redirect logic here
+      if (status === 401 && !originalRequest._retry) {
+        originalRequest._retry = true;
+        
+        // Check if it's a session expiry error
+        if (data?.code === 'SESSION_EXPIRED' || data?.message?.includes('expired')) {
+          console.warn('Session expired, attempting to refresh...');
+          
+          const supabase = createClientComponentClient();
+          const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (session?.access_token) {
+            // Update the authorization header with new token
+            originalRequest.headers['Authorization'] = `Bearer ${session.access_token}`;
+            
+            // Retry the original request with new token
+            return api(originalRequest);
+          } else {
+            console.error('Failed to refresh session:', refreshError);
+            // Only redirect to login if refresh completely fails
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login?session_expired=true';
+            }
+          }
+        } else {
+          console.warn('Authentication failed. Redirecting to login...');
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
+        }
       } else if (status >= 500) {
         console.error('Server error:', status, data?.error || data?.message);
       } else if (status === 404) {

@@ -46,8 +46,13 @@ export default function SignupPage() {
                 colors: {
                   brand: 'var(--accent-blue)',
                   brandAccent: 'var(--accent-blue-hover, #A1D4EE)',
+                  brandButtonText: 'var(--text-on-accent)',
+                  brandButtonBackground: 'var(--accent-blue)',
                   defaultButtonBackground: 'var(--accent-blue)',
                   defaultButtonBackgroundHover: 'var(--accent-blue-hover, #A1D4EE)',
+                  defaultButtonText: 'var(--text-on-accent)',
+                  defaultButtonBorder: 'var(--accent-blue)',
+                  defaultButtonBorderHover: 'var(--accent-blue-hover)',
                   inputBackground: 'var(--background-card)',
                   inputBorder: 'var(--border-input)',
                   inputBorderHover: 'var(--border-input)',

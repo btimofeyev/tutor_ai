@@ -449,9 +449,18 @@ export function useDashboardHandlers({
     if (!result.success) {
       alert(result.error || "Could not update completion status.");
     } else {
-      // Force refresh the child data to update the UI immediately
-      if (childrenData.selectedChild?.id) {
-        await childrenData.refreshChildSpecificData(true);
+      // Update local state immediately for instant feedback
+      const updatedLessons = childrenData.lessonsBySubject[lesson.child_subject_id]?.map(l => 
+        l.id === lessonId 
+          ? { ...l, completed_at: isCompleting ? new Date().toISOString() : null }
+          : l
+      );
+      
+      if (updatedLessons) {
+        childrenData.setLessonsBySubject(prev => ({
+          ...prev,
+          [lesson.child_subject_id]: updatedLessons
+        }));
       }
 
       if (result.syncedEntries > 0) {
@@ -503,27 +512,35 @@ export function useDashboardHandlers({
 
     modalManagement.setIsSubmittingGrade(true);
     try {
-      // Invalidate cache before the API call to ensure fresh data
-      if (childrenData.selectedChild?.id) {
-        childrenData.invalidateChildCache(childrenData.selectedChild.id);
+      // Optimistically update the UI for graded items
+      const lesson = modalManagement.gradingLesson;
+      const updatedLessons = childrenData.lessonsBySubject[lesson.child_subject_id]?.map(l => 
+        l.id === lesson.id 
+          ? { 
+              ...l, 
+              completed_at: new Date().toISOString(),
+              grade_value: gradeValue?.score || null,
+              grade_max_value: gradeValue?.total || null
+            }
+          : l
+      );
+      
+      if (updatedLessons) {
+        childrenData.setLessonsBySubject(prev => ({
+          ...prev,
+          [lesson.child_subject_id]: updatedLessons
+        }));
       }
 
       // If gradeValue is null, we're completing without a grade
       const result = await materialManagement.toggleLessonCompletion(
         modalManagement.gradingLesson.id,
         true,
-        gradeValue
+        gradeValue,
+        true // Skip refresh since we're updating optimistically
       );
 
       if (result.success) {
-        // Small delay to ensure backend processing is complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Force refresh the child data to update the UI immediately
-        if (childrenData.selectedChild?.id) {
-          await childrenData.refreshChildSpecificData(true);
-        }
-
         modalManagement.closeGradeModal();
 
         // Show appropriate success message
@@ -537,9 +554,17 @@ export function useDashboardHandlers({
           // Handle sync notification if needed
         }
       } else {
+        // Revert optimistic update on failure
+        if (childrenData.selectedChild?.id) {
+          await childrenData.refreshChildSpecificData(true);
+        }
         showError(result.error || "Could not update grade and completion status.");
       }
     } catch (error) {
+      // Revert optimistic update on error
+      if (childrenData.selectedChild?.id) {
+        await childrenData.refreshChildSpecificData(true);
+      }
       showError("Failed to save grade. Please try again.");
     } finally {
       modalManagement.setIsSubmittingGrade(false);

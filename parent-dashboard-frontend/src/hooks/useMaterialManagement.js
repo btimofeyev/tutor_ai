@@ -153,8 +153,8 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
 
       const response = await api.put(`/materials/${materialId}/toggle-complete`, payload);
 
-      // Force refresh to get updated data
-      if (refreshChildData) await refreshChildData(true);
+      // Force refresh to get updated data - COMMENTED OUT to prevent page refresh
+      // if (refreshChildData) await refreshChildData(true);
       if (invalidateChildCache) {
         // Get child ID from the response or use a workaround
         // For now, we'll invalidate cache in the dashboard

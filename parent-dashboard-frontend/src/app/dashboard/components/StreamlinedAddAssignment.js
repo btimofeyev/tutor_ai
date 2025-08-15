@@ -14,7 +14,7 @@ import {
   CameraIcon
 } from '@heroicons/react/24/outline';
 import Button from '../../../components/ui/Button';
-import api from '../../../utils/api';
+import api, { uploadApi } from '../../../utils/api';
 import { useStreamlinedUpload } from '../../../hooks/useStreamlinedUpload';
 import { useProcessingContext } from '../../../components/ProcessingNotificationProvider';
 
@@ -421,8 +421,8 @@ export default function StreamlinedAddAssignment({
         uploadFormData.append('content_type', actualContentType);
         uploadFormData.append('due_date', formData.dueDate || '');
 
-        // Use async upload endpoint (without problematic Content-Type header)
-        const response = await api.post('/materials/upload-async', uploadFormData);
+        // Use async upload endpoint with proper timeout for mobile
+        const response = await uploadApi.post('/materials/upload-async', uploadFormData);
 
         if (response.data.success) {
           // Material created, AI processing in background

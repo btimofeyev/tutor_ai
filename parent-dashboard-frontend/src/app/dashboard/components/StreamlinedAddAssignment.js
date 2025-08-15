@@ -407,19 +407,38 @@ export default function StreamlinedAddAssignment({
     try {
       if (useAiMode && (formData.files || []).length > 0) {
         // AI Mode: Upload files for async analysis
+        
+        // Debug logging for mobile upload issues
+        console.log('=== UPLOAD DEBUG START ===');
+        console.log('File being uploaded:', formData.files[0]);
+        console.log('File name:', formData.files[0]?.name);
+        console.log('File type:', formData.files[0]?.type);
+        console.log('File size:', formData.files[0]?.size);
+        console.log('Selected Subject ID:', selectedSubjectId);
+        console.log('Selected Lesson:', selectedLesson);
+        console.log('Selected Content Type:', selectedContentType);
+        console.log('Form Title:', formData.title);
+        
         const uploadFormData = new FormData();
 
         // Add the file
         uploadFormData.append('files', formData.files[0]);
 
-        // Add metadata
+        // Add metadata with safe file name handling
         const actualContentType = getContentTypeValue(selectedContentType);
+        const fileName = formData.files[0]?.name || 'camera-upload';
+        const title = formData.title || fileName.split('.')[0] || 'Mobile Upload';
+        
         uploadFormData.append('child_subject_id', selectedSubjectId);
         uploadFormData.append('user_content_type', actualContentType);
         uploadFormData.append('lesson_id', selectedLesson);
-        uploadFormData.append('title', formData.title || formData.files[0].name.split('.')[0]);
+        uploadFormData.append('title', title);
         uploadFormData.append('content_type', actualContentType);
         uploadFormData.append('due_date', formData.dueDate || '');
+
+        console.log('FormData title:', title);
+        console.log('FormData actualContentType:', actualContentType);
+        console.log('=== UPLOAD DEBUG END ===');
 
         // Use async upload endpoint with proper timeout for mobile
         const response = await uploadApi.post('/materials/upload-async', uploadFormData);
@@ -467,7 +486,15 @@ export default function StreamlinedAddAssignment({
         }
       }
     } catch (error) {
+      console.error('=== UPLOAD ERROR DEBUG START ===');
       console.error('Submission error:', error);
+      console.error('Error message:', error.message);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      console.error('Error headers:', error.response?.headers);
+      console.error('Network error:', error.code);
+      console.error('Request config:', error.config);
+      console.error('=== UPLOAD ERROR DEBUG END ===');
       setCurrentStep('details');
     }
   };

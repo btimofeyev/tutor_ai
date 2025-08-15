@@ -406,33 +406,35 @@ export default function StreamlinedAddAssignment({
 
     try {
       if (useAiMode && (formData.files || []).length > 0) {
-        // AI Mode: Upload files for async analysis
-        const uploadFormData = new FormData();
-
-        // Add the file
-        uploadFormData.append('files', formData.files[0]);
-
-        // Add metadata
+        // AI Mode: Use processUpload hook for async analysis
         const actualContentType = getContentTypeValue(selectedContentType);
-        uploadFormData.append('child_subject_id', selectedSubjectId);
-        uploadFormData.append('user_content_type', actualContentType);
-        uploadFormData.append('lesson_id', selectedLesson);
-        uploadFormData.append('title', formData.title || formData.files[0].name.split('.')[0]);
-        uploadFormData.append('content_type', actualContentType);
-        uploadFormData.append('due_date', formData.dueDate || '');
-
-        // Use async upload endpoint
-        const response = await api.post('/materials/upload-async', uploadFormData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-
-        if (response.data.success) {
-          // Material created, AI processing in background
-          const materialTitle = formData.title || formData.files[0].name.split('.')[0];
-          addProcessingMaterial(response.data.material_id, materialTitle);
-          setCurrentStep('processing-started');
+        const metadata = {
+          subjectId: selectedSubjectId,
+          materialType: actualContentType,
+          lesson: selectedLesson,
+          title: formData.title || formData.files[0].name.split('.')[0],
+          dueDate: formData.dueDate || '',
+          enableAiAnalysis: true,
+          useAsyncProcessing: true // Enable background processing
+        };
+        
+        const result = await processUpload(formData.files, metadata);
+        
+        if (result.success) {
+          if (result.isAsync) {
+            // Async upload - material created, AI processing in background
+            const materialTitle = formData.title || formData.files[0].name.split('.')[0];
+            addProcessingMaterial(result.material_id, materialTitle);
+            setCurrentStep('processing-started');
+          } else if (result.needsReview) {
+            // Sync upload with AI results for review
+            setAiAnalysisResults(result.analysisData);
+            setCurrentStep('review');
+          } else {
+            setCurrentStep('complete');
+          }
         } else {
-          throw new Error(response.data.message || 'Upload failed');
+          throw new Error(result.error || 'Upload failed');
         }
       } else {
         // Manual Mode: Save with user-provided data

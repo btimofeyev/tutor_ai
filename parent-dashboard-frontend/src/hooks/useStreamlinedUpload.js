@@ -48,14 +48,9 @@ export function useStreamlinedUpload(childId, onComplete) {
       // Add additional fields for AI analysis
       formData.append('child_subject_id', metadata.subjectId || files[0]?.subjectId);
       formData.append('user_content_type', metadata.materialType || files[0]?.materialType);
-      formData.append('lesson_id', metadata.lesson || files[0]?.lesson);
-      formData.append('title', metadata.title || files[0]?.name?.split('.')[0] || 'Untitled');
-      formData.append('content_type', metadata.materialType || files[0]?.materialType);
-      formData.append('due_date', metadata.dueDate || '');
 
-      // Use async endpoint for background processing if specified
-      const useAsync = metadata.useAsyncProcessing === true;
-      const endpoint = useAsync ? '/materials/upload-async' : '/materials/upload';
+      // Always use AI analysis endpoint since quick-upload was removed
+      const endpoint = '/materials/upload';
 
       // Simulate progress updates
       const progressInterval = setInterval(() => {
@@ -63,35 +58,24 @@ export function useStreamlinedUpload(childId, onComplete) {
       }, 500);
 
       const response = await uploadApi.post(endpoint, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
         timeout: 120000, // 2 minutes timeout for AI processing
       });
 
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      if (useAsync) {
-        // Async endpoint returns { success: true, material_id: ... }
-        if (response.data.success) {
-          return {
-            success: true,
-            isAsync: true,
-            material_id: response.data.material_id,
-            material: response.data.material
-          };
-        } else {
-          throw new Error(response.data.message || 'Upload failed');
-        }
+      // AI analysis endpoint returns { lesson_json: ... }
+      if (response.data.lesson_json) {
+        return {
+          success: true,
+          needsReview: true,
+          analysisData: response.data.lesson_json
+        };
       } else {
-        // Sync endpoint returns { lesson_json: ... }
-        if (response.data.lesson_json) {
-          return {
-            success: true,
-            needsReview: true,
-            analysisData: response.data.lesson_json
-          };
-        } else {
-          throw new Error('AI analysis failed - no data returned');
-        }
+        throw new Error('AI analysis failed - no data returned');
       }
     } catch (error) {
       console.error('Upload error:', error);

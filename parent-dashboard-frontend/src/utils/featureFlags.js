@@ -3,10 +3,10 @@
 
 export const FEATURE_FLAGS = {
   // AI-related features
-  AI_TUTORING: false,
+  AI_TUTORING: true,
   AI_CHAT_INSIGHTS: false,
-  CHILD_LOGIN: false,
-  KLIO_AI_ADDON: false,
+  CHILD_LOGIN: true,
+  KLIO_AI_ADDON: true,
   
   // Other features that might need gating
   ADVANCED_SCHEDULING: true,

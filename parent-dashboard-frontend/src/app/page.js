@@ -69,18 +69,18 @@ export default function LandingPage() {
               <Link href="/pricing" className="text-text-secondary hover:text-text-primary font-medium transition-colors">
                 Pricing
               </Link>
-              <Link href="/login" className="text-text-secondary hover:text-text-primary">
+              <Link href="/tutor" className="text-accent-blue hover:text-accent-blue font-bold transition-colors">
+                🎓 Student Tutor
+              </Link>
+              <Link href="/login" className="text-text-secondary hover:text-text-primary font-medium transition-colors">
                 Log In
               </Link>
-              <Button as="link" href="/signup" variant="primary" size="sm">
-                Sign Up Free
-              </Button>
             </nav>
-            {/* Mobile menu button */}
+            {/* Mobile navigation */}
             <div className="md:hidden">
-              <Button as="link" href="/signup" variant="primary" size="sm">
-                Get Started
-              </Button>
+              <Link href="/login" className="text-text-secondary hover:text-text-primary font-medium text-sm">
+                Log In
+              </Link>
             </div>
           </div>
         </div>

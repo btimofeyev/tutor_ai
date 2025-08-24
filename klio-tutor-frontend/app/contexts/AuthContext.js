@@ -42,13 +42,36 @@ export function AuthProvider({ children }) {
         localStorage.setItem('child_token', data.tokens.accessToken);
         localStorage.setItem('child_refresh_token', data.tokens.refreshToken);
         localStorage.setItem('child_data', JSON.stringify(data.child));
-        localStorage.setItem('session_id', data.sessionId);
+        // DON'T store session_id initially - this signals fresh login
+        
         setChild({
           id: data.child.id,
           first_name: data.child.name.split(' ')[0], // Extract first name
           name: data.child.name,
           grade: data.child.grade
         });
+
+        // Force start a new session on login
+        try {
+          const sessionResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/session/new`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${data.tokens.accessToken}`
+            },
+            body: JSON.stringify({ reason: 'login' })
+          });
+          
+          const sessionData = await sessionResponse.json();
+          if (sessionData.success && sessionData.sessionId) {
+            // Only store session_id after we successfully create a new session
+            localStorage.setItem('session_id', sessionData.sessionId);
+            console.log('New session started on login:', sessionData.sessionId);
+          }
+        } catch (sessionError) {
+          console.error('Failed to start new session on login:', sessionError);
+        }
+
         return { success: true };
       } else {
         return { success: false, error: data.error };
@@ -59,7 +82,26 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // End current session before logout
+    try {
+      const token = localStorage.getItem('child_token');
+      if (token) {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/session/end`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ reason: 'logout' })
+        });
+        console.log('Session ended on logout');
+      }
+    } catch (error) {
+      console.error('Failed to end session on logout:', error);
+    }
+
+    // Clear all local storage
     localStorage.removeItem('child_token');
     localStorage.removeItem('child_refresh_token');
     localStorage.removeItem('child_data');
@@ -73,9 +115,9 @@ export function AuthProvider({ children }) {
   };
 
   // Handle token expiration - centralized logout
-  const handleTokenExpiration = () => {
+  const handleTokenExpiration = async () => {
     console.log('Token expired, logging out user');
-    logout();
+    await logout();
   };
 
   // Enhanced fetch with automatic token expiration handling

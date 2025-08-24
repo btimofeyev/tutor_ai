@@ -771,8 +771,8 @@ export function useDashboardHandlers({
       modalManagement.setCredentialFormError("PIN cannot be empty.");
       return;
     }
-    if (!/^\d{4,6}$/.test(modalManagement.childPinInput)) {
-      modalManagement.setCredentialFormError("PIN must be 4 to 6 digits.");
+    if (!/^\d{4}$/.test(modalManagement.childPinInput)) {
+      modalManagement.setCredentialFormError("PIN must be exactly 4 digits.");
       return;
     }
     if (modalManagement.childPinInput !== modalManagement.childPinConfirmInput) {

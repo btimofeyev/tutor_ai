@@ -4,7 +4,7 @@
 export const FEATURE_FLAGS = {
   // AI-related features
   AI_TUTORING: true,
-  AI_CHAT_INSIGHTS: false,
+  AI_CHAT_INSIGHTS: true,
   CHILD_LOGIN: true,
   KLIO_AI_ADDON: true,
   

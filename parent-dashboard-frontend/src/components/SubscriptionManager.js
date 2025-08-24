@@ -152,12 +152,11 @@ export default function SubscriptionManager({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => {}} // Disabled
-                disabled={true}
-                className="w-full !text-xs !py-1.5 opacity-60 cursor-not-allowed"
-                title="AI Pack is currently in development"
+                onClick={() => handleUpgrade(PRICE_IDS.klio_addon)}
+                disabled={upgrading}
+                className="w-full !text-xs !py-1.5"
               >
-                <SparklesIcon className="h-3.5 w-3.5 mr-1"/> AI Pack (Coming Soon)
+                <SparklesIcon className="h-3.5 w-3.5 mr-1"/> AI Pack
               </Button>
               <Button
                 variant="secondary"
@@ -243,11 +242,10 @@ export default function SubscriptionManager({
                 <>
                   <Button
                     variant="secondary"
-                    disabled={true}
-                    className="opacity-60 cursor-not-allowed"
-                    title="AI features are currently in development"
+                    onClick={() => handleUpgrade(PRICE_IDS.klio_addon)}
+                    disabled={upgrading}
                   >
-                    Klio AI Pack (Coming Soon)
+                    Klio AI Pack
                   </Button>
                   <Button
                     variant="primary"

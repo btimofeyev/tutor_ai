@@ -319,8 +319,8 @@ exports.setChildPin = async (req, res) => {
 
   if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
   if (!child_id) return res.status(400).json({ error: 'Child ID is required.' });
-  if (!pin || typeof pin !== 'string' || !/^\d{4,6}$/.test(pin)) {
-      return res.status(400).json({ error: 'PIN must be 4 to 6 digits.' });
+  if (!pin || typeof pin !== 'string' || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ error: 'PIN must be exactly 4 digits.' });
   }
 
   try {

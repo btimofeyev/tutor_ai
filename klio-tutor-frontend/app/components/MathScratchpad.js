@@ -655,10 +655,10 @@ const FractionOperationsTemplate = ({ id, values, onChange, onRemove }) => {
 // Math Template Toolbar
 const MathTemplateToolbar = ({ onAddTemplate }) => {
   const templates = [
-    { type: 'addition', label: '+', icon: FiPlus, color: 'green' },
+    { type: 'addition', label: '+', icon: null, color: 'green' },
     { type: 'subtraction', label: '−', icon: null, color: 'red' },
     { type: 'multiplication', label: '×', icon: null, color: 'purple' },
-    { type: 'division', label: '÷', icon: FiDivide, color: 'blue' },
+    { type: 'division', label: '÷', icon: null, color: 'blue' },
     { type: 'longdivision', label: '⌐÷', icon: null, color: 'indigo' },
     { type: 'fraction', label: 'a/b', icon: null, color: 'emerald' },
     { type: 'fractionops', label: '1/2+3/4', icon: null, color: 'amber' },
@@ -669,17 +669,19 @@ const MathTemplateToolbar = ({ onAddTemplate }) => {
   ];
 
   return (
-    <div className="border-b border-gray-200 p-3 bg-gray-50">
-      <div className="text-xs text-gray-600 mb-2">Math Templates:</div>
-      <div className="flex gap-2 flex-wrap">
+    <div className="border-b border-gray-200 p-4 bg-gradient-to-r from-blue-50 to-purple-50">
+      <div className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+        🧮 <span className="ml-2">Math Tools</span>
+      </div>
+      <div className="grid grid-cols-4 gap-3">
         {templates.map(({ type, label, icon: Icon, color }) => (
           <button
             key={type}
             onClick={() => onAddTemplate(type)}
-            className={`flex items-center justify-center space-x-1 px-3 py-2 text-sm border-2 rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-sm bg-white hover:bg-${color}-50 border-${color}-200 text-${color}-700 hover:border-${color}-300`}
+            className={`flex flex-col items-center justify-center px-4 py-3 text-lg border-2 rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-lg bg-white hover:bg-${color}-50 border-${color}-200 text-${color}-700 hover:border-${color}-400 min-h-[70px] font-semibold`}
           >
-            {Icon && <Icon size={14} />}
-            <span className="font-medium">{label}</span>
+            {Icon && <Icon size={20} className="mb-1" />}
+            <span className="text-sm font-bold">{label}</span>
           </button>
         ))}
       </div>
@@ -689,12 +691,12 @@ const MathTemplateToolbar = ({ onAddTemplate }) => {
 
 // Main Math Scratchpad with Hybrid Text + Templates
 const MathScratchpad = forwardRef(function MathScratchpad({ 
-  currentProblemText, 
   onSubmitWork, 
   onClose, 
   isVisible = true 
 }, ref) {
   const [textContent, setTextContent] = useState('');
+  const [finalAnswer, setFinalAnswer] = useState('');
   const [mathTemplates, setMathTemplates] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const contentRef = useRef(null);
@@ -816,6 +818,11 @@ const MathScratchpad = forwardRef(function MathScratchpad({
       }
     });
 
+    // Add final answer section
+    if (finalAnswer.trim()) {
+      result += `\n\nFINAL ANSWER: ${finalAnswer.trim()}`;
+    }
+
     return result.trim();
   };
 
@@ -826,7 +833,7 @@ const MathScratchpad = forwardRef(function MathScratchpad({
     setIsSubmitting(true);
     
     if (onSubmitWork) {
-      await onSubmitWork(content, { text: currentProblemText || 'Current problem' });
+      await onSubmitWork(content, { text: 'Math work from scratchpad' });
     }
     
     setIsSubmitting(false);
@@ -834,6 +841,7 @@ const MathScratchpad = forwardRef(function MathScratchpad({
 
   const clearWork = () => {
     setTextContent('');
+    setFinalAnswer('');
     setMathTemplates([]);
   };
 
@@ -855,11 +863,6 @@ const MathScratchpad = forwardRef(function MathScratchpad({
           <div>
             <h2 className="text-lg font-bold text-gray-800">Math Scratchpad</h2>
             <p className="text-sm text-gray-600">Type and use math templates</p>
-            {currentProblemText && (
-              <div className="text-xs text-blue-600 mt-1 max-w-sm truncate">
-                Working on: {currentProblemText}
-              </div>
-            )}
           </div>
         </div>
         <div className="flex items-center space-x-2">
@@ -898,71 +901,97 @@ const MathScratchpad = forwardRef(function MathScratchpad({
             }}
           />
           
-          {/* Content Area */}
-          <div className="relative bg-white border-2 border-gray-300 rounded-lg shadow-sm p-4 min-h-full">
+          {/* Content Area - Graph Paper Style */}
+          <div className="relative bg-white border-2 border-gray-300 rounded-lg shadow-sm p-6 min-h-full">
             
-            {/* Text Work Area */}
-            <textarea
-              ref={contentRef}
-              value={textContent}
-              onChange={(e) => setTextContent(e.target.value)}
-              placeholder={`Type your work here...
-
-You can type normally and add math templates using the buttons above.
-
-For example:
-- Type: "First, let me divide 24 by 8"
-- Click [÷] to add a division template
-- Continue typing: "So the answer is 3"`}
-              className="w-full border-0 bg-transparent resize-none font-mono text-sm leading-relaxed focus:outline-none placeholder-gray-400 mb-4"
-              style={{
-                fontFamily: 'Courier New, Consolas, monospace',
-                lineHeight: '1.6',
-                minHeight: '200px'
-              }}
-            />
-
-            {/* Math Templates */}
-            {mathTemplates.length > 0 && (
-              <div className="border-t border-gray-200 pt-4">
-                <div className="text-sm text-gray-600 mb-2">Math Templates:</div>
-                <div className="flex flex-wrap gap-2">
-                  {mathTemplates.map(renderTemplate)}
+            {/* Main Work Area */}
+            <div className="space-y-6">
+              
+              {/* My Work Section */}
+              <div>
+                <div className="text-center border-b border-gray-200 pb-2 mb-4">
+                  <h3 className="text-lg font-bold text-gray-700">📝 My Work</h3>
                 </div>
+                
+                {/* Large Text Work Area */}
+                <textarea
+                  ref={contentRef}
+                  value={textContent}
+                  onChange={(e) => setTextContent(e.target.value)}
+                  placeholder={`Show your work step by step...
+
+Problem: 
+
+Step 1:
+
+Step 2:
+
+Answer:`}
+                  className="w-full border-0 bg-transparent resize-none text-base leading-loose focus:outline-none placeholder-gray-400 mb-4"
+                  style={{
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    lineHeight: '2',
+                    minHeight: '300px'
+                  }}
+                />
+
+                {/* Math Templates within My Work */}
+                {mathTemplates.length > 0 && (
+                  <div className="mt-4">
+                    <div className="flex flex-wrap gap-3">
+                      {mathTemplates.map(renderTemplate)}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Final Answer Section - Always at Bottom */}
+              <div className="border-t-2 border-gray-300 pt-6 mt-8">
+                <label className="block text-lg font-bold text-gray-700 mb-3">✨ Final Answer:</label>
+                <input
+                  type="text"
+                  value={finalAnswer}
+                  onChange={(e) => setFinalAnswer(e.target.value)}
+                  placeholder="Write your final answer here..."
+                  className="w-full border-2 border-gray-300 rounded-lg p-4 text-xl font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300 placeholder-gray-400"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Submit Section */}
-      <div className="p-4 border-t border-gray-200 bg-white">
+      <div className="p-4 border-t border-gray-200 bg-accent-blue">
         <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-600">
-            💬 Your work will be sent to chat for review
+          <div className="text-sm text-gray-800 font-medium">
+            Send your work for review!
           </div>
-          <div className="flex space-x-2">
+          <div className="flex space-x-3">
             <button
               onClick={clearWork}
-              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white hover:bg-gray-50 rounded-lg transition-colors font-medium border border-gray-200"
             >
-              Clear All
+              🗑️ Clear All
             </button>
             <button
               onClick={submitWork}
-              disabled={!textContent.trim() && mathTemplates.length === 0 || isSubmitting}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={(!textContent.trim() && mathTemplates.length === 0 && !finalAnswer.trim()) || isSubmitting}
+              className="flex items-center space-x-2 px-6 py-3 bg-white hover:bg-gray-50 text-gray-900 rounded-xl border-2 border-gray-200 hover:border-gray-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-lg shadow-sm hover:shadow-md"
             >
-              <FiSend size={14} />
-              <span>{isSubmitting ? 'Submitting...' : 'Submit Work'}</span>
+              <FiSend size={18} />
+              <span>{isSubmitting ? 'Sending...' : 'Submit My Work'}</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Helper Text */}
-      <div className="px-4 pb-2 text-xs text-gray-500 bg-white">
-        💡 Tip: Type normally and click template buttons for structured math notation
+      <div className="px-4 pb-3 text-sm text-gray-600 bg-white text-center">
+        <div className="flex items-center justify-center space-x-2">
+          <span className="text-lg">💡</span>
+          <span className="font-medium">Use the math tools above and show your thinking step by step!</span>
+        </div>
       </div>
     </motion.div>
   );

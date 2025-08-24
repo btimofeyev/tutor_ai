@@ -30,10 +30,10 @@ const weightsRoutes = require('./routes/weightsRoutes');
 const unitsRoutes = require('./routes/unitsRoutes');
 const childAuthRoutes = require('./routes/childAuthRoutes');
 const scheduleRoutes = require('./routes/scheduleRoutes');
-const parentNotesRoutes = require('./routes/parentNotesRoutes');
 const parentRoutes = require('./routes/parentRoutes');
 const customCategoriesRoutes = require('./routes/customCategoriesRoutes');
 const tutorRoutes = require('./routes/tutorRoutes');
+const parentNotesRoutes = require('./routes/parentNotesRoutes');
 
 // Import Stripe routes
 const stripeRoutes = require('./routes/stripeRoutes');
@@ -85,10 +85,10 @@ app.use('/api/weights', weightsRoutes);
 app.use('/api/custom-categories', customCategoriesRoutes); // Add Custom Categories routes
 app.use('/api/auth/child', childAuthRoutes);
 app.use('/api/tutor', tutorRoutes); // Add Tutor routes
-app.use('/api/parent', parentRoutes); // Add Parent summary routes
+app.use('/api/parent', parentRoutes);
+app.use('/api/children', parentNotesRoutes); 
 app.use('/api/schedule', scheduleRoutes); // Add Schedule routes
 app.use('/api/stripe', stripeRoutes); // Add Stripe routes
-app.use('/api/children', parentNotesRoutes); // Add Parent Notes routes (child-specific and global)
 
 // Health check route
 app.get('/api/health', (req, res) => {

@@ -36,29 +36,15 @@ class SessionMemoryService {
           return {
             sessionId,
             ...session,
-            isActive: true
+            isActive: session.messages.length > 0
           };
         }
       }
       
-      // Create new session if none exists or all are expired
-      const sessionId = this.generateSessionId(childId);
-      const newSession = {
-        child_id: childId,
-        messages: [],
-        created_at: new Date(),
-        last_activity: new Date(),
-        expires_at: new Date(Date.now() + this.config.SESSION_EXPIRY_HOURS * 60 * 60 * 1000)
-      };
-      
-      this.sessions.set(sessionId, newSession);
-      
-      logger.info(`Created new session ${sessionId} for child ${childId}`);
-      return {
-        sessionId,
-        ...newSession,
-        isActive: false
-      };
+      // No active session found - return null to indicate no session exists
+      // Don't auto-create sessions here - let forceNewSession handle creation
+      logger.info(`No active session found for child ${childId}`);
+      return null;
       
     } catch (error) {
       logger.error('Error getting session:', error);
@@ -187,7 +173,7 @@ class SessionMemoryService {
         return {
           messages: [],
           hasHistory: false,
-          sessionId: sessionData?.sessionId || null,
+          sessionId: null,
           lastResponseId: null
         };
       }
@@ -387,6 +373,204 @@ class SessionMemoryService {
       logger.error('Error getting session stats:', error);
       return null;
     }
+  }
+
+  /**
+   * End a specific session for a child (for New Chat, logout, etc.)
+   */
+  async endSession(childId, reason = 'manual') {
+    try {
+      let endedSessionId = null;
+      
+      // Find and remove the child's active session
+      for (const [sessionId, session] of this.sessions.entries()) {
+        if (session.child_id === childId) {
+          endedSessionId = sessionId;
+          
+          // Mark for summary if it has enough messages
+          if (session.messages.length >= 5) {
+            session.ready_for_summary = true;
+            session.summary_marked_at = new Date();
+            session.end_reason = reason;
+            logger.info(`Session ${sessionId} marked for summary before ending (reason: ${reason})`);
+          } else {
+            // Remove immediately if too few messages
+            this.sessions.delete(sessionId);
+            logger.info(`Session ${sessionId} ended and removed (reason: ${reason}, messages: ${session.messages.length})`);
+          }
+          break;
+        }
+      }
+      
+      return {
+        success: true,
+        endedSessionId,
+        reason
+      };
+      
+    } catch (error) {
+      logger.error('Error ending session:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Force start a new session for a child (for login, new chat)
+   */
+  async forceNewSession(childId, reason = 'new_session') {
+    try {
+      // First end any existing session
+      await this.endSession(childId, reason);
+      
+      // Create new session
+      const sessionId = this.generateSessionId(childId);
+      const newSession = {
+        child_id: childId,
+        messages: [],
+        curriculumContext: {
+          assignments: new Map(),
+          performanceData: null,
+          subjectContexts: new Map(),
+          lastUpdated: null,
+          activeTopics: []
+        },
+        created_at: new Date(),
+        last_activity: new Date(),
+        expires_at: new Date(Date.now() + this.config.SESSION_EXPIRY_HOURS * 60 * 60 * 1000),
+        start_reason: reason
+      };
+      
+      this.sessions.set(sessionId, newSession);
+      
+      logger.info(`Force created new session ${sessionId} for child ${childId} (reason: ${reason})`);
+      return {
+        success: true,
+        sessionId,
+        reason
+      };
+      
+    } catch (error) {
+      logger.error('Error forcing new session:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Store curriculum context in session
+   */
+  async storeCurriculumContext(sessionId, type, key, data) {
+    try {
+      const session = this.sessions.get(sessionId);
+      if (!session) {
+        logger.warn(`Attempted to store curriculum context in non-existent session: ${sessionId}`);
+        return false;
+      }
+
+      if (this.isExpired(session)) {
+        logger.warn(`Attempted to store curriculum context in expired session: ${sessionId}`);
+        this.sessions.delete(sessionId);
+        return false;
+      }
+
+      // Store curriculum data based on type
+      switch (type) {
+        case 'assignment':
+          session.curriculumContext.assignments.set(key, data);
+          break;
+        case 'performance':
+          session.curriculumContext.performanceData = data;
+          break;
+        case 'subject':
+          session.curriculumContext.subjectContexts.set(key, data);
+          break;
+        case 'topic':
+          if (!session.curriculumContext.activeTopics.includes(key)) {
+            session.curriculumContext.activeTopics.push(key);
+          }
+          break;
+      }
+
+      session.curriculumContext.lastUpdated = new Date();
+      
+      logger.debug(`Stored ${type} curriculum context in session ${sessionId}: ${key}`);
+      return true;
+      
+    } catch (error) {
+      logger.error('Error storing curriculum context:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get all curriculum context from session
+   */
+  async getCurriculumContext(sessionId) {
+    try {
+      const session = this.sessions.get(sessionId);
+      if (!session || this.isExpired(session)) {
+        return null;
+      }
+
+      return session.curriculumContext;
+      
+    } catch (error) {
+      logger.error('Error getting curriculum context:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Format curriculum context for AI prompt injection
+   */
+  formatCurriculumContextForAI(curriculumContext) {
+    if (!curriculumContext) return '';
+
+    let contextText = '\n\n[STUDENT\'S CURRENT COURSEWORK CONTEXT:';
+    
+    // Check if we have structured comprehensive context (new format)
+    if (curriculumContext.performanceData && 
+        curriculumContext.performanceData.includes('STUDENT\'S CURRENT COURSEWORK CONTEXT')) {
+      // New structured format - use as-is
+      contextText = '\n\n' + curriculumContext.performanceData;
+    } else {
+      // Legacy format - build from components
+      
+      // Add performance data
+      if (curriculumContext.performanceData) {
+        contextText += '\n\nPERFORMACE REVIEW:\n' + curriculumContext.performanceData;
+      }
+
+      // Add assignment details
+      if (curriculumContext.assignments && curriculumContext.assignments.size > 0) {
+        contextText += '\n\nASSIGNMENT DETAILS:';
+        for (const [title, content] of curriculumContext.assignments) {
+          contextText += `\n\n**${title}**:\n${content}`;
+        }
+      }
+
+      // Add subject contexts
+      if (curriculumContext.subjectContexts && curriculumContext.subjectContexts.size > 0) {
+        contextText += '\n\nSUBJECT CONTEXTS:';
+        for (const [subject, content] of curriculumContext.subjectContexts) {
+          contextText += `\n\n**${subject}**:\n${content}`;
+        }
+      }
+
+      // Add active topics
+      if (curriculumContext.activeTopics && curriculumContext.activeTopics.length > 0) {
+        contextText += '\n\nACTIVE TOPICS: ' + curriculumContext.activeTopics.join(', ');
+      }
+
+      contextText += '\n]';
+    }
+    
+    return contextText + '\n\n';
   }
 
   /**

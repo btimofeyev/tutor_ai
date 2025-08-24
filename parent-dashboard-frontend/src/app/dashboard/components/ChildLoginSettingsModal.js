@@ -1,7 +1,6 @@
 // app/dashboard/components/ChildLoginSettingsModal.js
 'use client';
 import React from 'react';
-import ComingSoonOverlay from '../../../components/ComingSoonOverlay';
 
 export default function ChildLoginSettingsModal({
   child, // The child object being edited
@@ -34,15 +33,8 @@ export default function ChildLoginSettingsModal({
         <h3 className="text-xl font-semibold mb-1 text-gray-800">Login Settings</h3>
         <p className="text-sm text-gray-500 mb-4">For <span className="font-medium text-blue-600">{child.name}</span></p>
 
-        {/* Coming Soon Overlay */}
-        <ComingSoonOverlay
-          title="Child Login Coming Soon!"
-          message={`We're building a secure login system for ${child.name}. This feature will allow your child to access their personalized learning dashboard with their own credentials.`}
-          iconType="rocket"
-        />
 
-        {/* Hidden original content - will be enabled when feature is ready */}
-        <div className="opacity-20 pointer-events-none">
+        <div>
           {errorMsg && <p className="text-red-600 text-sm mb-3 p-2 bg-red-50 rounded">{errorMsg}</p>}
           {successMsg && <p className="text-green-600 text-sm mb-3 p-2 bg-green-50 rounded">{successMsg}</p>}
 

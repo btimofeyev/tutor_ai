@@ -59,6 +59,7 @@ class HttpTransportSimplified {
         throw new Error(`Tool error: ${response.data.error}`);
       }
 
+      console.log(`🔧 HTTP Transport returning:`, typeof response.data.result, response.data.result?.length || 'no length');
       return response.data.result;
     } catch (error) {
       if (error.response && error.response.data && error.response.data.error) {

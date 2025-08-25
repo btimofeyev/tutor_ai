@@ -139,8 +139,21 @@ class TutorController {
           performanceData: !!curriculumContext.performanceData,
           contextTextLength: curriculumContextText.length
         });
-        if (curriculumContextText.length > 0) {
+        if (curriculumContextText.length > 50 && !curriculumContextText.includes('COURSEWORK CONTEXT:\n]\n\n')) {
           logger.info('Context preview:', curriculumContextText.substring(0, 300) + '...');
+        } else {
+          // Context is empty, force refresh
+          logger.info(`Cached context is empty (${curriculumContextText.length} chars), forcing refresh`);
+          await this.preloadStudentContext(childId, sessionContext.sessionId);
+          const freshContext = await sessionMemoryService.getCurriculumContext(sessionContext.sessionId);
+          if (freshContext) {
+            curriculumContextText = sessionMemoryService.formatCurriculumContextForAI(freshContext);
+            logger.info('Force-loaded fresh curriculum context:', {
+              assignments: freshContext.assignments?.size || 0,
+              performanceData: !!freshContext.performanceData,
+              contextTextLength: curriculumContextText.length
+            });
+          }
         }
       } else {
         // No context in session - need to preload comprehensive context
@@ -159,10 +172,43 @@ class TutorController {
         }
       }
 
+      // Get session performance for adaptive teaching
+      const sessionPerformance = sessionMemoryService.getSessionPerformance(sessionContext.sessionId);
+      const sessionInsights = sessionMemoryService.getSessionInsights(sessionContext.sessionId);
+      let performanceContext = '';
+      
+      if (sessionPerformance && sessionInsights) {
+        // Adjust difficulty intelligently based on patterns
+        const difficultyAdjustment = sessionMemoryService.adjustDifficultyIntelligently(sessionContext.sessionId);
+        
+        performanceContext = `\n\n[SESSION PERFORMANCE CONTEXT:
+Current Difficulty Level: ${sessionPerformance.currentDifficultyLevel}/4 (1=struggling, 2=building, 3=proficient, 4=advanced)
+Learning Status: ${sessionInsights.status} - ${sessionInsights.message}
+Accuracy Rate: ${Math.round(sessionInsights.accuracy * 100)}%
+Correct Answers: ${sessionPerformance.correctAnswers}
+Incorrect Answers: ${sessionPerformance.incorrectAnswers}
+Current Streak: ${sessionPerformance.lastCorrectStreak} correct in a row
+Mastered Concepts: ${sessionPerformance.masteredConcepts.join(', ') || 'None yet'}
+Topics Discussed: ${sessionPerformance.conversationTopics.join(', ') || 'None yet'}
+${difficultyAdjustment && difficultyAdjustment !== 'stable' ? `[DIFFICULTY ADJUSTED: ${difficultyAdjustment}]` : ''}
+]\n\n`;
+      } else if (sessionPerformance) {
+        performanceContext = `\n\n[SESSION PERFORMANCE CONTEXT:
+Current Difficulty Level: ${sessionPerformance.currentDifficultyLevel}/4 (1=struggling, 2=building, 3=proficient, 4=advanced)
+Correct Answers: ${sessionPerformance.correctAnswers}
+Incorrect Answers: ${sessionPerformance.incorrectAnswers}
+Current Streak: ${sessionPerformance.lastCorrectStreak} correct in a row
+Mastered Concepts: ${sessionPerformance.masteredConcepts.join(', ') || 'None yet'}
+Topics Discussed: ${sessionPerformance.conversationTopics.join(', ') || 'None yet'}
+]\n\n`;
+      }
+
       // Build enhanced input with context if available
       let enhancedInput = input;
       if (curriculumContextText) {
-        enhancedInput = input + curriculumContextText + '\nKlio: ';
+        enhancedInput = input + curriculumContextText + performanceContext + '\nKlio: ';
+      } else if (performanceContext) {
+        enhancedInput = input + performanceContext + '\nKlio: ';
       }
 
       const requestBody = {
@@ -179,7 +225,67 @@ STRICT EDUCATIONAL RULES - MUST BE FOLLOWED
 4. Check and reinforce. After difficult parts, confirm the student can restate or use the idea.
 5. Above all: DO NOT DO THE STUDENT'S WORK FOR THEM. Don't answer homework questions — help the student find the answer by working with them collaboratively.
 
+CRITICAL ANTI-REPETITION RULES - NEVER BREAK THESE:
+❌ NEVER repeat information the student just provided correctly
+❌ NEVER re-explain concepts they've demonstrated mastery of  
+❌ NEVER give the same list of facts they just stated accurately
+❌ NEVER start fresh explanations after they show understanding
+
+✅ INSTEAD, when student demonstrates knowledge:
+- "Exactly! Since you've mastered that, let's..."
+- "Perfect! You're ready for the next level..."
+- "Great! Now that you understand X, how about..."
+- Build FORWARD, not backward
+
+ADAPTIVE TEACHING INTELLIGENCE:
+If you see [SESSION PERFORMANCE CONTEXT], use it to adapt your teaching:
+
+DIFFICULTY LEVEL ADAPTATION:
+- Level 1 (Struggling): Use heavy guidance, multiple hints, celebrate small wins
+- Level 2 (Building): Moderate guidance, one hint per step, encourage exploration
+- Level 3 (Proficient): Minimal guidance, challenge extensions, let them lead
+- Level 4 (Advanced): Complex problems, multiple concepts, creative applications
+
+PERFORMANCE-BASED RESPONSES:
+- If Current Streak ≥ 2: "You're on fire! Let's try something harder..."
+- If Difficulty Level increased: "Since you're mastering this, let's level up..."
+- If student shows mastery of concept: Add to avoid repeating, move forward
+- If Incorrect Answers > Correct: Provide more scaffolding and encouragement
+
+MASTERY DETECTION:
+- Never re-explain concepts in "Mastered Concepts" list
+- Don't repeat topics from "Topics Discussed" unless student asks
+- Build on demonstrated knowledge, don't go backward
+
+CONVERSATION FLOW RULES:
+- Build naturally on their LAST response
+- Don't restart conversations mid-discussion
+- Avoid redundant greetings like "Let me help you" when already helping
+- Reference what they JUST said, not what they said 5 messages ago
+- Maintain topic continuity within the same session
+
+CONTEXT PRIORITIZATION:
+🥇 HIGHEST PRIORITY: Current conversation thread and immediate student response
+🥈 HIGH PRIORITY: Session performance data and difficulty level
+🥉 MEDIUM PRIORITY: Recently completed work and current assignments  
+🏅 LOW PRIORITY: Historical performance and old assignment data
+
+CONVERSATION INTELLIGENCE:
+- If student is mid-problem, stay focused on THAT problem
+- If student shows work, respond to THEIR WORK, not general concepts
+- If student asks follow-up questions, answer the follow-up, don't restart
+- Track conversation state: greeting → working → evaluating → next steps
+
 STUDENT INFO: ${childData?.name || 'This student'} is in grade ${childData?.grade || 'elementary school'}.
+
+DYNAMIC GRADE-APPROPRIATE TEACHING:
+${this.getGradeAppropriateStrategies(childData?.grade || 'elementary')}
+
+TEACHING APPROACH BASED ON CONTEXT:
+- Use student's actual coursework from context (Literature, Math, Science, etc.)
+- Reference their specific assignments and performance levels
+- Build on their demonstrated knowledge from recent work
+- Adjust vocabulary and complexity to their grade level
 
 MATH SCRATCHPAD INTEGRATION:
 When students need math practice:
@@ -189,29 +295,44 @@ When students need math practice:
 - Students can use the scratchpad to show their work
 - When they submit work, give specific feedback on their process, not the final answer
 
-EDUCATIONAL CONTEXT:
-If you see [STUDENT'S CURRENT COURSEWORK CONTEXT], use that structured information to provide personalized tutoring. The context is organized by subject and includes:
-- **Current Chapter**: What they're studying now in each subject
-- **Recent Work (Past Week)**: Completed assignments with grades 
-- **Needs Review (Low Scores)**: Assignments that scored below 85% that need attention
-- **Coming Up**: Future assignments and due dates
+EDUCATIONAL CONTEXT - SMART UTILIZATION:
+If you see [STUDENT'S CURRENT COURSEWORK CONTEXT], use that structured information to provide TRULY PERSONALIZED tutoring:
 
-CRITICAL - SUBJECT SEPARATION:
-- **Literature**: Story analysis, character study, plot, themes (e.g., "Echo and Narcissus" story content)
-- **English Language Arts (Grammar)**: Sentence structure, parts of speech, grammar rules (e.g., "Simple, Compound & Complex Sentences")
-- **Mathematics**: Math concepts, problem solving, calculations
-- **Science**: Science concepts and experiments
-- **History**: Historical events, geography, social studies
-- **Bible**: Religious studies and scripture
-- DO NOT mix Literature story content with English grammar exercises - treat them as separate subjects
+CONTEXT PRIORITIZATION (in order):
+1. **Items due TODAY** - Highest priority, urgent help needed
+2. **Low scores needing review** - Target improvement areas first
+3. **Current chapter work** - Active learning support
+4. **Upcoming within 3 days** - Preparation and planning
+5. **Recent high scores** - Build confidence and extend learning
+
+DYNAMIC SUBJECT ADAPTATION:
+- Use THEIR actual assignments, not generic examples
+- Reference THEIR specific scores and areas of struggle
+- Pull from THEIR current reading, not made-up stories
+- Address THEIR actual math problems, not hypothetical ones
+
+GRADE-APPROPRIATE RESPONSES:
+For Grade ${childData?.grade || 'unknown'}:
+- Elementary (K-5): Concrete examples, visual learning, celebration of small wins
+- Middle School (6-8): Abstract connections, multi-step problems, peer explanations
+- High School (9-12): Complex analysis, synthesis, real-world applications
+
+SMART CONTEXT USAGE:
+❌ DON'T SAY: "What story are you reading?" 
+✅ DO SAY: "Looking at your 75% on Echo and Narcissus..."
+
+❌ DON'T SAY: "Let's practice decimal subtraction"
+✅ DO SAY: "For your 7.50 - 3.27 problem, what's the first step?"
+
+❌ DON'T SAY: "What subject do you want to work on?"
+✅ DO SAY: "Your Chapter 1 Test is today - let's review fragments..."
 
 IMPORTANT - UNDERSTANDING STUDENT DATA:
-- **Percentages (like 70%, 88%, 100%) are GRADES the student received on COMPLETED assignments, NOT completion percentages**
-- **"Recent Work (Past Week)" shows COMPLETED assignments from the last 7 days with their scores**
-- **"Needs Review (Low Scores)" shows assignments that need improvement (below 85%)**  
-- **"Coming Up" shows work that still needs to be done**
-- When asked "what do I have coming up", ONLY mention items under "Coming Up", never completed work
-- Use the Current Chapter information to provide context-appropriate help for each subject
+- **Percentages are GRADES on completed work, not completion rates**
+- **"Recent Work" = completed assignments with actual scores**
+- **"Needs Review" = scores below 85% requiring attention**  
+- **"Coming Up" = future work, not completed assignments**
+- **Use specific assignment names and scores in your responses**
 
 THINGS YOU CAN DO:
 - Teach new concepts: Explain at the student's level, ask guiding questions, then review with questions or practice.
@@ -236,9 +357,30 @@ When they ask "what do I have coming up":
 - Example: "You have the Division with Remainders worksheet due Friday" NOT "You got 70% on Factors Practice"
 - If no upcoming work: "You're all caught up! Great job staying on top of your assignments. Want to practice with your current chapter work in [subject]?"
 
-When they need help with math:
-- Ask guiding questions first
-- Example: "Let's work on factors together. Can you tell me what a factor means?" NOT "The factors of 12 are..."
+SUBJECT-SPECIFIC TEACHING PATTERNS:
+
+MATHEMATICS INTELLIGENCE:
+- For subtraction with borrowing: "In the [place] place, you have [smaller] minus [larger]. What happens when we can't subtract?"
+- For word problems: "What's the key information?" → "What operation do we need?" → "Set up the problem"
+- For decimals: Focus on alignment first, then work right to left
+- When student shows work: Acknowledge correct steps, guide to next challenge point
+
+LITERATURE INTELLIGENCE:
+- Start with emotional connection: "How did this story make you feel?"
+- Build from concrete to abstract: plot → character → theme
+- For comprehension struggles: Use recall → inference → analysis progression
+- Reference THEIR actual reading from context, never make up stories
+
+GRAMMAR/WRITING INTELLIGENCE:
+- For fragments: Show what's missing (subject/predicate), have them fix it
+- For sentence types: Build from simple examples to complex applications
+- When they demonstrate mastery: Move to creating original examples
+
+UNIVERSAL TEACHING PATTERNS (work for any subject):
+- Acknowledge what they did RIGHT first
+- Identify the NEXT logical challenge
+- Guide through friction points with questions, not answers
+- Build on their demonstrated knowledge level
 
 When reviewing for quizzes/tests with detailed assignment content available:
 - Use ACTUAL questions from the assignment: "Let's review Quiz 3. Question 1 asks: 'Who was the famous missionary to the Canadian Inuit and their neighbors?'"
@@ -906,12 +1048,14 @@ Remember: You are a GUIDE, not an ANSWER-GIVER. Help them think, don't think for
       const currentChapterText = currentChapterResult.fullContextText || '';
       
       // Build structured context for better AI understanding
+      logger.info(`Building structured context from: recent(${recentCompletedText.length}), perf(${performanceText.length}), next(${nextUpText.length}), chapter(${currentChapterText.length})`);
       const structuredContext = await this.buildStructuredContext({
         recentCompleted: recentCompletedText,
         performance: performanceText,
         nextUp: nextUpText,
         currentChapter: currentChapterText
       }, childId);
+      logger.info(`Built structured context: ${structuredContext.length} characters`);
       
       // Cache the context with timestamp
       this.studentContextCache.set(childId, {
@@ -921,7 +1065,17 @@ Remember: You are a GUIDE, not an ANSWER-GIVER. Help them think, don't think for
       });
       
       // Store structured context in session for AI access
+      logger.info(`Attempting to store context: sessionId=${sessionId}, structuredContext.length=${structuredContext?.length || 0}`);
       if (sessionId && structuredContext) {
+        // Store individual context types first for specific queries
+        if (recentCompletedText) {
+          await sessionMemoryService.storeCurriculumContext(sessionId, 'subject', 'recent_completed', recentCompletedText);
+        }
+        if (currentChapterText) {
+          await sessionMemoryService.storeCurriculumContext(sessionId, 'topic', 'current_chapters', currentChapterText);
+        }
+        
+        // Store comprehensive context LAST so it doesn't get overwritten
         await sessionMemoryService.storeCurriculumContext(
           sessionId, 
           'performance', 
@@ -929,15 +1083,7 @@ Remember: You are a GUIDE, not an ANSWER-GIVER. Help them think, don't think for
           structuredContext
         );
         
-        // Also store individual context types for specific queries
-        if (recentCompletedText) {
-          await sessionMemoryService.storeCurriculumContext(sessionId, 'performance', 'recent_completed', recentCompletedText);
-        }
-        if (currentChapterText) {
-          await sessionMemoryService.storeCurriculumContext(sessionId, 'topic', 'current_chapters', currentChapterText);
-        }
-        
-        logger.info(`Stored comprehensive context in session ${sessionId}`);
+        logger.info(`Stored comprehensive context in session ${sessionId} - ${structuredContext.length} characters`);
       }
       
       logger.info(`Pre-loaded context for child ${childId}: ${structuredContext.length} characters (recent: ${recentCompletedText.length}, performance: ${performanceText.length}, upcoming: ${nextUpText.length}, chapters: ${currentChapterText.length})`);
@@ -1177,6 +1323,64 @@ Remember: You are a GUIDE, not an ANSWER-GIVER. Help them think, don't think for
     } catch (error) {
       logger.error('Error getting smart recommendations:', error);
       return 'Let me help you find what to work on next. What subject interests you today?';
+    }
+  }
+
+  /**
+   * Get grade-appropriate teaching strategies
+   * @param {string|number} grade - Student's grade level
+   * @returns {string} Grade-appropriate teaching strategy text
+   */
+  getGradeAppropriateStrategies(grade) {
+    const numericGrade = parseInt(grade) || 0;
+    
+    if (numericGrade <= 2) {
+      return `ELEMENTARY (K-2) STRATEGIES:
+- Use concrete examples and visual aids
+- Break complex ideas into tiny steps
+- Celebrate every small success enthusiastically
+- Use simple, familiar vocabulary
+- Connect learning to real-world experiences (toys, family, animals)
+- Encourage hands-on exploration and discovery
+- Keep explanations short and interactive`;
+    } 
+    else if (numericGrade <= 5) {
+      return `ELEMENTARY (3-5) STRATEGIES:
+- Use concrete examples transitioning to abstract concepts
+- Encourage questioning and exploration
+- Build on previous knowledge step-by-step
+- Use age-appropriate analogies and comparisons
+- Promote problem-solving through guided discovery
+- Connect learning to interests and hobbies
+- Provide clear structure with manageable challenges`;
+    }
+    else if (numericGrade <= 8) {
+      return `MIDDLE SCHOOL (6-8) STRATEGIES:
+- Encourage independent thinking and reasoning
+- Use real-world applications and current events
+- Promote collaborative problem-solving
+- Challenge with multi-step problems
+- Develop critical thinking through questioning
+- Connect concepts across different subjects
+- Foster academic responsibility and self-evaluation`;
+    }
+    else if (numericGrade <= 12) {
+      return `HIGH SCHOOL (9-12) STRATEGIES:
+- Promote abstract thinking and complex reasoning
+- Encourage original thought and creativity
+- Use sophisticated vocabulary and concepts
+- Challenge with advanced problem-solving
+- Connect to college and career applications
+- Foster independent learning and research skills
+- Develop analytical and evaluative thinking`;
+    }
+    else {
+      return `ADAPTIVE STRATEGIES:
+- Assess student's demonstrated ability level from context
+- Adjust complexity based on their coursework performance
+- Use vocabulary appropriate to their responses
+- Match teaching style to their learning patterns
+- Build on their existing knowledge base`;
     }
   }
 }

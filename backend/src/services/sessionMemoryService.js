@@ -437,6 +437,14 @@ class SessionMemoryService {
           lastUpdated: null,
           activeTopics: []
         },
+        performance: {
+          correctAnswers: 0,
+          incorrectAnswers: 0,
+          masteredConcepts: [],
+          currentDifficultyLevel: 2, // 1=struggling, 2=building, 3=proficient, 4=advanced
+          lastCorrectStreak: 0,
+          conversationTopics: []
+        },
         created_at: new Date(),
         last_activity: new Date(),
         expires_at: new Date(Date.now() + this.config.SESSION_EXPIRY_HOURS * 60 * 60 * 1000),
@@ -571,6 +579,175 @@ class SessionMemoryService {
     }
     
     return contextText + '\n\n';
+  }
+
+  /**
+   * Track student performance for adaptive difficulty
+   */
+  async trackPerformance(sessionId, isCorrect, concept = null) {
+    try {
+      const session = this.sessions.get(sessionId);
+      if (!session || this.isExpired(session)) {
+        return false;
+      }
+
+      if (isCorrect) {
+        session.performance.correctAnswers++;
+        session.performance.lastCorrectStreak++;
+        if (concept && !session.performance.masteredConcepts.includes(concept)) {
+          session.performance.masteredConcepts.push(concept);
+        }
+        
+        // Increase difficulty after 2 correct in a row
+        if (session.performance.lastCorrectStreak >= 2 && session.performance.currentDifficultyLevel < 4) {
+          session.performance.currentDifficultyLevel++;
+          logger.info(`Increased difficulty level to ${session.performance.currentDifficultyLevel} for session ${sessionId}`);
+        }
+      } else {
+        session.performance.incorrectAnswers++;
+        session.performance.lastCorrectStreak = 0;
+        
+        // Decrease difficulty after struggles
+        if (session.performance.currentDifficultyLevel > 1) {
+          session.performance.currentDifficultyLevel--;
+          logger.info(`Decreased difficulty level to ${session.performance.currentDifficultyLevel} for session ${sessionId}`);
+        }
+      }
+
+      return true;
+    } catch (error) {
+      logger.error('Error tracking performance:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get session performance data
+   */
+  getSessionPerformance(sessionId) {
+    try {
+      const session = this.sessions.get(sessionId);
+      if (!session || this.isExpired(session)) {
+        return null;
+      }
+      return session.performance;
+    } catch (error) {
+      logger.error('Error getting session performance:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Add topic to conversation tracking
+   */
+  async addConversationTopic(sessionId, topic) {
+    try {
+      const session = this.sessions.get(sessionId);
+      if (!session || this.isExpired(session)) {
+        return false;
+      }
+
+      if (!session.performance.conversationTopics.includes(topic)) {
+        session.performance.conversationTopics.push(topic);
+      }
+      return true;
+    } catch (error) {
+      logger.error('Error adding conversation topic:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Advanced difficulty adjustment based on performance patterns
+   */
+  adjustDifficultyIntelligently(sessionId) {
+    try {
+      const session = this.sessions.get(sessionId);
+      if (!session || this.isExpired(session)) {
+        return false;
+      }
+
+      const perf = session.performance;
+      const totalAnswers = perf.correctAnswers + perf.incorrectAnswers;
+      
+      // Not enough data to adjust
+      if (totalAnswers < 3) {
+        return false;
+      }
+
+      const accuracyRate = perf.correctAnswers / totalAnswers;
+      
+      // Intelligent difficulty adjustment based on accuracy patterns
+      if (accuracyRate >= 0.8 && perf.lastCorrectStreak >= 3) {
+        // Student is excelling, increase difficulty
+        if (perf.currentDifficultyLevel < 4) {
+          perf.currentDifficultyLevel++;
+          logger.info(`🚀 Student excelling! Increased difficulty to level ${perf.currentDifficultyLevel}`);
+          return 'increased';
+        }
+      } else if (accuracyRate <= 0.4 && perf.incorrectAnswers >= 3) {
+        // Student struggling, decrease difficulty
+        if (perf.currentDifficultyLevel > 1) {
+          perf.currentDifficultyLevel--;
+          logger.info(`📉 Student struggling, decreased difficulty to level ${perf.currentDifficultyLevel}`);
+          return 'decreased';
+        }
+      }
+      
+      return 'stable';
+    } catch (error) {
+      logger.error('Error adjusting difficulty:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get learning insights for the session
+   */
+  getSessionInsights(sessionId) {
+    try {
+      const session = this.sessions.get(sessionId);
+      if (!session || this.isExpired(session)) {
+        return null;
+      }
+
+      const perf = session.performance;
+      const totalAnswers = perf.correctAnswers + perf.incorrectAnswers;
+      
+      if (totalAnswers === 0) {
+        return {
+          status: 'starting',
+          message: 'Beginning learning session',
+          accuracy: 0,
+          difficultyLevel: perf.currentDifficultyLevel
+        };
+      }
+
+      const accuracyRate = perf.correctAnswers / totalAnswers;
+      
+      let status = 'working';
+      let message = `Working through problems with ${Math.round(accuracyRate * 100)}% accuracy`;
+      
+      if (accuracyRate >= 0.8) {
+        status = 'excelling';
+        message = `Excelling! ${Math.round(accuracyRate * 100)}% accuracy with ${perf.lastCorrectStreak} correct in a row`;
+      } else if (accuracyRate <= 0.4) {
+        status = 'struggling';
+        message = `Working through challenges - needs more support`;
+      }
+
+      return {
+        status,
+        message,
+        accuracy: accuracyRate,
+        difficultyLevel: perf.currentDifficultyLevel,
+        masteredConcepts: perf.masteredConcepts.length,
+        topicsDiscussed: perf.conversationTopics.length
+      };
+    } catch (error) {
+      logger.error('Error getting session insights:', error);
+      return null;
+    }
   }
 
   /**

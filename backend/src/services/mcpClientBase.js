@@ -156,7 +156,7 @@ class MCPClientBase {
         };
       }
 
-      console.log(`✅ Search completed for ${searchType}`);
+      console.log(`✅ Search completed for ${searchType}`, typeof result, result?.length || 'no length');
       
       // Handle both text and JSON responses from different transport types
       if (typeof result === 'string') {
@@ -167,6 +167,17 @@ class MCPClientBase {
           raw_response: result
         };
       } else if (result && typeof result === 'object') {
+        // Check if this is a wrapped response from simplified HTTP transport
+        if (result.result && typeof result.result === 'string') {
+          console.log(`📦 Unwrapping HTTP transport response: ${result.result.length} characters`);
+          return {
+            fullContextText: result.result,
+            results: this.parseTextSearchResponse(result.result, searchType),
+            summary: result.result.includes('No results found') ? 'No results found' : 'Search completed',
+            raw_response: result.result
+          };
+        }
+        
         return {
           fullContextText: result.fullContextText || this.convertLegacyToText(result, searchType),
           results: result.results || {},

@@ -1,318 +1,578 @@
-# Klio Tutor Frontend - Adaptive Learning System
+# Klio AI Tutor Frontend - Context-Aware Learning Assistant
 
 ## Overview
-Advanced AI-powered adaptive tutoring interface built with Next.js and GPT-5-nano. This frontend provides personalized, cost-effective learning experiences that automatically adjust to each child's needs, learning style, and progress in real-time.
+The Klio AI Tutor is a Next.js-based educational frontend that provides personalized AI tutoring for K-12 students. This system is designed to integrate deeply with the parent dashboard's learning management system, creating a context-aware AI tutor that knows exactly what assignments students are working on and can reference actual lesson content.
 
-## Architecture
+## Current Architecture
+
+### Technology Stack
 - **Framework**: Next.js 15 with App Router
-- **UI Library**: React 19 with Tailwind CSS
-- **AI Model**: GPT-5-nano via OpenAI Responses API (80% cost reduction)
-- **Authentication**: JWT-based child authentication
-- **API Integration**: RESTful backend with adaptive learning features
-- **Styling**: Custom child-friendly design system
-- **Adaptive Engine**: Real-time difficulty adjustment and personalization
+- **UI**: React 19 with Tailwind CSS
+- **AI**: OpenAI GPT-4o-mini for cost-effective tutoring
+- **Authentication**: JWT-based child authentication with PIN
+- **Backend**: Express.js API at localhost:5000
+- **Database**: Supabase PostgreSQL with comprehensive learning schema
+- **Math Rendering**: KaTeX for mathematical expressions
 
-## Project Structure
+### Project Structure
 ```
 klio-tutor-frontend/
 ├── app/
 │   ├── components/
-│   │   ├── LoginPage.js       # Child login with username/PIN
-│   │   └── TutorPage.js       # Main chat interface
+│   │   ├── auth/
+│   │   │   └── LoginPage.js          # Child PIN authentication
+│   │   └── tutor/
+│   │       └── SimpleChatInterface.js # Main chat interface
 │   ├── contexts/
-│   │   └── AuthContext.js     # Authentication state management
-│   ├── globals.css            # Tailwind CSS + custom styles
-│   ├── layout.js             # Root layout with AuthProvider
-│   └── page.js               # Main app routing logic
-├── tailwind.config.js        # Tailwind configuration
-├── postcss.config.js         # PostCSS configuration
-├── next.config.mjs          # Next.js configuration
-└── package.json             # Dependencies and scripts
+│   │   └── AuthContext.js           # Authentication state management
+│   ├── globals.css                  # Tailwind + custom styles
+│   ├── layout.js                    # Root layout with AuthProvider
+│   └── page.js                      # Main routing logic
+├── package.json                     # Dependencies
+└── CLAUDE.md                       # This documentation
 ```
 
-## Technology Stack
-- **Next.js 15**: React framework with App Router
-- **React 19**: UI library with hooks and context
-- **Tailwind CSS 3**: Utility-first CSS framework
-- **Fredoka Font**: Child-friendly Google Font
-- **OpenAI GPT-5-nano**: Most cost-effective AI model ($0.05/M input, $0.40/M output)
-- **Responses API**: Advanced chain-of-thought reasoning preservation
-- **MCP Server**: Educational data context provider for personalized learning
-- **Supabase Integration**: Real-time access to assignments, grades, and progress
-- **React Markdown**: Rich formatting for educational content
-- **Framer Motion**: Smooth animations
-- **React Icons**: Icon library
+## Current Features
 
-## Environment Configuration
+### 1. Child Authentication System
+- **PIN-based Login**: Simple 4-digit PIN interface designed for children
+- **Username + PIN**: Secure but child-friendly authentication
+- **Session Management**: JWT tokens with automatic refresh
+- **Parent Integration**: Links to parent accounts in main dashboard
 
-### Environment Variables (.env.local)
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:5000  # Backend API URL
+### 2. AI Chat Interface
+- **GPT-4o-mini Integration**: Cost-effective AI model optimized for education
+- **Educational Prompts**: Socratic method guidance, age-appropriate responses
+- **Conversation History**: Persistent sessions with sidebar navigation
+- **Math Support**: KaTeX rendering for mathematical expressions
+- **Markdown Support**: Rich formatting for educational content
+
+### 3. Session Management
+- **Persistent Sessions**: Conversations survive page refreshes
+- **Response Chaining**: OpenAI conversation storage for context continuity
+- **History Sidebar**: Access to previous learning sessions
+- **Auto-cleanup**: Old sessions cleaned up automatically
+
+## 🚀 THE REVOLUTIONARY UPGRADE: Context-Aware Learning
+
+### The Vision
+Transform the AI tutor from a generic chatbot into a **context-aware learning companion** that:
+- Knows exactly what assignments the student needs to complete
+- Can reference actual worksheet questions and lesson content
+- Understands the teaching context from lesson plans
+- Provides targeted help based on the student's current progress
+
+### Database Schema Understanding
+
+The learning management system has this hierarchy:
+```
+children (students)
+├── child_subjects (Math, Science, etc.)
+    ├── units (Fractions, Algebra, etc.)
+        ├── lesson_groups (teacher's lesson plans)
+            └── materials (student worksheets, assignments, tests)
 ```
 
-### API Endpoints Used
-- `POST /api/auth/child/login` - Child authentication
-- `POST /api/tutor/chat` - Educational AI tutoring chat with GPT-5-nano and MCP context
-- `GET /api/health` - Backend health check
+### Key Database Tables for Integration
 
-### MCP Server Integration
-The backend connects to an MCP (Model Context Protocol) server that provides:
-- Real-time access to student assignments and grades
-- Lesson content with actual worksheet questions
-- Performance analytics for targeted tutoring
-- Smart recommendations based on completion status
+#### `materials` Table (Student Work)
+```sql
+- id: unique identifier
+- lesson_id: links to lesson_groups (teacher content)
+- child_subject_id: which subject this belongs to
+- title: "Fractions Worksheet", "Chapter 5 Quiz"
+- content_type: worksheet, assignment, quiz, test
+- lesson_json: AI-extracted content with actual questions
+- completed_at: NULL = incomplete (next work to do)
+- grade_value: student's score
+- grade_max_value: points possible
+- material_order: sequence within lesson
+```
 
-### Educational Tutoring API Format
+#### `lesson_groups` Table (Teacher Lessons)
+```sql
+- id: unique identifier
+- unit_id: which unit this lesson belongs to
+- title: "Converting Fractions to Decimals"
+- description: lesson plan content
+- sequence_order: lesson sequence
+```
+
+#### `learning_sessions` Table (Study Tracking)
+```sql
+- id: session identifier
+- child_id: which student
+- material_id: what they're working on
+- problems_attempted/correct: progress tracking
+```
+
+## Implementation Plan
+
+### Phase 1: Backend Learning Context Service
+
+#### 1. Create `learningContextService.js`
 ```javascript
-// Request with chain-of-thought preservation
-{
-  message: "Help me with math problems",
-  sessionHistory: [...previousMessages],
-  previousResponseId: "response_12345" // For reasoning chain continuity
+// backend/src/services/learningContextService.js
+
+class LearningContextService {
+  // Get next incomplete assignments
+  async getNextAssignments(childId, limit = 5) {
+    const { data } = await supabase
+      .from('materials')
+      .select(`
+        *,
+        lesson_groups!inner(title, description),
+        child_subjects!inner(*, subjects(name)),
+        units!lesson_groups(name)
+      `)
+      .eq('child_subjects.child_id', childId)
+      .is('completed_at', null)
+      .order('material_order')
+      .limit(limit);
+    
+    return data;
+  }
+
+  // Get full context for current material
+  async getMaterialContext(materialId) {
+    const { data } = await supabase
+      .from('materials')
+      .select(`
+        *,
+        lesson_groups!inner(*),
+        child_subjects!inner(*, subjects(name))
+      `)
+      .eq('id', materialId)
+      .single();
+    
+    return data;
+  }
+
+  // Get recent grades for encouragement
+  async getRecentProgress(childId, days = 7) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    
+    const { data } = await supabase
+      .from('materials')
+      .select('title, grade_value, grade_max_value, completed_at')
+      .eq('child_subject_id.child_id', childId)
+      .not('completed_at', 'is', null)
+      .gte('completed_at', cutoff.toISOString())
+      .order('completed_at', { ascending: false });
+    
+    return data;
+  }
+}
+```
+
+#### 2. Enhance AI Service Integration
+```javascript
+// backend/src/services/simpleOpenAIService.js
+
+async sendMessage(sessionId, message, childName) {
+  // Detect if student needs assignment help
+  const needsContext = this.detectHomeworkIntent(message);
+  
+  if (needsContext) {
+    // Get student's current learning context
+    const context = await learningContextService.getNextAssignments(childId);
+    
+    // Build context-aware system prompt
+    const contextPrompt = this.buildContextAwarePrompt(childName, context);
+  }
+  
+  // Continue with normal AI processing...
 }
 
-// Response with educational guidance
-{
-  success: true,
-  response: "Let me help you with math step by step. First, can you tell me what kind of math problem you're working on?",
-  responseId: "response_12346",
-  timestamp: "2025-08-18T00:00:00.000Z"
+detectHomeworkIntent(message) {
+  const homeworkKeywords = [
+    'homework', 'assignment', 'worksheet', 'problem', 'question',
+    'next', 'help', 'stuck', "don't understand", 'quiz', 'test'
+  ];
+  
+  return homeworkKeywords.some(word => 
+    message.toLowerCase().includes(word)
+  );
+}
+
+buildContextAwarePrompt(childName, context) {
+  let prompt = this.buildStudyAssistantPrompt(childName);
+  
+  if (context && context.length > 0) {
+    const current = context[0];
+    prompt += `
+
+CURRENT LEARNING CONTEXT:
+Subject: ${current.child_subjects.subjects.name}
+Unit: ${current.units.name}
+Lesson: "${current.lesson_groups.title}"
+Assignment: "${current.title}"
+
+ASSIGNMENT DETAILS:
+${JSON.stringify(current.lesson_json, null, 2)}
+
+TEACHING CONTEXT:
+${current.lesson_groups.description}
+
+When helping, reference the specific assignment and guide using educational methods.
+Don't give direct answers - help the student think through the problem.`;
+  }
+  
+  return prompt;
 }
 ```
 
-## Design System
+#### 3. New API Endpoints
+```javascript
+// backend/src/routes/aiTutorRoutes.js
 
-### Colors
-- **Accent Blue**: `#B3E0F8` - Primary interface color
-- **Accent Yellow**: `#FFE6A7` - Highlights and accents
-- **Accent Green**: `#A7F3D0` - Success states
-- **Accent Red**: `#FDA4AF` - Error states
-- **Text Primary**: `#232323` - Main text color
-- **Text Secondary**: `#757575` - Secondary text
+// Get learning context for AI tutor
+router.get('/context/:childId', enforceAIAccess, async (req, res) => {
+  try {
+    const context = await learningContextService.getNextAssignments(
+      req.params.childId
+    );
+    res.json({ success: true, context });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
-### Typography
-- **Primary Font**: Fredoka (Google Fonts)
-- **Fallback**: system-ui, sans-serif
-- **Weight Range**: 300-700
-
-### Components
-- **Input Base**: Rounded inputs with focus states
-- **Button Primary**: Blue accent buttons with hover effects
-- **Loading Dots**: Animated loading indicators
-- **Bounce Gentle**: Subtle bounce animations
-
-## Development Commands
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server (runs on port 3001)
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
-
-# Run linting
-npm run lint
+// Get specific material context
+router.get('/material/:materialId/context', enforceAIAccess, async (req, res) => {
+  try {
+    const context = await learningContextService.getMaterialContext(
+      req.params.materialId
+    );
+    res.json({ success: true, context });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 ```
 
-## Authentication Flow
+### Phase 2: Frontend Context Integration
 
-### Child Login Process
-1. Child enters username and PIN on LoginPage
-2. Frontend sends POST request to `/api/auth/child/login`
-3. Backend validates credentials and returns JWT tokens
-4. Frontend stores tokens and child data in localStorage
-5. App navigates to TutorPage with authenticated session
-
-### Token Management
-- **Access Token**: Short-lived (2 hours) for API requests
-- **Refresh Token**: Long-lived (7 days) for token renewal
-- **Session ID**: Database session tracking
-- **Child Data**: Basic profile information
-
-### Protected Routes
-- All tutor functionality requires valid child authentication
-- Automatic token validation on app initialization
-- Logout clears all stored authentication data
-
-## Key Features
-
-### 🎓 Educational Tutoring System
-- **Socratic Method**: AI guides students to discover answers through questions and hints
-- **Step-by-Step Learning**: Breaks down complex problems into manageable steps
-- **Educational Guidance**: Never gives direct answers - helps students think through problems
-- **Cost Optimization**: GPT-5-nano provides high-quality tutoring at minimal cost
-- **MCP Integration**: Real-time access to student's actual coursework, assignments, and grades
-- **Personalized Context**: AI references specific assignments and performance data
-
-### 🤖 GPT-5-nano Integration
-- **Chain of Thought**: Preserves reasoning across conversations for better context continuity
-- **Minimal Reasoning Mode**: Fast responses optimized for educational conversations
-- **Educational System Prompt**: Specifically designed to guide learning, not provide answers
-- **Conversation Continuity**: Maintains context across the entire tutoring session
-- **Real Assignment Content**: AI works with actual lesson questions and worksheet content
-- **Smart Context Detection**: Automatically fetches relevant coursework when students mention assignments
-
-### 💡 Clean Learning Interface
-- **Simple Chat Design**: Clean, distraction-free interface focused on learning
-- **Subject-Specific Suggestions**: Color-coded buttons for math, science, writing
-- **Learning-Focused Prompts**: Encourages students to engage with the material
-- **Markdown Support**: Rich formatting for mathematical expressions and educational content
-
-### 🔐 Authentication & Security
-- Child-friendly username + PIN authentication
-- JWT token management with automatic refresh
-- Session-based learning continuity
-- Privacy-focused design for K-8 students
-
-### 📱 Enhanced User Experience
-- **Markdown Support**: Rich formatting for math steps and educational content
-- **Responsive Design**: Works perfectly on tablets and phones
-- **Accessibility**: Screen reader support and keyboard navigation
-- **Performance**: Optimized bundle size and fast loading
-
-## API Integration
-
-### Authentication Headers
+#### 1. Enhanced Quick Suggestions
 ```javascript
-const headers = {
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${accessToken}`
+// app/components/tutor/SimpleChatInterface.js
+
+const [quickSuggestions, setQuickSuggestions] = useState([]);
+const [learningContext, setLearningContext] = useState(null);
+
+// Load learning context on component mount
+useEffect(() => {
+  if (childData?.id) {
+    fetchLearningContext();
+  }
+}, [childData]);
+
+const fetchLearningContext = async () => {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/tutor/context/${childData.id}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('child_token')}`
+        }
+      }
+    );
+    
+    const data = await response.json();
+    if (data.success) {
+      setLearningContext(data.context);
+      updateQuickSuggestions(data.context);
+    }
+  } catch (error) {
+    console.error('Error fetching learning context:', error);
+  }
+};
+
+const updateQuickSuggestions = (context) => {
+  if (context && context.length > 0) {
+    const current = context[0];
+    setQuickSuggestions([
+      `Help with ${current.title}`,
+      "What's my next assignment?",
+      "I'm stuck on a problem",
+      "Explain this lesson's concept"
+    ]);
+  } else {
+    // Fallback to generic suggestions
+    setQuickSuggestions([
+      "Help me with my homework",
+      "Explain this concept",
+      "Practice problems",
+      "Check my progress"
+    ]);
+  }
 };
 ```
 
+#### 2. Context Display Component
+```javascript
+// New component to show current assignment context
+
+const LearningContextCard = ({ context }) => {
+  if (!context || context.length === 0) return null;
+  
+  const current = context[0];
+  
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+      <div className="flex items-center mb-2">
+        <FiBook className="text-blue-600 mr-2" />
+        <span className="text-sm font-medium text-blue-800">
+          Currently Working On
+        </span>
+      </div>
+      <h3 className="font-semibold text-gray-800">{current.title}</h3>
+      <p className="text-sm text-gray-600">
+        {current.child_subjects.subjects.name} • {current.lesson_groups.title}
+      </p>
+      {current.lesson_json?.questions && (
+        <p className="text-xs text-blue-600 mt-2">
+          {current.lesson_json.questions.length} questions to work through
+        </p>
+      )}
+    </div>
+  );
+};
+```
+
+### Phase 3: Smart Features
+
+#### 1. Automatic Problem Detection
+```javascript
+// Detect when student asks about specific problems
+const detectProblemReference = (message) => {
+  const problemPatterns = [
+    /question (\d+)/i,
+    /problem (\d+)/i,
+    /number (\d+)/i,
+    /#(\d+)/
+  ];
+  
+  for (const pattern of problemPatterns) {
+    const match = message.match(pattern);
+    if (match) {
+      return parseInt(match[1]);
+    }
+  }
+  return null;
+};
+```
+
+#### 2. Progress Tracking Integration
+```javascript
+// Track when students complete problems
+const markProblemAttempted = async (materialId, problemNumber) => {
+  await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/problem-attempt`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('child_token')}`
+    },
+    body: JSON.stringify({
+      materialId,
+      problemNumber,
+      attemptedAt: new Date().toISOString()
+    })
+  });
+};
+```
+
+## Example User Experience After Implementation
+
+### Before (Current State):
+**Student**: "I need help with homework"  
+**AI**: "What subject do you need help with?"  
+**Student**: "Math"  
+**AI**: "What specific math problem?"
+
+### After (Context-Aware):
+**Student**: "I need help with homework"  
+**AI**: "I see you're working on the Fractions Worksheet from yesterday's lesson on 'Converting Fractions to Decimals'. You have 7 questions remaining.
+
+Looking at question #4: 'Convert 5/8 to a decimal. Show your work.'
+
+Your teacher showed two methods in the lesson. Would you like to try the division method or the equivalent fraction method first?"
+
+**Student**: "Division method"  
+**AI**: "Perfect! So we need to divide 5 by 8. Since 5 is smaller than 8, what do you think happens when we try to divide? Remember what happens with decimal points..."
+
+## Development Environment
+
+### Prerequisites
+- Node.js 18+
+- Backend API running on localhost:5000
+- Supabase database with learning schema
+
+### Setup Commands
+```bash
+cd klio-tutor-frontend
+npm install
+npm run dev  # Starts on port 3001
+```
+
+### Environment Variables
+```bash
+# .env.local
+NEXT_PUBLIC_API_URL=http://localhost:5000
+```
+
+## Testing the Integration
+
+### Test Scenarios
+1. **Login as a child** with materials in database
+2. **Ask "help with homework"** - should show context-aware response
+3. **Reference specific questions** - AI should know the content
+4. **Check quick suggestions** - should be dynamic based on assignments
+
+### Database Test Data
+Ensure test database has:
+- Child account with PIN
+- Materials with `completed_at = NULL`
+- `lesson_json` with actual question content
+- Parent lesson content in `lesson_groups`
+
+## Success Metrics
+
+### Quantitative Goals
+- 90% reduction in "What homework?" clarification questions
+- 50% faster time to get specific help
+- 80% of conversations reference actual assignment content
+
+### Qualitative Goals
+- Students feel AI "knows" their work
+- Parents see immediate value in integration
+- Natural conversation flow about specific problems
+
+## Future Enhancements
+
+### Phase 4: Advanced Features
+- **Voice Support**: Text-to-speech for younger students
+- **Image Recognition**: Upload photos of worksheet problems
+- **Progress Visualization**: Show completion progress in chat
+- **Parent Notifications**: Alert parents when student struggles
+
+### Phase 5: Learning Analytics
+- **Concept Mastery Tracking**: Update `concept_mastery` table
+- **Difficulty Prediction**: Identify problems student will struggle with
+- **Adaptive Difficulty**: Suggest easier/harder problems based on performance
+
+## Architecture Notes
+
+### Performance Considerations
+- Cache learning context for 5 minutes to reduce DB queries
+- Lazy load lesson content only when needed
+- Batch problem attempts to reduce API calls
+
+### Security
+- All context fetched through authenticated API endpoints
+- Children can only access their own materials
+- No sensitive grade information exposed in frontend cache
+
 ### Error Handling
-- Network error recovery
-- Token expiration handling
-- User-friendly error messages
-- Automatic retry logic
+- Graceful degradation when learning context unavailable
+- Fallback to generic tutoring when DB connection fails
+- Clear error messages for authentication issues
 
-## Development Guidelines
+## 📋 Implementation Progress Tracker
 
-### Code Style
-- Use functional components with hooks
-- Implement proper error boundaries
-- Follow React best practices
-- Maintain consistent naming conventions
+### Phase 1: Backend Learning Context Service
+- [ ] Create `backend/src/services/learningContextService.js`
+  - [ ] Implement `getNextAssignments(childId)` method
+  - [ ] Implement `getMaterialContext(materialId)` method  
+  - [ ] Implement `getRecentProgress(childId)` method
+  - [ ] Add proper error handling and logging
+- [ ] Enhance `backend/src/services/simpleOpenAIService.js`
+  - [ ] Add `detectHomeworkIntent(message)` method
+  - [ ] Add `buildContextAwarePrompt(childName, context)` method
+  - [ ] Modify `sendMessage()` to include learning context
+  - [ ] Test context integration with AI responses
+- [ ] Add new API endpoints in `backend/src/routes/aiTutorRoutes.js`
+  - [ ] Add `GET /context/:childId` endpoint
+  - [ ] Add `GET /material/:materialId/context` endpoint
+  - [ ] Add `POST /problem-attempt` endpoint for tracking
+  - [ ] Test all endpoints with authentication
 
-### Security Considerations
-- Never expose sensitive data in console logs
-- Validate all user inputs
-- Use HTTPS in production
-- Implement proper CORS policies
+### Phase 2: Frontend Context Integration
+- [ ] Enhance `app/components/tutor/SimpleChatInterface.js`
+  - [ ] Add learning context state management
+  - [ ] Implement `fetchLearningContext()` function
+  - [ ] Add dynamic quick suggestions based on assignments
+  - [ ] Add context refresh on new sessions
+- [ ] Create `LearningContextCard` component
+  - [ ] Display current assignment information
+  - [ ] Show progress indicators
+  - [ ] Add visual assignment status
+- [ ] Update quick suggestions system
+  - [ ] Make suggestions dynamic based on incomplete materials
+  - [ ] Add fallback for when no context available
+  - [ ] Test suggestion updates
 
-### Performance
-- Optimize bundle size
-- Lazy load components when appropriate
-- Implement proper caching strategies
-- Monitor Core Web Vitals
+### Phase 3: Smart Features
+- [ ] Implement problem detection
+  - [ ] Add `detectProblemReference(message)` function
+  - [ ] Parse question numbers from student messages
+  - [ ] Link specific problems to material context
+- [ ] Add progress tracking
+  - [ ] Implement `markProblemAttempted()` function
+  - [ ] Track study sessions per material
+  - [ ] Update learning analytics tables
+- [ ] Enhanced AI responses
+  - [ ] Reference specific question numbers
+  - [ ] Include lesson context in explanations
+  - [ ] Provide step-by-step guidance based on teaching methods
 
-## Deployment
+### Phase 4: Testing & Refinement
+- [ ] Database setup for testing
+  - [ ] Create test child accounts with PIN authentication
+  - [ ] Add sample materials with `completed_at = NULL`
+  - [ ] Populate `lesson_json` with realistic question content
+  - [ ] Create lesson_groups with teaching context
+- [ ] Integration testing
+  - [ ] Test login → context fetch → AI response flow
+  - [ ] Verify homework intent detection works
+  - [ ] Test dynamic suggestions update correctly
+  - [ ] Validate specific question referencing
+- [ ] User experience validation
+  - [ ] Compare before/after conversation flows
+  - [ ] Measure reduction in clarification questions
+  - [ ] Test with multiple subjects and assignment types
 
-### Production Build
-```bash
-npm run build
-```
+### Phase 5: Performance & Polish
+- [ ] Performance optimizations
+  - [ ] Add 5-minute context caching
+  - [ ] Implement lazy loading for lesson content
+  - [ ] Batch problem attempt updates
+- [ ] Error handling improvements
+  - [ ] Graceful degradation when context unavailable
+  - [ ] Fallback to generic tutoring on DB failures
+  - [ ] Clear error messages for auth issues
+- [ ] Security validation
+  - [ ] Verify children only access own materials
+  - [ ] Test authentication on all new endpoints
+  - [ ] Validate no grade information leaks in frontend
 
-### Environment Setup
-- Set `NEXT_PUBLIC_API_URL` to production backend URL
-- Ensure CORS is configured for production domain
-- Test authentication flow in production environment
+### Completion Checklist
+- [ ] All backend services implemented and tested
+- [ ] All frontend components updated with context awareness
+- [ ] Database queries optimized and indexed
+- [ ] User testing shows dramatic improvement in experience
+- [ ] Documentation updated with final implementation details
+- [ ] Success metrics achieved (90% reduction in "What homework?" questions)
 
-### PM2 Configuration
-```bash
-# Build the application
-npm run build
+---
 
-# Start with PM2
-pm2 start npm --name "klio-tutor-frontend" -- start
+### Implementation Notes
+- **Start with Phase 1** - Backend foundation is crucial
+- **Test early and often** - Each phase should be functional before moving to next
+- **Use real data** - Test with actual lesson content and assignments
+- **Focus on user experience** - The AI should feel "magical" in knowing student's work
 
-# Monitor logs
-pm2 logs klio-tutor-frontend
-```
+---
 
-## Troubleshooting
-
-### Common Issues
-1. **Login 404 Error**: Check API endpoint URL in environment variables
-2. **CORS Errors**: Verify backend CORS configuration includes frontend URL
-3. **Styling Issues**: Clear Next.js cache with `rm -rf .next`
-4. **Token Errors**: Clear localStorage and try logging in again
-
-### Debug Mode
-```bash
-# Run with verbose logging
-npm run dev
-
-# Check browser console for detailed error messages
-# Verify network requests in browser dev tools
-```
-
-### Health Checks
-- Frontend: `http://localhost:3001`
-- Backend API: `http://localhost:5000/api/health`
-- Authentication: Test login with valid child credentials
-
-## What We're Building
-
-### 🎓 Vision: Accessible AI Educational Tutoring
-We're creating a cost-effective AI tutoring system that guides students through learning using proven educational methods like the Socratic approach.
-
-### 🚀 Current Capabilities (August 2025)
-- **GPT-5-nano Powered**: Cost-effective AI tutoring with high-quality educational interactions
-- **Socratic Tutoring**: AI guides students to discover answers rather than providing direct solutions
-- **Conversation Continuity**: Chain-of-thought preservation maintains context across sessions
-- **Multi-Subject Support**: Math, science, writing, reading with educational guidance
-- **K-12 Focused**: Age-appropriate language and educational approaches
-- **Real Coursework Integration**: AI works with actual assignments, worksheets, and lesson content
-- **Performance-Aware Tutoring**: AI knows student grades and suggests review for low-scoring work
-- **Smart Recommendations**: AI prioritizes incomplete work and areas needing improvement
-
-### 💰 Cost Effectiveness
-- **GPT-5-nano Model**: Most cost-effective reasoning model for educational applications
-- **Minimal Reasoning Effort**: Optimized for fast, educational responses
-- **Chain-of-Thought Caching**: Reduces repeated reasoning costs
-- **Scalable Architecture**: Cost-effective enough for widespread educational deployment
-
-### 🔮 Future Development Opportunities
-
-#### Educational Enhancement
-- **Learning Style Recognition**: Adapt explanations to different learning preferences
-- **Progress Tracking**: Monitor student understanding and learning patterns
-- **Curriculum Alignment**: Integration with educational standards
-- **Parent Reporting**: Detailed insights into student learning sessions
-
-#### Technical Improvements
-- **Voice Integration**: Natural speech input/output for accessibility
-- **Visual Learning**: Support for diagrams and mathematical notation
-- **Advanced Reasoning**: Higher reasoning effort for complex problems
-- **Multi-Modal Support**: Integration with images and documents
-
-### 🎯 Current Goals
-- **Accessible Tutoring**: Make quality educational guidance available to all students
-- **Cost-Effective Solution**: Leverage GPT-5-nano for affordable AI tutoring
-- **Educational Best Practices**: Implement proven teaching methods in AI form
-- **Student-Centered Learning**: Guide discovery rather than provide answers
-
-### 🌍 Impact Vision
-- Make personalized tutoring accessible regardless of economic background
-- Support students in developing critical thinking skills
-- Complement traditional education with AI-powered guidance
-- Create scalable educational technology that truly helps students learn
-
-## Support
-
-### Logs
-- Browser console for frontend errors
-- Network tab for API communication issues
-- PM2 logs for production deployment issues
-
-### Configuration Files
-- `next.config.mjs` - Next.js settings
-- `tailwind.config.js` - Styling configuration
-- `package.json` - Dependencies and scripts
+*This documentation serves as the blueprint for transforming the Klio AI Tutor from a generic educational chatbot into a revolutionary context-aware learning companion that truly understands and assists with the student's actual schoolwork.*

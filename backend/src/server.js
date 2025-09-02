@@ -32,8 +32,10 @@ const childAuthRoutes = require('./routes/childAuthRoutes');
 const scheduleRoutes = require('./routes/scheduleRoutes');
 const parentRoutes = require('./routes/parentRoutes');
 const customCategoriesRoutes = require('./routes/customCategoriesRoutes');
-const tutorRoutes = require('./routes/tutorRoutes');
 const parentNotesRoutes = require('./routes/parentNotesRoutes');
+
+// Import AI Tutor routes
+const aiTutorRoutes = require('./routes/aiTutorRoutes');
 
 // Import Stripe routes
 const stripeRoutes = require('./routes/stripeRoutes');
@@ -84,10 +86,19 @@ app.use('/api/materials', materialsRoutes);
 app.use('/api/weights', weightsRoutes);
 app.use('/api/custom-categories', customCategoriesRoutes); // Add Custom Categories routes
 app.use('/api/auth/child', childAuthRoutes);
-app.use('/api/tutor', tutorRoutes); // Add Tutor routes
 app.use('/api/parent', parentRoutes);
 app.use('/api/children', parentNotesRoutes); 
 app.use('/api/schedule', scheduleRoutes); // Add Schedule routes
+
+// Add request logging middleware for tutor routes
+app.use('/api/tutor', (req, res, next) => {
+  console.log(`🌐 Tutor API: ${req.method} ${req.url} from ${req.ip}`);
+  next();
+});
+
+// AI Tutor routes
+app.use('/api/tutor', aiTutorRoutes); // Add AI Tutor routes
+
 app.use('/api/stripe', stripeRoutes); // Add Stripe routes
 
 // Health check route
@@ -99,6 +110,7 @@ app.get('/api/health', (req, res) => {
     version: process.env.npm_package_version || '1.0.0'
   });
 });
+
 
 // Import error handlers
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');

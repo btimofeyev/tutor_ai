@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const parentSummaryService = require('../services/parentSummaryService');
+// Note: parentSummaryService removed during simplification
+// const parentSummaryService = require('../services/parentSummaryService');
 const { authenticateParent } = require('../middleware/auth');
 const logger = require('../utils/logger')('parentRoutes');
 
@@ -25,15 +26,14 @@ router.get('/children/:childId/summaries', async (req, res) => {
       });
     }
 
-    const summaries = await parentSummaryService.getSummariesForChild(
-      parseInt(childId), 
-      parseInt(limit)
-    );
+    // Simplified system: return empty summaries since chat system was simplified
+    const summaries = [];
 
     res.json({
       success: true,
       summaries,
-      total: summaries.length
+      total: 0,
+      message: 'Chat summaries not available in simplified mode'
     });
 
   } catch (error) {
@@ -63,16 +63,18 @@ router.get('/children/:childId/summary-stats', async (req, res) => {
       });
     }
 
-    const stats = await parentSummaryService.getSummaryStats(
-      parseInt(childId), 
-      parseInt(days)
-    );
-
-    if (!stats) {
-      return res.status(500).json({
-        error: 'Failed to calculate summary statistics'
-      });
-    }
+    // Simplified system: return basic stats structure
+    const stats = {
+      childId: parseInt(childId),
+      timeframe: parseInt(days),
+      totalSessions: 0,
+      averageSessionTime: 0,
+      conceptsCovered: 0,
+      improvementAreas: [],
+      strengths: [],
+      lastUpdated: new Date().toISOString(),
+      message: 'Detailed analytics not available in simplified mode'
+    };
 
     res.json({
       success: true,
@@ -101,7 +103,13 @@ router.post('/generate-summaries', async (req, res) => {
       });
     }
 
-    const result = await parentSummaryService.forceGenerateSummaries();
+    // Simplified system: summary generation not available
+    const result = {
+      message: 'Summary generation not available in simplified mode',
+      processed: 0,
+      errors: 0,
+      timestamp: new Date().toISOString()
+    };
 
     res.json({
       success: true,
@@ -123,7 +131,14 @@ router.post('/generate-summaries', async (req, res) => {
  */
 router.get('/summary-service/health', async (req, res) => {
   try {
-    const health = parentSummaryService.getHealthStatus();
+    // Simplified system: basic health status
+    const health = {
+      status: 'simplified',
+      lastUpdate: new Date().toISOString(),
+      serviceName: 'parentSummaryService',
+      version: '2.0.0-simplified',
+      message: 'Service simplified - basic functionality only'
+    };
     
     res.json({
       success: true,

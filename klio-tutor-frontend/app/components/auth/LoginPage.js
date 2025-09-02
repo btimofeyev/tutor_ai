@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import Image from 'next/image';
 
 export default function LoginPage() {
@@ -53,7 +53,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4 overflow-hidden">
+    <div className="min-h-screen bg-[#F5F2ED] flex items-center justify-center p-4 overflow-hidden">
       <div className="w-full max-w-md max-h-screen overflow-y-auto">
         {/* Header */}
         <div className="text-center mb-6">
@@ -65,36 +65,36 @@ export default function LoginPage() {
             className="mx-auto mb-3"
             priority
           />
-          <h1 className="text-3xl font-bold text-gray-900 mb-2 font-fredoka">
+          <h1 className="text-3xl font-bold text-[#4A4A4A] mb-2 font-fredoka">
             Klio AI Tutor
           </h1>
-          <p className="text-base text-gray-600 mb-3">
+          <p className="text-base text-[#7A7A7A] mb-3">
             Your personal learning companion
           </p>
           
           {/* Feature highlights */}
           <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="bg-white/70 rounded-lg p-3 text-center">
+            <div className="bg-white/80 rounded-xl p-3 text-center shadow-sm border border-[#7FB069]/20">
               <div className="text-2xl mb-1">📚</div>
-              <p className="text-xs text-gray-600 font-medium">Get Homework Help</p>
+              <p className="text-xs text-[#7A7A7A] font-medium">Get Homework Help</p>
             </div>
-            <div className="bg-white/70 rounded-lg p-3 text-center">
+            <div className="bg-white/80 rounded-xl p-3 text-center shadow-sm border border-[#7FB069]/20">
               <div className="text-2xl mb-1">🤔</div>
-              <p className="text-xs text-gray-600 font-medium">Learn by Thinking</p>
+              <p className="text-xs text-[#7A7A7A] font-medium">Learn by Thinking</p>
             </div>
-            <div className="bg-white/70 rounded-lg p-3 text-center">
+            <div className="bg-white/80 rounded-xl p-3 text-center shadow-sm border border-[#7FB069]/20">
               <div className="text-2xl mb-1">🔒</div>
-              <p className="text-xs text-gray-600 font-medium">Safe & Educational</p>
+              <p className="text-xs text-[#7A7A7A] font-medium">Safe & Educational</p>
             </div>
           </div>
         </div>
 
         {/* Login Form */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+        <div className="bg-white/90 rounded-2xl border border-[#D4CAC4] p-6 shadow-xl backdrop-blur-sm">
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Username Field */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="username" className="block text-sm font-medium text-[#4A4A4A] mb-2">
                 Username
               </label>
               <input
@@ -111,25 +111,25 @@ export default function LoginPage() {
 
             {/* PIN Field with Pin Pad */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-[#4A4A4A] mb-2">
                 PIN
               </label>
               
               {/* PIN Display */}
-              <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="mb-4 p-4 bg-[#F0F8ED] rounded-xl border border-[#7FB069]/30 shadow-sm">
                 <div className="flex justify-center space-x-3">
                   {[...Array(4)].map((_, index) => (
                     <div
                       key={index}
                       className={`w-5 h-5 rounded-full border-2 transition-colors ${
                         index < pin.length
-                          ? 'bg-blue-500 border-blue-500'
-                          : 'bg-white border-gray-300'
+                          ? 'bg-[#7FB069] border-[#7FB069]'
+                          : 'bg-white border-[#D4CAC4]'
                       }`}
                     />
                   ))}
                 </div>
-                <p className="text-center text-xs text-gray-500 mt-2">
+                <p className="text-center text-xs text-[#8A8A8A] mt-2">
                   Enter your {pin.length > 0 ? `${4 - pin.length} more` : '4'} digit PIN
                 </p>
               </div>
@@ -142,7 +142,7 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => handlePinInput(number.toString())}
                     disabled={loading || pin.length >= 4}
-                    className="w-16 h-16 bg-white border-2 border-gray-200 rounded-xl text-xl font-bold text-gray-800 hover:bg-blue-50 hover:border-blue-300 active:bg-blue-100 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-sm flex items-center justify-center"
+                    className="w-16 h-16 bg-white border-2 border-[#D4CAC4] rounded-xl text-xl font-bold text-[#4A4A4A] hover:bg-[#F0F8ED] hover:border-[#7FB069] active:bg-[#E8F5E0] transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-sm flex items-center justify-center"
                   >
                     {number}
                   </button>
@@ -151,7 +151,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleClearPin}
                   disabled={loading || pin.length === 0}
-                  className="w-16 h-16 bg-red-50 border-2 border-red-200 rounded-xl text-xs font-bold text-red-600 hover:bg-red-100 hover:border-red-300 active:bg-red-200 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-sm flex items-center justify-center"
+                  className="w-16 h-16 bg-[#FCE8E6] border-2 border-[#E88873]/30 rounded-xl text-xs font-bold text-[#E88873] hover:bg-[#F8D7D4] hover:border-[#E88873] active:bg-[#F4C2BC] transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-sm flex items-center justify-center"
                 >
                   Clear
                 </button>
@@ -167,7 +167,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleBackspace}
                   disabled={loading || pin.length === 0}
-                  className="w-16 h-16 bg-yellow-50 border-2 border-yellow-200 rounded-xl text-lg font-bold text-yellow-700 hover:bg-yellow-100 hover:border-yellow-300 active:bg-yellow-200 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-sm flex items-center justify-center"
+                  className="w-16 h-16 bg-[#FFF8E1] border-2 border-[#F4D06F]/30 rounded-xl text-lg font-bold text-[#D4A827] hover:bg-[#FFF4CC] hover:border-[#F4D06F] active:bg-[#FFEFB5] transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-sm flex items-center justify-center"
                 >
                   ⌫
                 </button>
@@ -176,8 +176,8 @@ export default function LoginPage() {
 
             {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-700 text-sm">{error}</p>
+              <div className="bg-[#FCE8E6] border border-[#E88873]/30 rounded-xl p-3">
+                <p className="text-[#D6776B] text-sm">{error}</p>
               </div>
             )}
 
@@ -202,19 +202,19 @@ export default function LoginPage() {
 
         {/* Help Text */}
         <div className="text-center mt-4 space-y-2">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[#8A8A8A]">
             Need help? Ask your parent for your username and PIN.
           </p>
-          <div className="bg-white/70 rounded-lg p-3 text-left">
-            <h3 className="font-semibold text-gray-800 text-xs mb-1">For Parents:</h3>
-            <p className="text-xs text-gray-600 mb-1">
+          <div className="bg-white/80 rounded-xl p-3 text-left shadow-sm border border-[#D4CAC4]">
+            <h3 className="font-semibold text-[#4A4A4A] text-xs mb-1">For Parents:</h3>
+            <p className="text-xs text-[#7A7A7A] mb-1">
               Manage accounts at{' '}
               <a href={process.env.NODE_ENV === 'production' ? 'https://klioai.com' : 'http://localhost:3000'} 
-                 className="text-blue-600 hover:underline font-medium">
+                 className="text-[#7FB069] hover:underline font-medium">
                 klioai.com
               </a>
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-[#8A8A8A]">
               💡 AI plan subscription required
             </p>
           </div>

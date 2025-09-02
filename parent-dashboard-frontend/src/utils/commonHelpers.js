@@ -206,10 +206,60 @@ export const getFromLocalStorage = (key, defaultValue = null) => {
   }
 };
 
+// Check if localStorage has space available
+export const checkStorageSpace = () => {
+  if (typeof window === 'undefined') return false;
+  
+  try {
+    const testKey = '__storage_test__';
+    localStorage.setItem(testKey, 'test');
+    localStorage.removeItem(testKey);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+// Clean up old processing entries from sessionStorage
+export const cleanupOldProcessingEntries = () => {
+  if (typeof window === 'undefined') return 0;
+  
+  let cleanedCount = 0;
+  try {
+    const keys = Object.keys(sessionStorage);
+    const processingKeys = keys.filter(k => k.startsWith('processing_'));
+    
+    processingKeys.forEach(key => {
+      try {
+        const data = JSON.parse(sessionStorage.getItem(key));
+        // Remove entries older than 1 hour or without timestamp
+        if (!data.timestamp || Date.now() - data.timestamp > 3600000) {
+          sessionStorage.removeItem(key);
+          cleanedCount++;
+        }
+      } catch (e) {
+        // Remove corrupted entries
+        sessionStorage.removeItem(key);
+        cleanedCount++;
+      }
+    });
+  } catch (error) {
+    console.warn('Error cleaning up old processing entries:', error);
+  }
+  
+  return cleanedCount;
+};
+
 export const saveToLocalStorage = (key, value) => {
   if (typeof window === 'undefined') return false;
 
   try {
+    // Check if we have space before attempting to save
+    if (!checkStorageSpace()) {
+      console.warn('localStorage quota exceeded, cannot save:', key);
+      return false;
+    }
+    
     localStorage.setItem(key, JSON.stringify(value));
     return true;
   } catch (error) {

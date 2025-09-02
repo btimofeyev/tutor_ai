@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../utils/api';
 import { useToast } from './useToast';
+import { cleanupOldProcessingEntries } from '../utils/commonHelpers';
 
 /**
  * Hook to manage AI processing notifications
@@ -15,11 +16,18 @@ export function useProcessingNotifications() {
 
   // Add material to processing queue
   const addProcessingMaterial = useCallback((materialId, title = 'Material') => {
+    // Clean up old processing entries before adding new ones
+    cleanupOldProcessingEntries();
+    
     setProcessingMaterials(prev => new Set([...prev, materialId]));
 
     // Store material info for later notification
-    const materialInfo = { id: materialId, title };
-    localStorage.setItem(`processing_${materialId}`, JSON.stringify(materialInfo));
+    const materialInfo = { id: materialId, title, timestamp: Date.now() };
+    try {
+      sessionStorage.setItem(`processing_${materialId}`, JSON.stringify(materialInfo));
+    } catch (error) {
+      console.warn('Failed to store processing notification:', error);
+    }
   }, []);
 
   // Remove material from processing queue
@@ -30,8 +38,12 @@ export function useProcessingNotifications() {
       return newSet;
     });
 
-    // Clean up localStorage
-    localStorage.removeItem(`processing_${materialId}`);
+    // Clean up sessionStorage
+    try {
+      sessionStorage.removeItem(`processing_${materialId}`);
+    } catch (error) {
+      console.warn('Failed to remove processing notification:', error);
+    }
     checkedMaterials.current.add(materialId);
   }, []);
 
@@ -43,7 +55,7 @@ export function useProcessingNotifications() {
 
       if (status.processing_status === 'completed') {
         // Get stored material info
-        const storedInfo = localStorage.getItem(`processing_${materialId}`);
+        const storedInfo = sessionStorage.getItem(`processing_${materialId}`);
         const materialInfo = storedInfo ? JSON.parse(storedInfo) : { title: 'Material' };
 
         showSuccess(`✨ AI analysis completed for "${materialInfo.title}"`);
@@ -57,7 +69,7 @@ export function useProcessingNotifications() {
         return true;
       } else if (status.processing_status === 'failed') {
         // Get stored material info
-        const storedInfo = localStorage.getItem(`processing_${materialId}`);
+        const storedInfo = sessionStorage.getItem(`processing_${materialId}`);
         const materialInfo = storedInfo ? JSON.parse(storedInfo) : { title: 'Material' };
 
         showError(`❌ AI analysis failed for "${materialInfo.title}"`);
@@ -114,17 +126,21 @@ export function useProcessingNotifications() {
     };
   }, [processingMaterials.size, pollProcessingStatus]);
 
-  // Load processing materials from localStorage on mount
+  // Load processing materials from sessionStorage on mount
   useEffect(() => {
     const storedMaterials = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key?.startsWith('processing_')) {
-        const materialId = key.replace('processing_', '');
-        if (!checkedMaterials.current.has(materialId)) {
-          storedMaterials.push(materialId);
+    try {
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key?.startsWith('processing_')) {
+          const materialId = key.replace('processing_', '');
+          if (!checkedMaterials.current.has(materialId)) {
+            storedMaterials.push(materialId);
+          }
         }
       }
+    } catch (error) {
+      console.warn('Error loading processing materials from sessionStorage:', error);
     }
 
     if (storedMaterials.length > 0) {

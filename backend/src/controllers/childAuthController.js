@@ -14,11 +14,12 @@ const JWT_EXPIRES_IN = '2h'; // 2 hour sessions for children
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 // Generate tokens
-const generateTokens = (childId, childName) => {
+const generateTokens = (childId, childName, childGrade = null) => {
   const accessToken = jwt.sign(
     {
       child_id: childId,
       name: childName,
+      grade: childGrade,
       type: 'child_access'
     },
     JWT_SECRET,
@@ -99,8 +100,10 @@ exports.childLogin = async (req, res) => {
       });
     }
 
+    // Note: Session clearing simplified - using new simple session system
+
     // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(child.id, child.name);
+    const { accessToken, refreshToken } = generateTokens(child.id, child.name, child.grade);
 
     // Log successful login
     await supabase

@@ -64,6 +64,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Chat interface specific styles */
+body.chat-interface {
+  height: 100vh;
+  overflow: hidden;
+}
+
 /* Animations */
 @keyframes bounce-gentle {
   0%, 100% { transform: translate3d(0, -5%, 0); }

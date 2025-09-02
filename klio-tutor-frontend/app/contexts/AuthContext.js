@@ -9,17 +9,24 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored authentication
-    const storedToken = localStorage.getItem('child_token');
-    const storedChild = localStorage.getItem('child_data');
-    
-    if (storedToken && storedChild) {
-      try {
-        setChild(JSON.parse(storedChild));
-      } catch (error) {
-        console.error('Failed to parse stored child data:', error);
-        localStorage.removeItem('child_token');
-        localStorage.removeItem('child_data');
+    // Check for stored authentication - only on client side
+    if (typeof window !== 'undefined') {
+      const storedToken = localStorage.getItem('child_token');
+      const storedChild = localStorage.getItem('child_data');
+      
+      // Check for existing auth data
+      
+      if (storedToken && storedChild) {
+        try {
+          const childData = JSON.parse(storedChild);
+          setChild(childData);
+        } catch (error) {
+          console.error('Failed to parse stored child data:', error);
+          localStorage.removeItem('child_token');
+          localStorage.removeItem('child_data');
+          localStorage.removeItem('child_refresh_token'); 
+          localStorage.removeItem('session_id');
+        }
       }
     }
     setLoading(false);
@@ -38,11 +45,13 @@ export function AuthProvider({ children }) {
       const data = await response.json();
       
       if (data.success) {
-        // Store access token and child data
-        localStorage.setItem('child_token', data.tokens.accessToken);
-        localStorage.setItem('child_refresh_token', data.tokens.refreshToken);
-        localStorage.setItem('child_data', JSON.stringify(data.child));
-        // DON'T store session_id initially - this signals fresh login
+        // Store access token and child data - only on client side
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('child_token', data.tokens.accessToken);
+          localStorage.setItem('child_refresh_token', data.tokens.refreshToken);
+          localStorage.setItem('child_data', JSON.stringify(data.child));
+          // DON'T store session_id initially - this signals fresh login
+        }
         
         setChild({
           id: data.child.id,
@@ -50,27 +59,6 @@ export function AuthProvider({ children }) {
           name: data.child.name,
           grade: data.child.grade
         });
-
-        // Force start a new session on login
-        try {
-          const sessionResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/session/new`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${data.tokens.accessToken}`
-            },
-            body: JSON.stringify({ reason: 'login' })
-          });
-          
-          const sessionData = await sessionResponse.json();
-          if (sessionData.success && sessionData.sessionId) {
-            // Only store session_id after we successfully create a new session
-            localStorage.setItem('session_id', sessionData.sessionId);
-            console.log('New session started on login:', sessionData.sessionId);
-          }
-        } catch (sessionError) {
-          console.error('Failed to start new session on login:', sessionError);
-        }
 
         return { success: true };
       } else {
@@ -85,33 +73,56 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     // End current session before logout
     try {
-      const token = localStorage.getItem('child_token');
-      if (token) {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/session/end`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ reason: 'logout' })
-        });
-        console.log('Session ended on logout');
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('child_token');
+        const currentSessionId = sessionStorage.getItem('current_session_id');
+        
+        if (token && currentSessionId) {
+          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/session/end`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ 
+              sessionId: currentSessionId,
+              reason: 'logout' 
+            })
+          });
+          console.log('🔚 Session ended on logout');
+        }
       }
     } catch (error) {
       console.error('Failed to end session on logout:', error);
     }
 
-    // Clear all local storage
-    localStorage.removeItem('child_token');
-    localStorage.removeItem('child_refresh_token');
-    localStorage.removeItem('child_data');
-    localStorage.removeItem('session_id');
+    // Clear all local storage and session storage - only on client side
+    if (typeof window !== 'undefined') {
+      // Clear localStorage
+      localStorage.removeItem('child_token');
+      localStorage.removeItem('child_refresh_token');
+      localStorage.removeItem('child_data');
+      localStorage.removeItem('session_id');
+      
+      // Clear sessionStorage (conversation-related data)
+      const currentSessionId = sessionStorage.getItem('current_session_id');
+      if (currentSessionId) {
+        sessionStorage.removeItem(`response_${currentSessionId}`);
+        sessionStorage.removeItem(`conversation_${currentSessionId}`);
+      }
+      sessionStorage.removeItem('current_session_id');
+      
+      console.log('🧹 Cleared all authentication and session data on logout');
+    }
     setChild(null);
   };
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('child_token');
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('child_token');
+      return token ? { 'Authorization': `Bearer ${token}` } : {};
+    }
+    return {};
   };
 
   // Handle token expiration - centralized logout

@@ -32,7 +32,8 @@ exports.verifyChildToken = async (req, res, next) => {
     // Add child info to request
     req.child = {
       child_id: decoded.child_id,
-      name: decoded.name
+      name: decoded.name,
+      grade: decoded.grade
     };
 
     next();

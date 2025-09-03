@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import AITutorInterface from '../components/tutor/AITutorInterface';
+import AITutorInterface from '../components/tutor/SimpleChatInterface';
 
 /**
  * Main Tutor Page - Entry point for AI tutoring session

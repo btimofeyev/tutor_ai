@@ -34,4 +34,9 @@ router.delete('/conversation/:sessionId', enforceAIAccess, simpleTutorController
 // Optional: Get conversation history (legacy)
 router.get('/session/:sessionId/history', enforceAIAccess, simpleTutorController.getHistory);
 
+// Learning context endpoints for enhanced AI tutoring
+router.get('/context/:childId', enforceAIAccess, simpleTutorController.getLearningContext);
+router.get('/material/:materialId/context', enforceAIAccess, simpleTutorController.getMaterialContext);
+router.post('/problem-attempt', enforceAIAccess, simpleTutorController.recordProblemAttempt);
+
 module.exports = router;

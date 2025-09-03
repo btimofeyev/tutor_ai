@@ -482,20 +482,22 @@ Ensure test database has:
 ## 📋 Implementation Progress Tracker
 
 ### Phase 1: Backend Learning Context Service
-- [ ] Create `backend/src/services/learningContextService.js`
-  - [ ] Implement `getNextAssignments(childId)` method
-  - [ ] Implement `getMaterialContext(materialId)` method  
-  - [ ] Implement `getRecentProgress(childId)` method
-  - [ ] Add proper error handling and logging
-- [ ] Enhance `backend/src/services/simpleOpenAIService.js`
-  - [ ] Add `detectHomeworkIntent(message)` method
-  - [ ] Add `buildContextAwarePrompt(childName, context)` method
-  - [ ] Modify `sendMessage()` to include learning context
+- [x] Create `backend/src/services/learningContextService.js`
+  - [x] Implement `getNextAssignments(childId)` method
+  - [x] Implement `getMaterialContext(materialId)` method  
+  - [x] Implement `getRecentProgress(childId)` method
+  - [x] Add proper error handling and logging
+  - [x] Added bonus methods: `getMaterialsNeedingGrades()`, `getLearningContextSummary()`, `formatContextForPrompt()`
+- [x] Enhance `backend/src/services/simpleOpenAIService.js`
+  - [x] Add `detectHomeworkIntent(message)` method
+  - [x] Add `buildContextAwarePrompt(childName, context)` method
+  - [x] Modify `sendMessage()` to include learning context
   - [ ] Test context integration with AI responses
-- [ ] Add new API endpoints in `backend/src/routes/aiTutorRoutes.js`
-  - [ ] Add `GET /context/:childId` endpoint
-  - [ ] Add `GET /material/:materialId/context` endpoint
-  - [ ] Add `POST /problem-attempt` endpoint for tracking
+- [x] Add new API endpoints in `backend/src/routes/aiTutorRoutes.js`
+  - [x] Add `GET /context/:childId` endpoint
+  - [x] Add `GET /material/:materialId/context` endpoint
+  - [x] Add `POST /problem-attempt` endpoint for tracking
+  - [x] Add corresponding controller methods in `simpleTutorController.js`
   - [ ] Test all endpoints with authentication
 
 ### Phase 2: Frontend Context Integration

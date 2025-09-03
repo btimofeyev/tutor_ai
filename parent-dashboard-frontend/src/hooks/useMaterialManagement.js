@@ -167,14 +167,21 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
   }, [refreshChildData, invalidateChildCache]);
 
   const deleteLesson = useCallback(async (materialId) => {
+    console.log('Attempting to delete material:', materialId);
     try {
-      await api.delete(`/materials/${materialId}`);
+      const response = await api.delete(`/materials/${materialId}`);
+      console.log('Delete response:', response.data);
       if (refreshChildData) await refreshChildData();
       return { success: true, message: 'Material deleted.' };
     } catch (error) {
+      console.error('Delete material error:', error);
+      console.error('Error response:', error.response?.data);
       return { success: false, error: error.response?.data?.error || "Failed to delete lesson" };
     }
   }, [refreshChildData]);
+
+  // Alias for backwards compatibility
+  const deleteMaterial = deleteLesson;
 
   const createNewUnit = useCallback(async (name, childSubjectId) => {
     if (!name.trim() || !childSubjectId) return { success: false, error: 'Name and subject are required.' };
@@ -232,7 +239,7 @@ export function useMaterialManagement(refreshChildData, invalidateChildCache) {
     uploading, savingLesson, isSavingEdit,
     handleLessonUpload, handleManualMaterialCreation, handleSaveLesson,
     updateLessonApprovalField, startEditingLesson, cancelEditingLesson,
-    saveEditedLesson, toggleLessonCompletion, deleteLesson,
+    saveEditedLesson, toggleLessonCompletion, deleteLesson, deleteMaterial,
     createNewUnit, createNewLessonContainer, updateUnit, deleteUnit,
   };
 }

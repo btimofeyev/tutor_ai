@@ -1,5 +1,6 @@
 const logger = require('../utils/logger')('simpleTutorController');
 const simpleOpenAIService = require('../services/simpleOpenAIService');
+const learningContextService = require('../services/learningContextService');
 
 /**
  * Simple Tutor Controller - Clean ChatGPT-like chat functionality
@@ -524,6 +525,145 @@ class SimpleTutorController {
       res.status(500).json({
         success: false,
         error: 'Failed to cleanup empty conversations'
+      });
+    }
+  }
+
+  /**
+   * Get learning context for a child - includes incomplete assignments, recent progress
+   */
+  getLearningContext = async (req, res) => {
+    try {
+      const { childId } = req.params;
+      const requestingChildId = req.child?.child_id;
+      
+      // Ensure child can only access their own learning context
+      if (childId !== requestingChildId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied'
+        });
+      }
+      
+      logger.info(`Fetching learning context for child: ${childId}`);
+      
+      const context = await learningContextService.getLearningContextSummary(childId);
+      
+      res.json({
+        success: true,
+        context: {
+          // New status-based categories
+          currentWork: context.currentWork,
+          upcoming: context.upcoming,
+          needsReview: context.needsReview,
+          
+          // Legacy fields for backward compatibility
+          nextAssignments: context.nextAssignments,
+          recentProgress: context.recentProgress,
+          needingGrades: context.needingGrades,
+          hasActiveWork: context.hasActiveWork,
+          hasRecentSuccess: context.hasRecentSuccess
+        }
+      });
+      
+    } catch (error) {
+      logger.error('Error getting learning context:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get learning context'
+      });
+    }
+  }
+
+  /**
+   * Get detailed context for a specific material
+   */
+  getMaterialContext = async (req, res) => {
+    try {
+      const { materialId } = req.params;
+      const requestingChildId = req.child?.child_id;
+      
+      logger.info(`Fetching material context for: ${materialId}`);
+      
+      const materialContext = await learningContextService.getMaterialContext(materialId);
+      
+      // Verify the material belongs to the requesting child
+      const materialChildId = materialContext?.child_subjects?.children?.id;
+      if (materialChildId !== requestingChildId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied to this material'
+        });
+      }
+      
+      res.json({
+        success: true,
+        material: materialContext
+      });
+      
+    } catch (error) {
+      logger.error('Error getting material context:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get material context'
+      });
+    }
+  }
+
+  /**
+   * Record a problem attempt for tracking student progress
+   */
+  recordProblemAttempt = async (req, res) => {
+    try {
+      const { materialId, problemNumber, isCorrect, timeSpent, studentWork } = req.body;
+      const childId = req.child?.child_id;
+      
+      if (!materialId || problemNumber === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: 'Material ID and problem number are required'
+        });
+      }
+      
+      logger.info(`Recording problem attempt: child ${childId}, material ${materialId}, problem ${problemNumber}`);
+      
+      // Store in problem_attempts table
+      const supabase = require('../utils/supabaseClient');
+      const { data, error } = await supabase
+        .from('problem_attempts')
+        .insert([{
+          child_id: childId,
+          material_id: materialId,
+          problem_data: {
+            problemNumber,
+            timeSpent,
+            studentWork
+          },
+          is_correct: isCorrect,
+          time_spent_seconds: timeSpent,
+          created_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+      
+      if (error) {
+        logger.error('Error recording problem attempt:', error);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to record problem attempt'
+        });
+      }
+      
+      res.json({
+        success: true,
+        attempt: data
+      });
+      
+    } catch (error) {
+      logger.error('Error recording problem attempt:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to record problem attempt'
       });
     }
   }

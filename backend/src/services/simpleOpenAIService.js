@@ -1,6 +1,7 @@
 const OpenAI = require('openai');
 const logger = require('../utils/logger')('simpleOpenAIService');
 const supabase = require('../utils/supabaseClient');
+const learningContextService = require('./learningContextService');
 
 /**
  * Simple OpenAI Service - Enhanced with Responses API
@@ -67,14 +68,60 @@ class SimpleOpenAIService {
       // Get child info from session metadata
       const sessionData = await this.getSessionData(sessionId);
       const childGrade = sessionData?.metadata?.child_grade || null;
+      const childId = sessionData?.child_id;
       
-      // Get or initialize conversation history
-      let conversation = this.conversationHistory.get(sessionId) || [
-        {
-          role: 'system',
-          content: this.buildStudyAssistantPrompt(childName, childGrade)
+      // Get learning context first (needed for assignment matching)
+      let learningContext = null;
+      let homeworkIntent = { needsContext: false, specificAssignment: null, confidence: 0 };
+      
+      if (childId) {
+        try {
+          // Fetch full learning context
+          learningContext = await learningContextService.getLearningContextSummary(childId);
+          logger.info(`Fetched learning context for child ${childId}: ${learningContext.nextAssignments.length} assignments`);
+          
+          // Detect homework intent with assignment matching
+          homeworkIntent = this.detectHomeworkIntent(message, learningContext.nextAssignments);
+          
+          // Filter to specific assignment if one was matched
+          if (homeworkIntent.specificAssignment) {
+            learningContext = this.filterToSpecificAssignment(learningContext, homeworkIntent.specificAssignment);
+            logger.info(`🎯 Context filtered to specific assignment: "${homeworkIntent.specificAssignment.title}" (confidence: ${homeworkIntent.confidence.toFixed(2)})`);
+          } else if (homeworkIntent.needsContext) {
+            logger.info(`📚 Using all available assignments context (no specific match found)`);
+          }
+          
+        } catch (error) {
+          logger.warn('Could not fetch learning context:', error.message);
+          // Fallback to simple intent detection without assignments
+          homeworkIntent = this.detectHomeworkIntent(message, []);
         }
-      ];
+      } else {
+        // Fallback for no childId
+        homeworkIntent = this.detectHomeworkIntent(message, []);
+      }
+      
+      // Get or initialize conversation history with context-aware system prompt
+      let conversation = this.conversationHistory.get(sessionId) || [];
+      
+      if (conversation.length === 0) {
+        // New conversation - use learning context if homework intent detected
+        const contextToUse = homeworkIntent.needsContext ? learningContext : null;
+        const systemPrompt = this.buildContextAwarePrompt(childName, childGrade, contextToUse);
+        conversation = [
+          {
+            role: 'system',
+            content: systemPrompt
+          }
+        ];
+      } else if (homeworkIntent.needsContext && learningContext && learningContext.hasActiveWork) {
+        // Update system prompt if we have homework intent with learning context
+        const newSystemPrompt = this.buildContextAwarePrompt(childName, childGrade, learningContext);
+        conversation[0] = {
+          role: 'system',
+          content: newSystemPrompt
+        };
+      }
       
       // Add current user message
       conversation.push({
@@ -597,6 +644,399 @@ Guidelines:
 - When asked about their grade, respond with "${childGrade ? `grade ${childGrade}` : 'I don\'t have your grade information'}"
 
 Remember: You're here to help ${childName} learn and understand, not to do their work for them. Guide them to discover answers through questions and explanations.`;
+  }
+
+  /**
+   * Calculate string similarity score using Levenshtein-like algorithm
+   * @param {string} str1 - First string
+   * @param {string} str2 - Second string
+   * @returns {number} Similarity score between 0 and 1
+   */
+  calculateSimilarity(str1, str2) {
+    if (!str1 || !str2) return 0;
+    
+    const s1 = str1.toLowerCase().trim();
+    const s2 = str2.toLowerCase().trim();
+    
+    if (s1 === s2) return 1;
+    
+    // Check for exact substring matches
+    if (s1.includes(s2) || s2.includes(s1)) {
+      return 0.8;
+    }
+    
+    // Word-based matching for titles
+    const words1 = s1.split(/\s+/).filter(w => w.length > 2);
+    const words2 = s2.split(/\s+/).filter(w => w.length > 2);
+    
+    if (words1.length === 0 || words2.length === 0) return 0;
+    
+    let matchingWords = 0;
+    for (const word1 of words1) {
+      for (const word2 of words2) {
+        if (word1.includes(word2) || word2.includes(word1) || word1 === word2) {
+          matchingWords++;
+          break;
+        }
+      }
+    }
+    
+    return matchingWords / Math.max(words1.length, words2.length);
+  }
+
+  /**
+   * Get content type priority bonus for preferring student work over teacher lessons
+   * @param {Object} assignment - Assignment object
+   * @returns {number} Priority multiplier (0.4-1.0)
+   */
+  getContentTypePriority(assignment) {
+    const title = assignment.title?.toLowerCase() || '';
+    const contentType = assignment.content_type_suggestion?.toLowerCase() || '';
+    const dbContentType = assignment.content_type?.toLowerCase() || '';
+    const subjectName = assignment.child_subjects?.subjects?.name?.toLowerCase() || '';
+    
+    // HIGHEST PRIORITY: Use database content_type as primary indicator
+    // Student work always gets highest priority
+    if (['worksheet', 'assignment', 'practice', 'review', 'test', 'quiz'].includes(dbContentType)) {
+      logger.info(`🎯 High priority content: "${assignment.title}" (database: ${dbContentType})`);
+      return 1.0; // Full bonus for confirmed student work
+    }
+    
+    // LOWEST PRIORITY: Teacher lessons from database
+    if (dbContentType === 'lesson') {
+      // Exception: Some lesson titles might actually be student work incorrectly categorized
+      if (title.includes('worksheet') || title.includes('practice problem set') || 
+          title.includes('mixed practice') || title.includes('homeschool')) {
+        logger.info(`🎯 High priority content: "${assignment.title}" (lesson with student work title)`);
+        return 0.9; // Slightly lower than pure worksheets but still high
+      }
+      logger.info(`🔽 Low priority content: "${assignment.title}" (database: lesson)`);
+      return 0.3; // Very low priority for teacher lessons
+    }
+    
+    // Fallback to title-based analysis when database content_type is unclear
+    // Highest priority: Student worksheets/assignments (actual homework)
+    if (title.includes('worksheet') || title.includes('assignment') || 
+        title.includes('practice problem set') || title.includes('mixed practice') ||
+        contentType === 'worksheet' || title.includes('homeschool')) {
+      logger.info(`🎯 High priority content: "${assignment.title}" (student work by title)`);
+      return 0.9; // High but slightly lower than database-confirmed
+    }
+    
+    // Medium-high priority: Reviews, tests, exercises (still student work)
+    if (title.includes('review') || title.includes('test') || title.includes('quiz') || 
+        title.includes('exam') || contentType === 'review' || contentType === 'test') {
+      logger.info(`📋 Medium priority content: "${assignment.title}" (assessment)`);
+      return 0.8;
+    }
+    
+    // Medium priority: Discussions, think exercises
+    if (title.includes('think') || title.includes('discuss') || title.includes('analysis')) {
+      logger.info(`💭 Medium priority content: "${assignment.title}" (discussion)`);
+      return 0.7;
+    }
+    
+    // Medium priority: Subject-specific lesson formats that are student work
+    // English/Literature: "After Reading from THE OUTLAWS..." or "Chapter X Review"
+    if ((title.includes('after reading') && title.includes('think') && title.includes('discuss')) ||
+        (title.includes('chapter') && title.includes('review')) ||
+        (title.includes('section') && title.includes('review'))) {
+      logger.info(`📚 Medium priority content: "${assignment.title}" (subject lesson assignment)`);
+      return 0.7;
+    }
+    
+    // Lower priority: Generic lesson content (likely teacher instructional material)
+    if (title.includes('lesson') && !title.includes('problems about') && 
+        !title.includes('review') && !title.includes('after reading') &&
+        !title.includes('worksheet') && !title.includes('assignment')) {
+      logger.info(`🔽 Low priority content: "${assignment.title}" (generic lesson content)`);
+      return 0.4; // Reduced weight for generic lessons
+    }
+    
+    logger.info(`📄 Default priority content: "${assignment.title}"`);
+    return 0.6; // Default
+  }
+
+  /**
+   * Get problem richness score based on number and depth of problems
+   * @param {Object} assignment - Assignment object
+   * @returns {number} Richness multiplier (0.3-1.0)
+   */
+  getProblemRichnessScore(assignment) {
+    // Parse lesson_json if it's a string, or use directly if it's already an object
+    let lessonData = null;
+    if (assignment.lesson_json) {
+      try {
+        lessonData = typeof assignment.lesson_json === 'string' 
+          ? JSON.parse(assignment.lesson_json) 
+          : assignment.lesson_json;
+      } catch (error) {
+        logger.warn(`Error parsing lesson_json for "${assignment.title}":`, error);
+      }
+    }
+    
+    // Count problems from various sources in lesson_json
+    const problemsWithContext = lessonData?.problems_with_context?.length || 0;
+    const worksheetQuestions = lessonData?.worksheet_questions?.length || 0;
+    const tasksOrQuestions = lessonData?.tasks_or_questions?.length || 0;
+    
+    const totalProblems = Math.max(problemsWithContext, worksheetQuestions, tasksOrQuestions);
+    
+    // Also consider content richness indicators from lesson_json
+    const hasDetailedContent = lessonData?.full_text_content?.length > 1000;
+    const hasLearningObjectives = lessonData?.learning_objectives?.length > 3;
+    
+    logger.info(`🔍 Problem count breakdown for "${assignment.title}": problems_with_context=${problemsWithContext}, worksheet_questions=${worksheetQuestions}, tasks_or_questions=${tasksOrQuestions}, max=${totalProblems}`);
+    
+    let richnessScore = 0.3; // Base score
+    
+    // Problem count scoring
+    if (totalProblems >= 25) {
+      richnessScore = 1.0; // Comprehensive worksheet (25+ problems)
+    } else if (totalProblems >= 15) {
+      richnessScore = 0.9; // Large assignment (15-24 problems)
+    } else if (totalProblems >= 10) {
+      richnessScore = 0.8; // Medium assignment (10-14 problems)
+    } else if (totalProblems >= 5) {
+      richnessScore = 0.6; // Small assignment (5-9 problems)
+    } else if (totalProblems > 0) {
+      richnessScore = 0.4; // Some problems (better than nothing)
+    } else {
+      richnessScore = 0.3; // No problems found
+    }
+    
+    // Bonus for rich content - but this should boost even low problem counts
+    if (hasDetailedContent) {
+      richnessScore += 0.2; // Larger bonus for detailed content
+      logger.info(`📋 Rich content bonus applied for "${assignment.title}"`);
+    }
+    if (hasLearningObjectives) {
+      richnessScore += 0.1; // Bonus for learning objectives
+      logger.info(`🎯 Learning objectives bonus applied for "${assignment.title}"`);
+    }
+    
+    // For assignments with no problems but rich content, give minimum viable score
+    if (totalProblems === 0 && hasDetailedContent) {
+      richnessScore = Math.max(richnessScore, 0.5);
+      logger.info(`📄 Minimum viable score applied for content-rich assignment "${assignment.title}"`);
+    }
+    
+    // Cap at 1.0
+    richnessScore = Math.min(richnessScore, 1.0);
+    
+    logger.info(`📊 Problem richness for "${assignment.title}": ${totalProblems} problems, content=${hasDetailedContent ? 'rich' : 'basic'}, objectives=${hasLearningObjectives ? 'yes' : 'no'}, richness=${richnessScore.toFixed(2)}`);
+    return richnessScore;
+  }
+
+  /**
+   * Extract assignment reference from student's message
+   * @param {string} message - Student's message
+   * @param {Array} assignments - Available assignments from learning context
+   * @returns {Object} { found: boolean, assignment: Object|null, confidence: number }
+   */
+  extractAssignmentReference(message, assignments) {
+    if (!message || !assignments || assignments.length === 0) {
+      return { found: false, assignment: null, confidence: 0 };
+    }
+    
+    const lowerMessage = message.toLowerCase();
+    logger.info(`🔍 Extracting assignment reference from: "${message}"`);
+    logger.info(`📚 Available assignments: ${assignments.map(a => a.title).join(', ')}`);
+    
+    let bestMatch = null;
+    let bestScore = 0;
+    const minConfidence = 0.2; // Minimum confidence threshold (lowered for new scoring system)
+    
+    for (const assignment of assignments) {
+      const title = assignment.title || '';
+      const subject = assignment.child_subjects?.subjects?.name || '';
+      const unit = assignment.units?.name || '';
+      
+      // Direct title matching
+      const titleScore = this.calculateSimilarity(message, title);
+      
+      // Subject-based matching (e.g., "math assignment")
+      const subjectScore = lowerMessage.includes(subject.toLowerCase()) ? 0.5 : 0;
+      
+      // Unit-based matching (e.g., "unit 2", "chapter 12")
+      const unitScore = unit && lowerMessage.includes(unit.toLowerCase()) ? 0.6 : 0;
+      
+      // Keywords matching (specific phrases that indicate assignments)
+      let keywordScore = 0;
+      const assignmentKeywords = [
+        'help with', 'work on', 'working on', 'about', 'tell me about',
+        'explain', 'review', 'assignment', 'worksheet', 'lesson'
+      ];
+      
+      for (const keyword of assignmentKeywords) {
+        if (lowerMessage.includes(keyword)) {
+          // Extract text after keyword
+          const afterKeyword = lowerMessage.split(keyword)[1];
+          if (afterKeyword) {
+            const extractedText = afterKeyword.trim();
+            const extractedScore = this.calculateSimilarity(extractedText, title);
+            keywordScore = Math.max(keywordScore, extractedScore);
+          }
+        }
+      }
+      
+      // Enhanced lesson number matching - boost worksheets over teacher lessons
+      let lessonNumberBonus = 0;
+      const lessonMatch = lowerMessage.match(/lesson\s+(\d+)/);
+      if (lessonMatch) {
+        const lessonNumber = lessonMatch[1];
+        const titleLower = title.toLowerCase();
+        
+        if (titleLower.includes(`lesson ${lessonNumber}`) || titleLower.includes(`lesson${lessonNumber}`)) {
+          // Base bonus for lesson number match
+          lessonNumberBonus = 0.6;
+          
+          // Extra bonus for student worksheets vs teacher lessons
+          if (titleLower.includes('mixed practice') || 
+              titleLower.includes('problem set') || 
+              titleLower.includes('homeschool') ||
+              titleLower.includes('saxon math')) {
+            lessonNumberBonus = 0.9; // Higher bonus for student worksheets
+            logger.info(`🎯 Lesson number bonus (student worksheet): "${title}" gets ${lessonNumberBonus}`);
+          } else if (titleLower.includes('problems about')) {
+            lessonNumberBonus = 0.5; // Lower bonus for teacher lessons  
+            logger.info(`📝 Lesson number bonus (teacher lesson): "${title}" gets ${lessonNumberBonus}`);
+          }
+        }
+      }
+      
+      // Base similarity score
+      const baseScore = Math.max(
+        titleScore * 1.0,      // Full title match gets highest weight
+        keywordScore * 0.9,    // Keyword-extracted match
+        lessonNumberBonus,     // Lesson number matching with worksheet preference
+        unitScore * 0.8,       // Unit match
+        subjectScore * 0.6     // Subject match gets lower weight
+      );
+      
+      // Enhanced scoring with content prioritization
+      const contentBonus = this.getContentTypePriority(assignment);
+      const richnessBonus = this.getProblemRichnessScore(assignment);
+      
+      // For very strong title matches, reduce content penalty impact
+      let finalScore = baseScore * contentBonus * richnessBonus;
+      
+      // If we have a very strong title match (0.8+), don't let content penalty kill it
+      if (titleScore >= 0.8) {
+        const titleBoostedScore = baseScore * Math.max(contentBonus, 0.7) * Math.max(richnessBonus, 0.5);
+        finalScore = Math.max(finalScore, titleBoostedScore);
+        logger.info(`🎯 Strong title match bonus applied for "${title}"`);
+      }
+      
+      logger.info(`📊 Assignment "${title}": base=${baseScore.toFixed(2)}, content=${contentBonus.toFixed(2)}, richness=${richnessBonus.toFixed(2)}, final=${finalScore.toFixed(2)}`);
+      
+      if (finalScore > bestScore && finalScore >= minConfidence) {
+        bestScore = finalScore;
+        bestMatch = assignment;
+      }
+    }
+    
+    if (bestMatch) {
+      logger.info(`✅ Assignment match found: "${bestMatch.title}" (confidence: ${bestScore.toFixed(2)})`);
+      return { found: true, assignment: bestMatch, confidence: bestScore };
+    } else {
+      logger.info('❌ No assignment match found above confidence threshold');
+      return { found: false, assignment: null, confidence: 0 };
+    }
+  }
+
+  /**
+   * Filter learning context to focus on specific assignment
+   * @param {Object} learningContext - Full learning context
+   * @param {Object} specificAssignment - The assignment to focus on
+   * @returns {Object} Filtered learning context with only the specific assignment
+   */
+  filterToSpecificAssignment(learningContext, specificAssignment) {
+    if (!learningContext || !specificAssignment) {
+      return learningContext;
+    }
+    
+    logger.info(`🎯 Filtering context to specific assignment: "${specificAssignment.title}"`);
+    
+    return {
+      ...learningContext,
+      nextAssignments: [specificAssignment], // Only include the specific assignment
+      hasActiveWork: true
+    };
+  }
+
+  /**
+   * Detect if student's message indicates they need homework/assignment help
+   * @param {string} message - Student's message
+   * @param {Array} assignments - Available assignments (optional for enhanced matching)
+   * @returns {Object} { needsContext: boolean, specificAssignment: Object|null, confidence: number }
+   */
+  detectHomeworkIntent(message, assignments = []) {
+    const homeworkKeywords = [
+      'homework', 'assignment', 'worksheet', 'problem', 'question',
+      'next', 'help', 'stuck', "don't understand", 'quiz', 'test',
+      'due', 'work on', 'working on', 'exercise', 'practice',
+      'math problem', 'science question', 'history assignment',
+      'what is it', 'tell me about', 'explain', 'about', 'lesson',
+      'chapter', 'unit', 'study', 'review'
+    ];
+    
+    const lowerMessage = message.toLowerCase();
+    const hasKeyword = homeworkKeywords.some(word => lowerMessage.includes(word));
+    
+    // Also check for very short follow-up questions that are clearly about assignments
+    const isFollowUpQuestion = lowerMessage.length < 20 && (
+      lowerMessage.includes('what') || 
+      lowerMessage.includes('how') || 
+      lowerMessage.includes('why') || 
+      lowerMessage.includes('about')
+    );
+    
+    const needsContext = hasKeyword || isFollowUpQuestion;
+    
+    // If context needed and assignments available, try to match specific assignment
+    let assignmentMatch = { found: false, assignment: null, confidence: 0 };
+    if (needsContext && assignments.length > 0) {
+      assignmentMatch = this.extractAssignmentReference(message, assignments);
+    }
+    
+    return {
+      needsContext,
+      specificAssignment: assignmentMatch.assignment,
+      confidence: assignmentMatch.confidence
+    };
+  }
+
+  /**
+   * Build context-aware system prompt that includes learning materials
+   * @param {string} childName - Student's name
+   * @param {string} childGrade - Student's grade level
+   * @param {Object} learningContext - Learning context from learningContextService
+   * @returns {string} Enhanced system prompt with learning context
+   */
+  buildContextAwarePrompt(childName = 'Student', childGrade = null, learningContext = null) {
+    // Start with base prompt
+    let prompt = this.buildStudyAssistantPrompt(childName, childGrade);
+    
+    // Add learning context if available
+    if (learningContext && learningContext.hasActiveWork) {
+      // Determine if we have a specific assignment context
+      const specificAssignment = learningContext.nextAssignments && learningContext.nextAssignments.length === 1 
+        ? learningContext.nextAssignments[0] 
+        : null;
+        
+      const contextStr = learningContextService.formatContextForPrompt(learningContext, specificAssignment);
+      console.log('🔍 DEBUG: Learning context being added to AI prompt:');
+      console.log('📝 Full context string length:', contextStr.length);
+      console.log('📋 Context type:', specificAssignment ? 'specific assignment' : 'multiple assignments overview');
+      console.log('📋 Context preview:', contextStr.substring(0, 500) + '...');
+      prompt += contextStr;
+      
+      // The formatContextForPrompt method now handles all the prompt logic
+      // including specific assignment focus vs. multiple assignments overview
+    }
+    
+    return prompt;
   }
 
   /**

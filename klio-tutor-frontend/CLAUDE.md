@@ -10,7 +10,7 @@ The Klio AI Tutor is a Next.js-based educational frontend that provides personal
 - **UI**: React 19 with Tailwind CSS
 - **AI**: OpenAI GPT-4o-mini for cost-effective tutoring
 - **Authentication**: JWT-based child authentication with PIN
-- **Backend**: Express.js API at localhost:5000
+- **Backend**: Express.js API at https://klioai.com/api (localhost:5000 for development)
 - **Database**: Supabase PostgreSQL with comprehensive learning schema
 - **Math Rendering**: KaTeX for mathematical expressions
 
@@ -406,20 +406,22 @@ Your teacher showed two methods in the lesson. Would you like to try the divisio
 
 ### Prerequisites
 - Node.js 18+
-- Backend API running on localhost:5000
+- Backend API running on https://klioai.com/api (localhost:5000 for development)
 - Supabase database with learning schema
 
 ### Setup Commands
 ```bash
 cd klio-tutor-frontend
 npm install
-npm run dev  # Starts on port 3001
+npm run dev  # Starts on port 3003
 ```
 
 ### Environment Variables
 ```bash
 # .env.local
-NEXT_PUBLIC_API_URL=http://localhost:5000
+NEXT_PUBLIC_API_URL=https://klioai.com/api  # Production
+# NEXT_PUBLIC_API_URL=http://localhost:5000  # Local development
+PORT=3003
 ```
 
 ## Testing the Integration

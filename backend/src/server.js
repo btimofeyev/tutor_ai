@@ -50,8 +50,10 @@ const corsOptions = {
       'https://klioai.com',
       'https://www.klioai.com',
       'https://app.klioai.com',
+      'https://tutor.klioai.com',
       'http://localhost:3000',
-      'http://localhost:3001'
+      'http://localhost:3001',
+      'http://localhost:3003'
     ];
 
     // Allow requests with no origin (like mobile apps or postman)

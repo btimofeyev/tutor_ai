@@ -8,7 +8,7 @@ A comprehensive homeschool management platform with AI-powered content analysis,
 - **Styling**: Tailwind CSS v4 with custom CSS variables
 - **Authentication**: Supabase with session management
 - **Database**: Supabase (PostgreSQL)
-- **API**: Express.js backend at localhost:5000
+- **API**: Express.js backend at https://klioai.com/api (localhost:5000 for development)
 - **AI**: OpenAI GPT-4.1-mini for content analysis
 - **File Processing**: multer, pdf-parse, mammoth
 
@@ -20,7 +20,7 @@ tutor_ai/
 │   ├── src/components/           # Reusable UI components
 │   ├── src/hooks/               # Custom React hooks
 │   └── src/utils/               # API client & utilities
-├── klioai-frontend/             # Child-friendly interface
+├── klio-tutor-frontend/         # Student tutor interface
 ├── backend/                     # Express.js API server
 │   ├── src/controllers/         # Route handlers
 │   ├── src/routes/             # API endpoints
@@ -231,7 +231,8 @@ npm test           # Run test suite
 localStorage.clear()
 
 # Check API connectivity
-curl http://localhost:5000/api/health
+curl https://klioai.com/api/health  # Production
+# curl http://localhost:5000/api/health  # Development
 
 # Verify database connection
 npm run db:status

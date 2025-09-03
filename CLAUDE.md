@@ -60,11 +60,20 @@ LOG_LEVEL=info
 FRONTEND_URL=https://klioai.com
 ```
 
-### Frontend Environment Variables (.env.local in parent-dashboard-frontend/)
+### Frontend Environment Variables 
+
+#### Parent Dashboard (.env.local in parent-dashboard-frontend/)
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://yklwdolmzgtivzdixofs.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJh... # (configured)
 NEXT_PUBLIC_API_URL=https://klioai.com/api
+NEXT_PUBLIC_TUTOR_URL=https://tutor.klioai.com
+```
+
+#### Klio Tutor Frontend (.env.local in klio-tutor-frontend/)
+```bash
+NEXT_PUBLIC_API_URL=https://klioai.com/api
+PORT=3003
 ```
 
 ## Development Commands
@@ -81,10 +90,10 @@ pm2 restart klioai            # Restart service
 
 ### Frontend Applications
 ```bash
-# Student Frontend
-cd /root/klioai/klioai-frontend
+# Klio Tutor Frontend (Student Interface)
+cd /root/klioai/klio-tutor-frontend
 npm install
-npm run dev                   # Development
+npm run dev                   # Development (port 3003)
 npm run build                 # Production build
 
 # Parent Dashboard
@@ -105,7 +114,7 @@ npm run build                 # Production build
 - Logs: `pm2 logs klioai`
 - Restart: `pm2 restart klioai`
 
-#### Frontend Service (Parent Dashboard)
+#### Parent Dashboard Frontend
 - Service name: `klioai-frontend`
 - Port: 3000
 - Location: `/root/klioai/parent-dashboard-frontend`
@@ -114,13 +123,28 @@ npm run build                 # Production build
 - Restart: `pm2 restart klioai-frontend`
 - Environment file: `.env.local` (contains Supabase public keys and API URL)
 
+#### Klio Tutor Frontend (Student Interface)
+- Service name: `klio-tutor`
+- Port: 3003
+- Location: `/root/klioai/klio-tutor-frontend`
+- Start command: `cd /root/klioai/klio-tutor-frontend && pm2 start npm --name "klio-tutor" -- start`
+- Logs: `pm2 logs klio-tutor`
+- Restart: `pm2 restart klio-tutor`
+- Environment file: `.env.local` (contains API URL)
+
 ### Domain Configuration
-- **Production URL**: https://klioai.com
+- **Production URLs**: 
+  - Parent Dashboard: https://klioai.com (port 3000)
+  - Student Tutor: https://tutor.klioai.com (port 3003)
+  - Backend API: https://klioai.com/api (port 3002)
 - **Nginx Configuration**:
-  - `/` → proxies to frontend on port 3000
-  - `/api/` → proxies to backend API on port 3002
-- **SSL**: Managed via Let's Encrypt certificates
-- **Nginx config location**: `/etc/nginx/sites-available/klioai.com`
+  - `klioai.com` → proxies to parent dashboard frontend on port 3000
+  - `klioai.com/api/` → proxies to backend API on port 3002
+  - `tutor.klioai.com` → proxies to klio tutor frontend on port 3003
+- **SSL**: Managed via Let's Encrypt certificates for both domains
+- **Nginx config locations**: 
+  - `/etc/nginx/sites-available/klioai.com`
+  - `/etc/nginx/sites-available/tutor.klioai.com`
 
 ## Database Management
 
@@ -153,7 +177,7 @@ npm run build                 # Production build
 
 ### API Security
 - Environment variable validation
-- CORS configuration
+- CORS configuration (allows klioai.com and tutor.klioai.com)
 - Rate limiting
 - Input validation
 
@@ -224,6 +248,9 @@ npm run build                 # Production build
 - **PM2 Save**: After making changes to PM2 processes, run `pm2 save` to persist configuration
 - **Frontend Build**: Always run `npm run build` in parent-dashboard-frontend before starting with PM2
 - **Port Usage**: 
-  - Port 3000: Parent Dashboard Frontend
-  - Port 3002: Backend API
-  - Port 3001: Previously used by snapandlearn (now removed)
+  - Port 3000: Parent Dashboard Frontend (klioai.com)
+  - Port 3003: Klio Tutor Frontend (tutor.klioai.com)
+  - Port 3002: Backend API (klioai.com/api)
+- **Note**: Port 3001 is used by famlynook service
+- **Architecture**: Separate subdomains for parent and student interfaces
+- **SSL Certificates**: Both klioai.com and tutor.klioai.com have Let's Encrypt SSL

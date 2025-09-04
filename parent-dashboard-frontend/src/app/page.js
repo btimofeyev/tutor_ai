@@ -69,7 +69,10 @@ export default function LandingPage() {
               <Link href="/pricing" className="text-text-secondary hover:text-text-primary font-medium transition-colors">
                 Pricing
               </Link>
-              <Link href="/tutor" className="text-accent-blue hover:text-accent-blue font-bold transition-colors">
+              <Link 
+                href={process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : 'https://tutor.klioai.com'} 
+                className="text-accent-blue hover:text-accent-blue font-bold transition-colors"
+              >
                 🎓 Student Tutor
               </Link>
               <Link href="/login" className="text-text-secondary hover:text-text-primary font-medium transition-colors">

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const supabase = require('../utils/supabaseClient');
+const { createPriceToPlanMap } = require('../config/stripeConfig');
 
 router.post(
   '/stripe', // This makes the full path /api/webhooks/stripe
@@ -62,11 +63,7 @@ async function handleCheckoutCompleted(session) {
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const price_id = subscription.items.data[0].price.id;
-  const priceToPlan = {
-      'price_1RVZczD8TZAZUMMAQWokffCi': 'klio_addon',
-      'price_1RVZT4D8TZAZUMMA3YIJeWWE': 'family',
-      'price_1RVZTrD8TZAZUMMAiUuoU72d': 'academy'
-  };
+  const priceToPlan = createPriceToPlanMap();
   const plan_type = priceToPlan[price_id] || 'unknown';
 
   let currentPeriodStartISO = null;
@@ -124,11 +121,7 @@ async function handleSubscriptionUpdated(subscription) {
   let stripe_price_id;
   if (subscription.items && subscription.items.data && subscription.items.data.length > 0) {
       stripe_price_id = subscription.items.data[0].price.id;
-      const priceToPlan = {
-          'price_1RVZczD8TZAZUMMAQWokffCi': 'klio_addon',
-          'price_1RVZT4D8TZAZUMMA3YIJeWWE': 'family',
-          'price_1RVZTrD8TZAZUMMAiUuoU72d': 'academy'
-      };
+      const priceToPlan = createPriceToPlanMap();
       plan_type = priceToPlan[stripe_price_id] || 'unknown';
   }
 
@@ -209,11 +202,7 @@ async function handlePaymentSucceeded(invoice) {
   const currentPeriodEndISO = new Date(periodEnd * 1000).toISOString();
 
   const price_id = subscriptionFromStripe.items.data[0].price.id;
-  const priceToPlan = {
-      'price_1RVZczD8TZAZUMMAQWokffCi': 'klio_addon',
-      'price_1RVZT4D8TZAZUMMA3YIJeWWE': 'family',
-      'price_1RVZTrD8TZAZUMMAiUuoU72d': 'academy'
-  };
+  const priceToPlan = createPriceToPlanMap();
   const plan_type = priceToPlan[price_id] || 'unknown';
 
   const { error } = await supabase

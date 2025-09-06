@@ -1,11 +1,9 @@
 const logger = require('../utils/logger')('simpleTutorController');
 const simpleOpenAIService = require('../services/simpleOpenAIService');
 const learningContextService = require('../services/learningContextService');
+const supabase = require('../utils/supabaseClient');
 
-/**
- * Simple Tutor Controller - Clean ChatGPT-like chat functionality
- * Handles basic conversation flow without complex routing
- */
+
 class SimpleTutorController {
   constructor() {
     logger.info('Simple Tutor Controller initialized');
@@ -105,7 +103,7 @@ class SimpleTutorController {
    */
   handleMessage = async (req, res) => {
     try {
-      const { sessionId, message, childId } = req.body;
+      const { sessionId, message, childId, quizContext } = req.body;
 
       if (!sessionId || !message || !childId) {
         return res.status(400).json({
@@ -126,8 +124,13 @@ class SimpleTutorController {
 
       logger.info(`Processing message for session ${sessionId}: ${message.substring(0, 50)}...`);
 
-      // Send to OpenAI with response chaining
-      const result = await simpleOpenAIService.sendMessage(sessionId, message.trim(), childName);
+      // Log quiz context if provided
+      if (quizContext?.isQuizActive) {
+        logger.info(`🧪 Quiz context detected: "${quizContext.quizTitle}" - Question: ${quizContext.currentQuestion?.question?.substring(0, 50)}...`);
+      }
+
+      // Send to OpenAI with response chaining and quiz context
+      const result = await simpleOpenAIService.sendMessage(sessionId, message.trim(), childName, quizContext);
 
       if (result.success) {
         logger.info(`Response generated for session ${sessionId} with ID ${result.responseId}`);
@@ -664,6 +667,199 @@ class SimpleTutorController {
       res.status(500).json({
         success: false,
         error: 'Failed to record problem attempt'
+      });
+    }
+  }
+
+  /**
+   * Generate quiz from assignment
+   */
+  generateQuiz = async (req, res) => {
+    try {
+      const { assignmentId, questionCount } = req.body;
+      const childId = req.child.child_id;
+
+      if (!assignmentId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Assignment ID is required'
+        });
+      }
+
+      logger.info(`🧪 Generating quiz for assignment ${assignmentId}, child ${childId}`);
+
+      // Get assignment with learning context
+      const assignment = await learningContextService.getMaterialContext(assignmentId);
+      
+      if (!assignment) {
+        return res.status(404).json({
+          success: false,
+          error: 'Assignment not found'
+        });
+      }
+
+      // Verify child has access to this assignment
+      if (assignment.child_subjects?.child_id !== childId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied to this assignment'
+        });
+      }
+
+      // Generate quiz using AI service
+      const quiz = await simpleOpenAIService.generateQuiz(assignment, questionCount);
+
+      logger.info(`✅ Quiz generated successfully for assignment: ${assignment.title}`);
+
+      res.json({
+        success: true,
+        quiz
+      });
+
+    } catch (error) {
+      logger.error('Error generating quiz:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate quiz. Please try again.'
+      });
+    }
+  }
+
+  /**
+   * Submit quiz attempt and record results
+   */
+  submitQuizAttempt = async (req, res) => {
+    try {
+      const { quizId, assignmentId, answers, score, totalQuestions, timeSpent } = req.body;
+      const childId = req.child.child_id;
+
+      if (!quizId || !assignmentId || !answers || score === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: 'Quiz ID, assignment ID, answers, and score are required'
+        });
+      }
+
+      logger.info(`📊 Recording quiz attempt: child ${childId}, assignment ${assignmentId}, score ${score}/${totalQuestions}`);
+
+      // Store quiz attempt in database
+      const attemptData = {
+        child_id: childId,
+        quiz_id: quizId,
+        material_id: assignmentId,
+        answers: JSON.stringify(answers), // Ensure answers are stored as JSON string
+        score: score,
+        total_questions: totalQuestions,
+        time_spent_seconds: timeSpent || 0,
+        completed_at: new Date().toISOString()
+        // percentage is auto-calculated by database as GENERATED column
+      };
+      
+      logger.info('📊 Attempting to save quiz data:', attemptData);
+      
+      const { data, error } = await supabase
+        .from('quiz_attempts')
+        .insert([attemptData])
+        .select();
+
+      if (error) {
+        logger.error('Error saving quiz attempt:', error);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to save quiz results'
+        });
+      }
+
+      logger.info(`✅ Quiz attempt saved with ID: ${data[0].id}`);
+
+      // Return success with attempt details
+      res.json({
+        success: true,
+        attemptId: data[0].id,
+        score,
+        totalQuestions,
+        percentage: Math.round((score / totalQuestions) * 100),
+        timeSpent
+      });
+
+    } catch (error) {
+      logger.error('Error submitting quiz attempt:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to submit quiz attempt'
+      });
+    }
+  }
+
+  /**
+   * Get quiz history for a child
+   */
+  getQuizHistory = async (req, res) => {
+    try {
+      const { childId } = req.params;
+      const requestingChildId = req.child.child_id;
+
+      // Ensure child can only access their own quiz history
+      if (childId !== requestingChildId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied'
+        });
+      }
+
+      logger.info(`📋 Fetching quiz history for child: ${childId}`);
+
+      // Get quiz attempts with material details
+      const { data, error } = await supabase
+        .from('quiz_attempts')
+        .select(`
+          *,
+          materials!material_id(
+            id,
+            title,
+            child_subjects!materials_child_subject_id_fkey(
+              subjects!child_subjects_subject_id_fkey(name)
+            )
+          )
+        `)
+        .eq('child_id', childId)
+        .order('completed_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        logger.error('Error fetching quiz history:', error);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to fetch quiz history'
+        });
+      }
+
+      // Format response
+      const quizHistory = data.map(attempt => ({
+        id: attempt.id,
+        quizId: attempt.quiz_id,
+        assignmentTitle: attempt.materials?.title || 'Unknown Assignment',
+        subject: attempt.materials?.child_subjects?.subjects?.name || 'General',
+        score: attempt.score,
+        totalQuestions: attempt.total_questions,
+        percentage: attempt.percentage,
+        timeSpent: attempt.time_spent_seconds,
+        completedAt: attempt.completed_at
+      }));
+
+      logger.info(`📊 Found ${quizHistory.length} quiz attempts for child ${childId}`);
+
+      res.json({
+        success: true,
+        quizHistory,
+        totalAttempts: quizHistory.length
+      });
+
+    } catch (error) {
+      logger.error('Error getting quiz history:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get quiz history'
       });
     }
   }

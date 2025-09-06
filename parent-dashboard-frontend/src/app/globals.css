@@ -484,3 +484,53 @@ button:not([class*="bg-"]):not([class*="btn-"]) {
   text-align: inherit;
 }
 
+/* Supabase Auth UI Button Overrides - Force Yellow Theme */
+.supabase-auth-ui_ui-button,
+.supabase-auth-ui_ui-button_primary,
+[data-supabase-auth-ui="button"],
+form[data-supabase] button[type="submit"],
+.auth-widget button[type="submit"],
+button[class*="supabase"],
+/* More specific selectors for Supabase Auth UI */
+form button[type="submit"],
+[class*="auth"] button,
+.supabase-auth-container button,
+/* Target any submit button in the auth form */
+main form button[type="submit"],
+div[class*="auth"] button[type="submit"] {
+  background-color: #FFE6A7 !important;
+  color: #374151 !important;
+  border: 1px solid #FFE6A7 !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  transition: all 150ms ease-out !important;
+  padding: 12px 24px !important;
+  font-size: 14px !important;
+  min-height: 44px !important;
+  cursor: pointer !important;
+}
+
+.supabase-auth-ui_ui-button:hover,
+.supabase-auth-ui_ui-button_primary:hover,
+[data-supabase-auth-ui="button"]:hover,
+form[data-supabase] button[type="submit"]:hover,
+.auth-widget button[type="submit"]:hover,
+button[class*="supabase"]:hover,
+form button[type="submit"]:hover,
+[class*="auth"] button:hover,
+.supabase-auth-container button:hover,
+main form button[type="submit"]:hover,
+div[class*="auth"] button[type="submit"]:hover {
+  background-color: #FFD993 !important;
+  border-color: #FFD993 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+.supabase-auth-ui_ui-button:active,
+form button[type="submit"]:active,
+main form button[type="submit"]:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1) !important;
+}
+

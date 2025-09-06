@@ -17,11 +17,7 @@ import Button from '../../components/ui/Button';
 import api from '../../utils/api';
 import { ComingSoonBadge } from '../../components/ComingSoonOverlay';
 
-const PRICE_IDS = {
-  klio_addon: 'price_1RVZczD8TZAZUMMAQWokffCi',
-  family: 'price_1RVZT4D8TZAZUMMA3YIJeWWE',
-  academy: 'price_1RVZTrD8TZAZUMMAiUuoU72d'
-};
+import { PRICE_IDS } from '../../utils/subscriptionConstants';
 
 export default function PricingPage() {
   const session = useSession();
@@ -124,18 +120,18 @@ export default function PricingPage() {
       limitations: [
         'Still limited to 1 child'
       ],
-      buttonText: 'Coming Soon',
-      buttonAction: null, // Disabled for now
+      buttonText: 'Add AI Tutoring',
+      buttonAction: () => handleUpgrade(PRICE_IDS.klio_addon, 'klio_addon'),
       highlighted: false,
-      available: false, // Mark as unavailable
+      available: true,
       popular: true,
       isAddOn: true,
-      isComingSoon: true // New flag for coming soon features
+      isComingSoon: false
     },
     {
       name: 'Family Plan',
       id: 'family',
-      price: '$19',
+      price: '$24.99',
       period: 'per month',
       description: 'Everything in Free + Klio for up to 3 children',
       icon: <UserGroupIcon className="h-8 w-8" />,
@@ -155,7 +151,7 @@ export default function PricingPage() {
     {
       name: 'Academy',
       id: 'academy',
-      price: '$39',
+      price: '$49.99',
       period: 'per month',
       description: 'Same as Family Plan but for up to 10 children',
       icon: <AcademicCapIcon className="h-8 w-8" />,
@@ -166,8 +162,8 @@ export default function PricingPage() {
         'Great for co-op homeschool groups'
       ],
       limitations: [],
-      buttonText: 'Contact Sales',
-      buttonAction: () => window.open('mailto:support@klioai.com?subject=Academy Plan Inquiry'),
+      buttonText: 'Get Academy',
+      buttonAction: () => handleUpgrade(PRICE_IDS.academy, 'academy'),
       highlighted: false,
       available: true
     }

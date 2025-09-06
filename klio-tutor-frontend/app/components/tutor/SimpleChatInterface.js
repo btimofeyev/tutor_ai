@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { FiSend, FiBook, FiUser, FiMessageCircle, FiLogOut, FiPlus, FiMenu, FiX, FiClock, FiTrash2 } from 'react-icons/fi';
+import { FiSend, FiBook, FiUser, FiMessageCircle, FiLogOut, FiPlus, FiMenu, FiX, FiClock, FiTrash2, FiEdit3 } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { useAuth } from '../../contexts/AuthContext';
+import QuizPanel from './QuizPanel';
 
 /**
  * SimpleChatInterface - Clean ChatGPT-like study assistant
@@ -34,6 +35,12 @@ const SimpleChatInterface = ({ childData }) => {
   const [learningContext, setLearningContext] = useState(null);
   const [loadingContext, setLoadingContext] = useState(false);
   const [contextError, setContextError] = useState(null);
+  
+  // Quiz state management
+  const [isQuizMode, setIsQuizMode] = useState(false);
+  const [quizData, setQuizData] = useState(null);
+  const [currentAssignment, setCurrentAssignment] = useState(null);
+  const [loadingQuiz, setLoadingQuiz] = useState(false);
   
   // Dynamic quick suggestions based on learning context
   const [quickSuggestions, setQuickSuggestions] = useState([
@@ -736,6 +743,174 @@ const SimpleChatInterface = ({ childData }) => {
   };
 
   /**
+   * Generate quiz from assignment
+   */
+  const handleStartQuiz = async (assignment) => {
+    if (!assignment || !childData?.id) {
+      console.error('❌ Missing assignment or child data for quiz generation');
+      return;
+    }
+    
+    try {
+      setLoadingQuiz(true);
+      console.log('🧪 Generating quiz for assignment:', assignment.title);
+      
+      // Call backend API to generate quiz
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/quiz/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('child_token')}`
+        },
+        body: JSON.stringify({
+          assignmentId: assignment.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Quiz generation request failed:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.quiz) {
+        console.log('✅ Quiz generated successfully from backend:', data.quiz);
+        setQuizData(data.quiz);
+        setCurrentAssignment(assignment);
+        setIsQuizMode(true);
+      } else {
+        console.warn('⚠️ Backend quiz generation failed:', data.error);
+        setError('Failed to generate quiz. Please try again.');
+      }
+      
+    } catch (error) {
+      console.error('💥 Error generating quiz:', error);
+      setError('Failed to generate quiz. Please try again.');
+    } finally {
+      setLoadingQuiz(false);
+    }
+  };
+
+
+  /**
+   * Handle hint request from quiz with full context
+   */
+  const handleQuizHintRequest = async (hintMessage, questionData = null) => {
+    if (!hintMessage.trim() || isLoading || !sessionId) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Create enhanced message with quiz context
+      const contextualMessage = questionData ? 
+        `[QUIZ CONTEXT] I'm taking a quiz on "${currentAssignment?.title || 'current assignment'}" and need help with this question: ${questionData.question}` :
+        hintMessage;
+      
+      // Add user message to chat
+      addMessage('user', `Help with quiz: ${hintMessage}`);
+      setCurrentInput('');
+
+      // Prepare quiz context for backend
+      const quizContext = questionData ? {
+        isQuizActive: true,
+        quizTitle: quizData?.title || 'Practice Quiz',
+        assignmentTitle: currentAssignment?.title,
+        assignmentId: currentAssignment?.id,
+        currentQuestion: {
+          id: questionData.id,
+          question: questionData.question,
+          type: questionData.type,
+          options: questionData.options,
+          hint: questionData.hint
+        },
+        learningObjectives: currentAssignment?.learning_objectives || [],
+        keyTerms: currentAssignment?.assignment_metadata?.key_terms || []
+      } : null;
+
+      // Send to backend with quiz context
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('child_token')}`
+        },
+        body: JSON.stringify({
+          message: contextualMessage,
+          sessionId: sessionId,
+          childId: childData?.id, // Add missing childId
+          quizContext: quizContext // Add quiz context to request
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        addMessage('assistant', data.response);
+        
+        // Store response ID
+        if (data.responseId && typeof window !== 'undefined') {
+          sessionStorage.setItem(`response_${sessionId}`, data.responseId);
+        }
+      } else {
+        console.error('Chat API Error:', data.error);
+        setError('Failed to get help. Please try again.');
+      }
+      
+    } catch (error) {
+      console.error('Error getting quiz help:', error);
+      setError('Connection error. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Close quiz and return to chat
+   */
+  const handleCloseQuiz = async (quizResults = null) => {
+    setIsQuizMode(false);
+    setQuizData(null);
+    
+    // If quiz was completed, automatically send results to chat
+    if (quizResults) {
+      const { score, totalQuestions, timeSpent, assignmentTitle, correctAnswers, incorrectAnswers } = quizResults;
+      const percentage = Math.round((score / totalQuestions) * 100);
+      
+      let completionMessage = `I just completed the quiz on "${assignmentTitle}". I scored ${score} out of ${totalQuestions} questions correct (${percentage}%). ${timeSpent ? `It took me ${Math.floor(timeSpent / 60)} minutes and ${timeSpent % 60} seconds.` : ''}
+
+Here are the details:`;
+
+      // Add incorrect answers for review
+      if (incorrectAnswers && incorrectAnswers.length > 0) {
+        completionMessage += `\n\n**Questions I got wrong:**`;
+        incorrectAnswers.forEach(q => {
+          completionMessage += `\n\nQuestion ${q.questionNumber}: ${q.question}
+My answer: ${q.userAnswer}
+Correct answer: ${q.correctAnswer}`;
+        });
+      }
+
+      // Add correct answers for reinforcement
+      if (correctAnswers && correctAnswers.length > 0) {
+        completionMessage += `\n\n**Questions I got right:**`;
+        correctAnswers.forEach(q => {
+          completionMessage += `\nQuestion ${q.questionNumber}: ${q.question} ✓`;
+        });
+      }
+
+      completionMessage += `\n\nCan you help me understand the concepts behind the questions I missed and explain why the correct answers are right?`;
+      
+      // Automatically send the completion message
+      await sendMessage(completionMessage);
+    }
+    
+    // Keep currentAssignment for context
+  };
+
+  /**
    * Render individual message
    */
   const renderMessage = (message) => {
@@ -950,6 +1125,7 @@ const SimpleChatInterface = ({ childData }) => {
     
     const handleAssignmentSelect = (assignment) => {
       const suggestion = `Help with ${assignment.title}`;
+      setCurrentAssignment(assignment);
       handleSuggestion(suggestion);
     };
 
@@ -1105,7 +1281,7 @@ const SimpleChatInterface = ({ childData }) => {
   }
 
   return (
-    <div className="flex h-screen max-h-screen bg-amber-50/30 overflow-hidden">
+    <div className="flex h-screen max-h-screen bg-amber-50/30 overflow-hidden">{/* Removed overlay - true split screen */}
       {/* Educational Sidebar */}
       <div className={`${sidebarOpen ? 'w-72' : 'w-0'} transition-all duration-300 overflow-hidden bg-amber-50/30 border-r border-amber-200 flex-shrink-0`}>
         <div className="h-full flex flex-col">
@@ -1208,7 +1384,9 @@ const SimpleChatInterface = ({ childData }) => {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-[#F5F2ED] min-h-0">
+      <div className={`flex flex-col bg-[#F5F2ED] min-h-0 transition-all duration-300 ${
+        isQuizMode ? 'w-1/2' : 'flex-1'
+      }`}>
         {/* Header */}
         <div className="bg-white/80 backdrop-blur-sm border-b border-[#D4CAC4] px-6 py-4 shadow-sm">
           <div className="flex items-center justify-between">
@@ -1290,9 +1468,22 @@ const SimpleChatInterface = ({ childData }) => {
         {/* Quick Actions - Above Input */}
         <div className="bg-amber-50/30 border-t border-amber-200 px-6 py-3">
           <div className="flex flex-wrap gap-2 justify-center max-w-3xl mx-auto">
+            {/* Quiz button - only show when assignment is selected */}
+            {currentAssignment && (
+              <button
+                onClick={() => handleStartQuiz(currentAssignment)}
+                disabled={loadingQuiz}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 text-sm font-medium rounded-lg shadow-sm transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FiEdit3 size={16} />
+                {loadingQuiz ? 'Generating...' : 'Practice Quiz'}
+              </button>
+            )}
+            
+            {/* Regular quick actions */}
             {[
               "What's next?",
-              "Explain a concept",
+              "Explain a concept", 
               "Check progress",
               "I'm stuck"
             ].map((action, index) => (
@@ -1344,6 +1535,18 @@ const SimpleChatInterface = ({ childData }) => {
         </div>
       </div>
 
+      {/* Quiz Panel - Slides in from right as flex sibling */}
+      {isQuizMode && (
+        <QuizPanel
+          isVisible={isQuizMode}
+          onClose={handleCloseQuiz}
+          quizData={quizData}
+          onHintRequest={handleQuizHintRequest}
+          childData={childData}
+          assignment={currentAssignment}
+        />
+      )}
+
       {/* Delete Confirmation Modal */}
       {deleteModal.isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1375,6 +1578,7 @@ const SimpleChatInterface = ({ childData }) => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

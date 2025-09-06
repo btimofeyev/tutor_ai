@@ -86,8 +86,20 @@ body.chat-interface {
   50% { opacity: 0.3; }
 }
 
+@keyframes fade-in {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes quiz-bounce {
+  0%, 100% { transform: translate3d(0, -3%, 0) scale(1); }
+  50% { transform: translate3d(0, 0, 0) scale(1.05); }
+}
+
 .animate-bounce-gentle { animation: bounce-gentle 1.5s infinite; }
 .animate-progress-bar { animation: progress-bar 2s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
+.animate-fade-in { animation: fade-in 0.3s ease-out; }
+.animate-quiz-bounce { animation: quiz-bounce 2s infinite; }
 
 @layer components {
   .input-base { 

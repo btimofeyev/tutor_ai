@@ -39,4 +39,9 @@ router.get('/context/:childId', enforceAIAccess, simpleTutorController.getLearni
 router.get('/material/:materialId/context', enforceAIAccess, simpleTutorController.getMaterialContext);
 router.post('/problem-attempt', enforceAIAccess, simpleTutorController.recordProblemAttempt);
 
+// Quiz functionality endpoints
+router.post('/quiz/generate', enforceAIAccess, simpleTutorController.generateQuiz);
+router.post('/quiz/submit', enforceAIAccess, simpleTutorController.submitQuizAttempt);
+router.get('/quiz/history/:childId', enforceAIAccess, simpleTutorController.getQuizHistory);
+
 module.exports = router;

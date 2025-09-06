@@ -209,7 +209,7 @@ export default function LandingPage() {
 
           <div className="card p-6 text-center">
             <h3 className="text-xl font-semibold text-text-primary mb-2">Family Plan</h3>
-            <div className="text-3xl font-bold text-text-primary mb-4">$19<span className="text-base font-normal text-text-secondary">/mo</span></div>
+            <div className="text-3xl font-bold text-text-primary mb-4">$24.99<span className="text-base font-normal text-text-secondary">/mo</span></div>
             <p className="text-text-secondary text-sm mb-4">Complete family solution</p>
             <ul className="text-left space-y-2 text-sm text-text-secondary mb-6">
               <li>• Everything in Starter + AI</li>

@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { FiSend, FiBook, FiUser, FiMessageCircle, FiLogOut, FiPlus, FiMenu, FiX, FiClock, FiTrash2, FiEdit3 } from 'react-icons/fi';
+import { FiSend, FiBook, FiUser, FiMessageCircle, FiLogOut, FiPlus, FiMenu, FiX, FiClock, FiTrash2, FiEdit3, FiLayers } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { useAuth } from '../../contexts/AuthContext';
 import QuizPanel from './QuizPanel';
+import FlashcardPanel from './FlashcardPanel';
 
 /**
  * SimpleChatInterface - Clean ChatGPT-like study assistant
@@ -41,6 +42,13 @@ const SimpleChatInterface = ({ childData }) => {
   const [quizData, setQuizData] = useState(null);
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [loadingQuiz, setLoadingQuiz] = useState(false);
+  const [showQuizSelector, setShowQuizSelector] = useState(false);
+  
+  // Flashcards state management
+  const [loadingFlashcards, setLoadingFlashcards] = useState(false);
+  const [showFlashcardSelector, setShowFlashcardSelector] = useState(false);
+  const [flashcardData, setFlashcardData] = useState(null);
+  const [isFlashcardMode, setIsFlashcardMode] = useState(false);
   
   // Dynamic quick suggestions based on learning context
   const [quickSuggestions, setQuickSuggestions] = useState([
@@ -53,6 +61,21 @@ const SimpleChatInterface = ({ childData }) => {
   const messagesContainerRef = useRef(null);
   const sessionStartTime = useRef(Date.now());
   const initializingRef = useRef(false); // Prevent double initialization
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if ((showQuizSelector || showFlashcardSelector) && !event.target.closest('.relative')) {
+        setShowQuizSelector(false);
+        setShowFlashcardSelector(false);
+      }
+    };
+
+    if (showQuizSelector || showFlashcardSelector) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showQuizSelector, showFlashcardSelector]);
 
   /**
    * Format relative time for conversation timestamps
@@ -743,6 +766,22 @@ const SimpleChatInterface = ({ childData }) => {
   };
 
   /**
+   * Handle quiz button click when no assignment is selected
+   */
+  const handleQuizButtonClick = () => {
+    setShowQuizSelector(!showQuizSelector);
+    setShowFlashcardSelector(false); // Close other dropdown
+  };
+
+  /**
+   * Handle flashcard button click when no assignment is selected
+   */
+  const handleFlashcardButtonClick = () => {
+    setShowFlashcardSelector(!showFlashcardSelector);
+    setShowQuizSelector(false); // Close other dropdown
+  };
+
+  /**
    * Generate quiz from assignment
    */
   const handleStartQuiz = async (assignment) => {
@@ -753,6 +792,7 @@ const SimpleChatInterface = ({ childData }) => {
     
     try {
       setLoadingQuiz(true);
+      setShowQuizSelector(false); // Close selector if open
       console.log('🧪 Generating quiz for assignment:', assignment.title);
       
       // Call backend API to generate quiz
@@ -793,6 +833,54 @@ const SimpleChatInterface = ({ childData }) => {
     }
   };
 
+  /**
+   * Generate flashcards from assignment
+   */
+  const handleStartFlashcards = async (assignment) => {
+    if (!assignment || !childData?.id) {
+      console.error('❌ Missing assignment or child data for flashcard generation');
+      return;
+    }
+
+    try {
+      setLoadingFlashcards(true);
+      setShowFlashcardSelector(false);
+      setCurrentAssignment(assignment);
+      setError(null);
+      
+      console.log(`🎴 Generating flashcards for: "${assignment.title}"`);
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/flashcards/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('child_token')}`
+        },
+        body: JSON.stringify({
+          childId: childData.id,
+          assignmentId: assignment.id,
+          questionCount: 10 // Default flashcard count
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.flashcards) {
+        console.log(`✅ Generated ${data.flashcards.length} flashcards`);
+        setFlashcardData(data);
+        setIsFlashcardMode(true);
+      } else {
+        console.warn('⚠️ Backend flashcard generation failed:', data.error);
+        setError('Failed to generate flashcards. Please try again.');
+      }
+      
+    } catch (error) {
+      console.error('💥 Error generating flashcards:', error);
+      setError('Failed to generate flashcards. Please try again.');
+    } finally {
+      setLoadingFlashcards(false);
+    }
+  };
 
   /**
    * Handle hint request from quiz with full context
@@ -870,6 +958,31 @@ const SimpleChatInterface = ({ childData }) => {
   /**
    * Close quiz and return to chat
    */
+  /**
+   * Detect upcoming tests from assignments
+   */
+  const detectUpcomingTests = (assignments) => {
+    if (!assignments) return [];
+    return assignments.filter(assignment => {
+      const title = assignment.title?.toLowerCase() || '';
+      const contentType = assignment.content_type?.toLowerCase() || '';
+      return (
+        (/test|exam|quiz|assessment/i.test(title) || contentType === 'test') &&
+        !assignment.completed_at
+      );
+    });
+  };
+
+  // Get upcoming tests from learning context
+  const upcomingTests = React.useMemo(() => {
+    const allAssignments = [
+      ...(learningContext?.upcomingAssignments || []),
+      ...(learningContext?.currentWork || []),
+      ...(learningContext?.needsReview || [])
+    ];
+    return detectUpcomingTests(allAssignments);
+  }, [learningContext]);
+
   const handleCloseQuiz = async (quizResults = null) => {
     setIsQuizMode(false);
     setQuizData(null);
@@ -908,6 +1021,14 @@ Correct answer: ${q.correctAnswer}`;
     }
     
     // Keep currentAssignment for context
+  };
+
+  /**
+   * Close flashcard mode
+   */
+  const handleCloseFlashcards = () => {
+    setIsFlashcardMode(false);
+    setFlashcardData(null);
   };
 
   /**
@@ -1094,7 +1215,7 @@ Correct answer: ${q.correctAnswer}`;
   /**
    * ReadyToStudyInterface - Shows assignments organized by status-based categories
    */
-  const ReadyToStudyInterface = ({ learningContext, handleSuggestion, quickSuggestions }) => {
+  const ReadyToStudyInterface = ({ learningContext, handleSuggestion, quickSuggestions, upcomingTests, handleStartQuiz, childData }) => {
     // Handle both new and old data formats
     const upcomingAssignments = learningContext?.upcoming || [];
     const currentWorkAssignments = learningContext?.currentWork || [];
@@ -1131,6 +1252,33 @@ Correct answer: ${q.correctAnswer}`;
 
     return (
       <div className="py-8 max-w-6xl mx-auto">
+        {/* Test Prep Banner - Show if there are upcoming tests */}
+        {upcomingTests.length > 0 && (
+          <div className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <span className="text-2xl">📝</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-blue-900">
+                    Test Prep: {upcomingTests[0].title}
+                  </h3>
+                  <p className="text-blue-700 text-sm">
+                    {upcomingTests[0].child_subjects?.subjects?.name || 'Subject'} • Get ready with practice questions!
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleStartQuiz(upcomingTests[0])}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+              >
+                Start Practice
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="text-center mb-10">
           <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center mx-auto mb-4">
             <span className="text-3xl">🎓</span>
@@ -1385,7 +1533,7 @@ Correct answer: ${q.correctAnswer}`;
 
       {/* Main Chat Area */}
       <div className={`flex flex-col bg-[#F5F2ED] min-h-0 transition-all duration-300 ${
-        isQuizMode ? 'w-1/2' : 'flex-1'
+        isQuizMode || isFlashcardMode ? 'w-1/2' : 'flex-1'
       }`}>
         {/* Header */}
         <div className="bg-white/80 backdrop-blur-sm border-b border-[#D4CAC4] px-6 py-4 shadow-sm">
@@ -1430,6 +1578,9 @@ Correct answer: ${q.correctAnswer}`;
               learningContext={learningContext}
               handleSuggestion={handleSuggestion}
               quickSuggestions={quickSuggestions}
+              upcomingTests={upcomingTests}
+              handleStartQuiz={handleStartQuiz}
+              childData={childData}
             />
           ) : (
             <>
@@ -1468,33 +1619,228 @@ Correct answer: ${q.correctAnswer}`;
         {/* Quick Actions - Above Input */}
         <div className="bg-amber-50/30 border-t border-amber-200 px-6 py-3">
           <div className="flex flex-wrap gap-2 justify-center max-w-3xl mx-auto">
-            {/* Quiz button - only show when assignment is selected */}
-            {currentAssignment && (
+            {/* Quiz button with dropdown - always visible with smart behavior */}
+            <div className="relative">
               <button
-                onClick={() => handleStartQuiz(currentAssignment)}
+                onClick={() => currentAssignment ? handleStartQuiz(currentAssignment) : handleQuizButtonClick()}
                 disabled={loadingQuiz}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 text-sm font-medium rounded-lg shadow-sm transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-5 py-3 bg-[#7FB069] text-white hover:bg-[#6DA056] text-sm font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-transparent hover:border-[#5D8943] group"
               >
-                <FiEdit3 size={16} />
-                {loadingQuiz ? 'Generating...' : 'Practice Quiz'}
+                <FiEdit3 
+                  size={18} 
+                  className={`transition-transform duration-200 ${loadingQuiz ? 'animate-spin' : 'group-hover:rotate-12'}`}
+                />
+                {loadingQuiz ? (
+                  <span className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Generating...
+                  </span>
+                ) : (
+                  'Practice Quiz'
+                )}
+                {!currentAssignment && !loadingQuiz && (
+                  <svg className="w-4 h-4 ml-1 transition-transform duration-200 group-hover:translate-y-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                )}
               </button>
-            )}
+              
+              {/* Quiz Selector Dropdown */}
+              {showQuizSelector && !currentAssignment && (
+                <div className="absolute bottom-full mb-3 left-0 bg-white rounded-2xl shadow-2xl border-2 border-[#7FB069]/20 min-w-72 z-50 animate-in slide-in-from-bottom-2 duration-300">
+                  <div className="p-4 border-b border-[#7FB069]/10 bg-gradient-to-r from-[#7FB069]/5 to-[#A7F3D0]/5">
+                    <h3 className="font-semibold text-[#4A4A4A] text-base flex items-center gap-2">
+                      <FiEdit3 size={16} className="text-[#7FB069]" />
+                      Choose Assignment to Quiz
+                    </h3>
+                    <p className="text-xs text-[#7A7A7A] mt-1">Practice with questions based on your assignments</p>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {(() => {
+                      const availableAssignments = [];
+                      
+                      // Add upcoming tests first (highest priority)
+                      if (upcomingTests?.length > 0) {
+                        availableAssignments.push(...upcomingTests.slice(0, 2).map(a => ({...a, category: 'Test Prep'})));
+                      }
+                      
+                      // Add upcoming assignments
+                      if (learningContext?.upcomingAssignments?.length > 0) {
+                        availableAssignments.push(...learningContext.upcomingAssignments
+                          .filter(a => !upcomingTests.some(test => test.id === a.id)) // Don't duplicate tests
+                          .slice(0, 2).map(a => ({...a, category: 'Upcoming'})));
+                      }
+                      
+                      // Add current work assignments
+                      if (learningContext?.currentWork?.length > 0) {
+                        availableAssignments.push(...learningContext.currentWork.slice(0, 2).map(a => ({...a, category: 'Recent'})));
+                      }
+                      
+                      // Add needs review assignments
+                      if (learningContext?.needsReview?.length > 0) {
+                        availableAssignments.push(...learningContext.needsReview.slice(0, 2).map(a => ({...a, category: 'Review'})));
+                      }
+                      
+                      if (availableAssignments.length === 0) {
+                        return (
+                          <div className="p-6 text-center">
+                            <div className="text-[#7A7A7A] text-sm mb-2">📚 No assignments available</div>
+                            <div className="text-xs text-[#BDBDBD]">Complete some assignments to unlock practice quizzes</div>
+                          </div>
+                        );
+                      }
+                      
+                      return availableAssignments.map((assignment, index) => (
+                        <button
+                          key={assignment.id || index}
+                          onClick={() => handleStartQuiz(assignment)}
+                          className="w-full text-left p-4 hover:bg-gradient-to-r hover:from-[#7FB069]/5 hover:to-[#A7F3D0]/5 transition-all duration-200 border-b border-[#7FB069]/10 last:border-b-0 group hover:shadow-sm"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="font-semibold text-[#4A4A4A] text-sm truncate max-w-48 group-hover:text-[#7FB069] transition-colors">{assignment.title}</div>
+                              <div className="text-xs text-[#7A7A7A] mt-1 flex items-center gap-2">
+                                <span>{assignment.child_subjects?.subjects?.name || 'Unknown Subject'}</span>
+                                {assignment.category && (
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+                                    assignment.category === 'Test Prep' 
+                                      ? 'bg-[#FDA4AF]/20 text-[#DC2626] border border-[#FDA4AF]/30' 
+                                      : assignment.category === 'Review'
+                                      ? 'bg-[#FFE6A7]/20 text-[#D97706] border border-[#FFE6A7]/30'
+                                      : assignment.category === 'Upcoming'
+                                      ? 'bg-[#B3E0F8]/20 text-[#1D4ED8] border border-[#B3E0F8]/30'
+                                      : 'bg-[#A7F3D0]/20 text-[#059669] border border-[#A7F3D0]/30'
+                                  }`}>
+                                    {assignment.category === 'Test Prep' && '🎯'}
+                                    {assignment.category === 'Review' && '📚'}
+                                    {assignment.category === 'Upcoming' && '⏰'}
+                                    {assignment.category === 'Recent' && '✏️'}
+                                    {assignment.category}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <FiEdit3 size={14} className="text-[#7FB069] flex-shrink-0 transition-all duration-200 transform group-hover:scale-110 group-hover:rotate-12" />
+                          </div>
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
             
-            {/* Regular quick actions */}
-            {[
-              "What's next?",
-              "Explain a concept", 
-              "Check progress",
-              "I'm stuck"
-            ].map((action, index) => (
+            {/* Flashcards button with dropdown */}
+            <div className="relative">
               <button
-                key={index}
-                onClick={() => handleSuggestion(action)}
-                className="px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-600 hover:text-gray-700 text-sm font-normal rounded-lg border border-gray-200 transition-colors"
+                onClick={() => currentAssignment ? handleStartFlashcards(currentAssignment) : handleFlashcardButtonClick()}
+                disabled={loadingFlashcards}
+                className="flex items-center gap-2 px-5 py-3 bg-[#FFE6A7] text-[#D97706] hover:bg-[#FDDC8A] hover:text-[#C2620A] text-sm font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-transparent hover:border-[#E6C67F] group"
               >
-                {action}
+                <FiLayers 
+                  size={18} 
+                  className={`transition-transform duration-200 ${loadingFlashcards ? 'animate-spin' : 'group-hover:rotate-12'}`}
+                />
+                {loadingFlashcards ? (
+                  <span className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-[#D97706] border-t-transparent rounded-full animate-spin"></div>
+                    Generating...
+                  </span>
+                ) : (
+                  'Study Cards'
+                )}
+                {!currentAssignment && !loadingFlashcards && (
+                  <svg className="w-4 h-4 ml-1 transition-transform duration-200 group-hover:translate-y-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                )}
               </button>
-            ))}
+              
+              {/* Flashcards Selector Dropdown */}
+              {showFlashcardSelector && !currentAssignment && (
+                <div className="absolute bottom-full mb-3 left-0 bg-white rounded-2xl shadow-2xl border-2 border-[#FFE6A7]/20 min-w-72 z-50 animate-in slide-in-from-bottom-2 duration-300">
+                  <div className="p-4 border-b border-[#FFE6A7]/10 bg-gradient-to-r from-[#FFE6A7]/5 to-[#FDDC8A]/5">
+                    <h3 className="font-semibold text-[#4A4A4A] text-base flex items-center gap-2">
+                      <FiLayers size={16} className="text-[#D97706]" />
+                      Choose Assignment for Flashcards
+                    </h3>
+                    <p className="text-xs text-[#7A7A7A] mt-1">Study key concepts and terms from your assignments</p>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {(() => {
+                      const availableAssignments = [];
+                      
+                      // Add upcoming tests first (highest priority)
+                      if (upcomingTests?.length > 0) {
+                        availableAssignments.push(...upcomingTests.slice(0, 2).map(a => ({...a, category: 'Test Prep'})));
+                      }
+                      
+                      // Add upcoming assignments
+                      if (learningContext?.upcomingAssignments?.length > 0) {
+                        availableAssignments.push(...learningContext.upcomingAssignments
+                          .filter(a => !upcomingTests.some(test => test.id === a.id)) // Don't duplicate tests
+                          .slice(0, 2).map(a => ({...a, category: 'Upcoming'})));
+                      }
+                      
+                      // Add current work assignments
+                      if (learningContext?.currentWork?.length > 0) {
+                        availableAssignments.push(...learningContext.currentWork.slice(0, 2).map(a => ({...a, category: 'Recent'})));
+                      }
+                      
+                      // Add needs review assignments
+                      if (learningContext?.needsReview?.length > 0) {
+                        availableAssignments.push(...learningContext.needsReview.slice(0, 2).map(a => ({...a, category: 'Review'})));
+                      }
+                      
+                      if (availableAssignments.length === 0) {
+                        return (
+                          <div className="p-6 text-center">
+                            <div className="text-[#7A7A7A] text-sm mb-2">📚 No assignments available</div>
+                            <div className="text-xs text-[#BDBDBD]">Complete some assignments to create flashcards</div>
+                          </div>
+                        );
+                      }
+                      
+                      return availableAssignments.map((assignment, index) => (
+                        <button
+                          key={assignment.id || index}
+                          onClick={() => handleStartFlashcards(assignment)}
+                          className="w-full text-left p-4 hover:bg-gradient-to-r hover:from-[#FFE6A7]/5 hover:to-[#FDDC8A]/5 transition-all duration-200 border-b border-[#FFE6A7]/10 last:border-b-0 group hover:shadow-sm"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="font-semibold text-[#4A4A4A] text-sm truncate max-w-48 group-hover:text-[#D97706] transition-colors">{assignment.title}</div>
+                              <div className="text-xs text-[#7A7A7A] mt-1 flex items-center gap-2">
+                                <span>{assignment.child_subjects?.subjects?.name || 'Unknown Subject'}</span>
+                                {assignment.category && (
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+                                    assignment.category === 'Test Prep' 
+                                      ? 'bg-[#FDA4AF]/20 text-[#DC2626] border border-[#FDA4AF]/30' 
+                                      : assignment.category === 'Review'
+                                      ? 'bg-[#FFE6A7]/20 text-[#D97706] border border-[#FFE6A7]/30'
+                                      : assignment.category === 'Upcoming'
+                                      ? 'bg-[#B3E0F8]/20 text-[#1D4ED8] border border-[#B3E0F8]/30'
+                                      : 'bg-[#A7F3D0]/20 text-[#059669] border border-[#A7F3D0]/30'
+                                  }`}>
+                                    {assignment.category === 'Test Prep' && '🎯'}
+                                    {assignment.category === 'Review' && '📚'}
+                                    {assignment.category === 'Upcoming' && '⏰'}
+                                    {assignment.category === 'Recent' && '✏️'}
+                                    {assignment.category}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <FiLayers size={14} className="text-[#D97706] flex-shrink-0 transition-all duration-200 transform group-hover:scale-110 group-hover:rotate-12" />
+                          </div>
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+            
           </div>
         </div>
 
@@ -1544,6 +1890,16 @@ Correct answer: ${q.correctAnswer}`;
           onHintRequest={handleQuizHintRequest}
           childData={childData}
           assignment={currentAssignment}
+        />
+      )}
+
+      {/* Flashcard Panel - Slides in from right as flex sibling */}
+      {isFlashcardMode && (
+        <FlashcardPanel
+          isVisible={isFlashcardMode}
+          onClose={handleCloseFlashcards}
+          flashcardData={flashcardData}
+          childData={childData}
         />
       )}
 

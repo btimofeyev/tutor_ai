@@ -19,8 +19,6 @@ class SimpleOpenAIService {
 
     this.config = {
       model: 'gpt-5-mini', // Cost-effective model
-      temperature: 0.7,
-      max_tokens: 1000,
       store: true, // Enable 30-day conversation storage
     };
 
@@ -76,7 +74,6 @@ class SimpleOpenAIService {
       let homeworkIntent = { needsContext: false, specificAssignment: null, confidence: 0 };
       
       if (quizContext?.isQuizActive) {
-        logger.info(`🧪 Quiz context active: "${quizContext.quizTitle}" - Processing quiz hint request`);
         // For quiz context, we'll use a special system prompt
         homeworkIntent = { needsContext: true, isQuizContext: true, quizContext: quizContext, confidence: 1.0 };
       } else if (childId) {
@@ -91,9 +88,7 @@ class SimpleOpenAIService {
           // Filter to specific assignment if one was matched
           if (homeworkIntent.specificAssignment) {
             learningContext = this.filterToSpecificAssignment(learningContext, homeworkIntent.specificAssignment);
-            logger.info(`🎯 Context filtered to specific assignment: "${homeworkIntent.specificAssignment.title}" (confidence: ${homeworkIntent.confidence.toFixed(2)})`);
           } else if (homeworkIntent.needsContext) {
-            logger.info(`📚 Using all available assignments context (no specific match found)`);
           }
           
         } catch (error) {
@@ -108,8 +103,6 @@ class SimpleOpenAIService {
       
       // Log quiz completion detection for debugging
       if (homeworkIntent.isQuizCompletion) {
-        logger.info(`🧪 QUIZ COMPLETION DETECTED for session ${sessionId.slice(-6)}`);
-        logger.info(`📊 Quiz results: ${JSON.stringify(homeworkIntent.quizResults)}`);
       }
       
       // Get or initialize conversation history with context-aware system prompt
@@ -173,14 +166,13 @@ class SimpleOpenAIService {
         ];
       }
       
-      console.log(`💬 Conversation length for ${sessionId.slice(-10)}: ${conversation.length - 1} messages`);
+      logger.debug(`Conversation length for ${sessionId.slice(-10)}: ${conversation.length - 1} messages`);
 
       // Create completion with store and response chaining
       const requestParams = {
         model: this.config.model,
         messages: conversation, // Use full conversation history
-        temperature: this.config.temperature,
-        max_tokens: this.config.max_tokens,
+
         store: this.config.store // Enable 30-day storage
         // metadata removed due to null value restrictions
       };
@@ -198,7 +190,6 @@ class SimpleOpenAIService {
       
       // Handle tool calls if present
       if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
-        logger.info(`🔧 AI wants to call ${responseMessage.tool_calls.length} tool(s)`);
         
         // Process each tool call
         const toolResults = [];
@@ -319,17 +310,17 @@ class SimpleOpenAIService {
         logger.debug(`No previous response ID from database for session ${sessionId}`);
         // Fallback to in-memory storage
         const inMemoryResponse = this.responseChain.get(sessionId);
-        console.log(`🔗 Using in-memory fallback for ${sessionId.slice(-10)}:`, inMemoryResponse || 'NONE');
+        logger.debug(`Using in-memory fallback for ${sessionId.slice(-10)}:`, inMemoryResponse || 'NONE');
         return inMemoryResponse || null;
       }
       
-      console.log(`🔗 Database response ID for ${sessionId.slice(-10)}:`, data.last_response_id);
+      logger.debug(`Database response ID for ${sessionId.slice(-10)}:`, data.last_response_id);
       return data.last_response_id;
     } catch (error) {
       logger.debug('Could not retrieve previous response ID:', error.message);
       // Fallback to in-memory storage
       const inMemoryResponse = this.responseChain.get(sessionId);
-      console.log(`🔗 In-memory fallback after error for ${sessionId.slice(-10)}:`, inMemoryResponse || 'NONE');
+      logger.debug(`In-memory fallback after error for ${sessionId.slice(-10)}:`, inMemoryResponse || 'NONE');
       return inMemoryResponse || null;
     }
   }
@@ -380,7 +371,6 @@ class SimpleOpenAIService {
       if (error) {
         logger.warn('Could not store session in database:', error.message);
       } else {
-        logger.info(`📝 Created database session ${sessionId} on first message`);
         // Remove from temporary storage since it's now in database
         this.sessionMetadata?.delete(sessionId);
       }
@@ -417,7 +407,7 @@ class SimpleOpenAIService {
       if (error) {
         logger.warn(`Could not update session ${sessionId} title:`, error.message);
       } else {
-        console.log(`📝 Updated session ${sessionId.slice(-10)} title: "${title}"`);
+        logger.debug(`Updated session ${sessionId.slice(-10)} title: "${title}"`);
       }
     } catch (error) {
       logger.warn('Error updating session with message:', error.message);
@@ -452,7 +442,7 @@ class SimpleOpenAIService {
       if (error) {
         logger.warn(`Could not save messages to database for session ${sessionId}:`, error.message);
       } else {
-        console.log(`💾 Saved ${messages.length} messages to database for session ${sessionId.slice(-10)}`);
+        logger.debug(`Saved ${messages.length} messages to database for session ${sessionId.slice(-10)}`);
       }
     } catch (error) {
       logger.warn('Error saving messages to database:', error.message);
@@ -465,7 +455,7 @@ class SimpleOpenAIService {
   async updateSessionResponseId(sessionId, responseId, conversationId = null) {
     // Always store in memory as fallback
     this.responseChain.set(sessionId, responseId);
-    console.log(`💾 Stored response ${responseId} for session ${sessionId.slice(-10)}`);
+    logger.debug(`Stored response ${responseId} for session ${sessionId.slice(-10)}`);
     
     try {
       const updateData = {
@@ -487,7 +477,7 @@ class SimpleOpenAIService {
         logger.warn(`Could not update session ${sessionId} in database:`, error.message);
         logger.info(`Using in-memory fallback for response chaining`);
       } else {
-        console.log(`✅ Successfully stored response ${responseId} in database`);
+        logger.debug(`Successfully stored response ${responseId} in database`);
       }
     } catch (error) {
       logger.warn('Could not update session response ID in database:', error.message);
@@ -548,7 +538,7 @@ class SimpleOpenAIService {
           timestamp: new Date().toISOString()
         }));
         
-        console.log(`📜 Retrieved ${userMessages.length} messages from memory for session ${sessionId.slice(-10)}`);
+        logger.debug(`Retrieved ${userMessages.length} messages from memory for session ${sessionId.slice(-10)}`);
         
         return {
           sessionId,
@@ -558,7 +548,7 @@ class SimpleOpenAIService {
       }
       
       // If not in memory, try to load from database
-      console.log(`🔍 No conversation in memory, checking database for session ${sessionId.slice(-10)}`);
+      logger.debug(`No conversation in memory, checking database for session ${sessionId.slice(-10)}`);
       
       const { data, error } = await supabase
         .from('conversation_messages')
@@ -577,7 +567,7 @@ class SimpleOpenAIService {
       }
       
       if (!data || data.length === 0) {
-        console.log(`📭 No messages found in database for session ${sessionId.slice(-10)}`);
+        logger.debug(`No messages found in database for session ${sessionId.slice(-10)}`);
         return {
           sessionId,
           messages: [],
@@ -594,7 +584,7 @@ class SimpleOpenAIService {
         timestamp: msg.created_at
       }));
       
-      console.log(`📜 Retrieved ${userMessages.length} messages from database for session ${sessionId.slice(-10)}`);
+      logger.debug(`Retrieved ${userMessages.length} messages from database for session ${sessionId.slice(-10)}`);
       
       return {
         sessionId,
@@ -629,7 +619,7 @@ class SimpleOpenAIService {
         logger.warn('Could not clean up expired messages:', messageError.message);
       } else {
         const deletedCount = expiredMessages?.length || 0;
-        console.log(`🧹 Cleaned up ${deletedCount} expired messages`);
+        logger.debug(`Cleaned up ${deletedCount} expired messages`);
         logger.info(`Cleaned up ${deletedCount} expired conversation messages`);
       }
       
@@ -646,9 +636,10 @@ class SimpleOpenAIService {
         logger.warn('Could not clean up old sessions:', sessionError.message);
       } else {
         const deletedCount = oldSessions?.length || 0;
-        console.log(`🧹 Cleaned up ${deletedCount} old sessions`);
+        logger.debug(`Cleaned up ${deletedCount} old sessions`);
         logger.info(`Cleaned up ${deletedCount} old conversation sessions`);
       }
+      
     } catch (error) {
       logger.warn('Cleanup error:', error.message);
     }
@@ -659,7 +650,7 @@ class SimpleOpenAIService {
    */
   async cleanupEmptyConversations() {
     try {
-      console.log('🧹 Starting cleanup of empty conversations...');
+      logger.debug('Starting cleanup of empty conversations...');
       
       // Get all sessions
       const { data: sessions, error: sessionError } = await supabase
@@ -684,7 +675,7 @@ class SimpleOpenAIService {
         
         if (!messageError && (!userMessages || userMessages.length === 0)) {
           // No user messages found, delete this empty conversation
-          console.log(`🗑️ Deleting empty conversation: ${session.session_id.slice(-10)}`);
+          logger.debug(`Deleting empty conversation: ${session.session_id.slice(-10)}`);
           
           // Delete any messages (system/assistant messages without user input)
           await supabase
@@ -702,7 +693,7 @@ class SimpleOpenAIService {
         }
       }
       
-      console.log(`🧹 Cleanup complete: Deleted ${deletedCount} empty conversations`);
+      logger.debug(`Cleanup complete: Deleted ${deletedCount} empty conversations`);
       logger.info(`Cleanup: Removed ${deletedCount} empty conversations`);
       
     } catch (error) {
@@ -711,109 +702,46 @@ class SimpleOpenAIService {
   }
 
   /**
-   * Build the study assistant system prompt with child information
+   * Build the study assistant system prompt with child information and Socratic method enforcement
    */
   buildStudyAssistantPrompt(childName = 'Student', childGrade = null) {
-    const gradeInfo = childGrade ? `The student is in grade ${childGrade}.` : '';
+    const gradeInfo = childGrade ? `Grade ${childGrade}` : '';
     
-    return `You are Klio, a helpful AI study assistant for K-12 students. You are currently helping ${childName}. ${gradeInfo}
+    return `You are Klio, an interactive AI tutor helping ${childName} (${gradeInfo}) using Socratic method.
 
-IMPORTANT STUDENT INFORMATION:
-- Student's name: ${childName}
-- ${childGrade ? `Grade level: ${childGrade}` : 'Grade level: Not specified'}
-- Always remember the student's name throughout the conversation
+CORE RULES:
+1. Ask questions before explaining - guide thinking, don't give answers
+2. One concept at a time - wait for understanding before moving on
+3. Keep responses short (2-3 sentences) then ask what they think
+4. End with a question requiring student participation
 
-Your role is to:
-- Help students understand concepts through clear, age-appropriate explanations
-- Answer questions about homework and schoolwork
-- Provide examples and practice problems when asked
-- Use the Socratic method to guide learning - ask questions to help students think through problems
-- Be encouraging, patient, and supportive
-- Adapt your language to be appropriate for the student's grade level${childGrade ? ` (grade ${childGrade})` : ''}
-
-Guidelines:
-- Keep responses concise but thorough
-- Use markdown formatting for math expressions (e.g., $x^2 + 1 = 10$)
-- When solving problems, guide the student through the steps rather than giving direct answers
-- Ask follow-up questions to check understanding
-- Be encouraging and celebrate progress
-- If you don't understand something, ask for clarification
-- Focus on educational content - if asked about non-academic topics, gently redirect to studies
-- When the student asks about their name, respond with "${childName}"
-- When asked about their grade, respond with "${childGrade ? `grade ${childGrade}` : 'I don\'t have your grade information'}"
-
-Remember: You're here to help ${childName} learn and understand, not to do their work for them. Guide them to discover answers through questions and explanations.`;
+Always help ${childName} discover solutions through guided questions.`;
   }
 
   /**
    * Build quiz-specific system prompt for providing hints without giving away answers
    */
   buildQuizHintPrompt(childName = 'Student', childGrade = null, quizContext = null) {
-    const gradeInfo = childGrade ? `The student is in grade ${childGrade}.` : '';
+    const gradeInfo = childGrade ? `Grade ${childGrade}` : '';
     
-    let prompt = `You are Klio, a helpful AI study assistant for K-12 students. You are currently helping ${childName} during a QUIZ. ${gradeInfo}
+    let prompt = `You are Klio helping ${childName} (${gradeInfo}) during a quiz. Use Socratic method - guide with questions, never give direct answers.
 
-🧪 QUIZ MODE ACTIVE 🧪
-
-CURRENT QUIZ CONTEXT:
-- Quiz Title: "${quizContext?.quizTitle || 'Practice Quiz'}"
-- Assignment: "${quizContext?.assignmentTitle || 'Current Assignment'}"
-- Student's Name: ${childName}
-- ${childGrade ? `Grade Level: ${childGrade}` : 'Grade level: Not specified'}
-
-CURRENT QUESTION CONTEXT:`;
+CURRENT QUIZ: "${quizContext?.quizTitle || 'Practice Quiz'}"`;
 
     if (quizContext?.currentQuestion) {
-      const question = quizContext.currentQuestion;
-      prompt += `
-- Question: "${question.question}"
-- Question Type: ${question.type || 'unknown'}`;
-      
-      if (question.options && question.options.length > 0) {
-        prompt += `
-- Multiple Choice Options: ${question.options.map((opt, i) => `${String.fromCharCode(65 + i)}. ${opt}`).join(', ')}`;
-      }
-      
-      if (question.hint) {
-        prompt += `
-- Built-in Hint: "${question.hint}"`;
+      prompt += `\nQuestion: "${quizContext.currentQuestion.question}"`;
+      if (quizContext.currentQuestion.options) {
+        prompt += `\nOptions: ${quizContext.currentQuestion.options.map((opt, i) => `${String.fromCharCode(65 + i)}) ${opt}`).join(', ')}`;
       }
     }
 
-    if (quizContext?.learningObjectives?.length > 0) {
-      prompt += `
+    prompt += `\n\nQUIZ RULES:
+1. Ask guiding questions - never explain directly
+2. Help eliminate wrong choices through questions
+3. Keep responses 1-2 sentences then ask what they think
+4. Guide to concepts but let them apply it
 
-LEARNING OBJECTIVES FOR THIS ASSIGNMENT:
-${quizContext.learningObjectives.map(obj => `- ${obj}`).join('\n')}`;
-    }
-
-    if (quizContext?.keyTerms?.length > 0) {
-      prompt += `
-
-KEY TERMS TO FOCUS ON:
-${quizContext.keyTerms.map(term => `- ${term}`).join('\n')}`;
-    }
-
-    prompt += `
-
-🚨 CRITICAL QUIZ MODE INSTRUCTIONS:
-1. **NEVER give the direct answer** - this is a quiz and the student must figure it out themselves
-2. **Provide step-by-step guidance** using the Socratic method
-3. **Ask leading questions** that help the student think through the problem
-4. **Reference the learning objectives** and key terms when giving hints
-5. **Break down complex problems** into smaller, manageable steps
-6. **Encourage the student** and be patient with their learning process
-7. **If it's multiple choice**, help them eliminate wrong answers without revealing the right one
-8. **Focus on the thinking process** rather than the final answer
-
-EXAMPLE GOOD RESPONSES:
-❌ "The answer is B" 
-✅ "Let's think about this step by step. What do you know about [concept]? Can you eliminate any answers that don't fit?"
-
-❌ "32.4 ÷ 4 = 8.1"
-✅ "Great question! When dividing decimals, what happens if we think about this as 324 ÷ 4 first? What would that equal? Then, where should we place the decimal point?"
-
-Remember: Your goal is to help ${childName} learn and discover the answer themselves, not to give it away. Guide them to success through understanding!`;
+Help ${childName} think through this step by step with questions.`;
 
     return prompt;
   }
@@ -826,38 +754,20 @@ Remember: Your goal is to help ${childName} learn and discover the answer themse
    * @returns {string} Quiz review focused system prompt
    */
   buildQuizReviewPrompt(childName = 'Student', childGrade = null, quizResults = null) {
-    const gradeInfo = childGrade ? `Grade ${childGrade}` : 'K-12';
+    const gradeInfo = childGrade ? `Grade ${childGrade}` : '';
     
-    let prompt = `You are Klio, an active AI tutor helping ${childName} (${gradeInfo}) learn from their quiz mistakes.
+    return `You are Klio helping ${childName} (${gradeInfo}) learn from quiz results using Socratic method.
 
-🎯 QUIZ TUTORING MODE - BE CONCISE AND INTERACTIVE
+QUIZ REVIEW APPROACH:
+1. Ask how the quiz felt overall
+2. Focus on one missed concept at a time
+3. Ask what they think the question was asking
+4. Guide them to discover why their answer didn't work
+5. Help them find the correct thinking process
 
-RESPONSE RULES:
-- Keep responses SHORT (2-3 sentences MAX)
-- Start with ONE guiding question immediately
-- NO long explanations or paragraphs
-- If student gave random/nonsense answers, address that first
+For random/nonsense answers: "I noticed you guessed on some questions. What was confusing about this one?"
 
-TUTORING STRATEGY:
-1. Pick ONE missed concept to work on
-2. Ask a simple question to check understanding
-3. Based on their answer, either:
-   - Ask a follow-up question to guide them
-   - Give a short hint and ask another question
-   - Move to next concept once they understand
-
-EXAMPLE APPROACH:
-❌ Bad: "The movable-type printing press was introduced to Europe by Johannes Gutenberg in the 15th century. This invention allowed for the mass production of books..."
-
-✅ Good: "I see you put 'free' for the printing press question. Let's think - what do you think a printing press does?"
-
-DETECT RANDOM ANSWERS:
-If student answered with words like "free", "maga", "awesome" - these are random guesses.
-Start with: "I noticed you guessed on some questions. That's okay! Let's work through [concept] together."
-
-START IMMEDIATELY with a question about their FIRST missed concept. No greetings or summaries.`;
-
-    return prompt;
+Always use questions to help ${childName} understand why the correct answer works.`;
   }
 
   /**
@@ -1309,6 +1219,7 @@ START IMMEDIATELY with a question about their FIRST missed concept. No greetings
     return results;
   }
 
+
   /**
    * Build context-aware system prompt that includes learning materials
    * @param {string} childName - Student's name
@@ -1327,29 +1238,22 @@ START IMMEDIATELY with a question about their FIRST missed concept. No greetings
         ? learningContext.nextAssignments[0] 
         : null;
         
+      // Format context (the learningContextService will handle the formatting)
       const contextStr = learningContextService.formatContextForPrompt(learningContext, specificAssignment);
-      console.log('🔍 DEBUG: Learning context being added to AI prompt:');
-      console.log('📝 Full context string length:', contextStr.length);
-      console.log('📋 Context type:', specificAssignment ? 'specific assignment' : 'multiple assignments overview');
-      console.log('📋 Context preview:', contextStr.substring(0, 500) + '...');
       prompt += contextStr;
-      
-      // The formatContextForPrompt method now handles all the prompt logic
-      // including specific assignment focus vs. multiple assignments overview
     }
     
     return prompt;
   }
 
   /**
-   * Generate quiz questions from assignment content
+   * Generate quiz questions and answers from assignment content using AI
    * @param {Object} assignment - Assignment object with lesson_json
-   * @param {number} questionCount - Number of questions to generate (default 5)
+   * @param {number} requestedCount - Number of questions to generate (default 10)
    * @returns {Object} Generated quiz object
    */
   async generateQuiz(assignment, requestedCount = null) {
     try {
-      logger.info(`🧪 Generating quiz for assignment: "${assignment.title}"`);
       
       if (!assignment || !assignment.lesson_json) {
         throw new Error('Assignment or lesson content not found');
@@ -1357,48 +1261,124 @@ START IMMEDIATELY with a question about their FIRST missed concept. No greetings
 
       const subject = assignment.child_subjects?.subjects?.name || 'General';
       const grade = assignment.child_subjects?.children?.grade || 'Elementary';
+      
+      // Parse lesson content
+      const lessonData = typeof assignment.lesson_json === 'string' 
+        ? JSON.parse(assignment.lesson_json) 
+        : assignment.lesson_json;
+      
+      // Extract all available content for quiz generation
+      const lessonContent = {
+        title: assignment.title,
+        subject: subject,
+        grade: grade,
+        learningObjectives: lessonData.learning_objectives || [],
+        keyTerms: lessonData.assignment_metadata?.key_terms || [],
+        subjectKeywords: lessonData.subject_keywords_or_subtopics || [],
+        mainContent: lessonData.main_content_summary_or_extract || '',
+        fullContent: lessonData.full_text_content || '',
+        teachingMethodology: lessonData.teaching_methodology || '',
+        tasksOrQuestions: lessonData.tasks_or_questions || [],
+        prerequisites: lessonData.prerequisites || [],
+        commonMistakes: lessonData.common_mistakes || []
+      };
 
-      // Simple, direct prompt with all assignment content
-      const prompt = `Create a practice quiz for this ${subject} assignment for ${grade} level students.
+      // Determine question count (default to 10, max 15)
+      const questionCount = Math.min(requestedCount || 10, 15);
+      
+      logger.info(`🧠 Generating ${questionCount} quiz questions for "${assignment.title}" using AI content analysis`);
 
-ASSIGNMENT TITLE: "${assignment.title}"
+      // Add randomization elements to ensure different questions each time
+      const randomSeed = Math.floor(Math.random() * 10000);
+      const currentTime = new Date().toISOString();
+      
+      // Randomly shuffle key terms and tasks for variety
+      const shuffledKeyTerms = [...lessonContent.keyTerms].sort(() => Math.random() - 0.5);
+      const shuffledTasks = [...lessonContent.tasksOrQuestions].sort(() => Math.random() - 0.5);
+      
+      // Random focus areas for variety
+      const focusAreas = [
+        'historical significance and context',
+        'key definitions and concepts', 
+        'cause and effect relationships',
+        'important people and their roles',
+        'geographic and temporal context',
+        'social and cultural impacts',
+        'political and economic factors'
+      ];
+      const randomFocus = focusAreas[Math.floor(Math.random() * focusAreas.length)];
+      
+      // Random question starters for variety
+      const questionStarters = [
+        'Create questions that explore different aspects of the material',
+        'Generate questions that test various levels of understanding',
+        'Develop questions that cover different areas of the content',
+        'Design questions that assess comprehension from multiple angles',
+        'Formulate questions that examine various concepts in the lesson'
+      ];
+      const randomStarter = questionStarters[Math.floor(Math.random() * questionStarters.length)];
 
-ASSIGNMENT CONTENT:
-${JSON.stringify(assignment.lesson_json, null, 2)}
+      // Create comprehensive prompt for GPT
+      const prompt = `Generate a quiz with ${questionCount} questions based on this lesson content:
 
-INSTRUCTIONS:
-- Generate ${requestedCount ? requestedCount : 'an appropriate number of (5-15)'} questions based on the actual content above
-- Focus on the key concepts, vocabulary words, and problems shown in the assignment
-- Make questions test understanding of the specific material, not generic knowledge
-- For vocabulary: test definitions and usage in context
-- For math: create similar problems with different numbers
-- For reading: test comprehension of the specific content
+QUIZ SEED: ${randomSeed} (use this for randomization)
+GENERATION TIME: ${currentTime}
+FOCUS AREA: ${randomFocus}
 
-QUESTION TYPE RULES:
-1. MULTIPLE CHOICE: Always provide exactly 4 options (A, B, C, D) with clear, distinct answers
-2. SHORT ANSWER: For open-ended questions where students type their own response
-3. FILL IN BLANK: Use format "The word _____ means brave" with clear single-word answers
-4. AVOID: Questions asking for labels, underlining, or interface actions students can't perform
+LESSON: "${lessonContent.title}"
+SUBJECT: ${lessonContent.subject} (${lessonContent.grade})
 
-EXAMPLES OF GOOD QUESTIONS:
-✅ "What does 'valiant' mean? A) Cowardly B) Brave and courageous C) Tired D) Hungry"
-✅ "Complete the sentence: The knight was _____ in battle. (valiant/coward/lazy/tired)"
-✅ "Explain what you learned from this assignment about narrative writing."
-❌ "Underline the modifier in this sentence" (students can't underline)
-❌ "Label the parts of speech" (without providing label options)
+LEARNING OBJECTIVES:
+${lessonContent.learningObjectives.join('\n')}
 
-Return your response as valid JSON in this exact format:
+KEY TERMS TO COVER (shuffled for variety):
+${shuffledKeyTerms.join(', ')}
+
+LESSON CONTENT:
+${lessonContent.mainContent}
+
+TASKS/QUESTIONS FROM LESSON (shuffled selection):
+${shuffledTasks.slice(0, 15).join('\n')}
+
+COMMON MISTAKES TO ADDRESS:
+${lessonContent.commonMistakes.join('\n')}
+
+RANDOMIZATION INSTRUCTIONS:
+- ${randomStarter}
+- Vary question difficulty and focus areas
+- Select different aspects of the content each time
+- Emphasize ${randomFocus} in some questions
+- Use the quiz seed ${randomSeed} to ensure variety
+
+REQUIREMENTS:
+- Generate ${questionCount} DIFFERENT questions from previous attempts
+- Mix question types: multiple choice (60%), short answer (30%), true/false (10%)
+- For multiple choice: provide 4 plausible options with ONE correct answer
+- For short answer: provide clear, specific correct answers
+- Base questions on the actual lesson content and learning objectives
+- Include explanations that help students understand why answers are correct
+- Questions should be appropriate for ${lessonContent.grade} level
+- VARY the specific topics/terms you focus on for each quiz generation
+
+Return as valid JSON:
 {
-  "title": "Practice Quiz: [Assignment Title]",
-  "subject": "${subject}",
+  "title": "Quiz: ${lessonContent.title}",
+  "subject": "${lessonContent.subject}",
   "questions": [
     {
       "id": "q1",
-      "question": "Question text here",
+      "question": "Clear question text here",
       "type": "multiple_choice",
-      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
-      "correctAnswer": "B",
-      "hint": "Helpful hint for the student"
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": "Option B",
+      "explanation": "Brief explanation of why this answer is correct"
+    },
+    {
+      "id": "q2", 
+      "question": "Define or explain this concept",
+      "type": "short_answer",
+      "correctAnswer": "Specific correct answer",
+      "explanation": "Why this answer is correct"
     }
   ]
 }`;
@@ -1409,7 +1389,7 @@ Return your response as valid JSON in this exact format:
         messages: [
           {
             role: 'system',
-            content: 'You are an expert educational quiz generator. Create engaging quizzes that test students on the specific content provided. Always respond with valid JSON.'
+            content: 'You are an expert educational quiz generator. Create quiz questions WITH correct answers based on the provided lesson content. Focus on testing comprehension and application of key concepts. Use the provided randomization elements to ensure variety in question selection and focus.'
           },
           {
             role: 'user',
@@ -1417,31 +1397,380 @@ Return your response as valid JSON in this exact format:
           }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.7,
-        max_tokens: 2500
+        max_completion_tokens: 4000
+        // Note: temperature, top_p, and seed parameters not supported by this model
       });
 
-      const quiz = JSON.parse(response.choices[0].message.content);
+      // Parse response
+      const messageContent = response.choices[0]?.message?.content;
+      logger.info(`GPT Response - Content length: ${messageContent?.length || 0}`);
       
-      // Ensure quiz has proper structure
-      if (!quiz.questions || !Array.isArray(quiz.questions)) {
-        throw new Error('Invalid quiz format received from AI');
+      if (!messageContent) {
+        throw new Error('No content received from GPT');
       }
 
-      // Add unique quiz ID
+      let quiz;
+      try {
+        quiz = JSON.parse(messageContent);
+      } catch (parseError) {
+        logger.error('JSON parsing failed:', parseError);
+        
+        // Try to extract JSON from response
+        const jsonMatch = messageContent.match(/\{.*\}/s);
+        if (jsonMatch) {
+          quiz = JSON.parse(jsonMatch[0]);
+          logger.info('Successfully extracted JSON using regex');
+        } else {
+          throw new Error('No valid JSON found in GPT response');
+        }
+      }
+      
+      // Validate quiz structure
+      if (!quiz.questions || !Array.isArray(quiz.questions) || quiz.questions.length === 0) {
+        throw new Error('Invalid quiz format - no questions found');
+      }
+
+      // Validate each question has required fields
+      quiz.questions.forEach((q, index) => {
+        if (!q.question || !q.correctAnswer) {
+          throw new Error(`Question ${index + 1} missing required fields (question or correctAnswer)`);
+        }
+      });
+
+      // Add metadata
       quiz.id = `quiz_${assignment.id}_${Date.now()}`;
       quiz.assignmentId = assignment.id;
+      quiz.generatedFromContent = true;
+      quiz.questionCount = quiz.questions.length;
       
-      logger.info(`✅ Generated quiz with ${quiz.questions.length} questions using direct GPT approach`);
+      logger.info(`✅ Generated quiz with ${quiz.questions.length} questions using AI content analysis`);
       return quiz;
 
     } catch (error) {
-      logger.error('Error generating quiz:', error);
+      logger.error('Error generating content-based quiz:', error);
       
-      // Simple fallback
-      return this.generateSimpleFallbackQuiz(assignment, requestedCount || 5);
+      // Simple fallback if all else fails
+      return {
+        id: `quiz_${assignment.id}_${Date.now()}`,
+        title: `Quiz: ${assignment.title}`,
+        subject: assignment.child_subjects?.subjects?.name || 'General',
+        assignmentId: assignment.id,
+        questions: [
+          {
+            id: "q1",
+            question: `What are the main concepts covered in "${assignment.title}"?`,
+            type: "short_answer",
+            correctAnswer: "The key concepts and topics from the lesson material",
+            explanation: "This question tests overall understanding of the lesson content"
+          }
+        ],
+        error: 'Fallback quiz generated due to processing error'
+      };
     }
   }
+
+
+  /**
+   * Extract facts and content from assignment for quiz/flashcard generation
+   * @param {Object} assignment - Assignment with lesson_json
+   * @returns {Array} Array of facts/content strings
+   */
+  extractFactsAndContent(assignment) {
+    const facts = [];
+    
+    try {
+      const lessonData = typeof assignment.lesson_json === 'string' 
+        ? JSON.parse(assignment.lesson_json) 
+        : assignment.lesson_json;
+      
+      console.log(`📚 Extracting facts from "${assignment.title}"`);
+      
+      // Priority 1: Answer key provides definitive facts
+      if (lessonData.answer_key && Array.isArray(lessonData.answer_key)) {
+        lessonData.answer_key.forEach(answer => {
+          if (typeof answer === 'string' && answer.trim().length > 5) {
+            facts.push(answer.trim());
+          } else if (answer.answer || answer.correct_answer) {
+            facts.push(answer.answer || answer.correct_answer);
+          }
+        });
+        console.log(`✅ Found ${lessonData.answer_key.length} facts from answer key`);
+      }
+      
+      // Priority 2: Key terms from assignment metadata
+      if (lessonData.assignment_metadata?.key_terms && Array.isArray(lessonData.assignment_metadata.key_terms)) {
+        lessonData.assignment_metadata.key_terms.forEach(term => {
+          facts.push(`Key term: ${term}`);
+        });
+        console.log(`🔑 Found ${lessonData.assignment_metadata.key_terms.length} key terms`);
+      }
+      
+      // Priority 3: Learning objectives tell us what students should know
+      if (lessonData.learning_objectives && Array.isArray(lessonData.learning_objectives)) {
+        lessonData.learning_objectives.forEach(objective => {
+          if (typeof objective === 'string' && objective.trim().length > 10) {
+            facts.push(`Learning objective: ${objective.trim()}`);
+          }
+        });
+        console.log(`🎯 Found ${lessonData.learning_objectives.length} learning objectives`);
+      }
+      
+      // Priority 4: Main content summary contains key facts
+      if (lessonData.main_content_summary && typeof lessonData.main_content_summary === 'string') {
+        // Split into sentences and take meaningful ones
+        const sentences = lessonData.main_content_summary
+          .split('.')
+          .map(s => s.trim())
+          .filter(s => s.length > 20 && s.length < 200);
+        
+        sentences.slice(0, 10).forEach(sentence => {
+          facts.push(`Fact: ${sentence}.`);
+        });
+        console.log(`📖 Found ${sentences.length} facts from content summary`);
+      }
+      
+      // Priority 5: Subject keywords provide context
+      if (lessonData.subject_keywords_or_subtopics && Array.isArray(lessonData.subject_keywords_or_subtopics)) {
+        lessonData.subject_keywords_or_subtopics.forEach(keyword => {
+          if (typeof keyword === 'string' && keyword.trim().length > 3) {
+            facts.push(`Topic: ${keyword.trim()}`);
+          }
+        });
+        console.log(`🏷️ Found ${lessonData.subject_keywords_or_subtopics.length} subject keywords`);
+      }
+      
+      // Clean and deduplicate facts
+      const uniqueFacts = [...new Set(facts)]
+        .filter(fact => fact && fact.length > 5 && fact.length < 300)
+        .slice(0, 30); // Limit to 30 facts max
+      
+      console.log(`✨ Final extracted facts: ${uniqueFacts.length} items`);
+      if (uniqueFacts.length > 0) {
+        console.log('📋 Sample facts:', uniqueFacts.slice(0, 3));
+      }
+      
+      return uniqueFacts;
+      
+    } catch (error) {
+      logger.error('Error extracting facts and content:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Generate flashcards from assignment content using AI
+   * @param {Object} assignment - Assignment object with lesson_json
+   * @param {number} requestedCount - Number of flashcards to generate (default 10)
+   * @returns {Object} Generated flashcards object
+   */
+  async generateFlashcards(assignment, requestedCount = null) {
+    try {
+      if (!assignment || !assignment.lesson_json) {
+        throw new Error('Assignment or lesson content not found');
+      }
+
+      const subject = assignment.child_subjects?.subjects?.name || 'General';
+      const grade = assignment.child_subjects?.children?.grade || 'Elementary';
+      
+      // Parse lesson content
+      const lessonData = typeof assignment.lesson_json === 'string' 
+        ? JSON.parse(assignment.lesson_json) 
+        : assignment.lesson_json;
+      
+      // Extract all available content for flashcard generation
+      const lessonContent = {
+        title: assignment.title,
+        subject: subject,
+        grade: grade,
+        learningObjectives: lessonData.learning_objectives || [],
+        keyTerms: lessonData.assignment_metadata?.key_terms || [],
+        subjectKeywords: lessonData.subject_keywords_or_subtopics || [],
+        mainContent: lessonData.main_content_summary_or_extract || '',
+        fullContent: lessonData.full_text_content || '',
+        teachingMethodology: lessonData.teaching_methodology || '',
+        tasksOrQuestions: lessonData.tasks_or_questions || [],
+        prerequisites: lessonData.prerequisites || [],
+        commonMistakes: lessonData.common_mistakes || []
+      };
+
+      // Determine flashcard count (default to 10, max 15)
+      const cardCount = Math.min(requestedCount || 10, 15);
+      
+      logger.info(`🎴 Generating ${cardCount} flashcards for "${assignment.title}" using AI content analysis`);
+
+      // Add randomization elements to ensure different cards each time
+      const randomSeed = Math.floor(Math.random() * 10000);
+      const currentTime = new Date().toISOString();
+      
+      // Randomly shuffle key terms and tasks for variety
+      const shuffledKeyTerms = [...lessonContent.keyTerms].sort(() => Math.random() - 0.5);
+      const shuffledTasks = [...lessonContent.tasksOrQuestions].sort(() => Math.random() - 0.5);
+      
+      // Random study approaches for variety
+      const studyApproaches = [
+        'key definitions and terminology',
+        'important concepts and their applications',
+        'cause and effect relationships',
+        'historical significance and context',
+        'examples and practical applications',
+        'comparisons and contrasts',
+        'critical thinking and analysis'
+      ];
+      const randomApproach = studyApproaches[Math.floor(Math.random() * studyApproaches.length)];
+      
+      // Random card types for variety
+      const cardVariations = [
+        'Create cards that test both recognition and recall',
+        'Generate cards that mix definitions with examples',
+        'Design cards that cover different levels of understanding',
+        'Develop cards that connect concepts to applications',
+        'Formulate cards that test key facts and relationships'
+      ];
+      const randomVariation = cardVariations[Math.floor(Math.random() * cardVariations.length)];
+
+      // Create comprehensive prompt for GPT
+      const prompt = `Generate ${cardCount} study flashcards based on this lesson content:
+
+SEED: ${randomSeed} (use this for randomization)
+GENERATION TIME: ${currentTime}
+STUDY APPROACH: ${randomApproach}
+
+LESSON: "${lessonContent.title}"
+SUBJECT: ${lessonContent.subject} (${lessonContent.grade})
+
+LEARNING OBJECTIVES:
+${lessonContent.learningObjectives.join('\n')}
+
+KEY TERMS TO COVER (shuffled for variety):
+${shuffledKeyTerms.join(', ')}
+
+LESSON CONTENT:
+${lessonContent.mainContent}
+
+TASKS/QUESTIONS FROM LESSON (shuffled selection):
+${shuffledTasks.slice(0, 15).join('\n')}
+
+COMMON MISTAKES TO ADDRESS:
+${lessonContent.commonMistakes.join('\n')}
+
+RANDOMIZATION INSTRUCTIONS:
+- ${randomVariation}
+- Emphasize ${randomApproach} in your card selection
+- Use the seed ${randomSeed} to ensure variety
+- Select different aspects of the content each time
+
+REQUIREMENTS:
+- Generate ${cardCount} DIFFERENT flashcards from previous attempts
+- Front: Clear question, term, or concept prompt
+- Back: Complete answer, definition, or explanation
+- Mix card types: definitions (40%), applications (30%), examples (20%), analysis (10%)
+- Base cards on the actual lesson content and learning objectives
+- Include helpful hints that guide learning without giving away answers
+- Cards should be appropriate for ${lessonContent.grade} level
+- VARY the specific topics/terms you focus on for each flashcard generation
+
+Return valid JSON:
+{
+  "title": "Study Cards: ${lessonContent.title}",
+  "subject": "${lessonContent.subject}",
+  "cards": [
+    {
+      "id": "card1",
+      "front": "Clear question or term to study",
+      "back": "Complete answer or definition",
+      "hint": "Helpful learning hint",
+      "category": "definition/application/example/analysis"
+    }
+  ]
+}`;
+
+      // Generate flashcards using structured output
+      const response = await this.openai.chat.completions.create({
+        model: this.config.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert educational flashcard creator. Create study cards WITH complete front and back content based on the provided lesson content. Focus on helping students memorize and understand key concepts. Use the provided randomization elements to ensure variety in card selection and focus.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 4000
+        // Note: temperature and other params not supported by this model
+      });
+
+      // Parse response
+      const messageContent = response.choices[0]?.message?.content;
+      logger.info(`GPT Response - Content length: ${messageContent?.length || 0}`);
+      
+      if (!messageContent) {
+        throw new Error('No content received from GPT');
+      }
+
+      let flashcards;
+      try {
+        flashcards = JSON.parse(messageContent);
+      } catch (parseError) {
+        logger.error('JSON parsing failed for flashcards:', parseError);
+        
+        // Try to extract JSON from response
+        const jsonMatch = messageContent.match(/\{.*\}/s);
+        if (jsonMatch) {
+          flashcards = JSON.parse(jsonMatch[0]);
+          logger.info('Successfully extracted JSON using regex');
+        } else {
+          throw new Error('No valid JSON found in GPT response');
+        }
+      }
+      
+      // Validate flashcard structure
+      if (!flashcards.cards || !Array.isArray(flashcards.cards) || flashcards.cards.length === 0) {
+        throw new Error('Invalid flashcard format - no cards found');
+      }
+
+      // Validate each card has required fields
+      flashcards.cards.forEach((card, index) => {
+        if (!card.front || !card.back) {
+          throw new Error(`Card ${index + 1} missing required fields (front or back)`);
+        }
+      });
+
+      // Add metadata
+      flashcards.id = `flashcards_${assignment.id}_${Date.now()}`;
+      flashcards.assignmentId = assignment.id;
+      flashcards.generatedFromContent = true;
+      flashcards.cardCount = flashcards.cards.length;
+      
+      logger.info(`✅ Generated ${flashcards.cards.length} flashcards using AI content analysis`);
+      return flashcards;
+
+    } catch (error) {
+      logger.error('Error generating content-based flashcards:', error);
+      
+      // Simple fallback if all else fails
+      return {
+        id: `flashcards_${assignment.id}_${Date.now()}`,
+        title: `Study Cards: ${assignment.title}`,
+        subject: assignment.child_subjects?.subjects?.name || 'General',
+        assignmentId: assignment.id,
+        cards: [
+          {
+            id: "card1",
+            front: `What are the main concepts in "${assignment.title}"?`,
+            back: "The key concepts and topics from the lesson material",
+            hint: "Review the lesson content and identify the most important ideas",
+            category: "review"
+          }
+        ],
+        error: 'Fallback flashcards generated due to processing error'
+      };
+    }
+  }
+
+
 
   /**
    * Simple fallback quiz generation
@@ -1778,75 +2107,6 @@ Generate the quiz now:`;
   /**
    * Generate intelligent fallback quiz using AI to analyze content
    */
-  async generateIntelligentFallbackQuiz(assignment, questionCount = 5) {
-    try {
-      const subject = assignment.child_subjects?.subjects?.name || 'General';
-      const grade = assignment.child_subjects?.children?.grade || 'Elementary';
-      
-      // Extract any available content
-      const lessonData = typeof assignment.lesson_json === 'string' 
-        ? JSON.parse(assignment.lesson_json) 
-        : assignment.lesson_json;
-
-      const allContent = [
-        assignment.title,
-        assignment.content,
-        lessonData.content,
-        lessonData.lesson_content,
-        lessonData.full_text_content,
-        JSON.stringify(lessonData.tasks_or_questions || []),
-        assignment.assignment_metadata?.description
-      ].filter(Boolean).join('\n');
-
-      const prompt = `Create a ${questionCount}-question quiz based on this ${subject} assignment for ${grade} students.
-
-ASSIGNMENT CONTENT:
-${allContent}
-
-Create questions that test understanding of the key concepts, skills, or content from this assignment. Make questions specific to the actual material provided, not generic questions.
-
-FORMAT AS JSON:
-{
-  "title": "Practice Quiz: ${assignment.title}",
-  "subject": "${subject}",
-  "questions": [
-    {
-      "id": "q1",
-      "question": "Specific question based on the content above",
-      "type": "multiple_choice",
-      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
-      "correctAnswer": "B",
-      "hint": "Review the specific part of the assignment that covers this concept"
-    }
-  ]
-}`;
-
-      const response = await this.openai.chat.completions.create({
-        model: this.config.model,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an educational quiz generator. Create specific questions based on the actual content provided, not generic questions.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000
-      });
-
-      const aiResponse = response.choices[0].message.content;
-      const quiz = this.parseQuizResponse(aiResponse, assignment);
-      
-      return quiz;
-
-    } catch (error) {
-      logger.error('Error generating intelligent fallback quiz:', error);
-      return this.generateFallbackQuiz(assignment, questionCount);
-    }
-  }
 
   /**
    * Get service health status

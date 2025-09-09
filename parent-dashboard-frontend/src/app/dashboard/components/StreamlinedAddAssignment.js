@@ -409,8 +409,10 @@ export default function StreamlinedAddAssignment({
         // AI Mode: Upload files for async analysis
         const uploadFormData = new FormData();
 
-        // Add the file
-        uploadFormData.append('files', formData.files[0]);
+        // Add all files
+        formData.files.forEach(file => {
+          uploadFormData.append('files', file);
+        });
 
         // Add metadata with safe file name handling
         const actualContentType = getContentTypeValue(selectedContentType);
@@ -429,8 +431,7 @@ export default function StreamlinedAddAssignment({
 
         if (response.data.success) {
           // Material created, AI processing in background
-          const materialTitle = formData.title || formData.files[0].name.split('.')[0];
-          addProcessingMaterial(response.data.material_id, materialTitle);
+          addProcessingMaterial(response.data.material_id, title);
           setCurrentStep('processing-started');
         } else {
           throw new Error(response.data.message || 'Upload failed');
@@ -733,7 +734,7 @@ export default function StreamlinedAddAssignment({
             </div>
             <p className="text-sm text-blue-700">
               {useAiMode
-                ? 'Upload a file and let AI extract title, objectives, and key terms automatically'
+                ? 'Upload files and let AI extract title, objectives, and key terms automatically'
                 : 'Fill in the details manually for quick creation'
               }
             </p>
@@ -747,12 +748,13 @@ export default function StreamlinedAddAssignment({
                 <div className="sm:hidden">
                   <label className="flex flex-col items-center justify-center w-full p-6 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors bg-gray-50 hover:bg-gray-100">
                     <CameraIcon className="h-10 w-10 mb-3 text-gray-400" />
-                    <span className="text-lg font-medium text-gray-900 mb-1">Take Photo</span>
-                    <span className="text-sm text-gray-500">Capture assignment with camera</span>
+                    <span className="text-lg font-medium text-gray-900 mb-1">Take Photos</span>
+                    <span className="text-sm text-gray-500">Capture multiple pages with camera</span>
                     <input
                       type="file"
                       accept="image/*"
                       capture="environment"
+                      multiple
                       onChange={handleFileChange}
                       className="hidden"
                     />
@@ -762,14 +764,15 @@ export default function StreamlinedAddAssignment({
                 {/* Desktop File Upload + Mobile Alternative */}
                 <div>
                   <label className={labelClasses}>
-                    <span className="hidden sm:inline">Upload Assignment File *</span>
-                    <span className="sm:hidden">Or Choose File *</span>
+                    <span className="hidden sm:inline">Upload Assignment Files *</span>
+                    <span className="sm:hidden">Or Choose Files *</span>
                   </label>
                   <input
                     type="file"
                     onChange={handleFileChange}
                     className={inputClasses}
                     accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif"
+                    multiple
                     required
                   />
                 </div>
@@ -777,12 +780,32 @@ export default function StreamlinedAddAssignment({
                 {/* File Preview */}
                 {(formData.files || []).length > 0 && (
                   <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-sm font-medium text-green-800 mb-1">
-                      ✓ File Selected
+                    <p className="text-sm font-medium text-green-800 mb-2">
+                      ✓ {formData.files.length} File{formData.files.length > 1 ? 's' : ''} Selected
                     </p>
-                    <p className="text-sm text-green-700">
-                      {(formData.files || [])[0]?.name}
-                    </p>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {formData.files.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between text-sm text-green-700 bg-white rounded px-2 py-1">
+                          <span className="truncate flex-1">
+                            {file.name}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const newFiles = formData.files.filter((_, i) => i !== index);
+                              setFormData(prev => ({ ...prev, files: newFiles }));
+                            }}
+                            className="ml-2 text-red-500 hover:text-red-700 flex-shrink-0"
+                          >
+                            <XMarkIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    {formData.files.length > 1 && (
+                      <p className="text-xs text-green-600 mt-2">
+                        💡 Multiple files will be processed as sequential pages
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

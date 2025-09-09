@@ -726,6 +726,61 @@ class SimpleTutorController {
   }
 
   /**
+   * Generate flashcards from assignment content
+   */
+  generateFlashcards = async (req, res) => {
+    try {
+      const { assignmentId, questionCount } = req.body;
+      const childId = req.child.child_id;
+
+      if (!assignmentId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Assignment ID is required'
+        });
+      }
+
+      // Get assignment from database
+      const { data: assignment, error: dbError } = await supabase
+        .from('materials')
+        .select(`
+          *,
+          child_subjects!inner(*, subjects(name))
+        `)
+        .eq('id', assignmentId)
+        .eq('child_subjects.child_id', childId)
+        .single();
+
+      if (dbError || !assignment) {
+        logger.error('Error fetching assignment for flashcards:', dbError);
+        return res.status(404).json({
+          success: false,
+          error: 'Assignment not found or access denied'
+        });
+      }
+
+      // Generate flashcards using OpenAI service
+      const flashcards = await simpleOpenAIService.generateFlashcards(assignment, questionCount || 10);
+
+      res.json({
+        success: true,
+        flashcards: flashcards.cards || [],
+        title: flashcards.title,
+        subject: flashcards.subject,
+        assignmentId: assignmentId,
+        assignmentTitle: assignment.title
+      });
+
+    } catch (error) {
+      logger.error('Error generating flashcards:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate flashcards. Please try again.'
+      });
+    }
+  }
+
+  /**
    * Submit quiz attempt and record results
    */
   submitQuizAttempt = async (req, res) => {

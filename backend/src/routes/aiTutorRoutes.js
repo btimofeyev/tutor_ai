@@ -15,6 +15,7 @@ router.get('/health', simpleTutorController.getHealth);
 // Cleanup endpoint (no authentication required)
 router.post('/cleanup/empty', simpleTutorController.cleanupEmptyConversations);
 
+
 // Apply child authentication to all other AI tutor routes
 router.use(verifyChildToken);
 
@@ -43,5 +44,8 @@ router.post('/problem-attempt', enforceAIAccess, simpleTutorController.recordPro
 router.post('/quiz/generate', enforceAIAccess, simpleTutorController.generateQuiz);
 router.post('/quiz/submit', enforceAIAccess, simpleTutorController.submitQuizAttempt);
 router.get('/quiz/history/:childId', enforceAIAccess, simpleTutorController.getQuizHistory);
+
+// Flashcard functionality endpoints
+router.post('/flashcards/generate', enforceAIAccess, simpleTutorController.generateFlashcards);
 
 module.exports = router;

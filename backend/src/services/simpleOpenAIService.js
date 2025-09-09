@@ -1483,7 +1483,6 @@ Return as valid JSON:
         ? JSON.parse(assignment.lesson_json) 
         : assignment.lesson_json;
       
-      console.log(`📚 Extracting facts from "${assignment.title}"`);
       
       // Priority 1: Answer key provides definitive facts
       if (lessonData.answer_key && Array.isArray(lessonData.answer_key)) {
@@ -1494,7 +1493,6 @@ Return as valid JSON:
             facts.push(answer.answer || answer.correct_answer);
           }
         });
-        console.log(`✅ Found ${lessonData.answer_key.length} facts from answer key`);
       }
       
       // Priority 2: Key terms from assignment metadata
@@ -1502,7 +1500,6 @@ Return as valid JSON:
         lessonData.assignment_metadata.key_terms.forEach(term => {
           facts.push(`Key term: ${term}`);
         });
-        console.log(`🔑 Found ${lessonData.assignment_metadata.key_terms.length} key terms`);
       }
       
       // Priority 3: Learning objectives tell us what students should know
@@ -1512,7 +1509,6 @@ Return as valid JSON:
             facts.push(`Learning objective: ${objective.trim()}`);
           }
         });
-        console.log(`🎯 Found ${lessonData.learning_objectives.length} learning objectives`);
       }
       
       // Priority 4: Main content summary contains key facts
@@ -1526,7 +1522,6 @@ Return as valid JSON:
         sentences.slice(0, 10).forEach(sentence => {
           facts.push(`Fact: ${sentence}.`);
         });
-        console.log(`📖 Found ${sentences.length} facts from content summary`);
       }
       
       // Priority 5: Subject keywords provide context
@@ -1536,7 +1531,6 @@ Return as valid JSON:
             facts.push(`Topic: ${keyword.trim()}`);
           }
         });
-        console.log(`🏷️ Found ${lessonData.subject_keywords_or_subtopics.length} subject keywords`);
       }
       
       // Clean and deduplicate facts
@@ -1544,10 +1538,6 @@ Return as valid JSON:
         .filter(fact => fact && fact.length > 5 && fact.length < 300)
         .slice(0, 30); // Limit to 30 facts max
       
-      console.log(`✨ Final extracted facts: ${uniqueFacts.length} items`);
-      if (uniqueFacts.length > 0) {
-        console.log('📋 Sample facts:', uniqueFacts.slice(0, 3));
-      }
       
       return uniqueFacts;
       

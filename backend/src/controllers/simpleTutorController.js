@@ -59,7 +59,6 @@ class SimpleTutorController {
     try {
       const { sessionId, reason } = req.body;
       
-      console.log(`🔚 Ending session: ${sessionId} (reason: ${reason || 'unknown'})`);
       logger.info(`Ending session ${sessionId} - reason: ${reason || 'unknown'}`);
 
       if (sessionId) {
@@ -77,7 +76,6 @@ class SimpleTutorController {
           if (error) {
             logger.warn(`Could not mark session ${sessionId} as ended:`, error.message);
           } else {
-            console.log(`✅ Session ${sessionId.slice(-10)} marked as ended in database`);
           }
         } catch (dbError) {
           logger.warn('Database not available for session cleanup:', dbError.message);
@@ -169,7 +167,6 @@ class SimpleTutorController {
     try {
       const { sessionId } = req.params;
 
-      console.log('🔍 getHistory called for session:', sessionId);
       logger.info(`Getting conversation history for session ${sessionId}`);
 
       if (!sessionId) {
@@ -180,7 +177,6 @@ class SimpleTutorController {
       }
 
       const conversation = await simpleOpenAIService.getConversation(sessionId);
-      console.log('📊 Retrieved conversation data:', { messageCount: conversation.messageCount, hasMessages: !!conversation.messages });
 
       res.json({
         success: true,
@@ -286,7 +282,6 @@ class SimpleTutorController {
         });
       }
       
-      console.log(`📚 Loading recent conversations for child: ${childId}`);
       
       // Get conversations from last 7 days with first message for preview
       const supabase = require('../utils/supabaseClient');
@@ -317,7 +312,6 @@ class SimpleTutorController {
       }
       
       if (!sessions || sessions.length === 0) {
-        console.log(`📭 No recent conversations found for child: ${childId}`);
         return res.json({
           success: true,
           conversations: []
@@ -347,7 +341,6 @@ class SimpleTutorController {
               title = session.topic;
             }
             
-            console.log(`💬 Session ${session.session_id.slice(-10)}: title="${title}", hasMessage=${!!firstMessage?.[0]?.content}`);
             
             return {
               session_id: session.session_id,
@@ -379,11 +372,9 @@ class SimpleTutorController {
                               conversation.preview !== 'Chat conversation' &&
                               conversation.preview.length > 0;
         
-        console.log(`🔍 Session ${conversation.session_id.slice(-10)}: hasRealMessages=${hasRealMessages}, preview="${conversation.preview}"`);
         return hasRealMessages;
       });
       
-      console.log(`📚 Retrieved ${conversationsWithPreviews.length} conversations, filtered to ${conversationsWithMessages.length} with actual messages`);
       
       res.json({
         success: true,
@@ -407,7 +398,6 @@ class SimpleTutorController {
       const { sessionId } = req.params;
       const requestingChildId = req.child?.child_id;
       
-      console.log(`🗑️ Deleting conversation: ${sessionId}`);
       
       if (!sessionId) {
         return res.status(400).json({
@@ -446,12 +436,9 @@ class SimpleTutorController {
           .eq('session_id', sessionId);
           
         if (messagesError) {
-          console.log(`⚠️ Could not delete messages for session ${sessionId}:`, messagesError.message);
         } else {
-          console.log(`🗑️ Deleted messages for session ${sessionId.slice(-10)}`);
         }
       } catch (messagesErr) {
-        console.log(`⚠️ Messages table may not exist:`, messagesErr.message);
       }
       
       // Delete session record
@@ -468,7 +455,6 @@ class SimpleTutorController {
         });
       }
       
-      console.log(`✅ Successfully deleted conversation ${sessionId.slice(-10)}`);
       
       res.json({
         success: true,
@@ -516,7 +502,6 @@ class SimpleTutorController {
    */
   cleanupEmptyConversations = async (req, res) => {
     try {
-      console.log('🧹 Manual cleanup triggered for empty conversations');
       await simpleOpenAIService.cleanupEmptyConversations();
       
       res.json({

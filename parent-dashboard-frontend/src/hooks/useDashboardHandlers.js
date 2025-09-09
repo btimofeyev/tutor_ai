@@ -47,7 +47,7 @@ export function useDashboardHandlers({
       modalManagement.setCurrentSubjectUnitsInModal(updatedUnitsForSubject);
       modalManagement.setNewUnitNameModalState("");
     } catch (error) {
-      alert(error.response?.data?.error || "Could not add unit.");
+      showError(error.response?.data?.error || "Could not add unit.");
     }
   }, [modalManagement, childrenData]);
 
@@ -313,7 +313,7 @@ export function useDashboardHandlers({
         formData.append("files", materialManagement.addLessonFile[i], materialManagement.addLessonFile[i].name);
       }
     } else {
-      alert("File selection error.");
+      showError("File selection error.");
       return;
     }
 
@@ -392,7 +392,7 @@ export function useDashboardHandlers({
       if (result.code === 'CHILD_LIMIT_EXCEEDED') {
         modalManagement.openUpgradePrompt('children');
       } else {
-        alert(result.error);
+        showError(result.error);
       }
     }
   }, [childrenData, modalManagement]);
@@ -401,7 +401,7 @@ export function useDashboardHandlers({
     modalManagement.setUpgrading(true);
     try {
       if (!PRICE_IDS[targetPlanKey]) {
-        alert('Invalid plan selected for upgrade.');
+        showError('Invalid plan selected for upgrade.');
         modalManagement.setUpgrading(false);
         return;
       }
@@ -414,7 +414,7 @@ export function useDashboardHandlers({
 
       window.location.href = response.data.checkout_url;
     } catch (error) {
-      alert('Failed to start upgrade process. Please try again.');
+      showError('Failed to start upgrade process. Please try again.');
       modalManagement.setUpgrading(false);
     }
   }, [modalManagement]);
@@ -426,7 +426,7 @@ export function useDashboardHandlers({
       .find(l => l.id === lessonId);
 
     if (!lesson) {
-      alert("Could not find lesson.");
+      showError("Could not find lesson.");
       return;
     }
 
@@ -447,7 +447,7 @@ export function useDashboardHandlers({
 
     const result = await materialManagement.toggleLessonCompletion(lessonId, isCompleting);
     if (!result.success) {
-      alert(result.error || "Could not update completion status.");
+      showError(result.error || "Could not update completion status.");
     } else {
       // Update local state immediately for instant feedback
       const updatedLessons = childrenData.lessonsBySubject[lesson.child_subject_id]?.map(l => 
@@ -578,7 +578,7 @@ export function useDashboardHandlers({
     );
 
     if (!subjectInfo || !subjectInfo.child_subject_id) {
-      alert("Selected subject invalid.");
+      showError("Selected subject invalid.");
       return;
     }
 
@@ -587,12 +587,12 @@ export function useDashboardHandlers({
       !materialManagement.lessonTitleForApproval ||
       !materialManagement.addLessonUserContentType
     ) {
-      alert("Missing data for approval.");
+      showError("Missing data for approval.");
       return;
     }
 
     if (!materialManagement.selectedLessonContainer || materialManagement.selectedLessonContainer === '__create_new__') {
-      alert("Please select or create a lesson container.");
+      showError("Please select or create a lesson container.");
       return;
     }
 
@@ -603,17 +603,17 @@ export function useDashboardHandlers({
       if (fileInput) fileInput.value = "";
       modalManagement.closeAddMaterialModal();
     } else {
-      alert(result.error || "Lesson save failed.");
+      showError(result.error || "Lesson save failed.");
     }
   }, [childrenData, materialManagement, modalManagement]);
 
   const handleCreateNewUnit = useCallback(async (newUnitName, childSubjectId) => {
     if (!childSubjectId) {
-      alert('Error: A subject must be selected before creating a new unit.');
+      showError('Error: A subject must be selected before creating a new unit.');
       return { success: false };
     }
     if (!newUnitName || !newUnitName.trim()) {
-      alert('Error: New unit name cannot be empty.');
+      showError('Error: New unit name cannot be empty.');
       return { success: false };
     }
 
@@ -657,11 +657,11 @@ export function useDashboardHandlers({
     const unitId = unitIdForCreation;
 
     if (!unitId) {
-      alert('Error: A unit must be selected before creating a new lesson group.');
+      showError('Error: A unit must be selected before creating a new lesson group.');
       return { success: false };
     }
     if (!newTitleFromForm || !newTitleFromForm.trim()) {
-      alert('Error: New lesson group title cannot be empty.');
+      showError('Error: New lesson group title cannot be empty.');
       return { success: false };
     }
 
@@ -718,7 +718,7 @@ export function useDashboardHandlers({
       modalManagement.setCurrentSubjectUnitsInModal(updatedUnitsList);
       modalManagement.setEditingUnit(null);
     } catch (error) {
-      alert(error.response?.data?.error || "Could not update unit.");
+      showError(error.response?.data?.error || "Could not update unit.");
     }
   }, [modalManagement, childrenData]);
 

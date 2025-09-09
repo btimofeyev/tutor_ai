@@ -71,7 +71,6 @@ class AdvancedSchedulingService {
      * Main entry point for advanced AI scheduling
      */
     async generateOptimalSchedule(scheduleRequest) {
-        console.log('🧠 Starting Advanced AI Scheduling Engine...');
 
         try {
             // Stage 1: Comprehensive Context Analysis
@@ -79,7 +78,6 @@ class AdvancedSchedulingService {
             
             // Early return if no materials to schedule
             if (context.materialAnalysis?.isEmpty) {
-                console.log('ℹ️ No materials found for scheduling - returning empty schedule');
                 return {
                     success: true,
                     children: scheduleRequest.children?.map(child => ({
@@ -104,11 +102,10 @@ class AdvancedSchedulingService {
             // Stage 5: Final Validation and Enhancement
             const finalSchedule = await this.validateAndEnhanceSchedule(optimizedSchedule, context);
 
-            console.log('✅ Advanced AI Scheduling completed successfully');
             return finalSchedule;
 
         } catch (error) {
-            console.error('⚠️ Advanced AI scheduling failed, falling back to enhanced rule-based:', error);
+            // AI scheduling failed, falling back to enhanced rule-based
             return await this.enhancedRuleBasedFallback(scheduleRequest);
         }
     }
@@ -133,7 +130,6 @@ class AdvancedSchedulingService {
             coordination_mode
         } = request;
 
-        console.log('📊 Analyzing scheduling context...');
 
         // Handle multi-child scheduling with context
         if (children_schedules && scheduling_context) {
@@ -345,8 +341,6 @@ class AdvancedSchedulingService {
         const currentDate = new Date(startDate);
 
         console.log('🔍 Debug time constraints calculation:');
-        console.log('   Start date:', start_date);
-        console.log('   End date:', end_date);
         console.log('   Child preferences:', preferences);
         console.log('   Study days:', preferences.study_days);
 
@@ -354,10 +348,8 @@ class AdvancedSchedulingService {
             const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
             const dateStr = currentDate.toISOString().split('T')[0];
             
-            console.log(`   🗓️ Checking ${dateStr} (${dayName})`);
             
             if (preferences.study_days && preferences.study_days.includes(dayName)) {
-                console.log(`   ✅ Added ${dateStr} (${dayName}) to available days`);
                 availableDays.push({
                     date: new Date(currentDate),
                     dayName,
@@ -366,12 +358,10 @@ class AdvancedSchedulingService {
                     endTime: preferences.preferred_end_time || '15:00'
                 });
             } else {
-                console.log(`   ❌ Skipped ${dateStr} (${dayName}) - not in study_days or no study_days defined`);
             }
             currentDate.setDate(currentDate.getDate() + 1);
         }
         
-        console.log(`🔍 Final available days: ${availableDays.map(d => d.date.toISOString().split('T')[0]).join(', ')}`);
 
         return {
             totalDays: availableDays.length,
@@ -428,13 +418,6 @@ class AdvancedSchedulingService {
             averageBreakTime: Math.round(allPreferences.reduce((sum, prefs) => sum + (prefs.break_duration_minutes || 15), 0) / allPreferences.length)
         };
         
-        console.log('🔍 Debug MULTI-CHILD time constraints calculation:');
-        console.log('   Start date:', start_date);
-        console.log('   End date:', end_date);
-        console.log('   Children count:', children_schedules.length);
-        console.log('   All preferences:', allPreferences);
-        console.log('   Common study days:', commonStudyDays);
-        console.log('   Family constraints:', familyConstraints);
 
         const availableDays = [];
         // Fix timezone issue by properly parsing the date string
@@ -445,22 +428,15 @@ class AdvancedSchedulingService {
             const dateStr = currentDate.toISOString().split('T')[0];
             
             // Debug date parsing issue
-            console.log(`   🗓️ Checking ${dateStr} (${dayName})`);
-            console.log(`      Raw date object: ${currentDate}`);
-            console.log(`      Day of week (getDay): ${currentDate.getDay()} (0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat)`);
-            console.log(`      Timezone offset: ${currentDate.getTimezoneOffset()} minutes`);
             
             // Alternative day name calculation to verify
             const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
             const altDayName = dayNames[currentDate.getDay()];
-            console.log(`      Alternative day name: ${altDayName}`);
             
             if (dayName !== altDayName) {
-                console.log(`      ⚠️ MISMATCH: toLocaleDateString says ${dayName}, getDay says ${altDayName}`);
             }
             
             if (commonStudyDays.includes(dayName)) {
-                console.log(`   ✅ Added ${dateStr} (${dayName}) to available days`);
                 availableDays.push({
                     date: new Date(currentDate),
                     dayName,
@@ -475,7 +451,6 @@ class AdvancedSchedulingService {
             currentDate.setDate(currentDate.getDate() + 1);
         }
         
-        console.log(`🔍 Final available days (multi-child): ${availableDays.map(d => d.date.toISOString().split('T')[0]).join(', ')}`);
 
         return {
             totalDays: availableDays.length,
@@ -497,7 +472,6 @@ class AdvancedSchedulingService {
      * Generate conflict-aware AI insights for family scheduling
      */
     async generateConflictAwareInsights(schedulingContext, materials) {
-        console.log('🤖 Generating conflict-aware scheduling insights...');
         
         const prompt = `As an expert educational scheduler, analyze this family's scheduling context and provide strategic insights for conflict-free scheduling.
 
@@ -551,7 +525,6 @@ Format as JSON with structure:
 
             return JSON.parse(response.choices[0].message.content);
         } catch (error) {
-            console.error('Failed to generate conflict-aware insights:', error);
             return {
                 conflict_resolution_strategy: "Stagger start times by 15-30 minutes between children",
                 priority_subjects: ["Mathematics", "English Language Arts"],
@@ -597,19 +570,15 @@ Provide strategic insights in this JSON format:
 }`;
 
         // Try AI call first, fallback to rule-based if it fails
-        console.log('🔍 Attempting AI-powered scheduling insights...');
         
         try {
             const aiResponse = await this.generateAIInsights(materialAnalysis, childProfile, {});
             if (aiResponse) {
-                console.log('✅ AI insights generated successfully');
                 return aiResponse;
             }
         } catch (error) {
-            console.log('⚠️ AI insights failed, falling back to rule-based approach:', error.message);
         }
         
-        console.log('🔍 Generating rule-based scheduling insights...');
         
         const highUrgencyCount = materialAnalysis.urgencyLevels.filter(u => u.urgency === 'high').length;
         const totalMaterials = materialAnalysis.totalMaterials;
@@ -657,7 +626,6 @@ Provide strategic insights in this JSON format:
             confidence: 0.85
         };
         
-        console.log('🔍 Rule-based insights generated:', insights);
         return insights;
     }
 
@@ -665,7 +633,6 @@ Provide strategic insights in this JSON format:
      * Stage 2: Generate Optimal Time Slots
      */
     async generateOptimalTimeSlots(context) {
-        console.log('⏰ Generating optimal time slots...');
 
         const { timeConstraints, childProfile, childProfiles, aiInsights } = context;
         const slots = [];
@@ -688,7 +655,6 @@ Provide strategic insights in this JSON format:
         // Optimize slot distribution using golden ratio and cognitive science
         const optimizedSlots = this.optimizeSlotDistribution(slots, context);
 
-        console.log(`📅 Generated ${optimizedSlots.length} optimized time slots`);
         return optimizedSlots;
     }
 
@@ -740,7 +706,6 @@ Provide strategic insights in this JSON format:
      * Stage 3: AI-Powered Subject Assignment
      */
     async performAISubjectAssignment(context, timeSlots) {
-        console.log('🎯 Performing AI-powered subject assignment...');
 
         const { materials, allMaterialsFlat, aiInsights, childProfile } = context;
 
@@ -760,17 +725,10 @@ Provide strategic insights in this JSON format:
 
         // Extract assignments from AI response and create preliminary schedule
         const assignmentsArray = assignments.assignments || assignments || [];
-        console.log(`📊 AI returned ${Array.isArray(assignmentsArray) ? assignmentsArray.length : 'non-array'} assignments`);
         const schedule = this.buildPreliminarySchedule(assignmentsArray, timeSlots, context.allMaterialsFlat || materials);
 
-        console.log(`📚 Assigned ${assignmentsArray.length} materials to time slots`);
-        console.log(`📋 Built ${schedule.length} schedule entries from assignments`);
         
         if (schedule.length === 0) {
-            console.warn('⚠️ No schedule entries created - checking inputs:');
-            console.warn(`- Assignments: ${assignments.length}`);
-            console.warn(`- Time slots: ${timeSlots.length}`);
-            console.warn(`- Materials: ${materials.length}`);
         }
         
         return schedule;
@@ -856,19 +814,15 @@ IMPORTANT:
 - PRIORITIZE BY DUE DATE - schedule urgent materials first`;
 
     // Try AI assignment first, fallback to rule-based if it fails
-    console.log('🤖 Attempting AI-powered material assignment...');
     
     try {
         const aiResponse = await this.callOpenAIForAssignments(materialsBySubject, timeSlots, aiInsights, childProfile);
         if (aiResponse && aiResponse.assignments) {
-            console.log('✅ AI assignment completed successfully');
             return aiResponse;
         }
     } catch (error) {
-        console.log('⚠️ AI assignment failed, falling back to rule-based:', error.message);
     }
     
-    console.log('🤖 Using rule-based assignment fallback');
     return this.generateRuleBasedAssignments(materialsBySubject, timeSlots, childProfile, context);
   }
 
@@ -876,7 +830,6 @@ IMPORTANT:
    * Stage 4: Cognitive Load Optimization
    */
   async optimizeCognitiveLoad(preliminarySchedule, context) {
-    console.log('🧠 Optimizing cognitive load distribution...');
     
     const { aiInsights } = context;
     let optimizedSchedule = [...preliminarySchedule];
@@ -900,7 +853,6 @@ IMPORTANT:
     // Add variety and breaks between similar subjects
     optimizedSchedule = this.addSubjectVariety(optimizedSchedule);
     
-    console.log('✅ Cognitive load optimization completed');
     return optimizedSchedule;
   }
 
@@ -908,7 +860,6 @@ IMPORTANT:
    * Stage 5: Final Validation and Enhancement
    */
   async validateAndEnhanceSchedule(schedule, context) {
-    console.log('✅ Validating and enhancing final schedule...');
     
     let enhancedSchedule = [...schedule];
     
@@ -936,7 +887,6 @@ IMPORTANT:
    * Enhanced Rule-Based Fallback System
    */
   async enhancedRuleBasedFallback(request) {
-    console.log('🔄 Using enhanced rule-based fallback...');
     
     try {
       const context = await this.analyzeSchedulingContext(request);
@@ -976,7 +926,6 @@ IMPORTANT:
       };
       
     } catch (error) {
-      console.error('⚠️ Enhanced fallback failed, using emergency fallback:', error);
       return this.emergencyFallbackSchedule(request);
     }
   }
@@ -985,7 +934,6 @@ IMPORTANT:
    * Emergency Fallback - Guaranteed Schedule Generation
    */
   emergencyFallbackSchedule(request) {
-    console.log('🚨 Using emergency fallback schedule generation...');
     
     const { materials, start_date, end_date, child_id } = request;
     const schedule = [];
@@ -1321,7 +1269,6 @@ IMPORTANT:
    * Generate rule-based assignments as fallback
    */
   generateRuleBasedAssignments(materialsBySubject, timeSlots, childProfile, context = {}) {
-    console.log('🎯 Starting day-first subject distribution to prevent same-subject-per-day conflicts...');
     
     // Handle both single-child and multi-child contexts
     const profileToUse = childProfile || (context.childProfiles && context.childProfiles[0]) || {};
@@ -1331,17 +1278,10 @@ IMPORTANT:
       preferred_end_time: '15:00'
     };
     
-    console.log('🔍 Debug context in generateRuleBasedAssignments:');
-    console.log('   Context keys:', Object.keys(context));
-    console.log('   Context subject_config:', context.subject_config);
-    console.log('   Context type of subject_config:', typeof context.subject_config);
     
     const { subject_config = {}, schedule_days = [] } = context;
     const timeSlotsArray = Array.isArray(timeSlots) ? timeSlots : [];
     
-    console.log('🔍 After destructuring:');
-    console.log('   subject_config:', subject_config);
-    console.log('   subject_config keys:', Object.keys(subject_config));
     
     // Group slots by date and sort by efficiency within each day
     const slotsByDate = new Map();
@@ -1359,11 +1299,9 @@ IMPORTANT:
     });
     
     const dates = Array.from(slotsByDate.keys()).sort();
-    console.log(`📅 Scheduling across ${dates.length} days: ${dates.join(', ')}`);
     
     // Create weekly subject plan with frequency constraints
     const weeklySubjectPlan = this.createWeeklySubjectPlan(materialsBySubject, subject_config, dates, preferences);
-    console.log('📊 Weekly subject plan:', weeklySubjectPlan);
     
     // Initialize tracking for each day
     const dailySchedule = new Map();
@@ -1405,7 +1343,6 @@ IMPORTANT:
       const availableSlots = slotsByDate.get(date) || [];
       const dailySubjects = weeklySubjectPlan.get(date) || [];
       
-      console.log(`🗓️ Processing ${date}: ${dailySubjects.length} subjects planned, ${availableSlots.length} slots available`);
       
       // Initialize daily schedule tracking
       dailySchedule.set(date, {
@@ -1440,12 +1377,10 @@ IMPORTANT:
       
       // Log any subjects that couldn't be scheduled as planned
       if (skippedSubjects.length > 0) {
-        console.log(`⚠️ Skipped subjects for ${date}:`, skippedSubjects.map(s => `${s.subject} (${s.reason})`).join(', '));
       }
       
       // Schedule the valid subjects
       const slotsToUse = Math.min(validSubjects.length, availableSlots.length);
-      console.log(`📝 Scheduling ${slotsToUse} subjects for ${date}: ${validSubjects.slice(0, slotsToUse).join(', ')}`);
       
       for (let i = 0; i < slotsToUse; i++) {
         const subject = validSubjects[i];
@@ -1475,10 +1410,8 @@ IMPORTANT:
         subjectData.currentIndex++;
         subjectData.scheduledThisWeek++;
         
-        console.log(`✅ Scheduled ${subject}: ${material.title} on ${date} at ${slot.startTime} (due: ${material.due_date || 'no due date'})`);
       }
       
-      console.log(`📋 Day ${date} complete: ${dayInfo.usedSlots} assignments, subjects: ${Array.from(dayInfo.scheduledSubjects).join(', ')}`);
     }
     
     // Summary logging
@@ -1488,10 +1421,6 @@ IMPORTANT:
       subjectDistribution[assignment.subject] = (subjectDistribution[assignment.subject] || 0) + 1;
     });
     
-    console.log(`🎉 Day-first scheduling complete:`);
-    console.log(`   📊 Total assignments: ${totalAssignments}`);
-    console.log(`   📚 Subject distribution:`, subjectDistribution);
-    console.log(`   ✅ No subject scheduled more than once per day`);
     
     return assignments;
   }
@@ -1501,7 +1430,6 @@ IMPORTANT:
    * and ensures no subject appears more than once per day
    */
   createWeeklySubjectPlan(materialsBySubject, subjectConfig, dates, preferences) {
-    console.log('📋 Creating simplified due-date-focused weekly plan...');
     
     const weeklyPlan = new Map();
     dates.forEach(date => weeklyPlan.set(date, []));
@@ -1511,13 +1439,10 @@ IMPORTANT:
     
     Object.entries(materialsBySubject).forEach(([subject, materials]) => {
       // Find subject config for frequency
-      console.log(`🔍 Looking for subject config for "${subject}"`);
-      console.log(`   Available subject configs:`, Object.keys(subjectConfig));
       
       const subjectConfigEntry = Object.entries(subjectConfig).find(([configSubjectId, config]) => {
         // Primary match: direct subject name comparison
         if (config.subject_name === subject) {
-          console.log(`   ✅ Direct match found: "${subject}" === "${config.subject_name}"`);
           return true;
         }
         
@@ -1534,15 +1459,12 @@ IMPORTANT:
           return match1 || match2 || match3;
         });
         
-        console.log(`   Config "${configSubjectId}" (${config.subject_name}) matches "${subject}": ${hasMatch}`);
         return hasMatch;
       });
       
       const frequency = subjectConfigEntry?.[1]?.frequency || 2;
       const maxFrequency = Math.min(frequency, dates.length);
       
-      console.log(`📚 Subject "${subject}": ${materials.length} materials, frequency ${frequency} → capped at ${maxFrequency}`);
-      console.log(`   Found config entry:`, subjectConfigEntry ? `${subjectConfigEntry[0]} = ${JSON.stringify(subjectConfigEntry[1])}` : 'NONE - using default frequency 2');
       
       // Add each material with its subject and urgency info
       materials.forEach((material, index) => {
@@ -1576,7 +1498,7 @@ IMPORTANT:
       return a.materialIndex - b.materialIndex;
     });
     
-    console.log('📊 Most urgent materials:', allMaterialsWithSubjects.slice(0, 5).map(m => 
+ 
       `${m.subject}: ${m.material.title?.substring(0, 30)}... (due: ${m.dueDateStr}, urgency: ${m.urgency} days)`
     ));
     
@@ -1595,7 +1517,6 @@ IMPORTANT:
       
       // Skip if this subject has reached its weekly frequency
       if (subjectCountThisWeek.get(subject) >= frequency) {
-        console.log(`⏭️ Skipping ${subject} - already scheduled ${frequency} times this week`);
         continue;
       }
       
@@ -1615,7 +1536,6 @@ IMPORTANT:
           subjectCountThisWeek.set(subject, subjectCountThisWeek.get(subject) + 1);
           placed = true;
           
-          console.log(`📅 Assigned ${subject} to ${currentDate} (${subjectCountThisWeek.get(subject)}/${frequency}) - material: ${item.material.title?.substring(0, 40)}... (due: ${item.dueDateStr})`);
         }
         
         // Move to next day
@@ -1624,15 +1544,12 @@ IMPORTANT:
       }
       
       if (!placed) {
-        console.log(`⚠️ Could not place ${subject} - all days already have this subject scheduled`);
       }
     }
     
     // Summary logging
-    console.log('\n📋 Final weekly plan:');
     dates.forEach(date => {
       const daySubjects = weeklyPlan.get(date);
-      console.log(`   ${date}: [${daySubjects.join(', ')}] (${daySubjects.length} subjects)`);
     });
     
     return weeklyPlan;
@@ -1730,11 +1647,9 @@ IMPORTANT:
       const material = materialMap.get(assignment.material_ids[0]); // Using first material for now
       
       const materialId = assignment.material_ids[0];
-      console.log(`🔨 Processing assignment ${index}: slot=${!!slot}, material=${!!material}, slot_id=${assignment.slot_id}, material_id=${materialId}`);
       
       // Check for duplicate material
       if (usedMaterials.has(materialId)) {
-        console.log(`⚠️ Skipping duplicate material: ${materialId}`);
         return;
       }
       
@@ -1866,7 +1781,6 @@ IMPORTANT:
    * Generate coordinated schedules for multiple children
    */
   async generateFamilyCoordinatedSchedule(familyRequest) {
-    console.log('👨‍👩‍👧‍👦 Starting Family Coordination System...');
     
     const { children_schedules, coordination_mode = 'balanced' } = familyRequest;
     
@@ -1890,7 +1804,6 @@ IMPORTANT:
       // Stage 5: Generate family metadata
       const familyMetadata = this.generateFamilyMetadata(optimizedSchedules, conflicts);
       
-      console.log('✅ Family coordination completed successfully');
       return {
         coordinated_schedules: optimizedSchedules,
         conflicts_resolved: conflicts.length,
@@ -1900,7 +1813,6 @@ IMPORTANT:
       };
       
     } catch (error) {
-      console.error('⚠️ Family coordination failed:', error);
       // Fallback: return individual schedules without coordination
       const individualSchedules = await Promise.all(
         children_schedules.map(req => this.generateOptimalSchedule(req))
@@ -1920,7 +1832,6 @@ IMPORTANT:
    * Generate coordinated schedules using shared family time slots
    */
   async generateIndividualSchedules(childrenRequests) {
-    console.log(`📚 Generating coordinated schedules for ${childrenRequests.length} children...`);
     
     // Create shared family time slot pool
     const familyTimeSlots = await this.createSharedFamilyTimeSlots(childrenRequests);
@@ -1936,7 +1847,6 @@ IMPORTANT:
     // Generate schedules one child at a time, sharing the time slot pool
     for (const [index, request] of childrenRequests.entries()) {
       try {
-        console.log(`📋 Scheduling child ${index + 1}/${childrenRequests.length}: ${request.child_id}`);
         
         const childSchedule = await this.generateScheduleWithSharedSlots(
           request, 
@@ -1952,7 +1862,6 @@ IMPORTANT:
         });
         
       } catch (error) {
-        console.warn(`⚠️ Failed to generate schedule for child ${request.child_id}:`, error);
         coordinatedSchedules.push({
           child_id: request.child_id,
           child_index: index,
@@ -1969,7 +1878,6 @@ IMPORTANT:
    * Create shared family time slot pool
    */
   async createSharedFamilyTimeSlots(childrenRequests) {
-    console.log('🕐 Creating shared family time slot pool...');
     
     // Find the broadest time constraints across all children
     const familyTimeConstraints = this.calculateFamilyTimeConstraints(childrenRequests);
@@ -1993,7 +1901,6 @@ IMPORTANT:
     // Apply blocked times (lunch, parent unavailability, etc.)
     this.applyBlockedTimes(familySlots, childrenRequests);
     
-    console.log(`📅 Created ${familySlots.length} shared family time slots`);
     return familySlots;
   }
 
@@ -2123,7 +2030,6 @@ IMPORTANT:
    * Get existing family schedules to avoid conflicts
    */
   async getExistingFamilySchedules(childrenRequests) {
-    console.log('📋 Fetching existing family schedules...');
     
     // Extract child IDs and date range
     const childIds = childrenRequests.map(req => req.child_id);
@@ -2146,14 +2052,11 @@ IMPORTANT:
         .order('start_time', { ascending: true });
       
       if (error) {
-        console.warn('⚠️ Failed to fetch existing schedules:', error);
         return [];
       }
       
-      console.log(`📊 Found ${existingEntries?.length || 0} existing schedule entries`);
       return existingEntries || [];
     } catch (error) {
-      console.warn('⚠️ Failed to fetch existing schedules:', error);
       return [];
     }
   }
@@ -2162,7 +2065,6 @@ IMPORTANT:
    * Reserve slots for existing schedules
    */
   reserveSlotsForExistingSchedules(familyTimeSlots, existingSchedules) {
-    console.log(`🔒 Reserving ${existingSchedules.length} existing schedule slots...`);
     
     existingSchedules.forEach(schedule => {
       // Find matching time slot
@@ -2175,7 +2077,6 @@ IMPORTANT:
         matchingSlot.isReserved = true;
         matchingSlot.reservedBy = schedule.child_id;
         matchingSlot.reservedFor = 'existing_schedule';
-        console.log(`🔒 Reserved slot ${matchingSlot.id} for existing schedule`);
       }
     });
   }
@@ -2184,13 +2085,11 @@ IMPORTANT:
    * Generate schedule using shared family time slots
    */
   async generateScheduleWithSharedSlots(childRequest, familyTimeSlots, existingCoordinatedSchedules) {
-    console.log(`⚡ Generating schedule for child ${childRequest.child_id} using shared slots...`);
     
     // Get available (unreserved) slots
     const availableSlots = familyTimeSlots.filter(slot => !slot.isReserved);
     
     if (availableSlots.length === 0) {
-      console.warn('⚠️ No available slots remaining for child');
       return { sessions: [], metadata: { error: 'No available time slots' } };
     }
     
@@ -2277,19 +2176,15 @@ IMPORTANT:
 - Do not double-assign materials or slots`;
 
     // Try AI assignment first, fallback to rule-based if it fails
-    console.log('🤖 Attempting AI-powered family scheduling assignment...');
     
     try {
         const aiResponse = await this.callOpenAIForFamilyAssignments(materialsBySubject, availableSlots, childProfile);
         if (aiResponse && aiResponse.assignments) {
-            console.log('✅ AI family assignment completed successfully');
             return aiResponse;
         }
     } catch (error) {
-        console.log('⚠️ AI family assignment failed, falling back to rule-based:', error.message);
     }
     
-    console.log('🤖 Using rule-based assignment for family scheduling (fallback)');
     return this.generateRuleBasedAssignmentsForAvailableSlots(materialsBySubject, availableSlots, childProfile);
   }
 
@@ -2373,7 +2268,6 @@ IMPORTANT:
           familySlot.isReserved = true;
           familySlot.reservedBy = material.lesson?.unit?.child_subject?.child_id;
           familySlot.reservedFor = `${assignment.subject} - ${material.title}`;
-          console.log(`🔒 Reserved family slot ${familySlot.id} for ${assignment.subject}`);
         }
       }
     });
@@ -2385,7 +2279,6 @@ IMPORTANT:
    * Apply blocked times to family time slots
    */
   applyBlockedTimes(familySlots, childrenRequests) {
-    console.log('🚫 Applying blocked times to family schedule...');
     
     // Common blocked times (can be customized per family)
     const defaultBlockedTimes = [
@@ -2420,7 +2313,6 @@ IMPORTANT:
       });
     });
     
-    console.log(`🚫 Blocked ${blockedCount} time slots for family unavailability`);
   }
 
   /**
@@ -2440,7 +2332,6 @@ IMPORTANT:
    * Detect conflicts between children's schedules
    */
   detectScheduleConflicts(individualSchedules) {
-    console.log('🔍 Detecting schedule conflicts...');
     
     const conflicts = [];
     const allSessions = [];
@@ -2492,7 +2383,6 @@ IMPORTANT:
     const resourceConflicts = this.detectResourceConflicts(allSessions);
     conflicts.push(...resourceConflicts);
     
-    console.log(`⚠️ Found ${conflicts.length} schedule conflicts`);
     return conflicts;
   }
 
@@ -2500,7 +2390,6 @@ IMPORTANT:
    * Apply coordination strategy to resolve conflicts
    */
   async applyCoordinationStrategy(individualSchedules, conflicts, coordinationMode) {
-    console.log(`🎯 Applying coordination strategy: ${coordinationMode}`);
     
     let coordinatedSchedules = [...individualSchedules];
     
@@ -2515,7 +2404,6 @@ IMPORTANT:
         coordinatedSchedules = await this.applyBalancedStrategy(coordinatedSchedules, conflicts);
         break;
       default:
-        console.warn('Unknown coordination mode, using balanced strategy');
         coordinatedSchedules = await this.applyBalancedStrategy(coordinatedSchedules, conflicts);
     }
     
@@ -2526,7 +2414,6 @@ IMPORTANT:
    * Synchronized strategy - align children's schedules for shared activities
    */
   async applySynchronizedStrategy(schedules, conflicts) {
-    console.log('🔄 Applying synchronized coordination...');
     
     // Find opportunities for shared study time
     const sharedOpportunities = this.findSharedStudyOpportunities(schedules);
@@ -2541,7 +2428,6 @@ IMPORTANT:
    * Staggered strategy - offset schedules to minimize conflicts
    */
   async applyStaggeredStrategy(schedules, conflicts) {
-    console.log('⏰ Applying staggered coordination...');
     
     // Calculate optimal time offsets
     const timeOffsets = this.calculateOptimalOffsets(schedules, conflicts);
@@ -2556,7 +2442,6 @@ IMPORTANT:
    * Balanced strategy - optimize individual needs with family harmony
    */
   async applyBalancedStrategy(schedules, conflicts) {
-    console.log('⚖️ Applying balanced coordination...');
     
     // Prioritize high-severity conflicts for resolution
     const highPriorityConflicts = conflicts.filter(c => c.severity >= 0.7);
@@ -2613,7 +2498,6 @@ Provide coordination adjustments in this JSON format:
       const aiCoordination = JSON.parse(cleanedContent);
       return this.applyAIAdjustments(schedules, aiCoordination.adjustments);
     } catch (error) {
-      console.warn('⚠️ AI coordination failed, using rule-based approach');
       return this.ruleBasedCoordination(schedules, conflicts);
     }
   }
@@ -2622,7 +2506,6 @@ Provide coordination adjustments in this JSON format:
    * Optimize family resources (shared study time, supervision, etc.)
    */
   optimizeFamilyResources(coordinatedSchedules) {
-    console.log('🏠 Optimizing family resources...');
     
     // Identify shared study opportunities
     const sharedStudySlots = this.identifySharedStudySlots(coordinatedSchedules);

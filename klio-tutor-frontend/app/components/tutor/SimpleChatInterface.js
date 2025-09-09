@@ -112,23 +112,18 @@ const SimpleChatInterface = ({ childData }) => {
     if (childData && typeof window !== 'undefined' && !initializingRef.current && !sessionId) {
       const token = localStorage.getItem('child_token');
       if (token) {
-        console.log('Initializing session for child:', childData.name);
         initializingRef.current = true;
         
         // Check for existing session first
         const existingSessionId = sessionStorage.getItem('current_session_id');
         if (existingSessionId) {
-          console.log('Restoring existing session:', existingSessionId);
           setSessionId(existingSessionId);
           // Restore conversation history
           restoreConversationHistory(existingSessionId);
-          console.log('Session restored:', existingSessionId);
         } else {
-          console.log('Creating new session');
           initializeSession();
         }
       } else {
-        console.log('No token found, logging out...');
         logout();
       }
     }
@@ -143,12 +138,10 @@ const SimpleChatInterface = ({ childData }) => {
       
       if (storedResponseId) {
         setLastResponseId(storedResponseId);
-        console.log('Restored response ID:', storedResponseId);
       }
       
       if (storedConversationId) {
         setConversationId(storedConversationId);
-        console.log('Restored conversation ID:', storedConversationId);
       }
     }
   }, [sessionId]);
@@ -193,9 +186,6 @@ const SimpleChatInterface = ({ childData }) => {
    */
   const restoreConversationHistory = async (sessionId) => {
     try {
-      console.log('🔄 Starting restoration for session:', sessionId);
-      console.log('🔑 Token available:', !!localStorage.getItem('child_token'));
-      console.log('🌍 API URL:', process.env.NEXT_PUBLIC_API_URL);
       
       // Set loading state to prevent auto-scroll interference
       setLoadingConversation(true);

@@ -1498,10 +1498,6 @@ IMPORTANT:
       return a.materialIndex - b.materialIndex;
     });
     
- 
-      `${m.subject}: ${m.material.title?.substring(0, 30)}... (due: ${m.dueDateStr}, urgency: ${m.urgency} days)`
-    ));
-    
     // Track subject appearances per day and per week
     const subjectCountByDay = new Map();
     const subjectCountThisWeek = new Map();

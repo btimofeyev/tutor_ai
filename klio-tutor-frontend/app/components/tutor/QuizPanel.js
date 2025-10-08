@@ -70,13 +70,6 @@ const QuizPanel = ({
 
     const question = quizData.questions[currentQuestion];
     
-    // Debug logging to understand the validation issue
-    console.log('🔍 Quiz Answer Debug:', {
-      userAnswer: currentAnswer,
-      correctAnswer: question.correctAnswer,
-      questionType: question.type,
-      options: question.options
-    });
     
     const isCorrect = validateAnswer(currentAnswer, question);
     
@@ -276,13 +269,6 @@ const QuizPanel = ({
   // Save completed quiz
   const saveQuizCompletion = async () => {
     try {
-      console.log('💾 Saving quiz completion...', {
-        quizId: quizData.id,
-        assignmentId: assignment?.id,
-        score,
-        totalQuestions: quizData.questions.length,
-        timeSpent
-      });
 
       // Submit quiz results to backend
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/quiz/submit`, {
@@ -310,7 +296,6 @@ const QuizPanel = ({
       const data = await response.json();
       
       if (data.success) {
-        console.log('✅ Quiz results saved successfully:', data);
         // Show success message to user
         if (typeof window !== 'undefined') {
           // Could show a toast or notification here

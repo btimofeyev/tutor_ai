@@ -197,12 +197,9 @@ const SimpleChatInterface = ({ childData }) => {
         }
       });
 
-      console.log('📡 API Response status:', response.status);
-      console.log('📡 API Response ok:', response.ok);
 
       if (!response.ok) {
         if (response.status === 401) {
-          console.log('🚫 Authentication failed during history restore, logging out...');
           setLoadingConversation(false);
           await logout();
           return;
@@ -213,13 +210,8 @@ const SimpleChatInterface = ({ childData }) => {
       }
 
       const data = await response.json();
-      console.log('📦 API Response data:', data);
-      console.log('📦 Conversation object:', data.conversation);
-      console.log('📦 Messages array:', data.conversation?.messages);
       
       if (data.success && data.conversation && data.conversation.messages) {
-        console.log(`📝 Restoring ${data.conversation.messages.length} messages`);
-        console.log('📝 First message preview:', data.conversation.messages[0]);
         
         // Convert backend message format to frontend format
         const restoredMessages = data.conversation.messages.map((msg, index) => ({
@@ -230,8 +222,6 @@ const SimpleChatInterface = ({ childData }) => {
           timestamp: msg.timestamp || new Date().toISOString()
         }));
         
-        console.log('🎯 Setting messages to state with length:', restoredMessages.length);
-        console.log('🎯 Current messages state before set:', messages.length);
         setMessages(restoredMessages);
         
         // Scroll to bottom instantly after restoring conversation
@@ -240,10 +230,7 @@ const SimpleChatInterface = ({ childData }) => {
           setLoadingConversation(false);
         }, 100);
         
-        console.log('✅ Successfully restored conversation history');
       } else {
-        console.log('⚠️ No conversation history found or invalid format for session:', sessionId);
-        console.log('⚠️ Data structure:', { success: data.success, hasConversation: !!data.conversation, hasMessages: !!data.conversation?.messages });
         setLoadingConversation(false);
       }
       
@@ -277,7 +264,6 @@ const SimpleChatInterface = ({ childData }) => {
       if (!response.ok) {
         // If unauthorized, logout to return to login page
         if (response.status === 401) {
-          console.log('Authentication failed, logging out...');
           await logout();
           return;
         }
@@ -293,7 +279,6 @@ const SimpleChatInterface = ({ childData }) => {
       // Skip welcome message - let ReadyToStudyInterface handle initial display
       // The welcome_message from backend is no longer needed as we show assignment cards instead
 
-      console.log('Session initialized successfully:', data.session_id);
 
     } catch (error) {
       console.error('Error initializing session:', error);
@@ -352,7 +337,6 @@ const SimpleChatInterface = ({ childData }) => {
       if (!response.ok) {
         // If unauthorized, logout to return to login page
         if (response.status === 401) {
-          console.log('Authentication expired, logging out...');
           await logout();
           return;
         }
@@ -431,7 +415,6 @@ const SimpleChatInterface = ({ childData }) => {
     
     try {
       setLoadingHistory(true);
-      console.log('📚 Loading conversation history...');
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/conversations/${childData.id}/recent`, {
         method: 'GET',
@@ -444,7 +427,6 @@ const SimpleChatInterface = ({ childData }) => {
         const data = await response.json();
         if (data.success) {
           setConversationHistory(data.conversations || []);
-          console.log(`📚 Loaded ${data.conversations?.length || 0} conversation(s)`);
         }
       } else if (response.status !== 404) {
         console.warn('Failed to load conversation history:', response.status);
@@ -465,7 +447,6 @@ const SimpleChatInterface = ({ childData }) => {
     try {
       setLoadingContext(true);
       setContextError(null);
-      console.log('🎓 Loading learning context...');
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/context/${childData.id}`, {
         method: 'GET',
@@ -477,28 +458,15 @@ const SimpleChatInterface = ({ childData }) => {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          console.log('🔍 DEBUG: Raw context data received:', JSON.stringify(data.context, null, 2));
-          console.log('🔍 DEBUG: Context structure:', {
-            hasActiveWork: data.context?.hasActiveWork,
-            upcoming: data.context?.upcoming?.length || 0,
-            currentWork: data.context?.currentWork?.length || 0,
-            needsReview: data.context?.needsReview?.length || 0,
-            nextAssignments: data.context?.nextAssignments?.length || 0,
-            rawUpcoming: data.context?.upcoming,
-            rawCurrentWork: data.context?.currentWork,
-            rawNeedsReview: data.context?.needsReview
-          });
           
           setLearningContext(data.context);
           const totalAssignments = (data.context.upcoming?.length || 0) + (data.context.currentWork?.length || 0) + (data.context.needsReview?.length || 0);
-          console.log(`🎓 Loaded learning context: ${totalAssignments} assignments (${data.context.upcoming?.length || 0} upcoming, ${data.context.currentWork?.length || 0} current, ${data.context.needsReview?.length || 0} review)`);
           
           // Update quick suggestions based on context
           updateQuickSuggestionsFromContext(data.context);
         }
       } else if (response.status === 404) {
         // No assignments found - this is normal
-        console.log('📝 No current assignments found');
         setLearningContext(null);
       } else {
         console.warn('Failed to load learning context:', response.status);
@@ -599,7 +567,6 @@ const SimpleChatInterface = ({ childData }) => {
       });
 
       if (response.ok) {
-        console.log(`📝 Tracked problem attempt: material ${materialId}, problem ${problemNumber}`);
       } else {
         console.warn('Failed to track problem attempt:', response.status);
       }
@@ -613,7 +580,6 @@ const SimpleChatInterface = ({ childData }) => {
    */
   const loadConversation = async (conversationSessionId) => {
     try {
-      console.log(`🔄 Loading conversation: ${conversationSessionId}`);
       
       // Set loading state to prevent auto-scroll interference
       setLoadingConversation(true);
@@ -645,7 +611,6 @@ const SimpleChatInterface = ({ childData }) => {
             setLoadingConversation(false);
           }, 100);
           
-          console.log(`✅ Loaded ${data.conversation.messages.length} messages`);
         } else {
           setLoadingConversation(false);
         }
@@ -677,7 +642,6 @@ const SimpleChatInterface = ({ childData }) => {
     const { conversationId } = deleteModal;
     
     try {
-      console.log(`🗑️ Deleting conversation: ${conversationId}`);
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/conversation/${conversationId}`, {
         method: 'DELETE',
@@ -700,7 +664,6 @@ const SimpleChatInterface = ({ childData }) => {
             setActiveConversationId(currentSessionId);
           }
           
-          console.log('✅ Conversation deleted successfully');
         }
       } else {
         console.error('Failed to delete conversation:', response.status);
@@ -722,7 +685,6 @@ const SimpleChatInterface = ({ childData }) => {
    */
   const startNewChat = async () => {
     try {
-      console.log('🔄 Starting new chat...');
       
       // Clear current session state
       setMessages([]);
@@ -743,7 +705,6 @@ const SimpleChatInterface = ({ childData }) => {
       setActiveConversationId(null);
       
       // Create a new session
-      console.log('🆕 Creating fresh session...');
       await initializeSession();
       
       // Refresh conversation history to show the new chat
@@ -783,7 +744,6 @@ const SimpleChatInterface = ({ childData }) => {
     try {
       setLoadingQuiz(true);
       setShowQuizSelector(false); // Close selector if open
-      console.log('🧪 Generating quiz for assignment:', assignment.title);
       
       // Call backend API to generate quiz
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/quiz/generate`, {
@@ -806,7 +766,6 @@ const SimpleChatInterface = ({ childData }) => {
       const data = await response.json();
       
       if (data.success && data.quiz) {
-        console.log('✅ Quiz generated successfully from backend:', data.quiz);
         setQuizData(data.quiz);
         setCurrentAssignment(assignment);
         setIsQuizMode(true);
@@ -838,7 +797,6 @@ const SimpleChatInterface = ({ childData }) => {
       setCurrentAssignment(assignment);
       setError(null);
       
-      console.log(`🎴 Generating flashcards for: "${assignment.title}"`);
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tutor/flashcards/generate`, {
         method: 'POST',
@@ -856,7 +814,6 @@ const SimpleChatInterface = ({ childData }) => {
       const data = await response.json();
       
       if (data.success && data.flashcards) {
-        console.log(`✅ Generated ${data.flashcards.length} flashcards`);
         setFlashcardData(data);
         setIsFlashcardMode(true);
       } else {
@@ -1221,18 +1178,6 @@ Correct answer: ${q.correctAnswer}`;
     const hasNeedsReview = needsReviewAssignments.length > 0;
     const hasAssignments = hasNewFormat || hasFallbackData;
     
-    console.log('🎨 DEBUG: ReadyToStudyInterface render data:', {
-      hasNewFormat,
-      hasFallbackData,
-      hasAssignments,
-      hasUpcoming,
-      hasCurrentWork,
-      hasNeedsReview,
-      upcomingCount: upcomingAssignments.length,
-      currentWorkCount: currentWorkAssignments.length,
-      needsReviewCount: needsReviewAssignments.length,
-      fallbackCount: fallbackAssignments.length
-    });
     
     const handleAssignmentSelect = (assignment) => {
       const suggestion = `Help with ${assignment.title}`;

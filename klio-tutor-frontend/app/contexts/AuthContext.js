@@ -89,7 +89,6 @@ export function AuthProvider({ children }) {
               reason: 'logout' 
             })
           });
-          console.log('🔚 Session ended on logout');
         }
       }
     } catch (error) {
@@ -112,7 +111,6 @@ export function AuthProvider({ children }) {
       }
       sessionStorage.removeItem('current_session_id');
       
-      console.log('🧹 Cleared all authentication and session data on logout');
     }
     setChild(null);
   };
@@ -127,7 +125,6 @@ export function AuthProvider({ children }) {
 
   // Handle token expiration - centralized logout
   const handleTokenExpiration = async () => {
-    console.log('Token expired, logging out user');
     await logout();
   };
 

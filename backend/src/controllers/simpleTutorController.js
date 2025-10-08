@@ -101,7 +101,7 @@ class SimpleTutorController {
    */
   handleMessage = async (req, res) => {
     try {
-      const { sessionId, message, childId, quizContext } = req.body;
+      const { sessionId, message, childId } = req.body;
 
       if (!sessionId || !message || !childId) {
         return res.status(400).json({
@@ -122,13 +122,8 @@ class SimpleTutorController {
 
       logger.info(`Processing message for session ${sessionId}: ${message.substring(0, 50)}...`);
 
-      // Log quiz context if provided
-      if (quizContext?.isQuizActive) {
-        logger.info(`🧪 Quiz context detected: "${quizContext.quizTitle}" - Question: ${quizContext.currentQuestion?.question?.substring(0, 50)}...`);
-      }
-
-      // Send to OpenAI with response chaining and quiz context
-      const result = await simpleOpenAIService.sendMessage(sessionId, message.trim(), childName, quizContext);
+      // Send to OpenAI
+      const result = await simpleOpenAIService.sendMessage(sessionId, message.trim(), childName, childId);
 
       if (result.success) {
         logger.info(`Response generated for session ${sessionId} with ID ${result.responseId}`);

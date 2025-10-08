@@ -18,7 +18,7 @@ class SimpleOpenAIService {
     });
 
     this.config = {
-      model: 'gpt-5-mini', // Cost-effective model
+      model: 'gpt-5', // Full GPT-5 model for better tool calling
       store: true, // Enable 30-day conversation storage
     };
 
@@ -59,69 +59,22 @@ class SimpleOpenAIService {
    * Send message with OpenAI Responses API and response chaining
    * Now supports quiz context for targeted tutoring help
    */
-  async sendMessage(sessionId, message, childName = 'Student', quizContext = null) {
+  async sendMessage(sessionId, message, childName = 'Student', childId = null) {
     try {
       // Get previous response ID for chaining
       const previousResponseId = await this.getPreviousResponseId(sessionId);
       
-      // Get child info from session metadata
+      // Get child info from session metadata (use passed childId if available)
       const sessionData = await this.getSessionData(sessionId);
       const childGrade = sessionData?.metadata?.child_grade || null;
-      const childId = sessionData?.child_id;
+      const finalChildId = childId || sessionData?.child_id;
       
-      // Handle quiz context first if provided
-      let learningContext = null;
-      let homeworkIntent = { needsContext: false, specificAssignment: null, confidence: 0 };
-      
-      if (quizContext?.isQuizActive) {
-        // For quiz context, we'll use a special system prompt
-        homeworkIntent = { needsContext: true, isQuizContext: true, quizContext: quizContext, confidence: 1.0 };
-      } else if (childId) {
-        try {
-          // Fetch full learning context for regular homework help
-          learningContext = await learningContextService.getLearningContextSummary(childId);
-          logger.info(`Fetched learning context for child ${childId}: ${learningContext.nextAssignments.length} assignments`);
-          
-          // Detect homework intent with assignment matching
-          homeworkIntent = this.detectHomeworkIntent(message, learningContext.nextAssignments);
-          
-          // Filter to specific assignment if one was matched
-          if (homeworkIntent.specificAssignment) {
-            learningContext = this.filterToSpecificAssignment(learningContext, homeworkIntent.specificAssignment);
-          } else if (homeworkIntent.needsContext) {
-          }
-          
-        } catch (error) {
-          logger.warn('Could not fetch learning context:', error.message);
-          // Fallback to simple intent detection without assignments
-          homeworkIntent = this.detectHomeworkIntent(message, []);
-        }
-      } else {
-        // Fallback for no childId
-        homeworkIntent = this.detectHomeworkIntent(message, []);
-      }
-      
-      // Log quiz completion detection for debugging
-      if (homeworkIntent.isQuizCompletion) {
-      }
-      
-      // Get or initialize conversation history with context-aware system prompt
+      // Get or initialize conversation history
       let conversation = this.conversationHistory.get(sessionId) || [];
       
       if (conversation.length === 0) {
-        // New conversation - determine system prompt type
-        let systemPrompt;
-        if (homeworkIntent.isQuizCompletion) {
-          // Use quiz review system prompt for quiz completion
-          systemPrompt = this.buildQuizReviewPrompt(childName, childGrade, homeworkIntent.quizResults);
-        } else if (homeworkIntent.isQuizContext) {
-          // Use quiz-specific system prompt
-          systemPrompt = this.buildQuizHintPrompt(childName, childGrade, homeworkIntent.quizContext);
-        } else {
-          // Use regular context-aware prompt
-          const contextToUse = homeworkIntent.needsContext ? learningContext : null;
-          systemPrompt = this.buildContextAwarePrompt(childName, childGrade, contextToUse);
-        }
+        // New conversation - create simple system prompt
+        const systemPrompt = this.buildStudyAssistantPrompt(childName, childGrade);
         
         conversation = [
           {
@@ -129,27 +82,6 @@ class SimpleOpenAIService {
             content: systemPrompt
           }
         ];
-      } else if (homeworkIntent.isQuizCompletion) {
-        // Update system prompt for quiz review
-        const newSystemPrompt = this.buildQuizReviewPrompt(childName, childGrade, homeworkIntent.quizResults);
-        conversation[0] = {
-          role: 'system',
-          content: newSystemPrompt
-        };
-      } else if (homeworkIntent.isQuizContext) {
-        // Update system prompt for quiz context
-        const newSystemPrompt = this.buildQuizHintPrompt(childName, childGrade, homeworkIntent.quizContext);
-        conversation[0] = {
-          role: 'system',
-          content: newSystemPrompt
-        };
-      } else if (homeworkIntent.needsContext && learningContext && learningContext.hasActiveWork) {
-        // Update system prompt if we have homework intent with learning context
-        const newSystemPrompt = this.buildContextAwarePrompt(childName, childGrade, learningContext);
-        conversation[0] = {
-          role: 'system',
-          content: newSystemPrompt
-        };
       }
       
       // Add current user message
@@ -168,14 +100,22 @@ class SimpleOpenAIService {
       
       logger.debug(`Conversation length for ${sessionId.slice(-10)}: ${conversation.length - 1} messages`);
 
-      // Create completion with store and response chaining
+      // Create response with GPT-5 Responses API
       const requestParams = {
         model: this.config.model,
-        messages: conversation, // Use full conversation history
-
-        store: this.config.store // Enable 30-day storage
-        // metadata removed due to null value restrictions
+        input: conversation, // Use full conversation history
+        reasoning: { effort: "medium" }, // Balanced reasoning for tutoring
+        text: { verbosity: "medium" } // Appropriate response length
       };
+
+      // Add function tools if childId exists
+      if (finalChildId) {
+        const tools = this.getToolDefinitions(finalChildId);
+        if (tools && tools.length > 0) {
+          requestParams.tools = tools;
+          logger.info(`Added ${tools.length} function tools to request for child ${finalChildId}`);
+        }
+      }
 
       // Note: Response chaining via 'include' parameter not yet supported in current OpenAI API
       // Using conversation persistence with 'store' parameter instead
@@ -183,19 +123,41 @@ class SimpleOpenAIService {
         logger.debug(`Previous response available: ${previousResponseId} (will use store persistence)`);
       }
 
-      // Get AI response
-      const response = await this.openai.chat.completions.create(requestParams);
-      const responseMessage = response.choices[0].message;
+      // Get AI response using Responses API
+      const response = await this.openai.responses.create(requestParams);
       const responseId = response.id;
       
+      // Parse response output
+      let responseMessage = null;
+      let toolCalls = [];
+      
+      if (response.output && Array.isArray(response.output)) {
+        // Find message and function calls in output
+        for (const item of response.output) {
+          if (item.type === 'message') {
+            responseMessage = item;
+          } else if (item.type === 'function_call') {
+            toolCalls.push(item);
+          }
+        }
+      }
+      
+      // If no structured message found, use output_text
+      if (!responseMessage && response.output_text) {
+        responseMessage = {
+          role: 'assistant',
+          content: response.output_text
+        };
+      }
+      
       // Handle tool calls if present
-      if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+      if (toolCalls && toolCalls.length > 0) {
         
         // Process each tool call
         const toolResults = [];
-        for (const toolCall of responseMessage.tool_calls) {
+        for (const toolCall of toolCalls) {
           try {
-            const result = await this.handleToolCall(toolCall, childId, learningContext);
+            const result = await this.handleToolCall(toolCall, finalChildId);
             toolResults.push({
               tool_call_id: toolCall.id,
               role: "tool",
@@ -211,25 +173,25 @@ class SimpleOpenAIService {
           }
         }
         
-        // Add assistant message with tool calls
+        // Add assistant message (tool calls are handled differently in Responses API)
+        // Don't include tool_calls field as it's not supported
         conversation.push({
           role: 'assistant',
-          content: responseMessage.content,
-          tool_calls: responseMessage.tool_calls
+          content: responseMessage?.content || ''  // Handle null responseMessage
         });
         
         // Add tool results
         conversation.push(...toolResults);
         
         // Get final AI response after tool execution
-        const finalResponse = await this.openai.chat.completions.create({
+        const finalResponse = await this.openai.responses.create({
           model: this.config.model,
-          messages: conversation,
-          temperature: this.config.temperature,
-          max_tokens: this.config.max_tokens
+          input: conversation,
+          reasoning: { effort: "medium" },
+          text: { verbosity: "medium" }
         });
         
-        const aiMessage = finalResponse.choices[0].message.content;
+        const aiMessage = finalResponse.output_text || finalResponse.output?.[0]?.content;
         
         // Add final AI response
         conversation.push({
@@ -272,7 +234,7 @@ class SimpleOpenAIService {
       ]);
 
       // Store response ID for tracking
-      await this.updateSessionResponseId(sessionId, responseId, response.conversation_id);
+      await this.updateSessionResponseId(sessionId, responseId, response.conversation_id || null);
 
       logger.info(`Session ${sessionId}: Message processed with response ${responseId}`);
       
@@ -280,8 +242,8 @@ class SimpleOpenAIService {
         success: true,
         response: aiMessage,
         responseId: responseId,
-        conversationId: response.conversation_id,
-        usage: response.usage
+        conversationId: response.conversation_id || null,
+        usage: response.usage || null
       };
 
     } catch (error) {
@@ -715,6 +677,14 @@ CORE RULES:
 3. Keep responses short (2-3 sentences) then ask what they think
 4. End with a question requiring student participation
 
+IMPORTANT: You have access to the student's actual assignments and homework.
+
+When students mention homework, assignments, subjects, or need help with schoolwork:
+1. ALWAYS use search_student_materials first to find their actual assignments
+2. Use get_material_details to see specific questions and content
+3. Reference the actual assignment titles and questions in your response
+4. Never ask "which assignment" - search for their work instead
+
 Always help ${childName} discover solutions through guided questions.`;
   }
 
@@ -958,7 +928,7 @@ Always use questions to help ${childName} understand why the correct answer work
    * @param {Array} assignments - Available assignments from learning context
    * @returns {Object} { found: boolean, assignment: Object|null, confidence: number }
    */
-  extractAssignmentReference(message, assignments) {
+  extractAssignmentReference(message, assignments, conversationState = null) {
     if (!message || !assignments || assignments.length === 0) {
       return { found: false, assignment: null, confidence: 0 };
     }
@@ -1042,17 +1012,42 @@ Always use questions to help ${childName} understand why the correct answer work
       const contentBonus = this.getContentTypePriority(assignment);
       const richnessBonus = this.getProblemRichnessScore(assignment);
       
+      // Conversation state bonus - boost assignments in current context
+      let stateBonus = 1.0;
+      if (conversationState) {
+        // Boost if this assignment matches current subject
+        if (conversationState.currentSubject === subject) {
+          stateBonus = 1.3;
+          logger.debug(`🎯 Subject context bonus for "${title}" (${subject})`);
+        }
+        
+        // Major boost if this is the current material
+        if (conversationState.currentMaterial === assignment.id) {
+          stateBonus = 1.5;
+          logger.debug(`🔥 Material context bonus for "${title}"`);
+        }
+        
+        // Small boost for recent mentions
+        const recentMention = conversationState.recentMentions.find(m => 
+          m.type === 'material' && m.value === title
+        );
+        if (recentMention) {
+          stateBonus = Math.max(stateBonus, 1.2);
+          logger.debug(`💭 Recent mention bonus for "${title}"`);
+        }
+      }
+      
       // For very strong title matches, reduce content penalty impact
-      let finalScore = baseScore * contentBonus * richnessBonus;
+      let finalScore = baseScore * contentBonus * richnessBonus * stateBonus;
       
       // If we have a very strong title match (0.8+), don't let content penalty kill it
       if (titleScore >= 0.8) {
-        const titleBoostedScore = baseScore * Math.max(contentBonus, 0.7) * Math.max(richnessBonus, 0.5);
+        const titleBoostedScore = baseScore * Math.max(contentBonus, 0.7) * Math.max(richnessBonus, 0.5) * stateBonus;
         finalScore = Math.max(finalScore, titleBoostedScore);
         logger.info(`🎯 Strong title match bonus applied for "${title}"`);
       }
       
-      logger.info(`📊 Assignment "${title}": base=${baseScore.toFixed(2)}, content=${contentBonus.toFixed(2)}, richness=${richnessBonus.toFixed(2)}, final=${finalScore.toFixed(2)}`);
+      logger.info(`📊 Assignment "${title}": base=${baseScore.toFixed(2)}, content=${contentBonus.toFixed(2)}, richness=${richnessBonus.toFixed(2)}, state=${stateBonus.toFixed(2)}, final=${finalScore.toFixed(2)}`);
       
       if (finalScore > bestScore && finalScore >= minConfidence) {
         bestScore = finalScore;
@@ -1089,74 +1084,7 @@ Always use questions to help ${childName} understand why the correct answer work
     };
   }
 
-  /**
-   * Detect if student's message indicates they need homework/assignment help
-   * @param {string} message - Student's message
-   * @param {Array} assignments - Available assignments (optional for enhanced matching)
-   * @returns {Object} { needsContext: boolean, specificAssignment: Object|null, confidence: number }
-   */
-  detectHomeworkIntent(message, assignments = []) {
-    const homeworkKeywords = [
-      'homework', 'assignment', 'worksheet', 'problem', 'question',
-      'next', 'help', 'stuck', "don't understand", 'quiz', 'test',
-      'due', 'work on', 'working on', 'exercise', 'practice',
-      'math problem', 'science question', 'history assignment',
-      'what is it', 'tell me about', 'explain', 'about', 'lesson',
-      'chapter', 'unit', 'study', 'review'
-    ];
-    
-    const lowerMessage = message.toLowerCase();
-    const hasKeyword = homeworkKeywords.some(word => lowerMessage.includes(word));
-    
-    // Check for quiz completion messages
-    const quizCompletionPatterns = [
-      'i just completed the quiz',
-      'i completed the quiz',
-      'finished the quiz',
-      'just finished the quiz',
-      'quiz on',
-      'scored',
-      'got wrong:',
-      'questions i got wrong',
-      'correct answer:'
-    ];
-    
-    const isQuizCompletion = quizCompletionPatterns.some(pattern => 
-      lowerMessage.includes(pattern)
-    ) || (
-      lowerMessage.includes('quiz') && 
-      (lowerMessage.includes('scored') || lowerMessage.includes('questions'))
-    );
-    
-    let quizResults = null;
-    if (isQuizCompletion) {
-      quizResults = this.extractQuizResults(message);
-    }
-    
-    // Also check for very short follow-up questions that are clearly about assignments
-    const isFollowUpQuestion = lowerMessage.length < 20 && (
-      lowerMessage.includes('what') || 
-      lowerMessage.includes('how') || 
-      lowerMessage.includes('why') || 
-      lowerMessage.includes('about')
-    );
-    
-    const needsContext = hasKeyword || isFollowUpQuestion || isQuizCompletion;
-    
-    // If context needed and assignments available, try to match specific assignment
-    let assignmentMatch = { found: false, assignment: null, confidence: 0 };
-    if (needsContext && assignments.length > 0) {
-      assignmentMatch = this.extractAssignmentReference(message, assignments);
-    }
-    
-    return {
-      needsContext,
-      specificAssignment: assignmentMatch.assignment,
-      confidence: assignmentMatch.confidence,
-      isQuizCompletion,
-      quizResults
-    };
-  }
+
 
   /**
    * Extract quiz results from a quiz completion message
@@ -2136,32 +2064,49 @@ Generate the quiz now:`;
   /**
    * Get tool definitions for OpenAI function calling
    */
-  getToolDefinitions(childId, learningContext) {
+  getToolDefinitions(childId) {
     const tools = [];
     
-    // Only add quiz generation tool if child has assignments
-    if (childId && learningContext?.nextAssignments?.length > 0) {
+    // Add material search tools if child has access
+    if (childId) {
       tools.push({
         type: "function",
-        function: {
-          name: "generate_quiz",
-          description: "Generate a practice quiz for the student based on their current assignments. Use this when the student asks to be quizzed, tested, or wants practice questions.",
-          parameters: {
-            type: "object",
-            properties: {
-              assignment_id: {
-                type: "string",
-                description: "The ID of the assignment to create a quiz for. If not specified, use the first available assignment."
-              },
-              question_count: {
-                type: "number",
-                description: "Number of questions to generate (default: 5, max: 10)",
-                minimum: 1,
-                maximum: 10
-              }
+        name: "search_student_materials",
+        description: "Search through the student's assignments, worksheets, and materials. Use this when the student asks for help with homework, mentions a subject, or asks about their work.",
+        parameters: {
+          type: "object",
+          properties: {
+            subject: {
+              type: "string",
+              description: "Subject to search (e.g., Math, English, Science, History). Optional - leave empty to search all subjects."
             },
-            required: []
-          }
+            keyword: {
+              type: "string", 
+              description: "Keyword to search for in assignment titles or content (e.g., 'fractions', 'essay', 'chapter 5')"
+            },
+            status: {
+              type: "string",
+              enum: ["incomplete", "completed", "all"],
+              description: "Filter by completion status. Use 'incomplete' for current work, 'completed' for finished work, 'all' for everything."
+            }
+          },
+          required: []
+        }
+      });
+
+      tools.push({
+        type: "function",
+        name: "get_material_details",
+        description: "Get detailed information about a specific assignment including questions, lesson content, and teaching context. Use this when you need to help with specific questions or provide targeted guidance.",
+        parameters: {
+          type: "object",
+          properties: {
+            material_id: {
+              type: "string",
+              description: "The ID of the material/assignment to get details for"
+            }
+          },
+          required: ["material_id"]
         }
       });
     }
@@ -2172,21 +2117,174 @@ Generate the quiz now:`;
   /**
    * Handle tool call execution
    */
-  async handleToolCall(toolCall, childId, learningContext) {
-    logger.info(`🔧 Executing tool: ${toolCall.function.name}`);
+  async handleToolCall(toolCall, childId) {
+    logger.info(`🔧 Executing tool: ${toolCall.name}`);
     
-    switch (toolCall.function.name) {
+    switch (toolCall.name) {
+      case 'search_student_materials':
+        return await this.handleSearchMaterialsTool(toolCall.arguments, childId);
+      case 'get_material_details':
+        return await this.handleGetMaterialDetailsTool(toolCall.arguments, childId);
       case 'generate_quiz':
-        return await this.handleGenerateQuizTool(toolCall.function.arguments, childId, learningContext);
+        return await this.handleGenerateQuizTool(toolCall.arguments, childId);
       default:
-        throw new Error(`Unknown tool: ${toolCall.function.name}`);
+        throw new Error(`Unknown tool: ${toolCall.name}`);
+    }
+  }
+
+  /**
+   * Handle search materials tool call
+   */
+  async handleSearchMaterialsTool(argumentsStr, childId) {
+    try {
+      const args = JSON.parse(argumentsStr);
+      const { subject, keyword, status = "incomplete" } = args;
+      
+      logger.info(`🔍 Searching materials for child ${childId}: subject="${subject || 'all'}", keyword="${keyword || 'none'}", status="${status}"`);
+      
+      // Use learningContextService for the search
+      let materials = [];
+      
+      if (status === 'incomplete' || status === 'all') {
+        const nextAssignments = await learningContextService.getNextAssignments(childId, 20);
+        // nextAssignments returns {currentWork: [], upcoming: [], needsReview: []}
+        // Combine all arrays from the object
+        const allAssignments = [
+          ...nextAssignments.currentWork,
+          ...nextAssignments.upcoming,
+          ...nextAssignments.needsReview
+        ];
+        materials.push(...allAssignments.map(m => ({ ...m, status: 'incomplete' })));
+      }
+      
+      if (status === 'completed' || status === 'all') {
+        // Get completed materials from last 30 days
+        const completedMaterials = await learningContextService.getRecentProgress(childId, 30);
+        // completedMaterials is already an array
+        materials.push(...completedMaterials.map(m => ({ ...m, status: 'completed' })));
+      }
+      
+      // Filter by subject if specified
+      if (subject) {
+        materials = materials.filter(m => 
+          m.child_subjects?.subjects?.name?.toLowerCase().includes(subject.toLowerCase())
+        );
+      }
+      
+      // Filter by keyword if specified
+      if (keyword) {
+        materials = materials.filter(m => 
+          m.title?.toLowerCase().includes(keyword.toLowerCase()) ||
+          (m.lesson_groups && m.lesson_groups.title?.toLowerCase().includes(keyword.toLowerCase())) ||
+          (m.lesson_json && JSON.stringify(m.lesson_json).toLowerCase().includes(keyword.toLowerCase()))
+        );
+      }
+      
+      // Format results for AI
+      const results = materials.slice(0, 10).map(m => ({
+        id: m.id,
+        title: m.title,
+        subject: m.child_subjects?.subjects?.name,
+        lesson: m.lesson_groups?.title,
+        status: m.status,
+        hasQuestions: m.lesson_json?.questions ? m.lesson_json.questions.length : 0,
+        dueDate: m.due_date,
+        grade: m.grade_value ? `${m.grade_value}/${m.grade_max_value}` : null
+      }));
+      
+      return {
+        success: true,
+        materials: results,
+        total: results.length,
+        message: `Found ${results.length} ${status} materials${subject ? ` in ${subject}` : ''}${keyword ? ` matching "${keyword}"` : ''}`
+      };
+      
+    } catch (error) {
+      logger.error('Error in searchMaterialsTool:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Handle get material details tool call
+   */
+  async handleGetMaterialDetailsTool(argumentsStr, childId) {
+    try {
+      const args = JSON.parse(argumentsStr);
+      const { material_id } = args;
+      
+      if (!material_id) {
+        return {
+          success: false,
+          error: "Material ID is required"
+        };
+      }
+      
+      logger.info(`📋 Getting material details for ${material_id}`);
+      
+      // Get detailed material info
+      const material = await learningContextService.getMaterialContext(material_id);
+      
+      if (!material) {
+        return {
+          success: false,
+          error: "Material not found"
+        };
+      }
+      
+      // Verify this material belongs to the child
+      if (material.child_subjects?.child_id !== childId) {
+        return {
+          success: false,
+          error: "Access denied"
+        };
+      }
+      
+      // Format detailed response
+      const details = {
+        id: material.id,
+        title: material.title,
+        subject: material.child_subjects?.subjects?.name,
+        lesson: {
+          title: material.lesson_groups?.title,
+          description: material.lesson_groups?.description,
+          sequence: material.lesson_groups?.sequence_order
+        },
+        content_type: material.content_type,
+        due_date: material.due_date,
+        status: material.completed_at ? 'completed' : 'incomplete',
+        grade: material.grade_value ? {
+          score: material.grade_value,
+          total: material.grade_max_value,
+          percentage: Math.round((material.grade_value / material.grade_max_value) * 100)
+        } : null,
+        questions: material.lesson_json?.questions || [],
+        concepts: material.lesson_json?.concepts || [],
+        instructions: material.lesson_json?.instructions || material.lesson_groups?.description
+      };
+      
+      return {
+        success: true,
+        material: details,
+        message: `Retrieved details for "${material.title}" - ${details.questions.length} questions available`
+      };
+      
+    } catch (error) {
+      logger.error('Error in getMaterialDetailsTool:', error);
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 
   /**
    * Handle quiz generation tool call
    */
-  async handleGenerateQuizTool(argumentsStr, childId, learningContext) {
+  async handleGenerateQuizTool(argumentsStr, childId) {
     try {
       const args = JSON.parse(argumentsStr);
       const questionCount = Math.min(args.question_count || 5, 10);
@@ -2194,9 +2292,10 @@ Generate the quiz now:`;
       // Get assignment - use specified ID or first available
       let assignment;
       if (args.assignment_id) {
-        assignment = learningContext.nextAssignments.find(a => a.id === args.assignment_id);
+        assignment = await learningContextService.getMaterialContext(args.assignment_id);
       } else {
-        assignment = learningContext.nextAssignments[0];
+        const nextAssignments = await learningContextService.getNextAssignments(childId, 1);
+        assignment = nextAssignments[0];
       }
       
       if (!assignment) {

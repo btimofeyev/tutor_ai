@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -12,7 +12,9 @@ import {
   PlusCircleIcon,
   AdjustmentsHorizontalIcon,
   BookOpenIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  ChevronDownIcon,
+  ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
 import { useSession } from "@supabase/auth-helpers-react";
 import { useChildrenData } from "../../../hooks/useChildrenData";
@@ -21,10 +23,8 @@ import { useModalManagement } from "../../../hooks/useModalManagement";
 import { useToast } from "../../../hooks/useToast";
 import { useDashboardHandlers } from "../../../hooks/useDashboardHandlers";
 import MaterialListItem from "../../dashboard/components/MaterialListItem";
-import LessonGroupedMaterials from "../../dashboard/components/LessonGroupedMaterials";
 import CompletionPieChart from "../../dashboard/components/charts/CompletionPieChart";
 import Breadcrumbs from "../../../components/ui/Breadcrumbs";
-import { signalDashboardRefresh } from "../../../utils/dashboardRefresh";
 import StreamlinedAddAssignment from "../../dashboard/components/StreamlinedAddAssignment";
 import EditMaterialModal from "../../dashboard/components/EditMaterialModal";
 import MaterialDeleteModal from "../../dashboard/components/MaterialDeleteModal";
@@ -55,6 +55,16 @@ export default function SubjectPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [expandedChapters, setExpandedChapters] = useState({});
+  const [expandedLessons, setExpandedLessons] = useState({});
+  const [archivedChapters, setArchivedChapters] = useState({});
+  const prevChapterCompletionRef = useRef({});
+  const prevLessonCompletionRef = useRef({});
+  const archivedStorageKey = useMemo(() => {
+    if (!childSubjectId) return null;
+    return `subject:${childSubjectId}:archivedChapters`;
+  }, [childSubjectId]);
 
   // Custom hooks
   const childrenData = useChildrenData(session);
@@ -73,6 +83,32 @@ export default function SubjectPage() {
     setSelectedMaterials: () => {},
     setBatchSelectionMode: () => {}
   });
+
+  useEffect(() => {
+    if (!archivedStorageKey || typeof window === 'undefined') return;
+    setExpandedChapters({});
+    setExpandedLessons({});
+    prevChapterCompletionRef.current = {};
+    prevLessonCompletionRef.current = {};
+
+    try {
+      const stored = localStorage.getItem(archivedStorageKey);
+      if (!stored) {
+        setArchivedChapters({});
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      const nextArchived = Array.isArray(parsed)
+        ? parsed.reduce((acc, id) => {
+            acc[String(id)] = true;
+            return acc;
+          }, {})
+        : {};
+      setArchivedChapters(nextArchived);
+    } catch (error) {
+      setArchivedChapters({});
+    }
+  }, [archivedStorageKey]);
 
   // Find the current subject and child
   const currentSubject = useMemo(() => {
@@ -113,6 +149,9 @@ export default function SubjectPage() {
               lesson.lesson_id === lessonContainer.id
             );
 
+            const completedMaterials = materialsForLesson.filter(material => material.completed_at).length;
+            const totalMaterials = materialsForLesson.length;
+
             return {
               ...lessonContainer,
               materials: materialsForLesson.sort((a, b) => {
@@ -120,19 +159,24 @@ export default function SubjectPage() {
                 const dateA = new Date(a.created_at || 0);
                 const dateB = new Date(b.created_at || 0);
                 return dateB - dateA; // Most recent first
-              })
+              }),
+              totalMaterials,
+              completedMaterials,
+              isComplete: totalMaterials > 0 && completedMaterials === totalMaterials
             };
           });
 
         // Log organized lessons for this unit
+        const totalMaterials = organizedLessons.reduce((sum, lesson) => sum + lesson.totalMaterials, 0);
+        const completedMaterials = organizedLessons.reduce((sum, lesson) => sum + lesson.completedMaterials, 0);
+
         return {
           ...unit,
           chapterNumber: index + 1,
           lessons: organizedLessons,
-          totalMaterials: organizedLessons.reduce((sum, lesson) => sum + lesson.materials.length, 0),
-          completedMaterials: organizedLessons.reduce((sum, lesson) =>
-            sum + lesson.materials.filter(material => material.completed_at).length, 0
-          )
+          totalMaterials,
+          completedMaterials,
+          isComplete: totalMaterials > 0 && completedMaterials === totalMaterials
         };
       });
 
@@ -141,8 +185,19 @@ export default function SubjectPage() {
 
   // Filter and search logic for chapter-based view
   const filteredChapters = useMemo(() => {
-    if (!searchTerm && selectedFilter === 'all') {
-      return organizedChapters;
+    const isFilteredView = !!searchTerm || selectedFilter !== 'all';
+    if (!isFilteredView) {
+      return organizedChapters.map(chapter => ({
+        ...chapter,
+        lessons: chapter.lessons.map(lesson => ({
+          ...lesson,
+          materials: lesson.materials,
+          filteredMaterialsCount: lesson.totalMaterials,
+          filteredCompletedMaterials: lesson.completedMaterials
+        })),
+        filteredTotalMaterials: chapter.totalMaterials,
+        filteredCompletedMaterials: chapter.completedMaterials
+      }));
     }
 
     const today = new Date();
@@ -190,22 +245,127 @@ export default function SubjectPage() {
           );
         }
 
+        const filteredCompletedMaterials = filteredMaterials.filter(material => material.completed_at).length;
+
         return {
           ...lesson,
-          materials: filteredMaterials
+          materials: filteredMaterials,
+          filteredMaterialsCount: filteredMaterials.length,
+          filteredCompletedMaterials
         };
       }).filter(lesson => lesson.materials.length > 0); // Only show lessons with materials
+
+      const filteredTotalMaterials = filteredLessons.reduce((sum, lesson) => sum + lesson.filteredMaterialsCount, 0);
+      const filteredCompletedMaterials = filteredLessons.reduce((sum, lesson) => sum + lesson.filteredCompletedMaterials, 0);
 
       return {
         ...chapter,
         lessons: filteredLessons,
-        totalMaterials: filteredLessons.reduce((sum, lesson) => sum + lesson.materials.length, 0),
-        completedMaterials: filteredLessons.reduce((sum, lesson) =>
-          sum + lesson.materials.filter(material => material.completed_at).length, 0
-        )
+        filteredTotalMaterials,
+        filteredCompletedMaterials
       };
     }).filter(chapter => chapter.lessons.length > 0); // Only show chapters with lessons
   }, [organizedChapters, selectedFilter, searchTerm]);
+
+  useEffect(() => {
+    if (!organizedChapters.length) return;
+
+    setExpandedChapters(prev => {
+      const next = { ...prev };
+
+      organizedChapters.forEach(chapter => {
+        const chapterKey = String(chapter.id);
+        const isArchived = !!archivedChapters[chapterKey];
+        const isComplete = chapter.isComplete;
+        const wasComplete = prevChapterCompletionRef.current[chapterKey];
+
+        if (!(chapterKey in next)) {
+          next[chapterKey] = !isArchived && !isComplete;
+        }
+
+        if (isArchived && next[chapterKey]) {
+          next[chapterKey] = false;
+        }
+
+        if (isComplete && !wasComplete && next[chapterKey]) {
+          next[chapterKey] = false;
+        }
+
+        prevChapterCompletionRef.current[chapterKey] = isComplete;
+      });
+
+      return next;
+    });
+
+    setExpandedLessons(prev => {
+      const next = { ...prev };
+
+      organizedChapters.forEach(chapter => {
+        const chapterKey = String(chapter.id);
+        const isChapterArchived = !!archivedChapters[chapterKey];
+
+        chapter.lessons.forEach(lesson => {
+          const lessonKey = String(lesson.id);
+          const isComplete = lesson.isComplete;
+          const wasComplete = prevLessonCompletionRef.current[lessonKey];
+
+          if (!(lessonKey in next)) {
+            next[lessonKey] = !isChapterArchived && !isComplete;
+          }
+
+          if (isChapterArchived && next[lessonKey]) {
+            next[lessonKey] = false;
+          }
+
+          if (isComplete && !wasComplete && next[lessonKey]) {
+            next[lessonKey] = false;
+          }
+
+          prevLessonCompletionRef.current[lessonKey] = isComplete;
+        });
+      });
+
+      return next;
+    });
+  }, [organizedChapters, archivedChapters]);
+
+  const persistArchivedChapters = useCallback((nextArchived) => {
+    if (!archivedStorageKey || typeof window === 'undefined') return;
+    const ids = Object.keys(nextArchived).filter((id) => nextArchived[id]);
+    localStorage.setItem(archivedStorageKey, JSON.stringify(ids));
+  }, [archivedStorageKey]);
+
+  const toggleArchiveChapter = useCallback((chapterId) => {
+    setArchivedChapters(prev => {
+      const next = { ...prev };
+      const chapterKey = String(chapterId);
+
+      if (next[chapterKey]) {
+        delete next[chapterKey];
+      } else {
+        next[chapterKey] = true;
+      }
+
+      persistArchivedChapters(next);
+      return next;
+    });
+  }, [persistArchivedChapters]);
+
+  const toggleChapter = useCallback((chapterId) => {
+    const chapterKey = String(chapterId);
+    setExpandedChapters(prev => ({
+      ...prev,
+      [chapterKey]: !prev[chapterKey]
+    }));
+  }, []);
+
+  const toggleLesson = useCallback((lessonId) => {
+    const lessonKey = String(lessonId);
+    setExpandedLessons(prev => ({
+      ...prev,
+      [lessonKey]: !prev[lessonKey]
+    }));
+  }, []);
 
   // Legacy filter for fallback view
   const filteredLessons = useMemo(() => {
@@ -254,6 +414,18 @@ export default function SubjectPage() {
 
     return filtered;
   }, [subjectLessons, selectedFilter, searchTerm]);
+
+  const isFilteredView = !!searchTerm || selectedFilter !== 'all';
+
+  const archivedChaptersInView = useMemo(() => {
+    if (!filteredChapters.length) return [];
+    return filteredChapters.filter(chapter => archivedChapters[String(chapter.id)]);
+  }, [filteredChapters, archivedChapters]);
+
+  const displayChapters = useMemo(() => {
+    if (showArchived) return filteredChapters;
+    return filteredChapters.filter(chapter => !archivedChapters[String(chapter.id)]);
+  }, [filteredChapters, archivedChapters, showArchived]);
 
   // Subject statistics
   const subjectStats = useMemo(() => {
@@ -479,6 +651,23 @@ export default function SubjectPage() {
                 </span>
               )}
             </button>
+
+            <button
+              onClick={() => setShowArchived((prev) => !prev)}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${
+                showArchived
+                  ? 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <ArchiveBoxIcon className="h-4 w-4" />
+              {showArchived ? 'Hide Archived' : 'Show Archived'}
+              {!showArchived && archivedChaptersInView.length > 0 && (
+                <span className="ml-1 px-2 py-0.5 text-xs bg-slate-200 text-slate-700 rounded-full">
+                  {archivedChaptersInView.length}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* Filter Options */}
@@ -516,134 +705,200 @@ export default function SubjectPage() {
         {organizedChapters.length > 0 ? (
           <div className="space-y-8">
             {/* Show filtered results count */}
-            {(searchTerm || selectedFilter !== 'all') && (
+            {(searchTerm || selectedFilter !== 'all' || (!showArchived && archivedChaptersInView.length > 0)) && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
-                  Showing {filteredChapters.length} chapters with{' '}
-                  {filteredChapters.reduce((sum, chapter) => sum + chapter.totalMaterials, 0)} materials
+                  Showing {displayChapters.length} chapters with{' '}
+                  {displayChapters.reduce((sum, chapter) => sum + (chapter.filteredTotalMaterials ?? chapter.totalMaterials), 0)} materials
                   {searchTerm && ` matching "${searchTerm}"`}
                   {selectedFilter !== 'all' && ` (${FILTER_OPTIONS.find(f => f.value === selectedFilter)?.label})`}
+                  {!showArchived && archivedChaptersInView.length > 0 && ` (${archivedChaptersInView.length} archived hidden)`}
                 </p>
-                {filteredChapters.length === 0 && (
+                {displayChapters.length === 0 && (
                   <button
                     onClick={() => {
-                      setSearchTerm('');
-                      setSelectedFilter('all');
+                      if (!showArchived && archivedChaptersInView.length > 0) {
+                        setShowArchived(true);
+                      } else {
+                        setSearchTerm('');
+                        setSelectedFilter('all');
+                      }
                     }}
                     className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
                   >
-                    Clear filters to see all materials
+                    {!showArchived && archivedChaptersInView.length > 0
+                      ? 'Show archived chapters'
+                      : 'Clear filters to see all materials'}
                   </button>
                 )}
               </div>
             )}
 
-            {filteredChapters.map(chapter => (
-              <div key={chapter.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                {/* Chapter Header */}
-                <div className={`px-6 py-4 border-b border-gray-200 ${
-                  chapter.isUnassigned
-                    ? 'bg-gradient-to-r from-orange-50 to-amber-50'
-                    : 'bg-gradient-to-r from-blue-50 to-indigo-50'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <BookOpenIcon className={`h-6 w-6 ${chapter.isUnassigned ? 'text-orange-600' : 'text-blue-600'}`} />
-                      <div>
-                        <h2 className="text-xl font-bold text-gray-900">
-                          {chapter.isUnassigned ? chapter.name :
-                            chapter.name.toLowerCase().startsWith('chapter') ?
-                              chapter.name :
-                              `Chapter ${chapter.chapterNumber}: ${chapter.name}`
-                          }
-                        </h2>
-                        {chapter.description && (
-                          <p className="text-sm text-gray-600 mt-1">{chapter.description}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                        {chapter.totalMaterials} materials
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                        {chapter.completedMaterials} completed
-                      </span>
-                      {chapter.totalMaterials > 0 && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                          {Math.round((chapter.completedMaterials / chapter.totalMaterials) * 100)}% done
+            {displayChapters.map(chapter => {
+              const chapterKey = String(chapter.id);
+              const isChapterArchived = !!archivedChapters[chapterKey];
+              const isChapterExpanded = expandedChapters[chapterKey] ?? (!isChapterArchived && !chapter.isComplete);
+              const chapterTotalMaterials = isFilteredView ? chapter.filteredTotalMaterials : chapter.totalMaterials;
+              const chapterCompletedMaterials = isFilteredView ? chapter.filteredCompletedMaterials : chapter.completedMaterials;
+              const chapterProgress = chapterTotalMaterials > 0
+                ? Math.round((chapterCompletedMaterials / chapterTotalMaterials) * 100)
+                : 0;
+
+              return (
+                <div key={chapter.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {/* Chapter Header */}
+                  <div className={`px-6 py-4 border-b border-gray-200 ${
+                    chapter.isUnassigned
+                      ? 'bg-gradient-to-r from-orange-50 to-amber-50'
+                      : 'bg-gradient-to-r from-blue-50 to-indigo-50'
+                  }`}>
+                    <div className="flex items-center justify-between gap-4">
+                      <button
+                        type="button"
+                        onClick={() => toggleChapter(chapter.id)}
+                        aria-expanded={isChapterExpanded}
+                        className="flex items-center gap-3 text-left"
+                      >
+                        <BookOpenIcon className={`h-6 w-6 ${chapter.isUnassigned ? 'text-orange-600' : 'text-blue-600'}`} />
+                        <div>
+                          <h2 className="text-xl font-bold text-gray-900">
+                            {chapter.isUnassigned ? chapter.name :
+                              chapter.name.toLowerCase().startsWith('chapter') ?
+                                chapter.name :
+                                `Chapter ${chapter.chapterNumber}: ${chapter.name}`
+                            }
+                          </h2>
+                          {chapter.description && (
+                            <p className="text-sm text-gray-600 mt-1">{chapter.description}</p>
+                          )}
+                        </div>
+                      </button>
+                      <div className="flex flex-wrap items-center gap-3 text-sm">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                          {chapterTotalMaterials} materials
                         </span>
-                      )}
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                          {chapterCompletedMaterials} completed
+                        </span>
+                        {chapterTotalMaterials > 0 && (
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                            {chapterProgress}% done
+                          </span>
+                        )}
+                        {isChapterArchived && (
+                          <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-semibold uppercase tracking-wide">
+                            Archived
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => toggleArchiveChapter(chapter.id)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+                            isChapterArchived
+                              ? 'border-slate-200 text-slate-600 bg-white hover:bg-slate-50'
+                              : 'border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50'
+                          }`}
+                          title={isChapterArchived ? 'Unarchive this chapter' : 'Archive this chapter'}
+                        >
+                          <ArchiveBoxIcon className="h-4 w-4" />
+                          <span className="hidden sm:inline">
+                            {isChapterArchived ? 'Unarchive' : 'Archive'}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleChapter(chapter.id)}
+                          aria-expanded={isChapterExpanded}
+                          className="p-1.5 rounded-full text-gray-500 hover:bg-white/70 transition-colors"
+                        >
+                          <ChevronDownIcon className={`h-5 w-5 transition-transform duration-200 ${isChapterExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Lessons in Chapter */}
-                <div className="divide-y divide-gray-100">
-                  {chapter.lessons.length > 0 ? (
-                    chapter.lessons.map((lesson, lessonIndex) => (
-                      <div key={lesson.id} className="p-6">
-                        {/* Lesson Header */}
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-2">
-                            <DocumentTextIcon className={`h-5 w-5 ${lesson.isUnassigned ? 'text-orange-600' : 'text-indigo-600'}`} />
-                            <h3 className={`text-lg font-semibold ${lesson.isUnassigned ? 'text-orange-800' : 'text-gray-800'}`}>
-                              {lesson.isUnassigned ? lesson.title :
-                                lesson.title.toLowerCase().startsWith('lesson') ?
-                                  lesson.title :
-                                  `Lesson ${lessonIndex + 1}: ${lesson.title}`
-                              }
-                            </h3>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <span>{lesson.materials.length} materials</span>
-                            <span className="text-gray-400">•</span>
-                            <span>
-                              {lesson.materials.filter(m => m.completed_at).length} completed
-                            </span>
-                          </div>
+                  {/* Lessons in Chapter */}
+                  {isChapterExpanded && (
+                    <div className="divide-y divide-gray-100">
+                      {chapter.lessons.length > 0 ? (
+                        chapter.lessons.map((lesson, lessonIndex) => {
+                          const lessonKey = String(lesson.id);
+                          const isLessonExpanded = expandedLessons[lessonKey] ?? (!isChapterArchived && !lesson.isComplete);
+                          const lessonTotalMaterials = isFilteredView ? lesson.filteredMaterialsCount : lesson.totalMaterials;
+                          const lessonCompletedMaterials = isFilteredView ? lesson.filteredCompletedMaterials : lesson.completedMaterials;
+
+                          return (
+                            <div key={lesson.id} className="p-6">
+                              {/* Lesson Header */}
+                              <button
+                                type="button"
+                                onClick={() => toggleLesson(lesson.id)}
+                                aria-expanded={isLessonExpanded}
+                                className={`flex w-full items-center justify-between text-left ${isLessonExpanded ? 'mb-4' : ''}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <DocumentTextIcon className={`h-5 w-5 ${lesson.isUnassigned ? 'text-orange-600' : 'text-indigo-600'}`} />
+                                  <h3 className={`text-lg font-semibold ${lesson.isUnassigned ? 'text-orange-800' : 'text-gray-800'}`}>
+                                    {lesson.isUnassigned ? lesson.title :
+                                      lesson.title.toLowerCase().startsWith('lesson') ?
+                                        lesson.title :
+                                        `Lesson ${lessonIndex + 1}: ${lesson.title}`
+                                    }
+                                  </h3>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <span>{lessonTotalMaterials} materials</span>
+                                  <span className="text-gray-400">•</span>
+                                  <span>{lessonCompletedMaterials} completed</span>
+                                  <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${isLessonExpanded ? 'rotate-180' : ''}`} />
+                                </div>
+                              </button>
+
+                              {/* Materials in Lesson */}
+                              {isLessonExpanded && (
+                                lesson.materials.length > 0 ? (
+                                  <div className="space-y-3">
+                                    {lesson.materials.map(material => (
+                                      <div key={material.id} className="bg-gray-50 rounded-lg border border-gray-200">
+                                        <MaterialListItem
+                                          lesson={material}
+                                          onOpenEditModal={dashboardHandlers.handleOpenEditModal}
+                                          onToggleComplete={dashboardHandlers.handleToggleLessonCompleteEnhanced}
+                                          onDeleteMaterial={dashboardHandlers.handleDeleteMaterial}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-6 text-gray-500">
+                                    <div className="text-4xl mb-2">📝</div>
+                                    <p className="text-sm">No materials in this lesson yet</p>
+                                    <button
+                                      onClick={() => modalManagement.openAddMaterialModal()}
+                                      className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                    >
+                                      Add Material
+                                    </button>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="p-6 text-center text-gray-500">
+                          <div className="text-4xl mb-2">📖</div>
+                          <p className="text-sm">No lessons in this chapter yet</p>
+                          <p className="text-xs text-gray-400 mt-1">Lessons will be created automatically when you add materials</p>
                         </div>
-
-                        {/* Materials in Lesson */}
-                        {lesson.materials.length > 0 ? (
-                          <div className="space-y-3">
-                            {lesson.materials.map(material => (
-                              <div key={material.id} className="bg-gray-50 rounded-lg border border-gray-200">
-                                <MaterialListItem
-                                  lesson={material}
-                                  onOpenEditModal={dashboardHandlers.handleOpenEditModal}
-                                  onToggleComplete={dashboardHandlers.handleToggleLessonCompleteEnhanced}
-                                  onDeleteMaterial={dashboardHandlers.handleDeleteMaterial}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-6 text-gray-500">
-                            <div className="text-4xl mb-2">📝</div>
-                            <p className="text-sm">No materials in this lesson yet</p>
-                            <button
-                              onClick={() => modalManagement.openAddMaterialModal()}
-                              className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
-                            >
-                              Add Material
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-6 text-center text-gray-500">
-                      <div className="text-4xl mb-2">📖</div>
-                      <p className="text-sm">No lessons in this chapter yet</p>
-                      <p className="text-xs text-gray-400 mt-1">Lessons will be created automatically when you add materials</p>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : subjectLessons.length > 0 ? (
           // Fallback: Show materials without chapter organization if no units exist

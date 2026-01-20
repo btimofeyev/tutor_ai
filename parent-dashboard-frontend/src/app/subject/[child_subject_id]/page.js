@@ -17,6 +17,7 @@ import {
   ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
 import { useSession } from "@supabase/auth-helpers-react";
+import api from "../../../utils/api";
 import { useChildrenData } from "../../../hooks/useChildrenData";
 import { useMaterialManagement } from "../../../hooks/useMaterialManagement";
 import { useModalManagement } from "../../../hooks/useModalManagement";
@@ -58,13 +59,8 @@ export default function SubjectPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [expandedChapters, setExpandedChapters] = useState({});
   const [expandedLessons, setExpandedLessons] = useState({});
-  const [archivedChapters, setArchivedChapters] = useState({});
   const prevChapterCompletionRef = useRef({});
   const prevLessonCompletionRef = useRef({});
-  const archivedStorageKey = useMemo(() => {
-    if (!childSubjectId) return null;
-    return `subject:${childSubjectId}:archivedChapters`;
-  }, [childSubjectId]);
 
   // Custom hooks
   const childrenData = useChildrenData(session);
@@ -85,30 +81,11 @@ export default function SubjectPage() {
   });
 
   useEffect(() => {
-    if (!archivedStorageKey || typeof window === 'undefined') return;
     setExpandedChapters({});
     setExpandedLessons({});
     prevChapterCompletionRef.current = {};
     prevLessonCompletionRef.current = {};
-
-    try {
-      const stored = localStorage.getItem(archivedStorageKey);
-      if (!stored) {
-        setArchivedChapters({});
-        return;
-      }
-      const parsed = JSON.parse(stored);
-      const nextArchived = Array.isArray(parsed)
-        ? parsed.reduce((acc, id) => {
-            acc[String(id)] = true;
-            return acc;
-          }, {})
-        : {};
-      setArchivedChapters(nextArchived);
-    } catch (error) {
-      setArchivedChapters({});
-    }
-  }, [archivedStorageKey]);
+  }, [childSubjectId]);
 
   // Find the current subject and child
   const currentSubject = useMemo(() => {
@@ -176,7 +153,8 @@ export default function SubjectPage() {
           lessons: organizedLessons,
           totalMaterials,
           completedMaterials,
-          isComplete: totalMaterials > 0 && completedMaterials === totalMaterials
+          isComplete: totalMaterials > 0 && completedMaterials === totalMaterials,
+          isArchived: !!unit.archived_at
         };
       });
 
@@ -275,7 +253,7 @@ export default function SubjectPage() {
 
       organizedChapters.forEach(chapter => {
         const chapterKey = String(chapter.id);
-        const isArchived = !!archivedChapters[chapterKey];
+        const isArchived = chapter.isArchived;
         const isComplete = chapter.isComplete;
         const wasComplete = prevChapterCompletionRef.current[chapterKey];
 
@@ -302,7 +280,7 @@ export default function SubjectPage() {
 
       organizedChapters.forEach(chapter => {
         const chapterKey = String(chapter.id);
-        const isChapterArchived = !!archivedChapters[chapterKey];
+        const isChapterArchived = chapter.isArchived;
 
         chapter.lessons.forEach(lesson => {
           const lessonKey = String(lesson.id);
@@ -327,29 +305,37 @@ export default function SubjectPage() {
 
       return next;
     });
-  }, [organizedChapters, archivedChapters]);
+  }, [organizedChapters]);
 
-  const persistArchivedChapters = useCallback((nextArchived) => {
-    if (!archivedStorageKey || typeof window === 'undefined') return;
-    const ids = Object.keys(nextArchived).filter((id) => nextArchived[id]);
-    localStorage.setItem(archivedStorageKey, JSON.stringify(ids));
-  }, [archivedStorageKey]);
+  const toggleArchiveChapter = useCallback(async (chapterId) => {
+    const currentUnits = childrenData.unitsBySubject[childSubjectId] || [];
+    const targetUnit = currentUnits.find(unit => String(unit.id) === String(chapterId));
+    if (!targetUnit) {
+      showError('Could not find that chapter.');
+      return;
+    }
 
-  const toggleArchiveChapter = useCallback((chapterId) => {
-    setArchivedChapters(prev => {
-      const next = { ...prev };
-      const chapterKey = String(chapterId);
+    const shouldArchive = !targetUnit.archived_at;
 
-      if (next[chapterKey]) {
-        delete next[chapterKey];
-      } else {
-        next[chapterKey] = true;
-      }
+    try {
+      const response = await api.patch(`/units/${chapterId}/archive`, { archived: shouldArchive });
+      const updatedUnit = response.data?.unit || response.data;
 
-      persistArchivedChapters(next);
-      return next;
-    });
-  }, [persistArchivedChapters]);
+      childrenData.setUnitsBySubject(prev => ({
+        ...prev,
+        [childSubjectId]: (prev[childSubjectId] || []).map(unit =>
+          String(unit.id) === String(chapterId)
+            ? { ...unit, archived_at: updatedUnit?.archived_at || (shouldArchive ? new Date().toISOString() : null) }
+            : unit
+        )
+      }));
+
+      childrenData.invalidateChildCache(childrenData.selectedChild?.id);
+      showSuccess(shouldArchive ? 'Chapter archived.' : 'Chapter unarchived.');
+    } catch (error) {
+      showError(error.response?.data?.error || 'Failed to update archive status.');
+    }
+  }, [childrenData, childSubjectId, showError, showSuccess]);
 
   const toggleChapter = useCallback((chapterId) => {
     const chapterKey = String(chapterId);
@@ -419,13 +405,13 @@ export default function SubjectPage() {
 
   const archivedChaptersInView = useMemo(() => {
     if (!filteredChapters.length) return [];
-    return filteredChapters.filter(chapter => archivedChapters[String(chapter.id)]);
-  }, [filteredChapters, archivedChapters]);
+    return filteredChapters.filter(chapter => chapter.isArchived);
+  }, [filteredChapters]);
 
   const displayChapters = useMemo(() => {
     if (showArchived) return filteredChapters;
-    return filteredChapters.filter(chapter => !archivedChapters[String(chapter.id)]);
-  }, [filteredChapters, archivedChapters, showArchived]);
+    return filteredChapters.filter(chapter => !chapter.isArchived);
+  }, [filteredChapters, showArchived]);
 
   // Subject statistics
   const subjectStats = useMemo(() => {
@@ -736,7 +722,7 @@ export default function SubjectPage() {
 
             {displayChapters.map(chapter => {
               const chapterKey = String(chapter.id);
-              const isChapterArchived = !!archivedChapters[chapterKey];
+              const isChapterArchived = chapter.isArchived;
               const isChapterExpanded = expandedChapters[chapterKey] ?? (!isChapterArchived && !chapter.isComplete);
               const chapterTotalMaterials = isFilteredView ? chapter.filteredTotalMaterials : chapter.totalMaterials;
               const chapterCompletedMaterials = isFilteredView ? chapter.filteredCompletedMaterials : chapter.completedMaterials;

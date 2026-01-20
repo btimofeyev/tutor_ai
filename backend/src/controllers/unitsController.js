@@ -262,6 +262,62 @@ exports.updateUnit = async (req, res) => {
   }
 };
 
+// Archive or unarchive a unit
+exports.setUnitArchiveStatus = async (req, res) => {
+  const parent_id = getParentId(req);
+  const { unit_id } = req.params;
+  const { archived } = req.body;
+
+  if (!parent_id) return res.status(401).json({ error: 'Unauthorized' });
+  if (!unit_id) return res.status(400).json({ error: 'unit_id is required' });
+
+  const archiveValue = !!archived;
+
+  try {
+    const { data: existingUnit, error: fetchError } = await supabase
+      .from('units')
+      .select(`
+        *,
+        child_subject:child_subject_id (
+          id,
+          child:child_id (
+            id,
+            parent_id
+          )
+        )
+      `)
+      .eq('id', unit_id)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!existingUnit) return res.status(404).json({ error: 'Unit not found' });
+
+    if (existingUnit.child_subject.child.parent_id !== parent_id) {
+      return res.status(403).json({ error: 'Access denied to this unit' });
+    }
+
+    const archived_at = archiveValue ? new Date().toISOString() : null;
+
+    const { data, error } = await supabase
+      .from('units')
+      .update({ archived_at })
+      .eq('id', unit_id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Unit not found or not updated' });
+
+    res.json({
+      message: archiveValue ? 'Unit archived successfully' : 'Unit unarchived successfully',
+      unit: data
+    });
+  } catch (error) {
+    console.error('Error updating unit archive status:', error);
+    res.status(500).json({ error: error.message || 'Failed to update unit archive status' });
+  }
+};
+
 // Delete a unit
 exports.deleteUnit = async (req, res) => {
   const parent_id = getParentId(req);

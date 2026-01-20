@@ -13,6 +13,7 @@ router.get('/:unit_id', unitsController.getUnitById);
 
 // Update a unit
 router.put('/:unit_id', unitsController.updateUnit);
+router.patch('/:unit_id/archive', unitsController.setUnitArchiveStatus);
 
 // Delete a unit
 router.delete('/:unit_id', unitsController.deleteUnit);
